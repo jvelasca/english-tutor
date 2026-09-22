@@ -95,8 +95,14 @@ def _ensure_fsrs_lexicon(user_id: str, words: list[str], *, why: str) -> None:
         academy_repo.upsert_fsrs_cards(user_id, pending)
 
 
-def _card_face(word: str, collection_id: int | None = None) -> dict:
-    """Cara B: traducción de pack o caché de diccionario."""
+def card_face(word: str, collection_id: int | None = None) -> dict:
+    """Cara B: traducción de pack o caché de diccionario.
+
+    V3.78.0: deja de ser privada porque el modo Flashcards la reutiliza para el
+    mazo automático. Es la MISMA cara que ve la sesión de retención: si hubiera
+    dos constructores, la misma palabra podría enseñar dos reversos distintos
+    según por dónde se entrara.
+    """
     translation = collections_repo.translation_for_word(word, collection_id)
     definition = ""
     entry = dictionary_repo.get_entry(word)
@@ -179,7 +185,7 @@ async def add_item(
         user_id,
         touched,
     )
-    face = await run_in_threadpool(_card_face, normalized, collection_id)
+    face = await run_in_threadpool(card_face, normalized, collection_id)
     return {"added": touched, "item": face}
 
 
@@ -347,7 +353,7 @@ async def retention_due(
     items = []
     for card in due:
         word = str(card.get("target_id") or "")
-        face = await run_in_threadpool(_card_face, word, collection_id)
+        face = await run_in_threadpool(card_face, word, collection_id)
         explained = fsrs.explain(card, now=now_iso)
         items.append(
             {

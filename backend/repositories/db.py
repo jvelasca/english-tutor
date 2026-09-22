@@ -1811,6 +1811,70 @@ def init_db() -> None:
             "ON vocab_collection_membership(user_id, collection_id)"
         )
 
+        # V3.78.0 — Flashcards: mazos manuales y tarjetas de frente/reverso.
+        # El mazo AUTOMÁTICO no vive aquí: es virtual (id 0) y se sintetiza desde
+        # el léxico, así que no hay una fila del sistema que se pueda borrar ni
+        # nada que migrar. Estas dos tablas son solo lo que el alumno crea.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS flashcard_decks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL DEFAULT '',
+                new_per_day INTEGER NOT NULL DEFAULT 10,
+                review_per_day INTEGER NOT NULL DEFAULT 50,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE (user_id, name),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS flashcard_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                deck_id INTEGER NOT NULL,
+                front TEXT NOT NULL,
+                back TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (deck_id) REFERENCES flashcard_decks(id)
+            )
+            """
+        )
+        # Ledger append-only de cada calificación. Es lo que hace EXACTOS los
+        # límites diarios y las estadísticas: contar «cartas distintas con
+        # `last_review_at` de hoy» no distingue nuevas de repaso y no cuenta las
+        # repeticiones de una misma tarjeta, que son las dos cosas que Anki mide.
+        # No sustituye a `learning_events`: ese sigue siendo el registro
+        # pedagógico; este es la contabilidad del mazo.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS flashcard_reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                deck_id INTEGER NOT NULL DEFAULT 0,
+                card_type TEXT NOT NULL,
+                card_id TEXT NOT NULL,
+                grade INTEGER NOT NULL,
+                was_new INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flashcard_cards_deck "
+            "ON flashcard_cards(user_id, deck_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flashcard_reviews_user "
+            "ON flashcard_reviews(user_id, created_at)"
+        )
+
         # V3.77: solicitudes de perfil. Son **estado del producto**, no un aviso
         # efímero: por eso viven en la BD y no en un fichero suelto — sobreviven
         # a reinicios, viajan en el backup y el lanzador (que ya abre esta BD en

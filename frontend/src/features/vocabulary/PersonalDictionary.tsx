@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, type Variants } from "motion/react";
-import { BookOpen, RefreshCw } from "lucide-react";
-import { getDrillCandidates, getLexicon } from "../../api/vocabulary";
+import { BookOpen, Layers, RefreshCw, Search } from "lucide-react";
+import {
+  getDrillCandidates,
+  getLexicon,
+  listFlashcardDecks,
+} from "../../api/vocabulary";
 import { normalizeDrillCandidates, normalizeLexicon } from "../../api/normalize";
 import type { LexicalItem, LexicalStatus, Lexicon } from "../../types/api";
 import { cefrBarValue, sortLexicalItems } from "./dictionary";
 import { ReviewQueueSection } from "./ReviewQueueSection";
 import { SpeakingDrillSection } from "./wordDrill";
-import { RetentionSession } from "./RetentionSession";
 import { AddVocabSection } from "./AddVocabSection";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
 import { SkillBar } from "../../components/SkillBar";
+import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
@@ -48,23 +52,55 @@ interface PersonalDictionaryProps {
    * la misma página y el ancho quedaba reducido dos veces).
    */
   showHeader?: boolean;
+  /**
+   * V3.78.0: puente a la única superficie de estudio. PERSONAL deja de estudiar
+   * —su sesión incrustada desaparece— y pasa a ser el inventario: esto es lo que
+   * salta a Flashcards, con una lista/pack concreta si se pide desde ahí.
+   */
+  onStudy?: (opts?: { collectionId?: number | null; label?: string }) => void;
 }
+
+/** Estados del léxico, en el orden en que se ofrecen como filtro. */
+const STATUS_FILTERS: LexicalStatus[] = [
+  "mastered",
+  "known",
+  "learning",
+  "weak",
+];
+
+/** Procedencias posibles de una palabra (`vocabulary.source`). */
+const SOURCE_FILTERS: { id: string; labelKey: string }[] = [
+  { id: "curriculum", labelKey: "dictionary.inventory.sourceCurriculum" },
+  { id: "user", labelKey: "dictionary.inventory.sourceUser" },
+  { id: "imported", labelKey: "dictionary.inventory.sourceImported" },
+];
 
 /** Diccionario personal (V2.3): evidencia por ítem léxico con estado y recall.
  * V3.19: la sección de candidatas al speaking micro-drill se nutre de la señal
  * determinista del servidor (`getDrillCandidates`) y cada palabra gana una
  * acción de micro-práctica oral dentro del panel. V3.32: la escalera de drill
  * (Recall → Sentence) vive en `./wordDrill` y se comparte con el diccionario
- * de consulta («Practicar esta palabra»). */
+ * de consulta («Practicar esta palabra»).
+ *
+ * V3.78.0: la vista deja de ser 「práctica」 y pasa a ser 「posesión」: buscador,
+ * filtro por estado y procedencia, fuerza de memoria por fila y una única
+ * entrada al estudio. Lo que se practica aquí (la cola de competencia del
+ * drill) se queda porque es superficie de PRODUCCIÓN, no de calificación de
+ * tarjetas; lo que se estudia se mudó a Flashcards. */
 export function PersonalDictionary({
   userId,
   showHeader = true,
+  onStudy,
 }: PersonalDictionaryProps) {
   const { t } = useI18n();
   const [lexicon, setLexicon] = useState<Lexicon | null>(null);
   const [candidates, setCandidates] = useState<string[]>([]);
   const [drillWord, setDrillWord] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<LexicalStatus | "all">("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [pending, setPending] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -87,10 +123,49 @@ export function PersonalDictionary({
     }
   }, [userId]);
 
+  /**
+   * V3.78.0: cuántas tarjetas quedan hoy. Se lee del mazo automático en lugar de
+   * pedir una cola: el inventario solo necesita el número, y la cola se pide al
+   * entrar a estudiar. Va en su propio efecto para que un fallo aquí no tumbe el
+   * léxico entero (y al revés).
+   */
+  const loadPending = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const decks = await listFlashcardDecks(userId);
+      const auto = decks.decks.find((d) => d.is_auto);
+      setPending(auto ? auto.due_count + auto.new_count : 0);
+    } catch {
+      setPending(null);
+    }
+  }, [userId]);
+
   useEffect(() => {
     if (!userId) return;
     void refresh();
-  }, [userId, refresh]);
+    void loadPending();
+  }, [userId, refresh, loadPending]);
+
+  const sorted = useMemo(
+    () => (lexicon ? sortLexicalItems(lexicon.items) : []),
+    [lexicon],
+  );
+
+  const visible = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return sorted.filter((lex) => {
+      if (statusFilter !== "all" && lex.status !== statusFilter) return false;
+      if (sourceFilter !== "all" && lex.source !== sourceFilter) return false;
+      if (!needle) return true;
+      return (
+        lex.word.toLowerCase().includes(needle) ||
+        lex.lemma.toLowerCase().includes(needle)
+      );
+    });
+  }, [sorted, search, statusFilter, sourceFilter]);
+
+  const hasFilters =
+    search.trim() !== "" || statusFilter !== "all" || sourceFilter !== "all";
 
   if (!lexicon) {
     return (
@@ -126,9 +201,7 @@ export function PersonalDictionary({
     );
   }
 
-  const { summary, items } = lexicon;
-  const sorted = sortLexicalItems(items);
-
+  const { summary } = lexicon;
   const maxCefr = Math.max(1, ...summary.by_cefr.map((b) => b.count));
 
   return (
@@ -145,7 +218,9 @@ export function PersonalDictionary({
       >
         {showHeader && <DictionaryHeader total={summary.total} />}
 
-        {/* Practicar hoy: retención (Anki-lite) + cola de competencia (drill). */}
+        {/* V3.78.0: una sola entrada al estudio (Flashcards) + la cola de
+            competencia del drill, que es superficie de PRODUCCIÓN y por eso se
+            queda aquí. */}
         {userId && (
           <motion.section
             variants={item}
@@ -155,7 +230,10 @@ export function PersonalDictionary({
             <h2 className="text-sm font-semibold tracking-tight">
               {t("dictionary.practiceToday")}
             </h2>
-            <RetentionSession userId={userId} onFinished={() => void refresh()} />
+            <StudyEntryCard
+              pending={pending}
+              onStudy={onStudy ? () => onStudy() : undefined}
+            />
             <ReviewQueueSection userId={userId} />
             {(candidates.length > 0 || drillWord !== null) && (
               <SpeakingDrillSection
@@ -182,7 +260,14 @@ export function PersonalDictionary({
             <h2 className="text-sm font-semibold tracking-tight">
               {t("dictionary.add.section")}
             </h2>
-            <AddVocabSection userId={userId} onChanged={() => void refresh()} />
+            <AddVocabSection
+              userId={userId}
+              onChanged={() => {
+                void refresh();
+                void loadPending();
+              }}
+              onStudy={onStudy}
+            />
           </motion.section>
         )}
 
@@ -290,6 +375,67 @@ export function PersonalDictionary({
 
         <motion.section variants={item} aria-label={t("dictionary.items")}>
           <Card className="gap-0 overflow-hidden p-0">
+            {/* V3.78.0: inventario = hay que poder BUSCAR y ACOTAR. Antes solo
+                se podía desplazar la lista entera; con el léxico de toda la app
+                eso deja de ser un listado y pasa a ser un archivo. */}
+            <div className="flex flex-col gap-2.5 border-b border-border/60 p-3 sm:p-4">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t("dictionary.inventory.searchPlaceholder")}
+                  aria-label={t("dictionary.inventory.search")}
+                  className="h-9 w-full rounded-md border border-border bg-background pr-2.5 pl-8 text-sm outline-none focus-visible:border-primary/60"
+                />
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-1.5"
+                role="group"
+                aria-label={t("dictionary.inventory.filterStatus")}
+              >
+                <FilterChip
+                  active={statusFilter === "all"}
+                  onClick={() => setStatusFilter("all")}
+                >
+                  {t("dictionary.inventory.sourceAll")}
+                </FilterChip>
+                {STATUS_FILTERS.map((status) => (
+                  <FilterChip
+                    key={status}
+                    active={statusFilter === status}
+                    onClick={() => setStatusFilter(status)}
+                  >
+                    {t(`dictionary.status.${status}`)}
+                  </FilterChip>
+                ))}
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-1.5"
+                role="group"
+                aria-label={t("dictionary.inventory.filterSource")}
+              >
+                <FilterChip
+                  active={sourceFilter === "all"}
+                  onClick={() => setSourceFilter("all")}
+                >
+                  {t("dictionary.inventory.sourceAll")}
+                </FilterChip>
+                {SOURCE_FILTERS.map((source) => (
+                  <FilterChip
+                    key={source.id}
+                    active={sourceFilter === source.id}
+                    onClick={() => setSourceFilter(source.id)}
+                  >
+                    {t(source.labelKey)}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
             {sorted.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
                 <BookOpen
@@ -298,12 +444,50 @@ export function PersonalDictionary({
                 />
                 <p className="text-sm text-muted-foreground">{t("dictionary.empty")}</p>
               </div>
+            ) : visible.length === 0 ? (
+              /* Con filtros, una lista vacía NO es «no tienes palabras»: es que
+                 no hay coincidencias. Distinguirlo evita el «no tengo nada»
+                 mentiroso cuando en realidad el filtro es el que no encuentra. */
+              <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
+                <Search
+                  className="size-8 text-muted-foreground/60"
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t("dictionary.inventory.noMatches")}
+                </p>
+                {hasFilters && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearch("");
+                      setStatusFilter("all");
+                      setSourceFilter("all");
+                    }}
+                  >
+                    {t("dictionary.inventory.clear")}
+                  </Button>
+                )}
+              </div>
             ) : (
-              <ul className="divide-y divide-border/60">
-                {sorted.map((lex) => (
-                  <LexicalRow key={lex.word} lexical={lex} />
-                ))}
-              </ul>
+              <>
+                <ul className="divide-y divide-border/60">
+                  {visible.map((lex) => (
+                    <LexicalRow key={lex.word} lexical={lex} />
+                  ))}
+                </ul>
+                {/* El contador solo aparece cuando hay recorte: si se ven todas,
+                    repetir el total sería ruido. */}
+                {visible.length !== sorted.length && (
+                  <p className="border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
+                    {t("dictionary.inventory.showing")
+                      .replace("{n}", String(visible.length))
+                      .replace("{total}", String(sorted.length))}
+                  </p>
+                )}
+              </>
             )}
           </Card>
         </motion.section>
@@ -357,20 +541,129 @@ function lexicalKindLabel(kind: string, t: (key: string) => string): string {
   return label === key ? t("dictionary.kind.other") : label;
 }
 
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+        active
+          ? "border-primary/60 bg-primary/10 text-foreground"
+          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * V3.78.0: entrada única al estudio desde PERSONAL.
+ *
+ * Sustituye a la `RetentionSession` que vivía incrustada aquí. No estudia: dice
+ * cuánto queda hoy y salta a Flashcards, que es donde se califica. El recuento
+ * puede faltar (`null`) si el mazo no se pudo leer; en ese caso se dice que no
+ * consta en vez de pintar un «0» que sería una afirmación falsa.
+ */
+function StudyEntryCard({
+  pending,
+  onStudy,
+}: {
+  pending: number | null;
+  /** Ausente en el diccionario incrustado (panel de destreza): allí no hay
+   * Flashcards, así que se explica dónde se estudia en vez de ofrecer un botón
+   * que no llevaría a ninguna parte. */
+  onStudy?: () => void;
+}) {
+  const { t } = useI18n();
+  const detail =
+    pending == null
+      ? t("dictionary.inventory.studyUnknown")
+      : pending === 0
+        ? t("dictionary.inventory.studyDone")
+        : t("dictionary.inventory.studyPending").replace(
+            "{count}",
+            String(pending),
+          );
+  return (
+    <Card className="gap-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <Layers className="size-4 text-primary" aria-hidden="true" />
+            {t("dictionary.inventory.studyTitle")}
+          </p>
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </div>
+        {onStudy ? (
+          <Button type="button" size="sm" onClick={onStudy}>
+            {t("dictionary.inventory.studyAction")}
+          </Button>
+        ) : null}
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        {onStudy ? t("dictionary.inventory.studyHint") : t("dictionary.inventory.studyElsewhere")}
+      </p>
+    </Card>
+  );
+}
+
 function LexicalRow({ lexical }: { lexical: LexicalItem }) {
   const { t } = useI18n();
   const kindLabel = lexicalKindLabel(lexical.kind, t);
   const statusLabel = t(`dictionary.status.${lexical.status}`);
+  /* V3.78.0: procedencia. `vocabulary.source` se guardaba desde siempre pero no
+     se mostraba; sin ella, el inventario no distingue lo que trajo el currículo
+     de lo que añadió el alumno. Se etiqueta con fallback al valor crudo para no
+     perder información si el backend añade una procedencia nueva. */
+  const sourceKey = `dictionary.inventory.source${lexical.source
+    .charAt(0)
+    .toUpperCase()}${lexical.source.slice(1)}`;
+  const sourceLabel = t(sourceKey) === sourceKey ? lexical.source : t(sourceKey);
+  /* Fuerza de memoria: estado del scheduler. Si no hay carta se dice que no
+     consta y se cae al texto antiguo de `next_review_days` (proyección de la
+     evidencia), que sigue siendo la única señal disponible en ese caso. */
+  const memory = lexical.memory ?? null;
+  const memoryText = memory
+    ? memory.state === "new" || memory.reps === 0
+      ? t("dictionary.inventory.memoryNew")
+      : memory.due
+        ? t("dictionary.inventory.memoryDue")
+        : t("dictionary.inventory.memoryNext").replace(
+            "{n}",
+            String(Math.max(1, Math.round(memory.next_in_days))),
+          )
+    : null;
+  const memoryTitle = memory
+    ? t("dictionary.inventory.memoryTitle")
+        .replace("{state}", memory.state)
+        .replace("{due}", memory.due_at ? memory.due_at.slice(0, 10) : "—")
+        .replace("{stability}", memory.stability.toFixed(1))
+        .replace("{retrievability}", String(Math.round(memory.retrievability * 100)))
+    : undefined;
 
   return (
     <li className="flex items-center gap-3 p-3 sm:p-4">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="truncate text-sm font-semibold text-foreground">
             {lexical.word}
           </span>
           {lexical.cefr && <LevelBadge level={lexical.cefr} className="shrink-0" />}
           <span className="shrink-0 text-xs text-muted-foreground">{kindLabel}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground/80">
+            {sourceLabel}
+          </span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <Progress
@@ -385,15 +678,29 @@ function LexicalRow({ lexical }: { lexical: LexicalItem }) {
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <Badge className={cn(STATUS_TONE[lexical.status])}>{statusLabel}</Badge>
-        {lexical.status !== "mastered" && (
-          <span className="text-[11px] text-muted-foreground">
-            {lexical.status === "weak"
-              ? t("mastery.reviewNow")
-              : t("dictionary.nextReviewIn").replace(
-                  "{days}",
-                  String(lexical.next_review_days),
-                )}
+        {memoryText ? (
+          <span
+            className={cn(
+              "text-[11px] tabular-nums",
+              memory?.due
+                ? "text-warning"
+                : "text-muted-foreground",
+            )}
+            title={memoryTitle}
+          >
+            {memoryText}
           </span>
+        ) : (
+          lexical.status !== "mastered" && (
+            <span className="text-[11px] text-muted-foreground">
+              {lexical.status === "weak"
+                ? t("mastery.reviewNow")
+                : t("dictionary.nextReviewIn").replace(
+                    "{days}",
+                    String(lexical.next_review_days),
+                  )}
+            </span>
+          )
         )}
       </div>
     </li>

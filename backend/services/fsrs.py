@@ -37,7 +37,7 @@ GRADE_LABELS: dict[int, str] = {
 
 STATES: tuple[str, ...] = ("new", "learning", "review", "relearning")
 
-TARGET_TYPES: tuple[str, ...] = ("skill", "lexicon", "objective")
+TARGET_TYPES: tuple[str, ...] = ("skill", "lexicon", "objective", "flashcard")
 
 # Parámetros FSRS-4.5 (retrievability). FACTOR = 19/81, DECAY = -0.5.
 FSRS_FACTOR = 19.0 / 81.0
@@ -398,6 +398,17 @@ def why_for_lexicon(status: str, group_produced: bool = False) -> str:
             return "transfer-gap"
         return "recognition-only"
     return "lexicon-maintenance"
+
+
+def why_for_flashcard() -> str:
+    """Razón pedagógica de una tarjeta MANUAL (V3.78.0).
+
+    No hay señal del alumno que explique por qué existe: la escribió él. Por eso
+    la razón es constante y dice exactamente eso — es una tarjeta de un mazo
+    manual, no una consecuencia de la evidencia recogida en el resto de la app.
+    Se mantiene como función (y no como literal en el llamante) para que el
+    vocabulario de razones siga viviendo en un solo sitio."""
+    return "flashcard-manual"
 
 
 def why_for_objective(unit, entry: dict) -> str:

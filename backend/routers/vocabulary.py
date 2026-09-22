@@ -8,10 +8,12 @@ from starlette.concurrency import run_in_threadpool
 
 import config
 from dependencies import current_user, read_audio_limited
+from domain import flashcards as flashcards_service
 from domain import learning as learning_service
 from domain import retention as retention_service
 from domain import vocabulary as vocabulary_service
 from repositories import decision_records as decision_records_repo
+from repositories import flashcards as flashcards_repo
 from schemas.vocabulary import (
     DecisionLifecycleIn,
     DecisionLifecycleOut,
@@ -19,6 +21,16 @@ from schemas.vocabulary import (
     DictionaryLookupRequest,
     DrillAttemptOut,
     DrillCandidatesOut,
+    FlashcardCardIn,
+    FlashcardCardOut,
+    FlashcardCardsOut,
+    FlashcardDeckIn,
+    FlashcardDeckOut,
+    FlashcardDecksOut,
+    FlashcardQueueOut,
+    FlashcardReviewIn,
+    FlashcardReviewOut,
+    FlashcardStatsOut,
     LexiconOut,
     RecallAttemptIn,
     RecallAttemptOut,
@@ -767,10 +779,199 @@ async def retention_due(
 async def retention_review(
     body: RetentionReviewIn, user: dict = Depends(current_user)
 ) -> dict:
-    """Grade 1–4 (Again/Hard/Good/Easy) → reprograma FSRS; evento informativo."""
-    result = await retention_service.retention_review(
-        user["id"], body.word, body.grade
+    """Grade 1–4 (Again/Hard/Good/Easy) → reprograma FSRS; evento informativo.
+
+    V3.78.0: delega en el servicio de Flashcards para que TODA calificación de
+    una carta `lexicon` pase por el mismo escritor y deje su fila en
+    `flashcard_reviews`. El ledger es lo que definen «tarjeta nueva» y los
+    límites del día: si este endpoint siguiera agendando por su cuenta, una
+    palabra calificada aquí contaría como nueva para siempre.
+    """
+    result = await flashcards_service.review_card(
+        user["id"],
+        flashcards_repo.AUTO_DECK_ID,
+        flashcards_service.CARD_TYPE_LEXICON,
+        body.word,
+        body.grade,
     )
     if result is None:
         raise HTTPException(status_code=400, detail="Review de retención no válido")
+    return {
+        "word": result["card_id"],
+        "grade": result["grade"],
+        "due_at": result["due_at"],
+        "next_in_days": result["next_in_days"],
+        "stability": result["stability"],
+        "retrievability": result["retrievability"],
+        "reps": result["reps"],
+    }
+
+
+# --- V3.78.0: modo Flashcards (mazos manuales + mazo automático virtual) -----
+#
+# El mazo automático (`id = 0`) es una VISTA del léxico, no una fila: por eso
+# rechaza la escritura en vez de aceptarla y guardarla en algún sitio raro.
+
+
+@router.get("/api/vocabulary/decks", response_model=FlashcardDecksOut)
+async def list_flashcard_decks(user: dict = Depends(current_user)) -> dict:
+    """Mazos del alumno: el automático (todo el léxico) + los manuales."""
+    return await flashcards_service.list_decks(user["id"])
+
+
+@router.post("/api/vocabulary/decks", response_model=FlashcardDeckOut)
+async def create_flashcard_deck(
+    body: FlashcardDeckIn, user: dict = Depends(current_user)
+) -> dict:
+    if not (body.name or "").strip():
+        raise HTTPException(status_code=400, detail="Nombre de mazo requerido")
+    result = await flashcards_service.create_deck(
+        user["id"],
+        name=body.name or "",
+        new_per_day=body.new_per_day,
+        review_per_day=body.review_per_day,
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="No se pudo crear el mazo")
     return result
+
+
+@router.patch(
+    "/api/vocabulary/decks/{deck_id}", response_model=FlashcardDeckOut
+)
+async def update_flashcard_deck(
+    deck_id: int, body: FlashcardDeckIn, user: dict = Depends(current_user)
+) -> dict:
+    result = await flashcards_service.update_deck(
+        user["id"],
+        deck_id,
+        name=body.name,
+        new_per_day=body.new_per_day,
+        review_per_day=body.review_per_day,
+    )
+    if result is None:
+        # Incluye el mazo automático: es del sistema y no se edita.
+        raise HTTPException(status_code=400, detail="Mazo no editable")
+    return result
+
+
+@router.delete("/api/vocabulary/decks/{deck_id}", status_code=204)
+async def delete_flashcard_deck(
+    deck_id: int, user: dict = Depends(current_user)
+) -> None:
+    if not await flashcards_service.delete_deck(user["id"], deck_id):
+        raise HTTPException(status_code=404, detail="Mazo no encontrado")
+
+
+@router.get(
+    "/api/vocabulary/decks/{deck_id}/queue", response_model=FlashcardQueueOut
+)
+async def flashcard_queue(
+    deck_id: int,
+    limit: int = Query(100, ge=1, le=100),
+    collection_id: int | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Cola de estudio: repasos vencidos primero, después las nuevas, recortada
+    por los límites del día del mazo."""
+    result = await flashcards_service.deck_queue(
+        user["id"], deck_id, collection_id=collection_id, limit=limit
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Mazo no encontrado")
+    return result
+
+
+@router.post(
+    "/api/vocabulary/decks/{deck_id}/review", response_model=FlashcardReviewOut
+)
+async def flashcard_review(
+    deck_id: int, body: FlashcardReviewIn, user: dict = Depends(current_user)
+) -> dict:
+    """Grade 1–4 → reprograma la carta y anota la revisión en el ledger."""
+    result = await flashcards_service.review_card(
+        user["id"], deck_id, body.card_type, body.card_id, body.grade
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Review de tarjeta no válido")
+    return result
+
+
+@router.get(
+    "/api/vocabulary/decks/{deck_id}/cards", response_model=FlashcardCardsOut
+)
+async def list_flashcard_cards(
+    deck_id: int, user: dict = Depends(current_user)
+) -> dict:
+    cards = await flashcards_service.list_cards(user["id"], deck_id)
+    return {"cards": cards}
+
+
+@router.post(
+    "/api/vocabulary/decks/{deck_id}/cards", response_model=FlashcardCardOut
+)
+async def create_flashcard_card(
+    deck_id: int, body: FlashcardCardIn, user: dict = Depends(current_user)
+) -> dict:
+    result = await flashcards_service.create_card(
+        user["id"], deck_id, front=body.front, back=body.back
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="No se pudo crear la tarjeta")
+    return {
+        "id": int(result["id"]),
+        "deck_id": int(result["deck_id"]),
+        "front": result["front"],
+        "back": result["back"],
+        "state": "new",
+        "reps": 0,
+        "due_at": "",
+        "created_at": result["created_at"],
+    }
+
+
+@router.patch(
+    "/api/vocabulary/decks/{deck_id}/cards/{card_id}",
+    response_model=FlashcardCardOut,
+)
+async def update_flashcard_card(
+    deck_id: int,
+    card_id: int,
+    body: FlashcardCardIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    result = await flashcards_service.update_card(
+        user["id"], deck_id, card_id, front=body.front, back=body.back
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+    return {
+        "id": int(result["id"]),
+        "deck_id": int(result["deck_id"]),
+        "front": result["front"],
+        "back": result["back"],
+        "created_at": result["created_at"],
+    }
+
+
+@router.delete(
+    "/api/vocabulary/decks/{deck_id}/cards/{card_id}", status_code=204
+)
+async def delete_flashcard_card(
+    deck_id: int, card_id: int, user: dict = Depends(current_user)
+) -> None:
+    if not await flashcards_service.delete_card(user["id"], deck_id, card_id):
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+
+
+@router.get(
+    "/api/vocabulary/decks/{deck_id}/stats", response_model=FlashcardStatsOut
+)
+async def flashcard_stats(
+    deck_id: int, user: dict = Depends(current_user)
+) -> dict:
+    result = await flashcards_service.deck_stats(user["id"], deck_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Mazo no encontrado")
+    return result
+

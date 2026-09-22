@@ -4,6 +4,167 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.78.0] — 2026-09-22
+
+**Release de PRODUCTO (minor) que reorganiza el diccionario en TRES MODOS —Consultar · Personal ·
+Flashcards— y separa posesión de estudio: PERSONAL deja de estudiar y pasa a ser el inventario del
+léxico, y FLASHCARDS se convierte en la ÚNICA superficie de estudio, con mazos manuales y tarjetas de
+frente/dorso sobre el motor FSRS que YA existía. CON migración de BD aditiva** (tres tablas nuevas:
+`flashcard_decks`, `flashcard_cards` y `flashcard_reviews`), **así que una BD de V3.77.2 se actualiza
+sin que nadie pierda nada. SIN bump de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el
+currículum (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar las evaluaciones y SIN tocar
+`LISTENING_BANK_VERSION`.** No añade ni retira un gate: **G1–G7 siguen `pending`** y el árbol que se
+certifica sigue siendo el de `v3.75.8`.
+
+- **Los tres modos, y el defecto cambia de sitio.** `DictionaryView` pasa a
+  `"lookup" | "personal" | "flashcards"` con las pestañas en el orden en que se usan, y
+  `DEFAULT_DICTIONARY_VIEW` cambia a `"lookup"`: el modo que se abre primero es el que responde a la
+  pregunta con la que se entra a un diccionario («¿qué significa esta palabra?»), no el que exige
+  tener léxico propio. Es un cambio **visible**, y se declara: un valor **persistido** de una versión
+  anterior sigue siendo válido y manda sobre el defecto, así que **nadie pierde su pestaña**; lo que
+  cambia es el arranque limpio. La doble persistencia (`localStorage` + settings por usuario) no se
+  toca.
+- **El panel incrustado sigue siendo de dos modos, y ahora es una frontera explícita.**
+  `QuizRoutePage` no puede hospedar una sesión de estudio —tiene su propio recorrido, límites y
+  resumen—, así que en lugar de repetir la restricción como convención en cada consumidor se declara
+  una vez: `toPanelView()` (`"flashcards" → "personal"`) y `PANEL_DICTIONARY_VIEWS`. Es lo que evita
+  que el panel pueda dejar **persistido** un modo que no sabe pintar en el ajuste que comparte con la
+  pantalla dedicada.
+- **PERSONAL es el inventario.** Buscador sobre el léxico, **filtro por estado**
+  (`mastered`/`known`/`learning`/`weak`, la clasificación que el servidor ya calculaba y que no se
+  podía usar para nada), **procedencia** por fila desde `vocabulary.source`
+  (`curriculum`/`user`/`imported`, un dato que se guardaba desde V3.77.0 y no se mostraba) y **fuerza
+  de memoria** por fila (estado FSRS, `due_at`, estabilidad, recuperabilidad y «próxima en N d»). La
+  memoria es el estado del **scheduler** y se muestra junto al `recall` derivado de la evidencia
+  porque responden a preguntas distintas —lo que la app infiere de lo que el alumno hizo frente a
+  cuándo toca repasarlo—, y mezclarlas fue justo lo que M4 tuvo que separar: por eso el
+  enriquecimiento vive en `domain/vocabulary.py` (fuente: el scheduler) y no en `services/lexicon.py`
+  (fuente: la curva de olvido de la tabla `vocabulary`), y se calcula **puro** sobre una sola lectura
+  de cartas, así que enriquecer 500 palabras no añade ni una conexión más.
+- **La sesión de repaso incrustada de PERSONAL desaparece** y en su lugar hay una tarjeta de entrada
+  («N tarjetas pendientes hoy» + botón **Estudiar**). Si el contenedor no ofrece el salto —el
+  diccionario incrustado—, el botón **no se pinta** y el texto explica dónde se estudia, en lugar de
+  ofrecer un botón que no llevaría a ninguna parte. `ReviewQueueSection` **se queda donde está** y se
+  declara para que no parezca un olvido: la cola de competencia del drill es superficie de
+  **producción**, no de calificación de tarjetas —practicar una palabra usándola no es repasarla—.
+- **Una sola superficie de estudio.** `RetentionSession` se generaliza a **`StudySession`**: deja de
+  pedir la cola por su cuenta y **recibe los ítems** y un `onGrade`, así que sirve para el mazo
+  automático y para uno manual sin saber cuál es; el contenedor decide el endpoint y el mazo. Desde
+  PERSONAL, «Estudiar» salta a Flashcards con el mazo automático; desde **«Mis listas» y packs**, la
+  acción salta con **esa colección filtrada** y **arranca sola** —el alumno ya pidió estudiar al
+  pulsar—. El estado `reviewing` y la sesión acotada de `AddVocabSection` desaparecen; en su lugar hay
+  un `onStudy(collectionId, label)` que **no sabe** cómo se navega. El **foco** vive en
+  `DictionaryScreen` y **no se persiste**: es un encargo de un solo salto, con `nonce` para que un
+  segundo clic sobre la misma lista reabra la sesión en vez de ser un no-op. Se conserva el candado de
+  V3.77.2: el resumen final **tiene** que ser alcanzable y ofrece actualizar solo si el contenedor
+  sabe recargar la cola.
+- **Backend: mazos, tarjetas y un ledger de revisiones.** Tres tablas nuevas sin tocar ninguna
+  existente (`flashcard_decks` con `UNIQUE (user_id, name)`, `flashcard_cards` y `flashcard_reviews`).
+  **El mazo automático es VIRTUAL** (`id = 0`, slug `auto`): no es una fila, se sintetiza desde el
+  léxico y no se puede borrar, así que no hay que sembrarlo, no puede quedar desincronizado del léxico
+  y no existe el caso raro de «el alumno borró el mazo del sistema». Sus cartas son las `lexicon`
+  —todo lo que la app ha registrado: currículum, chat, speaking, listas y packs—, sembradas de forma
+  **perezosa** antes de leerlas: depender de que el alumno abra el panel de REVISAR sería un mazo que
+  no enseña lo que promete. `repositories/flashcards.py` (CRUD y contadores, sin lógica de negocio) y
+  `domain/flashcards.py` (mazos con sus recuentos, cola unificada y despacho de grade) son los dos
+  módulos nuevos.
+- **FSRS: un tipo de carta nuevo, y NINGÚN segundo planificador.** `TARGET_TYPES` gana `"flashcard"`
+  y se añade `why_for_flashcard()` («flashcard-manual»: no hay señal del alumno que explique por qué
+  existe la carta —la escribió él— y la razón lo dice). Las tarjetas a mano se programan con el mismo
+  `fsrs.schedule` y se explican con el mismo `fsrs.explain`, con los cuatro grados de siempre. **Y eso
+  no era gratis, así que se cerró en el mismo commit:** el panel autograduable solo excluía
+  `objective`; sin excluir también `flashcard`, **las tarjetas manuales se colaban en el panel de
+  REVISAR** y el alumno las habría calificado en dos sitios a la vez —exactamente el doble escritor
+  que M4 cerró—. La exclusión se declara **una sola vez** (`_PANEL_EXCLUDED_TARGET_TYPES`) y la usan
+  los tres sitios, con el trato idéntico al de `objective`: fuera de la cola y de `due_count`, y
+  `by_type` conservando el total como diagnóstico.
+- **Los límites del día salen del ledger, no del scheduler.** `flashcard_reviews` cuenta **cada
+  calificación**, no cada tarjeta distinta, porque Anki mide repasos: una tarjeta fallada y repetida
+  tres veces son tres repasos; `was_new` marca la primera vez, que es lo que aplica el tope de nuevas.
+  Contar «cartas distintas con `last_review_at` de hoy» no distingue nuevas de repaso ni cuenta
+  repeticiones, que son justo las dos cosas que hacen falta. Y de ahí sale la definición de **nueva**:
+  «nunca calificada en esta superficie», leída del ledger y **no** el `reps` del scheduler —la siembra
+  de retención marca `reps = 1` en las cartas que deriva de la evidencia de las lecciones, así que una
+  palabra recién añadida puede llegar con `reps = 1` y una `due_at` de dentro de diez horas:
+  clasificada por `reps` desaparecería del mazo en vez de ofrecerse como nueva—.
+- **El evento del ledger pedagógico también se clasifica:** `flashcard:<id>:<grade>` →
+  **`informative`**, igual que `retention:<word>:<grade>`. Sin esa rama caería a `telemetry`, que no es
+  incorrecto pero describe mal lo que pasó. **Nada de esto acredita mastery**: no toca
+  `learning_evidence`, ni Assessment, ni CEFR.
+- **Endpoints nuevos, todos con sesión y todos por usuario:** `GET /api/vocabulary/decks` (auto +
+  manuales con lo que queda **hoy** y el total), `POST/PATCH/DELETE /api/vocabulary/decks[/{id}]` (el
+  automático **rechaza** escritura), `GET .../decks/{id}/queue` (`limit` 1–100),
+  `POST .../decks/{id}/review`, `GET/POST/PATCH/DELETE .../decks/{id}/cards[/{card_id}]` y
+  `GET .../decks/{id}/stats`. Dos decisiones que no conviene deshacer: **borrar arrastra** (borrar una
+  tarjeta borra su carta FSRS, y borrar un mazo borra las de sus tarjetas, para no dejar cartas de
+  repaso de tarjetas que ya no existen) y **el endpoint viejo no se convierte en un segundo
+  escritor**: `POST /api/vocabulary/retention/review` **delega** en el mismo servicio con el mazo
+  automático, así que una palabra calificada por ahí también cuenta en el ledger —si siguiera
+  agendando por su cuenta, contaría como nueva para siempre y su revisión no aparecería en ninguna
+  estadística—.
+- **La UI de Flashcards, con cuatro subpestañas en el orden en que se usan.** **Estudiar** (cola
+  unificada, frente/dorso, 4 grados, contador, límites del día respetados y resumen alcanzable con
+  actualizar; orden: primero los repasos vencidos y después las nuevas, el orden clásico de Anki y
+  además el que respeta el dinero del alumno —lo que se sabe y se está olvidando antes que lo que
+  nunca ha visto—). **Mazos** (el automático —«todo mi diccionario», con contadores y **sin renombrar
+  ni borrar**— y los manuales, con crear, editar `new_per_day`/`review_per_day` —por defecto 10 y
+  50— y borrar **con confirmación** que dice cuántas tarjetas se lleva por delante). **Tarjetas**
+  (filtro por texto, filtro por estado, orden por recientes/anverso/vencimiento y CRUD; cada fila
+  muestra su fuerza de memoria, porque sin ella el navegador no distingue una tarjeta recién creada de
+  una repasada cinco veces, y el orden por vencimiento manda al final las tarjetas **sin carta
+  programada**, que no es «vence ya» sino «aún no está en el scheduler»). **Estadísticas** (repasos de
+  hoy, total de 30 días, tasa de acierto, histograma de 14 días y previsión de 7). **La previsión
+  excluye las nuevas a propósito:** su `due_at` no anticipa cuándo las estudiará el alumno —eso lo
+  decide su plan— y contarlas prometería un día que no depende de ellas; se calcula con el `due_at`
+  que el scheduler ya guarda y no con una proyección de estabilidad.
+- **Contratos en la frontera.** `normalize.ts` gana `normalizeDeckList`, `normalizeStudyQueue`,
+  `normalizeFlashcardList` y `normalizeFlashcardStats`: es la regla que dejó V3.77.2 y se cumple —**el
+  estado de React no recibe una forma sin comprobar**—.
+- **Los tres candados del plan muerden, comprobados revirtiendo el código y no razonando sobre él**:
+  quitando `"flashcard"` de la exclusión del panel, `test_manual_cards_do_not_leak_into_fsrs_panel`
+  falla; haciendo que `new_remaining` fuera un número grande, `test_queue_respects_new_per_day` falla;
+  y quitando el avance del índice en `StudySession` —que es exactamente el fallo de V3.77.2— los
+  **3** tests del resumen y de la salida fallan. Restaurado, la suite vuelve a verde (16/16 backend,
+  5/5 del componente).
+- **Verificación:** `pytest` **2988/2988** + `ruff` limpio + `transfer_validation OK=True` ·
+  `tsc --noEmit` limpio · `vitest run` **939/939** (106 ficheros) · `npm run build` correcto ·
+  i18n `--strict` **1679 cadenas / 0 huérfanas / 0 usadas sin definir / 0 duplicadas** · contraste
+  `--strict` **480 pares + 6 guardas / 0 bloqueantes** · `check_release_consistency` OK en los **6
+  orígenes** · `validation_gate.py auto` **10/10** · launcher **205/205**. Playwright:
+  `drillProvenance` **2/2** y `vocabularyRoutesReview` **1/1** en desktop; el barrido completo **no**
+  se corrió en local y la autoridad es el CI.
+- **Honestidad.** (i) **El defecto del diccionario cambia y eso se ve:** quien tenga la app recién
+  instalada abría «Personal» y ahora abre «Consultar»; un valor **persistido** de una versión anterior
+  sigue mandando, así que nadie pierde su pestaña, y el cambio está fijado con un test en las dos
+  direcciones precisamente porque es comportamiento y no pintura. (ii) **La consulta del diccionario
+  sigue sin alimentar el léxico** (invariante D3 de V3.77.0, no tocada): buscar «however» no lo añade
+  a PERSONAL; con PERSONAL presentado como «las palabras de toda la app», esa ausencia se lee como
+  hueco y se declara como hueco explícito, aparcado con su propia decisión. (iii) **El mazo automático
+  y los manuales NO son simétricos, y el automático es el peor parado:** no se renombra, no se borra,
+  **no admite límites propios** (usa 10 y 50) ni tarjetas escritas a mano; es coherente con ser una
+  vista del léxico y no una fila, pero significa que «estudiar solo estas 20 palabras con tope 20» se
+  consigue con una lista, no con un mazo. (iv) **FSRS-lite sigue sin ser FSRS, ahora también para las
+  tarjetas a mano:** los intervalos salen de la versión simplificada y declarada de
+  `domain/retention.py`, **sin** los parámetros por alumno que FSRS completo ajusta con el historial;
+  una tarjeta escrita a mano no recibe un plan mejor que una palabra del currículum, recibe el mismo.
+  (v) **El ledger no distingue de dónde vino la calificación:** una palabra del léxico calificada
+  desde el endpoint viejo de retención cuenta como un repaso del mazo automático —deliberado, es lo
+  que evita dos contabilidades— pero «repasos de hoy» incluye calificaciones hechas en otra pantalla.
+  (vi) **La migración es aditiva y no migra datos:** las tres tablas nacen vacías y las palabras que
+  ya existían **no tienen carta** hasta que alguien sincronice —lo que hace el propio mazo automático
+  al abrirse—; una palabra sin carta sale como «sin estudiar», que es la lectura honesta de «no
+  consta». (vii) **Los mazos manuales se quedan cortos a propósito:** sin plantillas ni campos
+  propios, sin cloze, sin import/export (`.apkg`/CSV), sin mazos filtrados, sin suspender/enterrar,
+  sin leech y sin opciones avanzadas por mazo; todo aparcado y declarado en `docs/audit/PARKED.md`.
+  (viii) **La tarjeta a mano guarda texto, no conocimiento:** un anverso de 400 caracteres y un
+  reverso de 2000, sin comprobar que el reverso sea correcto ni que el anverso sea una pregunta —es
+  un bloc de notas con memoria—. (ix) **Una sesión está topada en 100 tarjetas**: no es una medida
+  pedagógica, es defensiva. (x) **El barrido visual completo no se corrió en local** (autoridad: el
+  CI); lo que sí se corrió son las **dos** specs que tocan el diccionario, y `drillProvenance` **tuvo
+  que cambiar** —entra explícitamente a «Personal» antes de buscar la entrada al drill, porque el
+  defecto ya no es esa pestaña—. (xi) **Los 7 gates siguen en `pending`** y el árbol que se certifica
+  sigue siendo el de `v3.75.8`. Ver `release-notes-v3.78.0.md`.
+
 ## [3.77.2] — 2026-09-22
 
 **Release de PRODUCTO (patch) de ENDURECIMIENTO sobre lo que la V3.77.1 dejó abierto alrededor del

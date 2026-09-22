@@ -2182,13 +2182,26 @@ async def _sync_objective_cards_for_level(
                     )
 
 
+# M4 (D3) + V3.78.0: tipos de carta que el panel autograduable NO consume. Se
+# declaran aquí, una sola vez, porque el motivo es el mismo en los dos casos
+# —tienen dueño propio: el micro-review de la unidad y el modo Flashcards del
+# diccionario— y una lista repetida en tres sitios es justo como se reabre un
+# doble escritor.
+_PANEL_EXCLUDED_TARGET_TYPES: tuple[str, ...] = ("objective", "flashcard")
+
+
 async def get_fsrs_due(user_id: str, limit: int = 20) -> FsrsDueOut:
     now_iso = datetime.now(timezone.utc).isoformat()
     cards = await sync_fsrs_cards(user_id, now=now_iso)
-    # M4 (D3): la cola del panel autograduable excluye las cartas `objective`;
-    # su repaso vive en el micro-review de la unidad (`UnitReviewPanel`).
+    # M4 (D3) + V3.78.0: la cola del panel autograduable excluye `objective` (su
+    # repaso vive en el micro-review de la unidad) y `flashcard` (su repaso vive
+    # en el modo Flashcards del diccionario). Sin lo segundo, las tarjetas
+    # manuales del alumno se colarían en dos sitios a la vez, que es
+    # exactamente el doble escritor que M4 cerró.
     reviewable = [
-        c for c in cards if (c.get("target_type") or "skill") != "objective"
+        c
+        for c in cards
+        if (c.get("target_type") or "skill") not in _PANEL_EXCLUDED_TARGET_TYPES
     ]
     due = fsrs.due_queue(reviewable, now=now_iso, limit=limit)
     return FsrsDueOut(
@@ -2200,7 +2213,8 @@ async def get_fsrs_due(user_id: str, limit: int = 20) -> FsrsDueOut:
 
 async def get_fsrs_summary(user_id: str) -> FsrsSummaryOut:
     """Resumen FSRS: totales por estado/tipo (diagnóstico) y `due_count` de las
-    cartas repasables en el panel (sin `objective`, M4/D3)."""
+    cartas repasables en el panel (sin `objective` ni `flashcard`, M4/D3 +
+    V3.78.0)."""
     now_iso = datetime.now(timezone.utc).isoformat()
     cards = await sync_fsrs_cards(user_id, now=now_iso)
     by_state: dict[str, int] = {}
@@ -2211,7 +2225,7 @@ async def get_fsrs_summary(user_id: str) -> FsrsSummaryOut:
         by_state[state] = by_state.get(state, 0) + 1
         t = card.get("target_type") or "skill"
         by_type[t] = by_type.get(t, 0) + 1
-        if t != "objective" and fsrs.is_due(card, now=now_iso):
+        if t not in _PANEL_EXCLUDED_TARGET_TYPES and fsrs.is_due(card, now=now_iso):
             due_count += 1
     return FsrsSummaryOut(
         total=len(cards),
@@ -2233,10 +2247,15 @@ async def review_fsrs_card(
 
     M4 (D3): las cartas `target_type="objective"` NO se gradúan aquí (single
     writer) — su repaso de contenido vive en el micro-review de la unidad. El
-    router responde 400 ante un intento de autogradearlas."""
+    router responde 400 ante un intento de autogradearlas.
+
+    V3.78.0: las cartas `target_type="flashcard"` tampoco, y por el mismo
+    motivo: su dueño es el modo Flashcards del diccionario, que además necesita
+    escribir su propio ledger de revisiones para que los límites diarios y las
+    estadísticas cuadren. Graduarlas por aquí saltaría esos dos efectos."""
     if target_type not in fsrs.TARGET_TYPES:
         return None
-    if target_type == "objective":
+    if target_type in _PANEL_EXCLUDED_TARGET_TYPES:
         return None
     if grade is None:
         if score is None:

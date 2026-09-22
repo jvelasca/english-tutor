@@ -946,14 +946,22 @@ def classify_event_role(event_type: str, detail: str) -> str:
       micro-drill (palabra o frase) acredita retención si supera el intervalo.
     - `drill:*:unclear` → `telemetry`: el ASR no reconoció el audio, no hubo ni
       acierto ni fallo (no se penaliza al alumno).
+    - `retention:<word>:<1-4>` → `informative`: grade FSRS de una carta léxica.
+    - `flashcard:<id>:<1-4>` → `informative`: grade de una tarjeta manual
+      (V3.78.0). Es el mismo caso que `retention:` —una calificación que
+      programa el repaso y no acredita— y sin esta rama caería a `telemetry`,
+      que no es incorrecto pero describe mal lo que pasó.
     - Cualquier otro evento → `telemetry`.
     """
     event_type = (event_type or "").strip()
     detail = (detail or "").strip()
     if event_type != "exercise" or not detail.startswith("drill:"):
-        # Sesión de retención Personal: grade FSRS etiquetado, no acredita
-        # mastery/Assessment (D5/E3). `retention:<word>:<1-4>`.
-        if event_type == "exercise" and detail.startswith("retention:"):
+        # Sesión de tarjetas: grade FSRS etiquetado, no acredita
+        # mastery/Assessment (D5/E3). `retention:<word>:<1-4>` (léxico) y
+        # `flashcard:<id>:<1-4>` (tarjeta manual, V3.78.0).
+        if event_type == "exercise" and detail.startswith(
+            ("retention:", "flashcard:")
+        ):
             return "informative"
         return "telemetry"
     parts = detail[len("drill:") :].split(":")

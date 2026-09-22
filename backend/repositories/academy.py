@@ -1149,6 +1149,21 @@ def list_fsrs_cards(user_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def delete_fsrs_card(user_id: str, target_type: str, target_id: str) -> bool:
+    """Borra una carta FSRS (V3.78.0).
+
+    Existe para que borrar una tarjeta manual no deje huérfana su carta de
+    repaso: es el registro de scheduling de una tarjeta que ya no existe.
+    """
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "DELETE FROM fsrs_cards "
+            "WHERE user_id = ? AND target_type = ? AND target_id = ?",
+            (user_id, str(target_type), str(target_id)),
+        )
+    return bool(cur.rowcount)
+
+
 # --- Unit review attempts (V3.16) -------------------------------------------
 
 

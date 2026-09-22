@@ -1,9 +1,13 @@
-import { getJson, postJson, withTimeout } from "./client";
+import { deleteJson, getJson, patchJson, postJson, withTimeout } from "./client";
 import {
+  normalizeDeckList,
   normalizeDictionaryEntry,
   normalizeDrillCandidates,
+  normalizeFlashcardList,
+  normalizeFlashcardStats,
   normalizeLexicon,
   normalizeRetentionDue,
+  normalizeStudyQueue,
   normalizeVocabBulkAdd,
   normalizeVocabCollections,
   normalizeVocabEnroll,
@@ -24,6 +28,14 @@ import type {
   DrillTransferAttempt,
   DrillTransferContext,
   DrillWriteAttempt,
+  FlashcardCard,
+  FlashcardCardType,
+  FlashcardCards,
+  FlashcardDeck,
+  FlashcardDecks,
+  FlashcardQueue,
+  FlashcardReviewResult,
+  FlashcardStats,
   Lexicon,
   RetentionDue,
   RetentionReviewResult,
@@ -461,4 +473,118 @@ export function reviewRetentionCard(
     word,
     grade,
   });
+}
+
+// --- V3.78.0: modo Flashcards ----------------------------------------------
+
+/** Mazos del alumno: el automático (todo el léxico) + los manuales. */
+export function listFlashcardDecks(_userId: string): Promise<FlashcardDecks> {
+  return getJson<unknown>("/api/vocabulary/decks").then(normalizeDeckList);
+}
+
+export function createFlashcardDeck(
+  _userId: string,
+  body: { name: string; new_per_day?: number; review_per_day?: number },
+): Promise<FlashcardDeck> {
+  return postJson<unknown>("/api/vocabulary/decks", body).then((raw) =>
+    normalizeDeckList({ decks: [raw] }).decks[0]!,
+  );
+}
+
+export function updateFlashcardDeck(
+  _userId: string,
+  deckId: number,
+  body: { name?: string; new_per_day?: number; review_per_day?: number },
+): Promise<FlashcardDeck> {
+  return patchJson<unknown>(`/api/vocabulary/decks/${deckId}`, body).then((raw) =>
+    normalizeDeckList({ decks: [raw] }).decks[0]!,
+  );
+}
+
+export function deleteFlashcardDeck(
+  _userId: string,
+  deckId: number,
+): Promise<void> {
+  return deleteJson<void>(`/api/vocabulary/decks/${deckId}`, undefined);
+}
+
+/**
+ * Cola de estudio de un mazo. `collectionId` solo tiene sentido en el mazo
+ * automático (id 0): acota el léxico a una lista o pack concreta.
+ */
+export function getFlashcardQueue(
+  _userId: string,
+  deckId: number,
+  options: { collectionId?: number | null } = {},
+): Promise<FlashcardQueue> {
+  const params = new URLSearchParams();
+  if (options.collectionId != null) {
+    params.set("collection_id", String(options.collectionId));
+  }
+  const q = params.toString();
+  return getJson<unknown>(
+    `/api/vocabulary/decks/${deckId}/queue${q ? `?${q}` : ""}`,
+  ).then(normalizeStudyQueue);
+}
+
+export function reviewFlashcard(
+  _userId: string,
+  deckId: number,
+  body: { card_type: FlashcardCardType; card_id: string; grade: number },
+): Promise<FlashcardReviewResult> {
+  return postJson<FlashcardReviewResult>(
+    `/api/vocabulary/decks/${deckId}/review`,
+    body,
+  );
+}
+
+export function listFlashcardCards(
+  _userId: string,
+  deckId: number,
+): Promise<FlashcardCards> {
+  return getJson<unknown>(`/api/vocabulary/decks/${deckId}/cards`).then(
+    normalizeFlashcardList,
+  );
+}
+
+export function createFlashcard(
+  _userId: string,
+  deckId: number,
+  body: { front: string; back: string },
+): Promise<FlashcardCard> {
+  return postJson<unknown>(`/api/vocabulary/decks/${deckId}/cards`, body).then(
+    (raw) => normalizeFlashcardList({ cards: [raw] }).cards[0]!,
+  );
+}
+
+export function updateFlashcard(
+  _userId: string,
+  deckId: number,
+  cardId: number,
+  body: { front: string; back: string },
+): Promise<FlashcardCard> {
+  return patchJson<unknown>(
+    `/api/vocabulary/decks/${deckId}/cards/${cardId}`,
+    body,
+  ).then((raw) => normalizeFlashcardList({ cards: [raw] }).cards[0]!);
+}
+
+export function deleteFlashcard(
+  _userId: string,
+  deckId: number,
+  cardId: number,
+): Promise<void> {
+  return deleteJson<void>(
+    `/api/vocabulary/decks/${deckId}/cards/${cardId}`,
+    undefined,
+  );
+}
+
+export function getFlashcardStats(
+  _userId: string,
+  deckId: number,
+): Promise<FlashcardStats> {
+  return getJson<unknown>(`/api/vocabulary/decks/${deckId}/stats`).then(
+    normalizeFlashcardStats,
+  );
 }

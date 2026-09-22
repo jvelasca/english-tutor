@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
+import { toPanelView } from "../../utils/dictionaryView";
 import { useSelectedRoute } from "../../hooks/useSelectedRoute";
 import {
   resolveRouteLevel,
@@ -214,6 +215,19 @@ type RouteView =
   | { kind: "assessment"; level: string }
   | { kind: "dictionary" }
   | { kind: "lookup" };
+
+/**
+ * V3.78.0: el diccionario INCRUSTADO solo tiene dos modos (Personal / Consultar).
+ * El modo Flashcards no cabe aquí —una sesión de estudio tiene su propio
+ * recorrido y esta pantalla es la práctica de la destreza—, así que en lugar de
+ * repetir esa restricción como convención se proyecta con `toPanelView`: el
+ * panel escribe en el MISMO ajuste compartido que la pantalla dedicada y esta es
+ * la frontera donde un espacio de tres modos se reduce a uno de dos.
+ */
+const PANEL_VIEW_BY_KIND = {
+  dictionary: toPanelView("personal"),
+  lookup: toPanelView("lookup"),
+} as const;
 
 function routeMode(session: RouteSession | null): RouteQuestionMode {
   if (!session) return "all";
@@ -518,9 +532,7 @@ export function QuizRoutePage({
                         setView({ kind: entry.kind });
                         // V3.39: recordar la pestaña usada (coherente con la
                         // pantalla dedicada del diccionario).
-                        persistDictionaryView(
-                          entry.kind === "dictionary" ? "personal" : "lookup",
-                        );
+                        persistDictionaryView(PANEL_VIEW_BY_KIND[entry.kind]);
                       }}
                       className={cn(
                         "inline-flex min-h-9 items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors",
@@ -635,7 +647,7 @@ export function QuizRoutePage({
                 className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
                 onClick={() => {
                   setView({ kind: "dictionary" });
-                  persistDictionaryView("personal");
+                  persistDictionaryView(PANEL_VIEW_BY_KIND.dictionary);
                 }}
               >
                 <BookOpen className="size-4" aria-hidden="true" />
@@ -652,7 +664,7 @@ export function QuizRoutePage({
                 className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
                 onClick={() => {
                   setView({ kind: "lookup" });
-                  persistDictionaryView("lookup");
+                  persistDictionaryView(PANEL_VIEW_BY_KIND.lookup);
                 }}
               >
                 <Search className="size-4" aria-hidden="true" />

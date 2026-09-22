@@ -172,6 +172,24 @@ class LexicalEvidence(BaseModel):
     mean_response_time_ms: float | None = None
 
 
+class LexicalMemoryOut(BaseModel):
+    """Fuerza de memoria de una palabra (V3.78.0).
+
+    Es el estado del SCHEDULER (`fsrs_cards`), no el `recall` derivado de la
+    evidencia que ya trae el ítem: `recall` dice lo que la app infiere de lo que
+    hizo el alumno; esto dice cuándo toca repasarlo. PERSONAL los muestra juntos
+    porque responden a preguntas distintas.
+    """
+
+    state: str = "new"
+    due_at: str = ""
+    due: bool = False
+    reps: int = 0
+    stability: float = 0.0
+    retrievability: float = 0.0
+    next_in_days: float = 0.0
+
+
 class LexicalItemOut(BaseModel):
     """Ítem del léxico personal (lexicón).
 
@@ -211,6 +229,8 @@ class LexicalItemOut(BaseModel):
     # V3.35 (Longitudinal Learning Evidence): evidencia fina del ledger
     # (`attempts`/`successes`/`days`/`intervals`), aditiva a los contadores.
     evidence: LexicalEvidence | None = None
+    # V3.78.0: fuerza de memoria FSRS de la palabra (`None` si nunca se programó).
+    memory: LexicalMemoryOut | None = None
 
 
 class LexicalUnitSurfaceOut(BaseModel):
@@ -1042,3 +1062,123 @@ class RetentionReviewOut(BaseModel):
     stability: float = 0.0
     retrievability: float = 0.0
     reps: int = 0
+
+
+# --- V3.78.0: modo Flashcards (mazos, tarjetas y estudio) --------------------
+
+
+class FlashcardLimitsOut(BaseModel):
+    new_per_day: int = 0
+    review_per_day: int = 0
+    new_remaining: int = 0
+    review_remaining: int = 0
+
+
+class FlashcardDeckOut(BaseModel):
+    id: int
+    name: str
+    slug: str = ""
+    is_auto: bool = False
+    new_per_day: int = 0
+    review_per_day: int = 0
+    card_count: int = 0
+    due_count: int = 0
+    new_count: int = 0
+    reviewed_today: int = 0
+    limits: FlashcardLimitsOut | None = None
+
+
+class FlashcardDecksOut(BaseModel):
+    decks: list[FlashcardDeckOut]
+    auto_deck_id: int = 0
+    fsrs_version: str = ""
+
+
+class FlashcardDeckIn(BaseModel):
+    """Crea o edita un mazo manual. Los dos límites son opcionales."""
+    name: str | None = Field(default=None, max_length=120)
+    new_per_day: int | None = Field(default=None, ge=0, le=9999)
+    review_per_day: int | None = Field(default=None, ge=0, le=9999)
+
+
+class FlashcardCardOut(BaseModel):
+    id: int
+    deck_id: int
+    front: str
+    back: str = ""
+    state: str = "new"
+    reps: int = 0
+    due_at: str = ""
+    created_at: str = ""
+
+
+class FlashcardCardsOut(BaseModel):
+    cards: list[FlashcardCardOut]
+
+
+class FlashcardCardIn(BaseModel):
+    front: str = Field(min_length=1, max_length=400)
+    back: str = Field(default="", max_length=2000)
+
+
+class FlashcardStudyItemOut(BaseModel):
+    card_type: str
+    card_id: str
+    front: str
+    back: str = ""
+    definition: str = ""
+    is_new: bool = False
+    state: str = "new"
+    due_at: str = ""
+    reps: int = 0
+    retrievability: float = 0.0
+
+
+class FlashcardQueueOut(BaseModel):
+    deck: FlashcardDeckOut
+    items: list[FlashcardStudyItemOut]
+    due_count: int = 0
+    new_count: int = 0
+    reviewed_today: int = 0
+    new_today: int = 0
+    limits: FlashcardLimitsOut
+    fsrs_version: str = ""
+
+
+class FlashcardReviewIn(BaseModel):
+    card_type: str = Field(min_length=1, max_length=20)
+    card_id: str = Field(min_length=1, max_length=80)
+    grade: int = Field(ge=1, le=4)
+
+
+class FlashcardReviewOut(BaseModel):
+    card_type: str
+    card_id: str
+    deck_id: int
+    front: str
+    back: str = ""
+    grade: int
+    due_at: str = ""
+    next_in_days: float = 0.0
+    stability: float = 0.0
+    retrievability: float = 0.0
+    reps: int = 0
+
+
+class FlashcardDayCountOut(BaseModel):
+    day: str
+    total: int = 0
+    good: int = 0
+    count: int = 0
+
+
+class FlashcardStatsOut(BaseModel):
+    deck: FlashcardDeckOut
+    cards_total: int = 0
+    reviewed_today: int = 0
+    new_today: int = 0
+    reviews_30d: int = 0
+    new_cards_30d: int = 0
+    accuracy_30d: float = 0.0
+    by_day: list[FlashcardDayCountOut] = []
+    forecast: list[FlashcardDayCountOut] = []

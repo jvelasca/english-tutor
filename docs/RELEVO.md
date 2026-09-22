@@ -5,6 +5,116 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-22 (UTC+2).
 >
+> **Nota (2026-09-22 · cierre de la sesión del diccionario en tres modos): V3.78.0 —
+> release DE PRODUCTO (minor) que reorganiza el diccionario en TRES MODOS
+> (Consultar · Personal · Flashcards) y separa posesión de estudio.** El cambio de
+> fondo no es una pestaña más: **PERSONAL deja de estudiar y pasa a ser el
+> inventario del léxico, y FLASHCARDS se convierte en la ÚNICA superficie de
+> estudio**, con mazos manuales y tarjetas de frente/dorso sobre el motor FSRS que
+> **ya existía**. **(A) Los tres modos.** `DictionaryView` pasa a
+> `"lookup" | "personal" | "flashcards"` y `DEFAULT_DICTIONARY_VIEW` cambia a
+> `"lookup"`: el modo que se abre primero es el que responde a la pregunta con la
+> que se entra a un diccionario, no el que exige tener léxico propio. Es un cambio
+> **visible** y se declara: un valor **persistido** de una versión anterior sigue
+> siendo válido y manda sobre el defecto, así que **nadie pierde su pestaña**; lo
+> que cambia es el arranque limpio. El panel incrustado (`QuizRoutePage`) **sigue
+> siendo de dos modos, ahora como frontera explícita** (`toPanelView()`:
+> `"flashcards" → "personal"`), que es lo que evita que el panel deje **persistido**
+> un modo que no sabe pintar en el ajuste que comparte con la pantalla dedicada.
+> **(B) PERSONAL es el inventario.** Buscador, **filtro por estado** (la
+> clasificación que el servidor ya calculaba y no se podía usar para nada),
+> **procedencia** por fila desde `vocabulary.source` (un dato que se guardaba desde
+> V3.77.0 y no se mostraba) y **fuerza de memoria** por fila (estado FSRS, `due_at`,
+> estabilidad, recuperabilidad, «próxima en N d»). La memoria es el estado del
+> **scheduler** y se muestra **junto** al `recall` derivado de la evidencia porque
+> responden a preguntas distintas —y mezclarlas fue justo lo que M4 tuvo que
+> separar—: vive en `domain/vocabulary.py` (fuente: el scheduler) y no en
+> `services/lexicon.py` (fuente: la curva de olvido de `vocabulary`), y se calcula
+> **puro** sobre una sola lectura de cartas. La sesión incrustada desaparece y en su
+> lugar hay una tarjeta de entrada («N pendientes hoy» + **Estudiar**); si el
+> contenedor no ofrece el salto, el botón **no se pinta** y el texto explica dónde
+> se estudia. `ReviewQueueSection` **se queda** —la cola de competencia del drill es
+> superficie de **producción**, no de calificación de tarjetas—. **(C) Una sola
+> superficie de estudio.** `RetentionSession` → **`StudySession`**: deja de pedir la
+> cola y **recibe los ítems** y un `onGrade`, así que sirve para el mazo automático y
+> para uno manual sin saber cuál es. Desde «Mis listas»/packs la acción salta a
+> Flashcards con **esa colección filtrada** y **arranca sola**; el estado `reviewing`
+> y la sesión acotada de `AddVocabSection` desaparecen a favor de un
+> `onStudy(collectionId, label)` que **no sabe** cómo se navega. El **foco** vive en
+> `DictionaryScreen` y **no se persiste** (encargo de un solo salto, con `nonce`
+> para que un segundo clic reabra la sesión). Se conserva el candado de V3.77.2: el
+> resumen final **tiene** que ser alcanzable. **(D) Backend: tres tablas nuevas
+> aditivas** (`flashcard_decks` con `UNIQUE (user_id, name)`, `flashcard_cards` y
+> `flashcard_reviews`, **append-only**), así que **una BD de V3.77.2 se actualiza sin
+> que nadie pierda nada**. **El mazo automático es VIRTUAL** (`id = 0`, slug `auto`):
+> no es una fila, se sintetiza desde el léxico (currículum, chat, speaking, listas y
+> packs) y no se puede borrar, así que no hay que sembrarlo, no puede quedar
+> desincronizado y no existe el caso raro de «el alumno borró el mazo del sistema»;
+> sus cartas `lexicon` se siembran de forma **perezosa** antes de leerlas —depender
+> de que el alumno abra el panel de REVISAR sería un mazo que no enseña lo que
+> promete—. Módulos nuevos: `repositories/flashcards.py` (CRUD y contadores, sin
+> lógica) y `domain/flashcards.py`. **(E) FSRS: un tipo de carta nuevo y NINGÚN
+> segundo planificador.** `TARGET_TYPES` gana `"flashcard"`; las tarjetas a mano se
+> programan con el mismo `fsrs.schedule` y los cuatro grados de siempre. **Y se
+> cerró en el mismo commit la mitad que no era gratis:** el panel autograduable solo
+> excluía `objective`, así que sin excluir también `flashcard` **las tarjetas
+> manuales se colaban en el panel de REVISAR** y el alumno las habría calificado en
+> dos sitios a la vez —exactamente el doble escritor que M4 cerró—; ahora la
+> exclusión se declara **una sola vez** (`_PANEL_EXCLUDED_TARGET_TYPES`) y la usan
+> los tres sitios. **Los límites del día salen del ledger, no del scheduler:**
+> `flashcard_reviews` cuenta **cada calificación** y no cada tarjeta distinta,
+> porque Anki mide repasos, y `was_new` marca la primera vez; contar «cartas
+> distintas con `last_review_at` de hoy» no distingue nuevas de repaso ni cuenta
+> repeticiones. De ahí sale la definición de **nueva** —«nunca calificada en esta
+> superficie», leída del ledger y **no** el `reps` del scheduler, porque la siembra
+> de retención marca `reps = 1` en las cartas derivadas de la evidencia de las
+> lecciones—. El evento `flashcard:<id>:<grade>` se clasifica **`informative`**,
+> igual que `retention:`, y **nada de esto acredita mastery**. Endpoints nuevos:
+> `GET /api/vocabulary/decks`, `POST/PATCH/DELETE .../decks[/{id}]` (el automático
+> **rechaza** escritura), `GET .../decks/{id}/queue` (`limit` 1–100),
+> `POST .../decks/{id}/review`, `GET/POST/PATCH/DELETE .../decks/{id}/cards[/{id}]`
+> y `GET .../decks/{id}/stats`. Dos decisiones a no deshacer: **borrar arrastra** (la
+> tarjeta borra su carta FSRS; el mazo borra las de sus tarjetas) y **el endpoint
+> viejo no es un segundo escritor** (`POST /api/vocabulary/retention/review`
+> **delega** en el mismo servicio con el mazo automático, así que una palabra
+> calificada por ahí también cuenta en el ledger; si agendara por su cuenta contaría
+> como nueva para siempre y su revisión no aparecería en ninguna estadística).
+> **(F) La UI de Flashcards**, con cuatro subpestañas: **Estudiar** (cola unificada,
+> frente/dorso, 4 grados, límites del día y resumen alcanzable; orden clásico de
+> Anki: repasos vencidos antes que nuevas), **Mazos** (el automático sin renombrar
+> ni borrar + manuales con `new_per_day`/`review_per_day`, por defecto 10 y 50, y
+> borrado con confirmación), **Tarjetas** (filtro por texto y estado, orden y CRUD,
+> cada fila con su fuerza de memoria) y **Estadísticas** (hoy, 30 días, acierto, 14
+> días y previsión a 7). **La previsión excluye las nuevas a propósito**: su
+> `due_at` no anticipa cuándo las estudiará el alumno y contarlas prometería un día
+> que no depende de ellas. **(G) Contratos en la frontera**: `normalize.ts` gana
+> `normalizeDeckList`/`normalizeStudyQueue`/`normalizeFlashcardList`/
+> `normalizeFlashcardStats`, que es la regla que dejó V3.77.2. **Los tres candados
+> del plan muerden, comprobados revirtiendo el código:** sin `"flashcard"` en la
+> exclusión, `test_manual_cards_do_not_leak_into_fsrs_panel` falla; con
+> `new_remaining` grande, `test_queue_respects_new_per_day` falla; y sin el avance
+> del índice en `StudySession` —el fallo exacto de V3.77.2— los **3** tests del
+> resumen y de la salida fallan. **Deuda declarada:** la consulta del diccionario
+> **sigue sin alimentar el léxico** (invariante D3 de V3.77.0, no tocada), así que
+> buscar «however» no lo añade a PERSONAL —se declara como hueco explícito y
+> aparcado, no como efecto colateral—; el mazo automático y los manuales **no son
+> simétricos** (el automático no admite límites propios ni tarjetas a mano); la
+> migración es aditiva y **no migra datos**, así que una palabra que ya existía sale
+> como «sin estudiar» —la lectura honesta de «no consta»—; la tarjeta a mano guarda
+> **texto, no conocimiento** (no se comprueba que el reverso sea correcto); y una
+> sesión está topada en **100 tarjetas** por defensa, no por pedagogía. **SIN bump
+> de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, currículum intacto
+> (`1.3.1`), evaluaciones intactas y `LISTENING_BANK_VERSION` intacto.** **Los 7
+> gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+> `v3.75.8`. Verificación: `pytest` **2988/2988** + `ruff` limpio +
+> `transfer_validation OK=True` · `tsc` limpio · `vitest` **939/939** (106
+> ficheros) · build correcto · i18n `--strict` **1679 / 0 / 0 / 0** · contraste
+> **480 + 6 / 0 bloqueantes** · `check_release_consistency` OK en los **6 orígenes**
+> · `validation_gate.py auto` **10/10** · launcher **205/205** · Playwright
+> `drillProvenance` **2/2** y `vocabularyRoutesReview` **1/1** en desktop (el
+> barrido completo **no** se corrió en local; la autoridad es el CI). Detalle
+> completo en **`release-notes-v3.78.0.md`**.
+>
 > **Nota (2026-09-22 · cierre de la auditoría externa de V3.77.1): V3.77.2 —
 > release DE PRODUCTO (patch) de ENDURECIMIENTO sobre lo que la V3.77.1 dejó
 > abierto alrededor del diccionario personal.** Siete cosas, y **la primera no es

@@ -477,6 +477,20 @@ export interface LexicalItem {
   competence?: LexicalCompetence | null;
   // V3.35: historia longitudinal del ítem (puede faltar en respuestas viejas).
   evidence?: LexicalEvidence | null;
+  // V3.78.0: fuerza de memoria del scheduler FSRS. `null`/ausente si la palabra
+  // no tiene carta (nunca se ha programado un repaso para ella).
+  memory?: LexicalMemory | null;
+}
+
+/** Estado FSRS de una palabra, tal como lo ve PERSONAL (V3.78.0). */
+export interface LexicalMemory {
+  state: string;
+  due_at: string;
+  due: boolean;
+  reps: number;
+  stability: number;
+  retrievability: number;
+  next_in_days: number;
 }
 
 export interface DrillCandidates {
@@ -997,6 +1011,111 @@ export interface RetentionReviewResult {
   stability: number;
   retrievability: number;
   reps: number;
+}
+
+// --- V3.78.0: modo Flashcards ----------------------------------------------
+
+/** Tipos de tarjeta de la cola unificada: el léxico o una tarjeta a mano. */
+export type FlashcardCardType = "lexicon" | "flashcard";
+
+export interface FlashcardLimits {
+  new_per_day: number;
+  review_per_day: number;
+  new_remaining: number;
+  review_remaining: number;
+}
+
+export interface FlashcardDeck {
+  id: number;
+  name: string;
+  slug: string;
+  /** El mazo automático (id 0) es una vista del léxico: no se edita ni se borra. */
+  is_auto: boolean;
+  new_per_day: number;
+  review_per_day: number;
+  card_count: number;
+  due_count: number;
+  new_count: number;
+  reviewed_today: number;
+  limits?: FlashcardLimits | null;
+}
+
+export interface FlashcardDecks {
+  decks: FlashcardDeck[];
+  auto_deck_id: number;
+  fsrs_version: string;
+}
+
+export interface FlashcardCard {
+  id: number;
+  deck_id: number;
+  front: string;
+  back: string;
+  state: string;
+  reps: number;
+  due_at: string;
+  created_at: string;
+}
+
+export interface FlashcardCards {
+  cards: FlashcardCard[];
+}
+
+export interface FlashcardStudyItem {
+  card_type: FlashcardCardType;
+  card_id: string;
+  front: string;
+  back: string;
+  definition: string;
+  is_new: boolean;
+  state: string;
+  due_at: string;
+  reps: number;
+  retrievability: number;
+}
+
+export interface FlashcardQueue {
+  deck: FlashcardDeck;
+  items: FlashcardStudyItem[];
+  due_count: number;
+  new_count: number;
+  reviewed_today: number;
+  new_today: number;
+  limits: FlashcardLimits;
+  fsrs_version: string;
+}
+
+export interface FlashcardReviewResult {
+  card_type: FlashcardCardType;
+  card_id: string;
+  deck_id: number;
+  front: string;
+  back: string;
+  grade: number;
+  due_at: string;
+  next_in_days: number;
+  stability: number;
+  retrievability: number;
+  reps: number;
+}
+
+export interface FlashcardDayCount {
+  day: string;
+  total: number;
+  good: number;
+  count: number;
+}
+
+export interface FlashcardStats {
+  deck: FlashcardDeck;
+  cards_total: number;
+  reviewed_today: number;
+  new_today: number;
+  reviews_30d: number;
+  new_cards_30d: number;
+  accuracy_30d: number;
+  by_day: FlashcardDayCount[];
+  forecast: FlashcardDayCount[];
 }
 
 export type Bucket = "day" | "week" | "month";

@@ -5,9 +5,9 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1590,
- "literal_uses": 1096,
- "referenced_keys": 1271,
+ "defined": 1679,
+ "literal_uses": 1173,
+ "referenced_keys": 1359,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",
@@ -25,6 +25,7 @@
   "conversation-item",
   "crossSkill.channel.",
   "dictionary.drill.recallCue.",
+  "dictionary.inventory.source",
   "dictionary.kind.",
   "dictionary.lookup.direction.",
   "dictionary.review.activity.",

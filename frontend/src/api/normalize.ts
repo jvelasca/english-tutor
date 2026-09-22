@@ -27,6 +27,16 @@ import type {
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
   DrillCandidates,
+  FlashcardCard,
+  FlashcardCardType,
+  FlashcardCards,
+  FlashcardDayCount,
+  FlashcardDeck,
+  FlashcardDecks,
+  FlashcardLimits,
+  FlashcardQueue,
+  FlashcardStats,
+  FlashcardStudyItem,
   LexicalItem,
   LexicalStatus,
   Lexicon,
@@ -138,6 +148,24 @@ function normalizeLexicalItem(raw: Raw): LexicalItem {
   if ("lexical_unit" in raw) out.lexical_unit = asString(raw.lexical_unit);
   if ("competence" in raw) {
     out.competence = asRecordOrNull(raw.competence) as LexicalItem["competence"];
+  }
+  // V3.78.0: la fuerza de memoria solo se toca si viene. Si el backend no la
+  // manda (contrato viejo) la fila sale sin ella y PERSONAL pinta «sin
+  // estudiar», que es la lectura honesta de «no consta».
+  if ("memory" in raw) {
+    const memory = asRecordOrNull(raw.memory);
+    out.memory = memory
+      ? {
+          ...(memory as unknown as LexicalItem["memory"]),
+          state: asString(memory.state, "new"),
+          due_at: asString(memory.due_at),
+          due: asBoolean(memory.due),
+          reps: asNumber(memory.reps),
+          stability: asNumber(memory.stability),
+          retrievability: asNumber(memory.retrievability),
+          next_in_days: asNumber(memory.next_in_days),
+        }
+      : null;
   }
   return out;
 }
@@ -265,6 +293,142 @@ export function normalizeRetentionDue(raw: unknown): RetentionDue {
     limit: asNumber(data.limit),
     items: asRecordArray(data.items).map(normalizeRetentionCard),
     fsrs_version: asString(data.fsrs_version),
+  };
+}
+
+// --- V3.78.0: modo Flashcards ----------------------------------------------
+
+const CARD_TYPES: readonly FlashcardCardType[] = ["lexicon", "flashcard"];
+
+function asCardType(value: unknown): FlashcardCardType {
+  return CARD_TYPES.includes(value as FlashcardCardType)
+    ? (value as FlashcardCardType)
+    : "lexicon";
+}
+
+function normalizeFlashcardLimits(raw: unknown): FlashcardLimits {
+  const data = asRecordOrNull(raw) ?? {};
+  return {
+    new_per_day: asNumber(data.new_per_day),
+    review_per_day: asNumber(data.review_per_day),
+    new_remaining: asNumber(data.new_remaining),
+    review_remaining: asNumber(data.review_remaining),
+  };
+}
+
+function normalizeFlashcardDeck(raw: Raw): FlashcardDeck {
+  const out = {
+    ...(raw as unknown as FlashcardDeck),
+    id: asNumber(raw.id),
+    name: asString(raw.name),
+    slug: asString(raw.slug),
+    is_auto: asBoolean(raw.is_auto),
+    new_per_day: asNumber(raw.new_per_day),
+    review_per_day: asNumber(raw.review_per_day),
+    card_count: asNumber(raw.card_count),
+    due_count: asNumber(raw.due_count),
+    new_count: asNumber(raw.new_count),
+    reviewed_today: asNumber(raw.reviewed_today),
+  };
+  if ("limits" in raw) out.limits = normalizeFlashcardLimits(raw.limits);
+  return out;
+}
+
+/** `GET /api/vocabulary/decks`: `decks` siempre array. */
+export function normalizeDeckList(raw: unknown): FlashcardDecks {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    ...(data as unknown as FlashcardDecks),
+    decks: asRecordArray(data.decks).map(normalizeFlashcardDeck),
+    auto_deck_id: asNumber(data.auto_deck_id),
+    fsrs_version: asString(data.fsrs_version),
+  };
+}
+
+function normalizeFlashcardCard(raw: Raw): FlashcardCard {
+  return {
+    ...(raw as unknown as FlashcardCard),
+    id: asNumber(raw.id),
+    deck_id: asNumber(raw.deck_id),
+    front: asString(raw.front),
+    back: asString(raw.back),
+    state: asString(raw.state, "new"),
+    reps: asNumber(raw.reps),
+    due_at: asString(raw.due_at),
+    created_at: asString(raw.created_at),
+  };
+}
+
+/** `GET /api/vocabulary/decks/{id}/cards`. */
+export function normalizeFlashcardList(raw: unknown): FlashcardCards {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    ...(data as unknown as FlashcardCards),
+    cards: asRecordArray(data.cards).map(normalizeFlashcardCard),
+  };
+}
+
+function normalizeStudyItem(raw: Raw): FlashcardStudyItem {
+  return {
+    ...(raw as unknown as FlashcardStudyItem),
+    card_type: asCardType(raw.card_type),
+    card_id: asString(raw.card_id),
+    front: asString(raw.front),
+    back: asString(raw.back),
+    definition: asString(raw.definition),
+    is_new: asBoolean(raw.is_new),
+    state: asString(raw.state, "new"),
+    due_at: asString(raw.due_at),
+    reps: asNumber(raw.reps),
+    retrievability: asNumber(raw.retrievability),
+  };
+}
+
+/** `GET /api/vocabulary/decks/{id}/queue`: `items` y `limits` siempre presentes. */
+export function normalizeStudyQueue(raw: unknown): FlashcardQueue {
+  const data = isRecord(raw) ? raw : {};
+  const deck = asRecordOrNull(data.deck);
+  return {
+    ...(data as unknown as FlashcardQueue),
+    deck: deck
+      ? normalizeFlashcardDeck(deck)
+      : normalizeFlashcardDeck({ is_auto: true, id: 0 }),
+    items: asRecordArray(data.items).map(normalizeStudyItem),
+    due_count: asNumber(data.due_count),
+    new_count: asNumber(data.new_count),
+    reviewed_today: asNumber(data.reviewed_today),
+    new_today: asNumber(data.new_today),
+    limits: normalizeFlashcardLimits(data.limits),
+    fsrs_version: asString(data.fsrs_version),
+  };
+}
+
+function normalizeDayCount(raw: Raw): FlashcardDayCount {
+  return {
+    day: asString(raw.day),
+    total: asNumber(raw.total),
+    good: asNumber(raw.good),
+    count: asNumber(raw.count),
+  };
+}
+
+/** `GET /api/vocabulary/decks/{id}/stats`: los dos ejes siempre array. */
+export function normalizeFlashcardStats(raw: unknown): FlashcardStats {
+  const data = isRecord(raw) ? raw : {};
+  const deck = asRecordOrNull(data.deck);
+  return {
+    ...(data as unknown as FlashcardStats),
+    deck: deck
+      ? normalizeFlashcardDeck(deck)
+      : normalizeFlashcardDeck({ is_auto: true, id: 0 }),
+    cards_total: asNumber(data.cards_total),
+    reviewed_today: asNumber(data.reviewed_today),
+    new_today: asNumber(data.new_today),
+    reviews_30d: asNumber(data.reviews_30d),
+    new_cards_30d: asNumber(data.new_cards_30d),
+    accuracy_30d: asNumber(data.accuracy_30d),
+    by_day: asRecordArray(data.by_day).map(normalizeDayCount),
+    forecast: asRecordArray(data.forecast).map(normalizeDayCount),
   };
 }
 

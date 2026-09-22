@@ -1508,6 +1508,102 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   release cierra **una** autorización que faltaba en **dos** endpoints, no el
   modelo de identidad. `[PRODUCTO]`
 
+## V3.78.0 — el diccionario en tres modos y la única superficie de estudio (2026-09-22)
+
+> Origen: **una petición del gerente sobre la app en uso**, no una auditoría.
+> «Piensa si tal vez estaría mejor tener tres modos, no dos: CONSULTA, PERSONAL y
+> FLASHCARDS en este orden. El segundo se trata de ver las palabras aprendidas en
+> toda la APP y practicar con ellas. El tercero, copia de la app Anki: tarjetas
+> personalizables de control absoluto.» De ahí salieron las dos decisiones que
+> gobiernan la release: alcance **Anki-lite** (sin plantillas, cloze ni
+> import/export) y **una sola superficie de estudio** —Personal gestiona,
+> Flashcards estudia—. Notas en `release-notes-v3.78.0.md`.
+
+### Cerrado en V3.78.0 (deja de ser deuda)
+
+- **El diccionario tenía dos pestañas y una de ellas estudiaba.** PERSONAL
+  incrustaba una sesión de repaso y «Mis listas»/packs abrían otra acotada a su
+  colección: dos superficies de calificación para el mismo motor, con el mismo
+  gesto. Ahora hay **una** (`Flashcards`) y PERSONAL es el inventario —buscador,
+  filtro por estado, procedencia y fuerza de memoria por fila—, con un botón
+  «Estudiar» que salta con el mazo ya elegido.
+- **El dato que se guardaba y no se veía.** `vocabulary.source` (de dónde salió
+  cada palabra) se guardaba desde V3.77.0 y ninguna pantalla lo mostraba, así que
+  «¿de dónde salió esto?» era incontestable. Ahora es una columna filtrable de
+  PERSONAL.
+- **Las dos fuerzas que M4 separó, por fin visibles juntas.** El `recall`
+  (derivado de la evidencia) y el estado del scheduler FSRS responden a preguntas
+  distintas y hasta ahora solo se veía el primero. `GET /api/vocabulary/lexicon`
+  gana `memory` por fila, calculado **puro** sobre una lectura de cartas: no
+  añade conexiones.
+- **El mazo «de toda la app» ya existía y no se podía usar.** `sync_fsrs_cards`
+  siembra cartas `lexicon` desde toda la tabla `vocabulary`, que se puebla sola
+  desde currículum, chat, speaking/writing/conversation/pronunciation y el drill.
+  El mazo automático es una **vista** de eso (`id = 0`, virtual, no borrable), no
+  una copia: no hay nada que sembrar ni que pueda quedar desincronizado.
+- **El cierre de sesión de las tarjetas ahora es exacto.** Los límites diarios y
+  las estadísticas salían de deducir «cartas con `last_review_at` de hoy», que no
+  distingue nuevas de repaso ni cuenta repeticiones. El ledger
+  `flashcard_reviews` (append-only) los hace **exactos**.
+- **La deuda que el plan declaró y se cerró en el mismo commit:** sin excluir
+  `flashcard` del panel autograduable, las tarjetas manuales se colaban en
+  REVISAR. Se cerró con candado que muerde (verificado revirtiendo).
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **La consulta del diccionario no alimenta el léxico, y ahora se nota más.** Es
+  la invariante **D3** declarada en V3.77.0 y esta release **no** la toca: buscar
+  «however» en Consultar **no** lo añade a PERSONAL. Con PERSONAL presentado como
+  «las palabras aprendidas en toda la app», esa ausencia se lee como un hueco, y
+  se declara como hueco **explícito**: cambiarlo exige decidir antes si consultar
+  es estudiar, y eso es una decisión de producto, no un arreglo. Lo mismo vale
+  para listening y reading, que tampoco pueblan `vocabulary`. `[PRODUCTO]`
+- **El mazo automático y los manuales no son simétricos, y el automático es el
+  peor parado.** No se renombra, no se borra, **no admite límites propios** (usa
+  10 y 50) ni tarjetas escritas a mano —añadir a mano es lo que hacen las
+  listas—. Es coherente con ser una vista del léxico, pero significa que
+  «estudiar solo estas 20 palabras con tope 20» se consigue con una lista, no con
+  un mazo. `[PRODUCTO]`
+- **`FSRS-lite` sigue sin ser FSRS, ahora también para las tarjetas a mano.** Los
+  intervalos salen de la versión simplificada y declarada de
+  `domain/retention.py`, **sin** los parámetros por alumno que FSRS completo
+  ajusta con el historial. Una tarjeta escrita a mano no recibe un plan mejor que
+  una palabra del currículum: recibe el mismo. `[MOTOR]`
+- **El ledger no distingue de dónde vino la calificación.** Una palabra del léxico
+  calificada desde el endpoint viejo de retención cuenta como un repaso del mazo
+  automático —deliberado: es lo que evita dos contabilidades— pero «repasos de
+  hoy» incluye calificaciones hechas en otra pantalla. `[PRODUCTO]`
+- **La migración es aditiva y no migra datos.** Las tres tablas nacen vacías y las
+  palabras que ya existían **no tienen carta** hasta que alguien sincronice (lo
+  que hace el propio mazo automático al abrirse). Una palabra sin carta sale como
+  «sin estudiar», que es la lectura honesta de «no consta»; no se disimula con una
+  fecha inventada. `[PRODUCTO]`
+- **La tarjeta a mano guarda texto, no conocimiento.** Un anverso de 400
+  caracteres y un reverso de 2000, sin comprobar que el reverso sea correcto ni
+  que el anverso sea una pregunta. Es un bloc de notas con memoria, y se presenta
+  como tal. `[PRODUCTO]`
+- **Una sesión está topada en 100 tarjetas** (`QUEUE_MAX`, `limit ≤ 100`). No es
+  una medida pedagógica, es defensiva: una sesión no debe convertirse en un
+  atracón. `[PRODUCTO]`
+- **El barrido visual completo no se corrió en local**, igual que en V3.77.2: la
+  autoridad es el CI. Sí se corrieron las **dos** specs que tocan el diccionario, y
+  `drillProvenance.spec.ts` **tuvo que cambiar** —entra explícitamente a «Personal»
+  antes de buscar la entrada al drill, porque el defecto ya no es esa pestaña—.
+  Esa spec localiza la entrada con `li:has(button[aria-pressed]) button[aria-pressed]`
+  y la fila del léxico **conserva** ese botón. `[VALIDACIÓN]`
+
+### Aparcado por decisión de alcance (Anki-lite, declarado)
+
+- Tipos de nota personalizables con campos propios y **plantillas** frente/dorso;
+  **cloze deletion**.
+- **Importar/exportar** (CSV y `.apkg`), mazos filtrados, suspender/enterrar,
+  **leech** y opciones avanzadas por mazo (pasos de aprendizaje, orden de las
+  nuevas).
+- Que la **consulta del diccionario** y listening/reading alimenten `vocabulary`
+  (rompe la invariante D3 declarada; ver arriba).
+- Mover `ReviewQueueSection`/`wordDrill`: son la superficie de **producción**, no
+  la de tarjetas, y se quedan donde están.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

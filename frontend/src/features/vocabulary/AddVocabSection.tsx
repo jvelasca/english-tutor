@@ -16,14 +16,24 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
-import { RetentionSession } from "./RetentionSession";
 
 interface AddVocabSectionProps {
   userId: string;
   onChanged?: () => void;
+  /**
+   * V3.78.0: «Mis listas» y los packs ya no repasan DENTRO del diccionario.
+   * Calificar tarjetas tiene una sola superficie (Flashcards), así que estas
+   * acciones navegan allí con la colección ya filtrada. El componente no sabe
+   * cómo se hace ese salto: se lo dice el dueño de la navegación.
+   */
+  onStudy?: (opts: { collectionId: number; label: string }) => void;
 }
 
-export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
+export function AddVocabSection({
+  userId,
+  onChanged,
+  onStudy,
+}: AddVocabSectionProps) {
   const { t, lang } = useI18n();
   const [word, setWord] = useState("");
   const [translation, setTranslation] = useState("");
@@ -33,16 +43,6 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState(false);
-  /**
-   * V3.77.2: colección que se está repasando con una sesión de retención
-   * ACOTADA (`?collection_id=`). Antes «Mis listas» eran insignias mudas sin
-   * ninguna acción: el alumno veía sus listas y no podía hacer nada con ellas.
-   */
-  const [reviewing, setReviewing] = useState<VocabCollection | null>(null);
-
-  const toggleReview = useCallback((collection: VocabCollection) => {
-    setReviewing((prev) => (prev?.id === collection.id ? null : collection));
-  }, []);
 
   const refreshPacks = useCallback(async () => {
     try {
@@ -237,14 +237,23 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
                       /* V3.77.2: un pack ya activo no se «reactiva» (la
                          activación es idempotente y añadía 0). La acción útil
                          es repasarlo; «Actualizar» se retira para no prometer
-                         una operación que no cambia nada. */
+                         una operación que no cambia nada.
+                         V3.78.0: repasar = saltar a Flashcards con este mazo
+                         filtrado. Aquí no se califica ninguna tarjeta. */
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={busy}
-                        aria-expanded={reviewing?.id === pack.id}
-                        onClick={() => toggleReview(pack)}
+                        disabled={busy || !onStudy}
+                        onClick={() =>
+                          onStudy?.({
+                            collectionId: pack.id,
+                            label:
+                              lang === "es" && pack.title_es
+                                ? pack.title_es
+                                : pack.title,
+                          })
+                        }
                       >
                         {t("dictionary.add.review")}
                       </Button>
@@ -289,9 +298,13 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={busy || list.item_count === 0}
-                    aria-expanded={reviewing?.id === list.id}
-                    onClick={() => toggleReview(list)}
+                    disabled={busy || list.item_count === 0 || !onStudy}
+                    onClick={() =>
+                      onStudy?.({
+                        collectionId: list.id,
+                        label: list.title,
+                      })
+                    }
                   >
                     {t("dictionary.add.reviewList")}
                   </Button>
@@ -301,27 +314,6 @@ export function AddVocabSection({ userId, onChanged }: AddVocabSectionProps) {
           </div>
         ) : null}
       </Card>
-
-      {/* Sesión acotada a la colección elegida. La clave remonta el estado al
-          cambiar de lista para no arrastrar la cola anterior. */}
-      {reviewing ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold text-muted-foreground">
-            {t("dictionary.add.reviewScope").replace(
-              "{title}",
-              reviewing.title_es && lang === "es"
-                ? reviewing.title_es
-                : reviewing.title,
-            )}
-          </p>
-          <RetentionSession
-            key={reviewing.id}
-            userId={userId}
-            collectionId={reviewing.id}
-            onFinished={onChanged}
-          />
-        </div>
-      ) : null}
 
       {message ? (
         <p className="text-sm text-muted-foreground" role="status">

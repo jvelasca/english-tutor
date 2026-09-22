@@ -261,6 +261,44 @@ async def seed_objective_vocabulary(user_id: str, level, objective) -> bool:
     )
 
 
+def _lexicon_memory(cards: list[dict]) -> dict[str, dict]:
+    """Fuerza de memoria por palabra, a partir de las cartas FSRS existentes.
+
+    Pura y sin consultas: recibe TODAS las cartas del alumno (una sola lectura) y
+    devuelve `{word: memoria}`. Solo mira las `lexicon`, y el `explain` del
+    scheduler es cálculo, no E/S, así que enriquecer 500 palabras no añade ni una
+    conexión más.
+
+    V3.78.0. Vive aquí y no en `services/lexicon` porque su fuente es el
+    scheduler, no la curva de olvido derivada de la tabla `vocabulary`: son dos
+    fuerzas distintas (la que la app INFIERE de la evidencia y la que el repaso
+    PROGRAMÓ) y mezclarlas fue justo lo que M4 tuvo que separar.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    memory: dict[str, dict] = {}
+    for card in cards:
+        if str(card.get("target_type") or "") != "lexicon":
+            continue
+        word = str(card.get("target_id") or "")
+        if not word:
+            continue
+        explained = fsrs.explain(card, now=now_iso)
+        memory[word] = {
+            "state": str(card.get("state") or "new"),
+            "due_at": str(card.get("due_at") or ""),
+            "due": fsrs.is_due(card, now=now_iso),
+            "reps": int(card.get("reps") or 0),
+            "stability": float(card.get("stability") or 0),
+            "retrievability": float(
+                explained.get("how_strong", {}).get("retrievability") or 0
+            ),
+            "next_in_days": float(
+                explained.get("when", {}).get("next_in_days") or 0
+            ),
+        }
+    return memory
+
+
 async def get_lexicon(user_id: str) -> dict:
     """Léxico personal del alumno: `{summary, items, units}` por ítem léxico.
 
@@ -268,13 +306,25 @@ async def get_lexicon(user_id: str) -> dict:
     la curva de olvido y el scheduler de repaso existentes. V3.25.1 (P1-02):
     expone además el agregado por `lexical_unit` (`units`, con las superficies
     y su competencia propia) y el resumen por unidad (`summary.units`), sin
-    cambiar el contrato por superficie."""
+    cambiar el contrato por superficie.
+
+    V3.78.0: añade `memory` por fila —estado FSRS, `due_at`, `reps` y
+    recuperabilidad—, que es lo que convierte PERSONAL en un inventario donde se
+    ve la fuerza de memoria de cada palabra sin tener que entrar a estudiarla.
+    """
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     # V3.35 (Longitudinal Learning Evidence): evidencia fina del ledger por ítem
     # (`attempts`/`successes`/`days`/`intervals`), aditiva a los contadores
     # rápidos de `vocabulary`. Una sola consulta agregada, sin N+1.
     evidence_by_word = await run_in_threadpool(
         evidence_repo.summarize_by_target, user_id, target_type="lexicon"
+    )
+    # V3.78.0: fuerza de memoria por fila (PERSONAL como inventario). Se lee de
+    # las cartas `lexicon` que ya existen; NO se siembra aquí —`/lexicon` es una
+    # lectura y no debe materializar nada—, así que una palabra sin carta sale
+    # con `memory = None` («sin estudiar»), que es exactamente lo que es.
+    memory_by_word = _lexicon_memory(
+        await run_in_threadpool(academy_repo.list_fsrs_cards, user_id)
     )
     items = [
         {
@@ -301,6 +351,8 @@ async def get_lexicon(user_id: str) -> dict:
             "speaking_prod": row.get("speaking_prod", 0),
             "writing_prod": row.get("writing_prod", 0),
             "conversation_prod": row.get("conversation_prod", 0),
+            # V3.78.0: estado FSRS de la palabra (o None si nunca se programó).
+            "memory": memory_by_word.get(str(row["word"])),
         }
         for row in rows
     ]

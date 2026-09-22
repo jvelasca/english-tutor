@@ -74,8 +74,22 @@ function routeFetch() {
     { url: "/api/vocabulary/lexicon", data: LEXICON },
     { url: "/api/vocabulary/drill/candidates", data: { words: [] } },
     {
-      url: "/api/vocabulary/retention/due",
-      data: { due_count: 0, items: [], limit: 15, fsrs_version: "" },
+      url: "/api/vocabulary/decks",
+      data: {
+        auto_deck_id: 0,
+        decks: [
+          {
+            id: 0,
+            name: "auto",
+            is_auto: true,
+            new_per_day: 10,
+            review_per_day: 50,
+            card_count: 0,
+            due_count: 0,
+            new_count: 0,
+          },
+        ],
+      },
     },
     { url: "/api/vocabulary/collections", data: { collections: [] } },
     { url: "/api/learning/review", data: { items: [], units: [] } },
@@ -102,6 +116,10 @@ describe("DictionaryScreen · un solo h1 con las vistas reales (V3.77.2)", () =>
   });
 
   it("la vista Personal incrustada no duplica la cabecera de la página", async () => {
+    // V3.78.0: el defecto es `lookup`, así que la vista Personal se pide
+    // explícitamente para seguir midiendo lo mismo que se medía en V3.77.2.
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "personal");
+
     render(
       <I18nProvider lang="en" setLang={() => {}}>
         <DictionaryScreen userId="u1" />

@@ -12,22 +12,6 @@ vi.mock("../../api/vocabulary", () => ({
   enrollVocabCollection: vi.fn(),
 }));
 
-// V3.77.2: la sesión de repaso acotada se aísla para verificar que «Repasar»
-// abre la colección correcta sin montar el motor de FSRS.
-vi.mock("./RetentionSession", () => ({
-  RetentionSession: ({
-    userId,
-    collectionId,
-  }: {
-    userId: string;
-    collectionId?: number;
-  }) => (
-    <div data-testid="retention-session">
-      scoped:{collectionId ?? "all"}:{userId}
-    </div>
-  ),
-}));
-
 import {
   addVocabularyItem,
   enrollVocabCollection,
@@ -115,7 +99,7 @@ describe("AddVocabSection", () => {
     ).toBeTruthy();
   });
 
-  it("Mis listas son filas con recuento y repaso acotado", async () => {
+  it("«Mis listas» son filas con recuento y el repaso salta a Flashcards con esa lista", async () => {
     const USER_LIST = {
       id: 3,
       kind: "user_list",
@@ -130,29 +114,31 @@ describe("AddVocabSection", () => {
     vi.mocked(listVocabCollections).mockResolvedValue({
       collections: [USER_LIST],
     } as never);
+    const onStudy = vi.fn();
 
-    renderSection(<AddVocabSection userId="u1" />);
+    renderSection(<AddVocabSection userId="u1" onStudy={onStudy} />);
 
     // Antes: una insignia «My basics (4)» sin ninguna acción.
     expect(await screen.findByText("My basics")).toBeTruthy();
     expect(screen.getByText("4 items")).toBeTruthy();
-    expect(screen.queryByTestId("retention-session")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Review list" }));
 
-    // La sesión se abre ACOTADA a esa lista (`collection_id`) y declara el ámbito.
-    expect(screen.getByTestId("retention-session").textContent).toBe(
-      "scoped:3:u1",
-    );
-    expect(screen.getByText(/Reviewing/)).toBeTruthy();
+    // V3.78.0: aquí ya no se califica ninguna tarjeta. La lista se identifica y
+    // el contenedor es quien decide a dónde lleva (la pestaña Flashcards).
+    expect(onStudy).toHaveBeenCalledWith({
+      collectionId: 3,
+      label: "My basics",
+    });
   });
 
-  it("un pack ya activo declara el estado y se repasa en vez de reactivarse", async () => {
+  it("un pack ya activo declara el estado y se repasa en Flashcards en vez de reactivarse", async () => {
     vi.mocked(listVocabCollections).mockResolvedValue({
       collections: [{ ...PACK, enrolled: true }],
     } as never);
+    const onStudy = vi.fn();
 
-    renderSection(<AddVocabSection userId="u1" />);
+    renderSection(<AddVocabSection userId="u1" onStudy={onStudy} />);
 
     expect(await screen.findByText("In my dictionary")).toBeTruthy();
     // Reactivar era idempotente (añadía 0): ya no se ofrece como acción.
@@ -160,8 +146,23 @@ describe("AddVocabSection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
 
-    expect(screen.getByTestId("retention-session").textContent).toBe(
-      "scoped:7:u1",
-    );
+    expect(onStudy).toHaveBeenCalledWith({
+      collectionId: 7,
+      label: "Travel",
+    });
+  });
+
+  it("sin contenedor de estudio el repaso no se ofrece (no hay a dónde ir)", async () => {
+    // El diccionario incrustado en una ruta de destreza no tiene pestaña
+    // Flashcards. Un botón que no lleva a ninguna parte es peor que no tenerlo.
+    vi.mocked(listVocabCollections).mockResolvedValue({
+      collections: [{ ...PACK, enrolled: true }],
+    } as never);
+
+    renderSection(<AddVocabSection userId="u1" />);
+
+    expect(await screen.findByText("In my dictionary")).toBeTruthy();
+    const review = screen.getByRole("button", { name: "Review" }) as HTMLButtonElement;
+    expect(review.disabled).toBe(true);
   });
 });

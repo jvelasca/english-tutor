@@ -834,56 +834,202 @@ const STRINGS: Record<string, Entry> = {
     en: "My lexicon",
     es: "Mi léxico",
   },
-  "dictionary.retention.title": {
-    en: "Retention session",
-    es: "Sesión de retención",
+  // V3.78.0: la sesión de tarjetas deja de ser una tarjeta incrustada en Personal
+  // y pasa a ser el modo Flashcards. Las claves se RENOMBRAN (no se duplican) de
+  // `dictionary.retention.*` a `flashcards.study.*`, que es donde vive ahora.
+  "flashcards.study.title": {
+    en: "Study",
+    es: "Estudiar",
   },
-  "dictionary.retention.hint": {
-    en: "Quick flashcards with spaced repetition (FSRS). Grades only schedule the next review — they do not certify mastery.",
-    es: "Tarjetas rápidas con repetición espaciada (FSRS). Los grades solo programan el próximo repaso — no certifican dominio.",
+  "flashcards.study.hint": {
+    en: "Flashcards with spaced repetition (FSRS). Grades only schedule the next review — they do not certify mastery.",
+    es: "Tarjetas con repetición espaciada (FSRS). Los grades solo programan el próximo repaso — no certifican dominio.",
   },
-  "dictionary.retention.empty": {
+  "flashcards.study.empty": {
     en: "Nothing due right now. Add words or come back later.",
     es: "Nada pendiente ahora. Añade palabras o vuelve más tarde.",
   },
-  "dictionary.retention.start": {
+  "flashcards.study.start": {
     en: "Start session ({n})",
     es: "Empezar sesión ({n})",
   },
-  "dictionary.retention.finished": {
+  "flashcards.study.finished": {
     en: "Session done — {n} cards reviewed.",
     es: "Sesión terminada — {n} tarjetas repasadas.",
   },
-  "dictionary.retention.back": {
+  "flashcards.study.back": {
     en: "Back",
     es: "Volver",
   },
   // V3.77.2: acción de la pantalla de fin de sesión (antes inalcanzable porque
   // `load()` recargaba la cola y borraba el contador justo al terminar).
-  "dictionary.retention.refresh": {
+  "flashcards.study.refresh": {
     en: "Refresh",
     es: "Actualizar",
   },
-  "dictionary.retention.flip": {
+  "flashcards.study.flip": {
     en: "Flip card",
     es: "Voltear tarjeta",
   },
-  "dictionary.retention.tapReveal": {
+  "flashcards.study.tapReveal": {
     en: "Tap to reveal",
     es: "Toca para revelar",
   },
-  "dictionary.retention.reveal": {
+  "flashcards.study.reveal": {
     en: "Show answer",
     es: "Mostrar respuesta",
   },
-  "dictionary.retention.noFace": {
+  "flashcards.study.noFace": {
     en: "No translation cached yet — grade to schedule the review anyway.",
     es: "Aún no hay traducción en caché — puedes graduar para programar el repaso.",
   },
-  "dictionary.retention.exit": {
+  "flashcards.study.exit": {
     en: "End session",
     es: "Terminar sesión",
   },
+  "flashcards.study.progress": {
+    en: "{i} / {n}",
+    es: "{i} / {n}",
+  },
+  "flashcards.study.newCard": { en: "New", es: "Nueva" },
+  "flashcards.study.reviewCard": { en: "Review", es: "Repaso" },
+  "flashcards.study.pendingToday": {
+    en: "{n} cards due",
+    es: "{n} tarjetas pendientes",
+  },
+  "flashcards.study.deck": { en: "Deck", es: "Mazo" },
+  "flashcards.study.filtered": {
+    en: "List: {name}",
+    es: "Lista: {name}",
+  },
+  "flashcards.study.clearFilter": {
+    en: "Study the whole dictionary",
+    es: "Estudiar todo el diccionario",
+  },
+  "flashcards.study.deckHint": {
+    en: "The auto deck is everything the app has registered for you; a manual deck is only what you put in it.",
+    es: "El mazo automático es todo lo que la app ha registrado por ti; un mazo manual es solo lo que tú metes en él.",
+  },
+  "flashcards.study.limitsNote": {
+    en: "Today's limits: {new} new and {review} reviews.",
+    es: "Límites de hoy: {new} nuevas y {review} repasos.",
+  },
+  // Subpestañas del modo Flashcards.
+  "flashcards.viewsLabel": {
+    en: "Flashcard views",
+    es: "Vistas de tarjetas",
+  },
+  "flashcards.tabs.study": { en: "Study", es: "Estudiar" },
+  "flashcards.tabs.decks": { en: "Decks", es: "Mazos" },
+  "flashcards.tabs.cards": { en: "Cards", es: "Tarjetas" },
+  "flashcards.tabs.stats": { en: "Stats", es: "Estadísticas" },
+  // Mazos.
+  "flashcards.decks.title": { en: "My decks", es: "Mis mazos" },
+  "flashcards.decks.auto": {
+    en: "My dictionary",
+    es: "Mi diccionario",
+  },
+  "flashcards.decks.autoHint": {
+    en: "Everything the app has registered for you: curriculum, lessons, chat, speaking — and whatever you added by hand.",
+    es: "Todo lo que la app ha registrado por ti: currículum, lecciones, chat, speaking — y lo que has añadido a mano.",
+  },
+  "flashcards.decks.new": { en: "New deck", es: "Nuevo mazo" },
+  "flashcards.decks.namePlaceholder": { en: "Deck name", es: "Nombre del mazo" },
+  "flashcards.decks.create": { en: "Create", es: "Crear" },
+  "flashcards.decks.rename": { en: "Rename", es: "Renombrar" },
+  "flashcards.decks.delete": { en: "Delete", es: "Borrar" },
+  "flashcards.decks.deleteConfirm": {
+    en: "Delete “{name}” and its {n} cards? This cannot be undone.",
+    es: "¿Borrar «{name}» y sus {n} tarjetas? No se puede deshacer.",
+  },
+  "flashcards.decks.empty": {
+    en: "No manual decks yet. Create one for anything the app does not know about.",
+    es: "Aún no hay mazos manuales. Crea uno para lo que la app no conoce.",
+  },
+  "flashcards.decks.cards": { en: "{n} cards", es: "{n} tarjetas" },
+  "flashcards.decks.due": { en: "{n} due", es: "{n} pendientes" },
+  "flashcards.decks.limitsNew": { en: "New / day", es: "Nuevas / día" },
+  "flashcards.decks.limitsReview": { en: "Reviews / day", es: "Repasos / día" },
+  "flashcards.decks.save": { en: "Save", es: "Guardar" },
+  "flashcards.decks.study": { en: "Study", es: "Estudiar" },
+  "flashcards.decks.settings": { en: "Limits", es: "Límites" },
+  "flashcards.decks.notEditable": {
+    en: "The auto deck cannot be renamed or deleted.",
+    es: "El mazo automático no se puede renombrar ni borrar.",
+  },
+  "flashcards.decks.error": {
+    en: "Could not save the deck.",
+    es: "No se pudo guardar el mazo.",
+  },
+  // Tarjetas.
+  "flashcards.cards.title": { en: "Cards", es: "Tarjetas" },
+  "flashcards.cards.add": { en: "Add card", es: "Añadir tarjeta" },
+  "flashcards.cards.front": { en: "Front", es: "Anverso" },
+  "flashcards.cards.back": { en: "Back", es: "Reverso" },
+  "flashcards.cards.frontPlaceholder": {
+    en: "What you see first…",
+    es: "Lo que ves primero…",
+  },
+  "flashcards.cards.backPlaceholder": {
+    en: "What you must recall…",
+    es: "Lo que debes recordar…",
+  },
+  "flashcards.cards.edit": { en: "Edit", es: "Editar" },
+  "flashcards.cards.delete": { en: "Delete", es: "Borrar" },
+  "flashcards.cards.save": { en: "Save", es: "Guardar" },
+  "flashcards.cards.empty": {
+    en: "No cards yet. Add the first one.",
+    es: "Aún no hay tarjetas. Añade la primera.",
+  },
+  "flashcards.cards.noMatches": {
+    en: "No cards match the filter.",
+    es: "Ninguna tarjeta coincide con el filtro.",
+  },
+  "flashcards.cards.searchPlaceholder": {
+    en: "Search front or back…",
+    es: "Buscar en anverso o reverso…",
+  },
+  // V3.78.0: navegador de tarjetas — orden y fuerza de memoria por tarjeta.
+  "flashcards.cards.order": { en: "Order:", es: "Orden:" },
+  "flashcards.cards.orderRecent": { en: "Recent", es: "Recientes" },
+  "flashcards.cards.orderFront": { en: "A–Z", es: "A–Z" },
+  "flashcards.cards.orderDue": { en: "Due", es: "Vencimiento" },
+  "flashcards.cards.cardMemory": {
+    en: "{reps} reviews · next {due}",
+    es: "{reps} repasos · próxima {due}",
+  },
+  "flashcards.cards.cardNew": {
+    en: "Not studied yet",
+    es: "Sin estudiar todavía",
+  },
+  "flashcards.cards.pickDeck": {
+    en: "Pick a manual deck to see and edit its cards.",
+    es: "Elige un mazo manual para ver y editar sus tarjetas.",
+  },
+  "flashcards.cards.error": {
+    en: "Could not save the card.",
+    es: "No se pudo guardar la tarjeta.",
+  },
+  "flashcards.cards.stateNew": { en: "New", es: "Nueva" },
+  "flashcards.cards.stateLearning": { en: "Learning", es: "Aprendiendo" },
+  "flashcards.cards.stateReview": { en: "Review", es: "Repaso" },
+  // Estadísticas.
+  "flashcards.stats.title": { en: "Statistics", es: "Estadísticas" },
+  "flashcards.stats.today": { en: "Reviewed today", es: "Repasadas hoy" },
+  "flashcards.stats.total": { en: "Reviews (all time)", es: "Repasos (total)" },
+  "flashcards.stats.accuracy": { en: "Accuracy", es: "Acierto" },
+  "flashcards.stats.accuracyHint": {
+    en: "Good or Easy over every grade, in the last 30 days.",
+    es: "Good o Easy sobre el total de grades, en los últimos 30 días.",
+  },
+  "flashcards.stats.byDay": { en: "Last 14 days", es: "Últimos 14 días" },
+  "flashcards.stats.forecast": { en: "Next 7 days", es: "Próximos 7 días" },
+  "flashcards.stats.dueToday": { en: "Due today", es: "Pendientes hoy" },
+  "flashcards.stats.empty": {
+    en: "Nothing to show yet. One study session and this page fills up.",
+    es: "Aún no hay nada que mostrar. Con una sesión de estudio, esta página se llena.",
+  },
+  "flashcards.stats.noData": { en: "No data", es: "Sin datos" },
   "dictionary.add.section": {
     en: "Add vocabulary",
     es: "Añadir vocabulario",
@@ -953,14 +1099,12 @@ const STRINGS: Record<string, Entry> = {
     es: "En mi diccionario",
   },
   // V3.77.2: la activación es idempotente (reactivar añadía 0). En su lugar, un
-  // pack o una lista ya activos se REPASAN con una sesión acotada a su
-  // `collection_id`.
+  // pack o una lista ya activos se REPASAN. V3.78.0: repasar ya no abre una
+  // sesión aquí dentro (no hay dos superficies de estudio): salta a Flashcards
+  // con la colección filtrada, así que la clave del ámbito desaparece con la
+  // sesión acotada que la usaba.
   "dictionary.add.review": { en: "Review", es: "Repasar" },
   "dictionary.add.reviewList": { en: "Review list", es: "Repasar lista" },
-  "dictionary.add.reviewScope": {
-    en: "Reviewing “{title}”",
-    es: "Repasando «{title}»",
-  },
   "dictionary.add.enrollOk": {
     en: "Added {n} words from “{title}”.",
     es: "Se añadieron {n} palabras de «{title}».",
@@ -985,15 +1129,90 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not add the word.",
     es: "No se pudo añadir la palabra.",
   },
-  // V3.38.1: pantalla dedicada del diccionario (ruta `/diccionario`), con las
-  // mismas dos vistas que el conmutador incrustado de Vocabulary.
+  // V3.38.1: pantalla dedicada del diccionario (ruta `/diccionario`). V3.78.0 la
+  // reorganiza en TRES modos, en el orden en que se usan: consultar una palabra,
+  // ver el propio léxico y estudiarlo con tarjetas.
   "dictionary.screen.title": { en: "Dictionary", es: "Diccionario" },
   "dictionary.screen.subtitle": {
-    en: "Your personal dictionary and the look-up of any word.",
-    es: "Tu diccionario personal y la consulta de cualquier palabra.",
+    en: "Look up any word, see everything you have learned, and study it with flashcards.",
+    es: "Consulta cualquier palabra, mira todo lo que has aprendido y estúdialo con tarjetas.",
   },
-  "dictionary.tabs.personal": { en: "Personal", es: "Personal" },
   "dictionary.tabs.lookup": { en: "Look up", es: "Consultar" },
+  "dictionary.tabs.personal": { en: "Personal", es: "Personal" },
+  "dictionary.tabs.flashcards": { en: "Flashcards", es: "Flashcards" },
+  // V3.78.0: PERSONAL pasa a ser posesión y gestión (buscador, filtros y
+  // procedencia); el estudio se muda al modo Flashcards.
+  "dictionary.inventory.searchPlaceholder": {
+    en: "Search your lexicon…",
+    es: "Buscar en tu léxico…",
+  },
+  "dictionary.inventory.showing": {
+    en: "Showing {n} of {total}",
+    es: "Mostrando {n} de {total}",
+  },
+  "dictionary.inventory.noMatches": {
+    en: "No word matches that search or filter.",
+    es: "Ninguna palabra coincide con esa búsqueda o filtro.",
+  },
+  "dictionary.inventory.clear": { en: "Clear filters", es: "Quitar filtros" },
+  "dictionary.inventory.source": { en: "Origin", es: "Procedencia" },
+  "dictionary.inventory.sourceAll": { en: "All", es: "Todas" },
+  "dictionary.inventory.sourceCurriculum": {
+    en: "From the curriculum",
+    es: "Del currículum",
+  },
+  "dictionary.inventory.sourceUser": { en: "Added by me", es: "Añadida por mí" },
+  "dictionary.inventory.sourceImported": {
+    en: "Imported list",
+    es: "Lista importada",
+  },
+  "dictionary.inventory.memoryNew": { en: "Not studied", es: "Sin estudiar" },
+  "dictionary.inventory.memoryDue": { en: "Due now", es: "Pendiente" },
+  "dictionary.inventory.memoryNext": {
+    en: "Next in {n} d",
+    es: "Próxima en {n} d",
+  },
+  "dictionary.inventory.memoryTitle": {
+    en: "FSRS state: {state} · due {due} · stability {stability} d · retrievability {retrievability}%",
+    es: "Estado FSRS: {state} · vence {due} · estabilidad {stability} d · recordabilidad {retrievability}%",
+  },
+  "dictionary.inventory.search": {
+    en: "Search words",
+    es: "Buscar palabras",
+  },
+  "dictionary.inventory.filterStatus": {
+    en: "Filter by status",
+    es: "Filtrar por estado",
+  },
+  "dictionary.inventory.filterSource": {
+    en: "Filter by origin",
+    es: "Filtrar por procedencia",
+  },
+  "dictionary.inventory.studyTitle": {
+    en: "Study with flashcards",
+    es: "Estudiar con tarjetas",
+  },
+  "dictionary.inventory.studyPending": {
+    en: "{count} cards waiting today",
+    es: "{count} tarjetas esperando hoy",
+  },
+  "dictionary.inventory.studyDone": {
+    en: "Nothing due today.",
+    es: "Hoy no queda nada pendiente.",
+  },
+  "dictionary.inventory.studyUnknown": {
+    en: "Couldn't check what's pending today.",
+    es: "No se ha podido comprobar lo pendiente de hoy.",
+  },
+  "dictionary.inventory.studyAction": { en: "Study", es: "Estudiar" },
+  "dictionary.inventory.studyHint": {
+    en: "Studying happens in the Flashcards tab, where you grade each card.",
+    es: "El estudio vive en la pestaña Flashcards, donde calificas cada tarjeta.",
+  },
+  "dictionary.inventory.studyElsewhere": {
+    en: "Open the dictionary screen to study them in the Flashcards tab.",
+    es: "Abre la pantalla del diccionario para estudiarlas en la pestaña Flashcards.",
+  },
   // V3.30: diccionario de consulta (vista «Consultar»).
   "dictionary.viewsLabel": {
     en: "Dictionary views",

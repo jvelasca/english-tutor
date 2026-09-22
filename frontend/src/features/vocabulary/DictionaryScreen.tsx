@@ -1,19 +1,36 @@
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Layers, Search } from "lucide-react";
+import { useCallback, useState } from "react";
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
 import type { DictionaryView } from "../../utils/dictionaryView";
 import { cn } from "../../lib/utils";
 import { PersonalDictionary } from "./PersonalDictionary";
 import { DictionaryLookup } from "./DictionaryLookup";
+import { FlashcardsScreen } from "./FlashcardsScreen";
 
 const VIEWS: {
   id: DictionaryView;
   labelKey: string;
   Icon: typeof BookOpen;
 }[] = [
-  { id: "personal", labelKey: "dictionary.tabs.personal", Icon: BookOpen },
   { id: "lookup", labelKey: "dictionary.tabs.lookup", Icon: Search },
+  { id: "personal", labelKey: "dictionary.tabs.personal", Icon: BookOpen },
+  {
+    id: "flashcards",
+    labelKey: "dictionary.tabs.flashcards",
+    Icon: Layers,
+  },
 ];
+
+/** Petición de estudio: qué mazo/léxico abrir en Flashcards y con qué etiqueta. */
+interface StudyFocus {
+  collectionId: number | null;
+  label: string;
+  /** Cambia en cada petición para que un segundo clic vuelva a abrir la sesión. */
+  nonce: number;
+}
+
+const NO_FOCUS: StudyFocus = { collectionId: null, label: "", nonce: 0 };
 
 /**
  * Pantalla dedicada del diccionario (ruta `/diccionario`, V3.38.1).
@@ -21,16 +38,35 @@ const VIEWS: {
  * Hasta V3.38 el diccionario solo era alcanzable como vista incrustada dentro
  * de Vocabulary (APRENDER). Es una herramienta AUXILIAR del núcleo, así que
  * ahora tiene su propio destino en la navegación (tras un separador) y esta
- * pantalla reutiliza las dos vistas ya existentes —diccionario personal y
- * consulta— sin duplicar lógica.
+ * pantalla reutiliza las vistas ya existentes sin duplicar lógica.
  *
  * V3.39: la vista activa se persiste (localStorage + settings por usuario) con
  * `useDictionaryView`, así que al volver a abrir la app se recuerda la última
  * pestaña usada.
+ *
+ * V3.78.0: los dos modos pasan a TRES, en el orden en que se usan —Consultar ·
+ * Personal · Flashcards— y la pantalla se convierte en el punto de encuentro
+ * entre posesión y estudio: PERSONAL ya no estudia, gestiona, y su botón
+ * «Estudiar» (igual que el de una lista o un pack en «Añadir») cambia a
+ * Flashcards con el foco puesto. El foco vive aquí, no en la vista, porque es
+ * un encargo de una sola pantalla y no una preferencia que deba persistirse.
  */
 export function DictionaryScreen({ userId }: { userId: string | null }) {
   const { t } = useI18n();
   const { view, setView } = useDictionaryView(userId);
+  const [focus, setFocus] = useState<StudyFocus>(NO_FOCUS);
+
+  const openStudy = useCallback(
+    (opts: { collectionId?: number | null; label?: string } = {}) => {
+      setFocus((prev) => ({
+        collectionId: opts.collectionId ?? null,
+        label: opts.label ?? "",
+        nonce: prev.nonce + 1,
+      }));
+      setView("flashcards");
+    },
+    [setView],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -73,17 +109,28 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
         </div>
 
         <div className="min-h-0 flex-1">
-          {view === "personal" ? (
-            /* V3.77.2: la pantalla es la única dueña del layout (un solo `h1`
-               y un solo contenedor de ancho), igual que ya hacía con la vista
-               de consulta. */
-            <PersonalDictionary userId={userId} showHeader={false} />
-          ) : (
+          {view === "lookup" ? (
             /* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
                vista de consulta no repite cabecera (antes había dos `h1` en la
                misma página) ni vuelve a aplicar el ancho y el relleno de
                página, que ya pone este contenedor. */
             <DictionaryLookup userId={userId} showHeader={false} />
+          ) : view === "personal" ? (
+            /* V3.77.2: la pantalla es la única dueña del layout (un solo `h1`
+               y un solo contenedor de ancho). V3.78.0: PERSONAL ya no estudia;
+               `onStudy` es el puente al modo Flashcards. */
+            <PersonalDictionary
+              userId={userId}
+              showHeader={false}
+              onStudy={openStudy}
+            />
+          ) : (
+            <FlashcardsScreen
+              userId={userId}
+              focusCollectionId={focus.collectionId}
+              focusCollectionLabel={focus.label}
+              focusNonce={focus.nonce}
+            />
           )}
         </div>
       </div>
