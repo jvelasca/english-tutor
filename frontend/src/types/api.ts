@@ -480,6 +480,10 @@ export interface LexicalItem {
   // V3.78.0: fuerza de memoria del scheduler FSRS. `null`/ausente si la palabra
   // no tiene carta (nunca se ha programado un repaso para ella).
   memory?: LexicalMemory | null;
+  // V3.80.0: la traducción que escribió el alumno ('' si no escribió ninguna).
+  // Manda sobre el pack y la caché al resolver la cara B de la tarjeta; aquí
+  // viaja en solo lectura (se edita en la sesión de estudio).
+  translation?: string;
 }
 
 /** Estado FSRS de una palabra, tal como lo ve PERSONAL (V3.78.0). */
@@ -973,6 +977,13 @@ export interface VocabItemAddResult {
   item: { word: string; translation: string; definition: string };
 }
 
+/** Resultado de corregir la traducción propia de una palabra (V3.80.0). */
+export interface VocabItemTranslationResult {
+  word: string;
+  translation: string;
+  updated: boolean;
+}
+
 export interface VocabBulkAddResult {
   added: string[];
   collection_id: number | null;
@@ -1059,6 +1070,13 @@ export interface FlashcardCard {
 
 export interface FlashcardCards {
   cards: FlashcardCard[];
+}
+
+/** Resultado del pegado masivo de tarjetas (V3.80.0). */
+export interface FlashcardBulkAddResult {
+  deck_id: number;
+  added: string[];
+  count: number;
 }
 
 export interface FlashcardStudyItem {

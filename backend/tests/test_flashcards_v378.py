@@ -17,6 +17,8 @@ import sqlite3
 
 from fastapi.testclient import TestClient
 
+from domain import flashcards as flashcards_domain
+from domain import retention as retention_domain
 from main import app
 from repositories import academy as academy_repo
 from repositories import db
@@ -488,6 +490,164 @@ def test_review_rejects_unknown_card_type_and_grade(monkeypatch, tmp_path):
                 f"/api/vocabulary/decks/{deck_id}/review",
                 params={"user_id": a},
                 json={"card_type": "flashcard", "card_id": "1", "grade": 9},
+            ).status_code
+            == 422
+        )
+
+
+# --- Pegado masivo (V3.80.0) -----------------------------------------------
+
+
+def test_parser_is_shared_between_lexicon_and_cards():
+    """Una sola sintaxis de pegado: la misma función parte las dos pantallas.
+
+    Si esto se rompiera, el alumno tendría que recordar dos formatos para lo que
+    él ve como la misma acción («pego una lista»).
+    """
+    text = (
+        "# comentario\n\nbreak a leg, mucha suerte\n"
+        "take off\ttakeoff\n  solo anverso  \n"
+    )
+    assert retention_domain.parse_bulk_lines(text) == [
+        ("break a leg", "mucha suerte"),
+        ("take off", "takeoff"),
+        ("solo anverso", ""),
+    ]
+
+
+def test_bulk_cards_accept_phrases_the_lexicon_would_reject(monkeypatch, tmp_path):
+    """La validación NO se comparte, y es a propósito.
+
+    El léxico normaliza palabras (minúsculas, y «2nd place» no es una palabra
+    porque empieza por dígito); una tarjeta admite una frase entera tal cual se
+    escribe. Compartir el parser no debe arrastrar la validación de uno al otro.
+    """
+    a, _b = _setup(monkeypatch, tmp_path)
+    text = "Break a leg,mucha suerte\n2nd place,segundo puesto"
+    with TestClient(app) as client:
+        deck_id = _make_deck(client, a, "Frases")
+        res = client.post(
+            f"/api/vocabulary/decks/{deck_id}/cards/bulk",
+            params={"user_id": a},
+            json={"text": text},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["added"] == ["Break a leg", "2nd place"]
+
+        # El léxico, con el mismo texto: minúsculas y fuera lo que no es palabra.
+        lexicon = client.post(
+            "/api/vocabulary/items/bulk",
+            params={"user_id": a},
+            json={"text": text},
+        )
+        assert lexicon.status_code == 200, lexicon.text
+        assert lexicon.json()["added"] == ["break a leg"]
+
+
+def test_bulk_cards_dedupes_and_reports_only_what_entered(monkeypatch, tmp_path):
+    """`added` cuenta lo que entró de verdad, no lo que se intentó pegar."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck_id = _make_deck(client, a, "Con duplicados")
+        res = client.post(
+            f"/api/vocabulary/decks/{deck_id}/cards/bulk",
+            params={"user_id": a},
+            json={
+                "text": "one,uno\none,otra vez\n\n# nota\n\n  ,sin anverso\ntwo,dos"
+            },
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["added"] == ["one", "two"]
+        cards = client.get(
+            f"/api/vocabulary/decks/{deck_id}/cards", params={"user_id": a}
+        ).json()["cards"]
+        assert [c["front"] for c in cards] == ["one", "two"]
+        assert cards[0]["back"] == "uno"
+
+
+def test_bulk_cards_are_capped_and_leave_a_schedulable_state(monkeypatch, tmp_path):
+    """El tope existe y las tarjetas pegadas nacen nuevas, como las de una en una."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck_id = _make_deck(client, a, "Grande")
+        text = "\n".join(f"card {i}" for i in range(250))
+        res = client.post(
+            f"/api/vocabulary/decks/{deck_id}/cards/bulk",
+            params={"user_id": a},
+            json={"text": text},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["count"] == flashcards_domain.CARDS_BULK_MAX
+
+        cards = client.get(
+            f"/api/vocabulary/decks/{deck_id}/cards", params={"user_id": a}
+        ).json()["cards"]
+        assert len(cards) == flashcards_domain.CARDS_BULK_MAX
+        assert all(c["state"] == "new" and c["reps"] == 0 for c in cards)
+        # Y la cola del mazo las ve: el pegado no deja tarjetas invisibles.
+        queue = client.get(
+            f"/api/vocabulary/decks/{deck_id}/queue", params={"user_id": a}
+        ).json()
+        assert len(queue["items"]) > 0
+        assert {i["front"] for i in queue["items"]} <= {
+            c["front"] for c in cards
+        }
+
+
+def test_bulk_cards_rejects_the_auto_deck_and_other_users(
+    monkeypatch, tmp_path
+):
+    """El mazo automático no admite escritura, y el mazo de otro tampoco."""
+    a, b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        assert (
+            client.post(
+                f"/api/vocabulary/decks/{flashcards_repo.AUTO_DECK_ID}/cards/bulk",
+                params={"user_id": a},
+                json={"text": "one,uno"},
+            ).status_code
+            == 400
+        )
+        deck_id = _make_deck(client, a, "Privado")
+        assert (
+            client.post(
+                f"/api/vocabulary/decks/{deck_id}/cards/bulk",
+                params={"user_id": b},
+                json={"text": "one,uno"},
+            ).status_code
+            == 400
+        )
+        assert _count("flashcard_cards", "user_id = ?", (b,)) == 0
+        # El mazo ajeno no existe para él ni para leer.
+        assert client.get(
+            f"/api/vocabulary/decks/{deck_id}/cards", params={"user_id": b}
+        ).json()["cards"] == []
+
+
+def test_bulk_cards_with_nothing_usable_is_a_no_op(monkeypatch, tmp_path):
+    """Un pegado sin tarjetas válidas no es un error: es cero y se dice."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck_id = _make_deck(client, a, "Vacío")
+        res = client.post(
+            f"/api/vocabulary/decks/{deck_id}/cards/bulk",
+            params={"user_id": a},
+            json={"text": "\n\n# solo comentarios\n   "},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"deck_id": deck_id, "added": [], "count": 0}
+        assert _count("flashcard_cards", "user_id = ?", (a,)) == 0
+
+
+def test_bulk_cards_requires_a_body_with_text(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck_id = _make_deck(client, a, "Validación")
+        assert (
+            client.post(
+                f"/api/vocabulary/decks/{deck_id}/cards/bulk",
+                params={"user_id": a},
+                json={"text": ""},
             ).status_code
             == 422
         )

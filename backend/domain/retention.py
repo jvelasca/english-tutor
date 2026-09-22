@@ -33,10 +33,25 @@ def _normalize_word(raw: str) -> str | None:
     return text
 
 
-def _parse_bulk_lines(text: str) -> list[dict]:
-    """Una palabra por línea; opcional `word,translation` o `word\\ttranslation`."""
-    items: list[dict] = []
-    seen: set[str] = set()
+def parse_bulk_lines(text: str) -> list[tuple[str, str]]:
+    """Parte un pegado en pares `(izquierda, derecha)`, sin opinar sobre ellos.
+
+    V3.80.0: la sintaxis es **una sola** para lo que el alumno pega, porque el
+    alumno pega lo mismo en los dos sitios. La usan el léxico (`add_bulk`) y las
+    tarjetas a mano (`flashcards.add_cards_bulk`):
+
+    - una entrada por línea;
+    - `,` o tabulador separan «anverso» de «reverso» (`word,translation`,
+      `word\\ttranslation`); sin separador, el reverso es vacío;
+    - `#` comenta la línea y las líneas vacías se ignoran.
+
+    Lo que **no** se comparte es la validación de cada lado, y a propósito: el
+    léxico normaliza palabras (minúsculas, sin dígitos, hasta 80 caracteres) y
+    una tarjeta admite una frase entera («break a leg»). Por eso esta función
+    solo parte y cada llamante valida y acota lo suyo. Teniendo dos parsers, la
+    sintaxis de pegado acabaría divergiendo entre las dos pantallas.
+    """
+    pairs: list[tuple[str, str]] = []
     for line in (text or "").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -47,6 +62,15 @@ def _parse_bulk_lines(text: str) -> list[dict]:
             left, right = line.split(",", 1)
         else:
             left, right = line, ""
+        pairs.append((left.strip(), right.strip()))
+    return pairs
+
+
+def _parse_bulk_lines(text: str) -> list[dict]:
+    """Una palabra por línea; opcional `word,translation` o `word\\ttranslation`."""
+    items: list[dict] = []
+    seen: set[str] = set()
+    for left, right in parse_bulk_lines(text):
         word = _normalize_word(left)
         if not word or word in seen:
             continue
@@ -55,7 +79,7 @@ def _parse_bulk_lines(text: str) -> list[dict]:
             {
                 "word": word,
                 "lemma": word,
-                "translation": right.strip(),
+                "translation": right,
                 "kind": "word",
             }
         )
@@ -95,15 +119,43 @@ def _ensure_fsrs_lexicon(user_id: str, words: list[str], *, why: str) -> None:
         academy_repo.upsert_fsrs_cards(user_id, pending)
 
 
-def card_face(word: str, collection_id: int | None = None) -> dict:
-    """Cara B: traducción de pack o caché de diccionario.
+def card_face(
+    user_id: str, word: str, collection_id: int | None = None
+) -> dict:
+    """Cara B: la traducción del alumno, o la del pack, o la caché del diccionario.
 
     V3.78.0: deja de ser privada porque el modo Flashcards la reutiliza para el
     mazo automático. Es la MISMA cara que ve la sesión de retención: si hubiera
     dos constructores, la misma palabra podría enseñar dos reversos distintos
     según por dónde se entrara.
+
+    V3.80.0: la precedencia pasa a estar **declarada**, porque antes no había
+    nada que pudiera mandar —solo existían el pack y la caché— y la cara B vacía
+    era el estado normal (139 de 145 cartas del léxico sin reverso, medido en la
+    BD del alumno). El orden es, de más a menos autoridad:
+
+    1. **Lo que escribió el alumno** (`vocabulary.translation`). Es un dato
+       humano, suyo y explícito: si corrige una traducción, su corrección manda
+       sobre cualquier cosa que la app pudiera haber puesto ahí.
+    2. **El catálogo del pack** (`vocab_collection_items`), que es contenido
+       curado y compartido: una autoría mejor que la generada a máquina.
+    3. **La caché del diccionario** (`dictionary_entries`), que es lo que el
+       modelo local generó a demanda al consultar la palabra.
+
+    Y si no hay ninguna de las tres, devuelve vacío: **no inventa**. Una tarjeta
+    sin reverso es un dato («no consta»), no un error que haya que disimular con
+    una traducción de relleno. De ahí que la UI tenga que ofrecer generarla o
+    escribirla, en vez de dar por hecho que siempre hay algo que enseñar.
+
+    `user_id` no es opcional a propósito (V3.80.0): la precedencia depende de un
+    dato POR ALUMNO, así que una firma que lo omitiera sería una firma que miente
+    sobre lo que hace. Los tres llamantes lo tienen a mano.
     """
-    translation = collections_repo.translation_for_word(word, collection_id)
+    translation = str(
+        vocabulary_repo.translation_for_word(user_id, word) or ""
+    ).strip()
+    if not translation:
+        translation = collections_repo.translation_for_word(word, collection_id)
     definition = ""
     entry = dictionary_repo.get_entry(word)
     if entry:
@@ -185,7 +237,7 @@ async def add_item(
         user_id,
         touched,
     )
-    face = await run_in_threadpool(card_face, normalized, collection_id)
+    face = await run_in_threadpool(card_face, user_id, normalized, collection_id)
     return {"added": touched, "item": face}
 
 
@@ -353,7 +405,7 @@ async def retention_due(
     items = []
     for card in due:
         word = str(card.get("target_id") or "")
-        face = await run_in_threadpool(card_face, word, collection_id)
+        face = await run_in_threadpool(card_face, user_id, word, collection_id)
         explained = fsrs.explain(card, now=now_iso)
         items.append(
             {

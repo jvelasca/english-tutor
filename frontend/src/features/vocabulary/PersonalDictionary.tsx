@@ -675,6 +675,22 @@ function LexicalRow({ lexical }: { lexical: LexicalItem }) {
             {Math.round(lexical.recall * 100)}%
           </span>
         </div>
+        {/* V3.80.0: tu reverso, en solo lectura. Está aquí para que el
+            inventario diga qué palabras ya tienen cara B propia; se corrige en
+            la sesión de estudio (el título lo declara para no prometer un
+            campo editable que no existe en este sitio). */}
+        {lexical.translation ? (
+          <p
+            className="mt-1.5 truncate text-xs text-muted-foreground"
+            lang="es"
+            title={t("dictionary.inventory.ownTranslationTitle")}
+          >
+            {t("dictionary.inventory.ownTranslation").replace(
+              "{text}",
+              lexical.translation,
+            )}
+          </p>
+        ) : null}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <Badge className={cn(STATUS_TONE[lexical.status])}>{statusLabel}</Badge>

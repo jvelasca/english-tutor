@@ -23,6 +23,8 @@ from schemas.vocabulary import (
     DrillCandidatesOut,
     FlashcardCardIn,
     FlashcardCardOut,
+    FlashcardCardsBulkIn,
+    FlashcardCardsBulkOut,
     FlashcardCardsOut,
     FlashcardDeckIn,
     FlashcardDeckOut,
@@ -54,6 +56,8 @@ from schemas.vocabulary import (
     VocabEnrollOut,
     VocabItemAddIn,
     VocabItemAddOut,
+    VocabItemTranslationIn,
+    VocabItemTranslationOut,
     VocabularyAnalyzeRequest,
     VocabularyAnalyzeResponse,
     VocabularyEventOut,
@@ -715,6 +719,29 @@ async def add_vocabulary_item(
     return result
 
 
+@router.patch(
+    "/api/vocabulary/items", response_model=VocabItemTranslationOut
+)
+async def set_vocabulary_item_translation(
+    body: VocabItemTranslationIn, user: dict = Depends(current_user)
+) -> dict:
+    """Corrige la traducción propia de una palabra del léxico (V3.80.0).
+
+    Es la pieza que hace que la cara B de una tarjeta deje de ser un callejón sin
+    salida: el alumno escribe o corrige el reverso y su texto **manda** sobre el
+    pack y sobre la caché del diccionario. Solo escribe la fila del usuario de la
+    sesión y **no crea vocabulario**: si la palabra no está en su léxico, es un
+    404, no un alta encubierta (invariante D3)."""
+    result = await vocabulary_service.set_item_translation(
+        user["id"], body.word, body.translation
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail="Palabra no encontrada en tu léxico"
+        )
+    return result
+
+
 @router.post("/api/vocabulary/items/bulk", response_model=VocabBulkAddOut)
 async def add_vocabulary_bulk(
     body: VocabBulkAddIn, user: dict = Depends(current_user)
@@ -894,6 +921,28 @@ async def flashcard_review(
     )
     if result is None:
         raise HTTPException(status_code=400, detail="Review de tarjeta no válido")
+    return result
+
+
+@router.post(
+    "/api/vocabulary/decks/{deck_id}/cards/bulk",
+    response_model=FlashcardCardsBulkOut,
+)
+async def add_flashcard_cards_bulk(
+    deck_id: int, body: FlashcardCardsBulkIn, user: dict = Depends(current_user)
+) -> dict:
+    """Pega una lista de tarjetas: una por línea, `anverso,reverso` (V3.80.0).
+
+    Mismo parser que el pegado de palabras del léxico, para que el alumno solo
+    tenga que aprenderse una sintaxis. Sin efectos FSRS: las tarjetas nacen
+    «nuevas» y se programan al calificarlas, como las creadas de una en una."""
+    result = await flashcards_service.add_cards_bulk(
+        user["id"], deck_id, text=body.text
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=400, detail="Mazo no válido para añadir tarjetas"
+        )
     return result
 
 

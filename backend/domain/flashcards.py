@@ -39,6 +39,13 @@ QUEUE_MAX = 100
 CARD_TYPE_LEXICON = "lexicon"
 CARD_TYPE_FLASHCARD = "flashcard"
 
+#: Tope del pegado masivo de tarjetas, y cotas de cada lado. Son los mismos
+#: límites que valida `FlashcardCardIn` en el alta de una en una: el pegado no
+#: puede colar lo que la pantalla rechaza de una tarjeta suelta.
+CARDS_BULK_MAX = 200
+MAX_CARD_FRONT = 400
+MAX_CARD_BACK = 2000
+
 AUTO_DECK_NAME = "My dictionary"
 
 
@@ -149,12 +156,12 @@ async def _deck_entries(user_id: str, deck_id: int) -> list[dict]:
     return await _manual_cards(user_id, deck_id)
 
 
-async def _with_face(entry: dict) -> dict:
+async def _with_face(entry: dict, user_id: str) -> dict:
     """Completa la cara B de una tarjeta del léxico (traducción y definición)."""
     if entry["card_type"] != CARD_TYPE_LEXICON or entry["back"]:
         return entry
     face = await run_in_threadpool(
-        retention_domain.card_face, entry["card_id"], None
+        retention_domain.card_face, user_id, entry["card_id"], None
     )
     return {
         **entry,
@@ -418,6 +425,53 @@ async def create_card(
     )
 
 
+async def add_cards_bulk(
+    user_id: str, deck_id: int, *, text: str
+) -> dict | None:
+    """Pega una lista de tarjetas en un mazo manual (V3.80.0).
+
+    Una entrada por línea, `anverso,reverso` (coma o tabulador), con el MISMO
+    parser que el pegado de palabras del léxico (`retention.parse_bulk_lines`):
+    el alumno pega lo mismo en las dos pantallas, así que la sintaxis tiene que
+    ser la misma o la app le obligaría a recordar dos formatos.
+
+    `None` si el mazo no es del usuario o es el automático (que no admite
+    tarjetas escritas a mano, igual que `create_card`). Devuelve
+    `{deck_id, added, count}`; `added` son los anversos que entraron de verdad,
+    que es lo que la UI cuenta —no lo que se intentó pegar.
+    """
+    if deck_id == flashcards_repo.AUTO_DECK_ID:
+        return None
+    if await run_in_threadpool(flashcards_repo.get_deck, user_id, deck_id) is None:
+        return None
+
+    cards: list[dict] = []
+    seen: set[str] = set()
+    for left, right in retention_domain.parse_bulk_lines(text):
+        # El anverso se colapsa como en `create_card` (espacios internos), y el
+        # deduplicado es por esa forma: pegar dos veces la misma línea no debe
+        # crear dos tarjetas que el alumno no puede distinguir.
+        front = " ".join(left.split())[:MAX_CARD_FRONT]
+        if not front or front.casefold() in seen:
+            continue
+        seen.add(front.casefold())
+        cards.append({"front": front, "back": right[:MAX_CARD_BACK]})
+        if len(cards) >= CARDS_BULK_MAX:
+            break
+
+    if not cards:
+        return {"deck_id": int(deck_id), "added": [], "count": 0}
+
+    created = await run_in_threadpool(
+        flashcards_repo.create_cards, user_id, deck_id, cards
+    )
+    return {
+        "deck_id": int(deck_id),
+        "added": [row["front"] for row in created],
+        "count": len(created),
+    }
+
+
 async def update_card(
     user_id: str, deck_id: int, card_id: int, *, front: str, back: str
 ) -> dict | None:
@@ -496,7 +550,7 @@ async def deck_queue(
     now_iso = _now()
     items = []
     for entry in selected:
-        entry = await _with_face(entry)
+        entry = await _with_face(entry, user_id)
         card = entry["card"] or {}
         explained = fsrs.explain(card, now=now_iso)
         items.append(

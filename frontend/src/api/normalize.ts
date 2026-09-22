@@ -167,6 +167,10 @@ function normalizeLexicalItem(raw: Raw): LexicalItem {
         }
       : null;
   }
+  // V3.80.0: la traducción propia solo se toca si viene, por el mismo motivo
+  // que `memory`: un contrato viejo no debe inventar un reverso que el alumno
+  // no escribió.
+  if ("translation" in raw) out.translation = asString(raw.translation);
   return out;
 }
 

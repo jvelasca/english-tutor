@@ -1646,6 +1646,74 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   falla cambia de una ejecución a otra, y las mismas specs pasan en aislamiento
   sobre un árbol limpio. La autoridad es el CI. `[VALIDACIÓN]`
 
+## V3.80.0 — Flashcards a fondo: la cara B, el mazo y los packs como mazos listos (2026-09-22)
+
+> Origen: **el alumno usando la app**, no una auditoría. «En DICCIONARIO/FLASHCARDS
+> no funciona muy bien. En ESTUDIAR al dar a "Mostrar respuesta" indica que "Aún no
+> está en caché y no se muestra…". En MAZOS creo uno nuevo pero luego no sé cómo
+> añadir palabras y empezar a practicar con ellas. También tal vez debería haber
+> mazos predefinidos. Revisa bien cómo lo hacen las apps top.» Notas en
+> `release-notes-v3.80.0.md`.
+
+### Cerrado en V3.80.0 (deja de ser deuda)
+
+- **La cara B vacía era un dato que no existía, no un fallo de pintado.** 139 de
+  145 cartas del léxico del alumno sin traducción: `card_face` solo miraba el
+  catálogo de packs (75 pares) y la caché (`dictionary_entries`, 9 filas), y
+  `vocabulary` **no tenía columna de traducción** —el dato que `add_item`/`add_bulk`
+  ya recibían se tiraba—. Ahora hay columna aditiva, **precedencia declarada**
+  (alumno → pack → caché), `PATCH /api/vocabulary/items` para corregirla sin crear
+  léxico, y la traducción del pack se guarda al inscribirse.
+- **El mazo creado no era el que se editaba.** `CardsTab` tenía su propio `deckId`
+  y arrancaba en `manual[0]`, no en el recién creado: ahora la selección es única
+  y de la pantalla, crear un mazo salta a Tarjetas con el anverso enfocado y cada
+  fila manual tiene «Añadir tarjetas».
+- **No había forma de cargar tarjetas en bloque.** `POST .../cards/bulk` con el
+  **mismo parser** que el léxico (`parse_bulk_lines`), en una transacción y con
+  recuento real.
+- **No había mazos con los que empezar.** Sección «Mazos listos» con los
+  `theme_pack` globales: **Añadir** (materializa palabras + FSRS) o **Estudiar**
+  el mazo automático filtrado por ese pack, sin copiar contenido.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **Copiar un pack a un mazo propio editable.** Hoy un pack se *añade* (sus
+  palabras entran al léxico con su carta) o se *estudia* filtrado; no se puede
+  tomar como base y quitarle o cambiarle palabras sin tocar el catálogo. Es lo que
+  haría un usuario de Anki y **no está**. `[PRODUCTO]`
+- **El mismo pack aparece en dos sitios**: en «Añadir» de PERSONAL (añadir a mi
+  diccionario) y en «Mazos listos» de Flashcards (empezar a estudiar). La
+  duplicación es **deliberada** y está declarada, pero consolidarla en una sola
+  superficie con las dos acciones no se ha hecho. `[UI]`
+- **Un mazo listo se estudia con los límites del mazo automático** (10 nuevas /
+  50 repasos): no tiene fila de mazo donde guardar límites propios, así que no se
+  puede decir «20 palabras al día solo de viajes». `[PRODUCTO]`
+- **Ampliar el catálogo curado de packs** (más temas, más niveles): autoría de
+  contenido, no de motor. `[CONTENIDO]`
+- **Plantillas y campos propios, cloze, import/export `.apkg`/CSV, mazos
+  filtrados, suspender/enterrar, leech y opciones avanzadas por mazo**
+  (pasos de aprendizaje, orden de las nuevas). Es el resto de la lista de «lo que
+  hacen las apps top» que el alumno pidió revisar: **aparcado entero**, no como
+  deuda escondida. `[PRODUCTO]`
+- **El reverso generado no se guarda como propio del alumno.** Vive en la caché
+  del diccionario (`dictionary_entries`) y solo lo que **escribe** el alumno entra
+  en `vocabulary.translation`: no se le atribuye un texto que no ha escrito, pero
+  significa que el generado no se puede editar desde PERSONAL ni se conserva si la
+  caché se vacía. `[PRODUCTO]`
+- **La definición no es editable**, solo la traducción: el lápiz del estudio toca
+  el reverso y la definición del modelo se conserva como apoyo. `[UI]`
+- **La consulta del diccionario sigue sin alimentar el léxico** (invariante D3 de
+  V3.77.0, no tocada): buscar una palabra no la añade a PERSONAL. Con PERSONAL
+  presentado como «las palabras de toda la app», la ausencia se lee como hueco.
+  `[PRODUCTO]`
+- **El guardia `test_el_instrumento_no_escribe_en_data_ni_en_curriculum` es
+  sensible al entorno**: compara mtime de todo `backend/data`, incluido
+  `tutor.db`, así que **falla si el alumno tiene la app abierta** mientras corre
+  la suite. No se ha tocado (acotarlo a `curriculum/` y a las rutas que el
+  instrumento puede escribir debilitaría lo que protege, y hay que decidirlo con
+  cuidado). Se declara medido: falló una vez con la app viva y pasó en la segunda
+  pasada con la app ociosa. `[VALIDACIÓN]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

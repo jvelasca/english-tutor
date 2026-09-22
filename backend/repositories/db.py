@@ -967,6 +967,25 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE vocabulary ADD COLUMN kind TEXT NOT NULL DEFAULT 'word'"
             )
+        # V3.80.0: la traducción que escribió el ALUMNO, para esta palabra.
+        #
+        # Hasta ahora la cara B de una tarjeta salía del catálogo de packs (75
+        # pares) o de la caché del diccionario (que solo se puebla al consultar):
+        # medido en la BD del alumno, **139 de 145** cartas del léxico no tenían
+        # reverso, así que «Mostrar respuesta» en ESTUDIAR era un callejón sin
+        # salida para casi todo el mazo automático. `vocabulary` no guardaba
+        # traducción en ninguna columna, así que el dato que el alumno ya teclea
+        # al pegar una lista (`add_item`/`add_bulk` lo recibían y lo tiraban) se
+        # perdía.
+        #
+        # Columna ADITIVA con DEFAULT '': una BD anterior se abre sin migrar nada
+        # y las filas viejas quedan en '' (sin traducción propia), que es la
+        # lectura honesta de «no consta» y deja mandar al pack y a la caché.
+        if "translation" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN translation TEXT "
+                "NOT NULL DEFAULT ''"
+            )
 
         # Migración idempotente (V3.19): desglose de producción por destreza.
         # V3.19: desglose de producción por destreza. `vocabulary` conserva la

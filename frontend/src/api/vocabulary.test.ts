@@ -13,6 +13,7 @@ import {
   markDrillAbandoned,
   markDrillStarted,
   reviewRetentionCard,
+  setVocabularyTranslation,
   submitDrillAttempt,
   submitDrillRecallAttempt,
   submitDrillSentenceAttempt,
@@ -207,6 +208,28 @@ describe("vocabulary api", () => {
     const [url, init] = fn.mock.calls[0];
     expect(url).toBe("/api/vocabulary/items/bulk");
     expect(JSON.parse(init.body as string).title).toBe("Basics");
+  });
+
+  it("setVocabularyTranslation PATCH /items con {word, translation} (V3.80.0)", async () => {
+    const fn = mockFetch({ word: "anchor", translation: "ancla", updated: true });
+    const out = await setVocabularyTranslation("u1", "anchor", "ancla");
+    const [url, init] = fn.mock.calls[0];
+    expect(url).toBe("/api/vocabulary/items");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "anchor",
+      translation: "ancla",
+    });
+    // El resultado se devuelve tal cual: el llamante necesita saber si se
+    // actualizó de verdad para no pintar una corrección que no se guardó.
+    expect(out.updated).toBe(true);
+  });
+
+  it("setVocabularyTranslation admite borrar la propia con '' (V3.80.0)", async () => {
+    const fn = mockFetch({ word: "anchor", translation: "", updated: true });
+    await setVocabularyTranslation("u1", "anchor", "");
+    const [, init] = fn.mock.calls[0];
+    expect(JSON.parse(init.body as string).translation).toBe("");
   });
 
   it("listVocabCollections y enrollVocabCollection", async () => {

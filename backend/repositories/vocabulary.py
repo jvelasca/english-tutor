@@ -409,6 +409,7 @@ def get_vocabulary(user_id: str) -> list[dict]:
             "exposure_count, last_exposed_at, exposure_days, first_exposed_at, "
             "production_days, "
             "cefr, level_id, objective_id, source, lemma, kind, lexical_unit, "
+            "translation, "
             "chat_prod, speaking_prod, writing_prod, conversation_prod, "
             "retrieval_successes, retrieval_days, last_retrieval_at, "
             "recall_successes, recall_days, recall_attempts, last_recall_at, "
@@ -418,6 +419,40 @@ def get_vocabulary(user_id: str) -> list[dict]:
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def translation_for_word(user_id: str, word: str) -> str:
+    """Traducción que escribió el ALUMNO para esta palabra (V3.80.0). `''` si no hay."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT translation FROM vocabulary WHERE user_id = ? AND word = ?",
+            (user_id, str(word or "").strip().lower()),
+        ).fetchone()
+    return str(row["translation"]) if row else ""
+
+
+def set_translation(user_id: str, word: str, translation: str) -> bool:
+    """Fija la traducción propia de una palabra del léxico (V3.80.0).
+
+    Idempotente: escribir la misma traducción dos veces deja la fila igual. Solo
+    toca la palabra **del usuario de la sesión** (el `WHERE` lleva `user_id`) y
+    devuelve `False` si esa palabra no está en su léxico —editar una traducción
+    no debe inventar vocabulario que el alumno no tiene—.
+
+    Acepta `''` a propósito: borrar una traducción propia es una corrección
+    legítima (se equivocó al escribirla) y devuelve la precedencia al pack y a
+    la caché del diccionario.
+    """
+    normalized = str(word or "").strip().lower()
+    if not normalized:
+        return False
+    cleaned = str(translation or "").strip()[:500]
+    with closing(_conn()) as conn, conn:
+        cursor = conn.execute(
+            "UPDATE vocabulary SET translation = ? WHERE user_id = ? AND word = ?",
+            (cleaned, user_id, normalized),
+        )
+    return cursor.rowcount > 0
 
 
 def list_vocabulary_events(
@@ -539,6 +574,12 @@ def seed_study_items(
     Crea la fila si no existe con `production_count=0` / `exposure_count=0`.
     Si ya existe, no toca contadores ni pisa `source=curriculum`. Devuelve las
     superficies normalizadas efectivamente tocadas (nuevas o ya presentes).
+
+    V3.80.0: `translation` deja de tirarse. Es la traducción que el alumno
+    escribió (al añadir la palabra o al pegar una lista) y pasa a la columna
+    `vocabulary.translation`, que es la que manda sobre el pack y la caché del
+    diccionario al resolver la cara B. Nunca pisa una traducción existente con
+    un vacío: quien escribe `word` a secas no borra lo que ya había escrito.
     """
     if get_user(user_id) is None:
         return []
@@ -554,6 +595,7 @@ def seed_study_items(
             unit = lexical_unit_key(word, lemma)
             cefr = str(it.get("cefr") or "").strip()
             kind = str(it.get("kind") or "word").strip() or "word"
+            translation = str(it.get("translation") or "").strip()[:500]
             row = conn.execute(
                 "SELECT word, source FROM vocabulary "
                 "WHERE user_id = ? AND word = ?",
@@ -565,9 +607,9 @@ def seed_study_items(
                     "(user_id, word, production_count, first_seen, last_seen, "
                     "exposure_count, last_exposed_at, production_days, "
                     "cefr, level_id, objective_id, source, lemma, kind, "
-                    "lexical_unit) "
-                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, '', '', ?, ?, ?, ?)",
-                    (user_id, word, cefr, source, lemma, kind, unit),
+                    "lexical_unit, translation) "
+                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, '', '', ?, ?, ?, ?, ?)",
+                    (user_id, word, cefr, source, lemma, kind, unit, translation),
                 )
             else:
                 conn.execute(
@@ -576,10 +618,21 @@ def seed_study_items(
                     "cefr = CASE WHEN cefr = '' THEN ? ELSE cefr END, "
                     "lexical_unit = CASE WHEN lexical_unit = '' "
                     "THEN ? ELSE lexical_unit END, "
+                    "translation = CASE WHEN ? = '' THEN translation "
+                    "ELSE ? END, "
                     "source = CASE WHEN source = 'user' AND ? = 'imported' "
                     "THEN 'imported' ELSE source END "
                     "WHERE user_id = ? AND word = ?",
-                    (lemma, cefr, unit, source, user_id, word),
+                    (
+                        lemma,
+                        cefr,
+                        unit,
+                        translation,
+                        translation,
+                        source,
+                        user_id,
+                        word,
+                    ),
                 )
             touched.append(word)
     return touched

@@ -231,6 +231,10 @@ class LexicalItemOut(BaseModel):
     evidence: LexicalEvidence | None = None
     # V3.78.0: fuerza de memoria FSRS de la palabra (`None` si nunca se programó).
     memory: LexicalMemoryOut | None = None
+    # V3.80.0: la traducción que escribió el alumno (`''` si no escribió ninguna).
+    # Es la que manda sobre el pack y la caché al resolver la cara B de la
+    # tarjeta; aquí viaja en SOLO LECTURA (se edita en la sesión de estudio).
+    translation: str = ""
 
 
 class LexicalUnitSurfaceOut(BaseModel):
@@ -993,6 +997,25 @@ class VocabItemAddOut(BaseModel):
     item: VocabItemFaceOut
 
 
+class VocabItemTranslationIn(BaseModel):
+    """Corrección de la traducción propia de una palabra (V3.80.0).
+
+    `translation` admite `''` a propósito: borrar una traducción propia es una
+    corrección legítima y devuelve la precedencia al pack y a la caché del
+    diccionario. El tope de 500 coincide con el que aplica el repositorio, que
+    además lo vuelve a recortar: la validación de forma no es la del almacén.
+    """
+
+    word: str = Field(min_length=1, max_length=80)
+    translation: str = Field(default="", max_length=500)
+
+
+class VocabItemTranslationOut(BaseModel):
+    word: str
+    translation: str = ""
+    updated: bool = False
+
+
 class VocabBulkAddIn(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
     title: str = Field(default="", max_length=120)
@@ -1119,6 +1142,24 @@ class FlashcardCardsOut(BaseModel):
 class FlashcardCardIn(BaseModel):
     front: str = Field(min_length=1, max_length=400)
     back: str = Field(default="", max_length=2000)
+
+
+class FlashcardCardsBulkIn(BaseModel):
+    """Pegado masivo de tarjetas (V3.80.0): `text` trae una por línea.
+
+    Mismo contrato que el pegado del léxico (`VocabBulkIn`): se manda el texto
+    crudo y el servidor lo parte, en vez de que el cliente trocee y mande una
+    lista que podría traer formas distintas. `max_length` acota el campo, no el
+    número de tarjetas: de eso se encarga el dominio (`CARDS_BULK_MAX`).
+    """
+
+    text: str = Field(min_length=1, max_length=20000)
+
+
+class FlashcardCardsBulkOut(BaseModel):
+    deck_id: int
+    added: list[str] = Field(default_factory=list)
+    count: int = 0
 
 
 class FlashcardStudyItemOut(BaseModel):

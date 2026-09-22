@@ -31,6 +31,7 @@ import type {
   FlashcardCard,
   FlashcardCardType,
   FlashcardCards,
+  FlashcardBulkAddResult,
   FlashcardDeck,
   FlashcardDecks,
   FlashcardQueue,
@@ -44,6 +45,7 @@ import type {
   VocabCollections,
   VocabEnrollResult,
   VocabItemAddResult,
+  VocabItemTranslationResult,
 } from "../types/api";
 
 /** Léxico personal del alumno (V2.3): resumen + ítems con estado y recall. */
@@ -422,6 +424,21 @@ export function addVocabularyBulk(
   }).then(normalizeVocabBulkAdd);
 }
 
+/** Corrige la traducción propia de una palabra que YA está en el léxico
+ * (V3.80.0). Es la que manda sobre el pack y la caché al resolver la cara B.
+ * No da de alta vocabulario: si la palabra no está en el léxico, el backend
+ * responde 404 (invariante D3). Pasar `''` devuelve la precedencia al pack. */
+export function setVocabularyTranslation(
+  _userId: string,
+  word: string,
+  translation: string,
+): Promise<VocabItemTranslationResult> {
+  return patchJson<VocabItemTranslationResult>("/api/vocabulary/items", {
+    word,
+    translation,
+  });
+}
+
 export function listVocabCollections(
   _userId: string,
 ): Promise<VocabCollections> {
@@ -577,6 +594,25 @@ export function deleteFlashcard(
   return deleteJson<void>(
     `/api/vocabulary/decks/${deckId}/cards/${cardId}`,
     undefined,
+  );
+}
+
+/**
+ * Pega una lista de tarjetas en un mazo manual (V3.80.0).
+ *
+ * Una entrada por línea, `anverso,reverso` (coma o tabulador), con el MISMO
+ * parser que el pegado del léxico. Devuelve `added` (los anversos que entraron)
+ * y `count`, que es lo que la pantalla declara: lo que se creó de verdad, no lo
+ * que se intentó pegar.
+ */
+export function addFlashcardsBulk(
+  _userId: string,
+  deckId: number,
+  text: string,
+): Promise<FlashcardBulkAddResult> {
+  return postJson<FlashcardBulkAddResult>(
+    `/api/vocabulary/decks/${deckId}/cards/bulk`,
+    { text },
   );
 }
 

@@ -849,6 +849,20 @@ const STRINGS: Record<string, Entry> = {
     en: "Nothing due right now. Add words or come back later.",
     es: "Nada pendiente ahora. Añade palabras o vuelve más tarde.",
   },
+  // V3.80.0: «nada pendiente» y «el mazo está vacío» son estados distintos y
+  // solo uno tiene arreglo desde aquí. El vacío ofrece el camino para llenarlo.
+  "flashcards.study.emptyDeck": {
+    en: "This deck has no cards yet. Add the first one and it can be studied right away.",
+    es: "Este mazo aún no tiene tarjetas. Añade la primera y podrá estudiarse enseguida.",
+  },
+  "flashcards.study.emptyAuto": {
+    en: "Your dictionary has no words yet. Add them in Personal and they will show up here.",
+    es: "Tu diccionario aún no tiene palabras. Añádelas en Personal y aparecerán aquí.",
+  },
+  "flashcards.study.addCards": {
+    en: "Add cards",
+    es: "Añadir tarjetas",
+  },
   "flashcards.study.start": {
     en: "Start session ({n})",
     es: "Empezar sesión ({n})",
@@ -880,8 +894,41 @@ const STRINGS: Record<string, Entry> = {
     es: "Mostrar respuesta",
   },
   "flashcards.study.noFace": {
-    en: "No translation cached yet — grade to schedule the review anyway.",
-    es: "Aún no hay traducción en caché — puedes graduar para programar el repaso.",
+    en: "No reverse side yet — write it with the pencil, or grade to schedule the review anyway.",
+    es: "Sin reverso todavía — escríbelo con el lápiz, o gradúa para programar el repaso igualmente.",
+  },
+  // V3.80.0: la cara B deja de ser un callejón sin salida. Al voltear, si no hay
+  // reverso se pide al modelo local (con su caché); «Generando…» es honesto
+  // mientras tanto, y si el modelo no responde se dice sin bloquear la sesión.
+  "flashcards.study.generating": {
+    en: "Generating the reverse with the local model…",
+    es: "Generando el reverso con el modelo local…",
+  },
+  "flashcards.study.lookupFailed": {
+    en: "The local model did not answer. You can write the reverse yourself, or grade anyway.",
+    es: "El modelo local no ha respondido. Puedes escribir el reverso tú, o graduar igualmente.",
+  },
+  // El lápiz solo aparece en tarjetas del léxico: son las únicas cuya
+  // traducción propia se puede guardar (una tarjeta manual se edita en Tarjetas).
+  "flashcards.study.writeBack": {
+    en: "Write the reverse",
+    es: "Escribir el reverso",
+  },
+  "flashcards.study.fixBack": {
+    en: "Correct the reverse",
+    es: "Corregir el reverso",
+  },
+  "flashcards.study.backPlaceholder": {
+    en: "Reverse side (Spanish)",
+    es: "Reverso (español)",
+  },
+  "flashcards.study.ownBack": {
+    en: "Your version",
+    es: "Tu versión",
+  },
+  "flashcards.study.editError": {
+    en: "The reverse could not be saved.",
+    es: "No se ha podido guardar el reverso.",
   },
   "flashcards.study.exit": {
     en: "End session",
@@ -952,6 +999,9 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.decks.limitsReview": { en: "Reviews / day", es: "Repasos / día" },
   "flashcards.decks.save": { en: "Save", es: "Guardar" },
   "flashcards.decks.study": { en: "Study", es: "Estudiar" },
+  // V3.80.0: el camino que faltaba — Estudiar y Añadir tarjetas son acciones
+  // distintas y las dos se necesitan desde la fila del mazo.
+  "flashcards.decks.addCards": { en: "Add cards", es: "Añadir tarjetas" },
   "flashcards.decks.settings": { en: "Limits", es: "Límites" },
   "flashcards.decks.notEditable": {
     en: "The auto deck cannot be renamed or deleted.",
@@ -961,6 +1011,19 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not save the deck.",
     es: "No se pudo guardar el mazo.",
   },
+  // V3.80.0: «Mazos listos» — los packs que ya existen, ofrecidos como mazo.
+  "flashcards.decks.readyTitle": { en: "Ready-made decks", es: "Mazos listos" },
+  "flashcards.decks.readyHint": {
+    en: "Word packs already in the app. Add one and its words join your dictionary with their review schedule; then study it filtered, without copying anything.",
+    es: "Packs de palabras que ya trae la app. Añade uno y sus palabras entran en tu diccionario con su plan de repaso; luego lo estudias filtrado, sin copiar nada.",
+  },
+  "flashcards.decks.readyItems": {
+    en: "{n} words · {cefr}",
+    es: "{n} palabras · {cefr}",
+  },
+  "flashcards.decks.readyAdd": { en: "Add", es: "Añadir" },
+  "flashcards.decks.readyAdded": { en: "{n} added", es: "{n} añadidas" },
+  "flashcards.decks.readyEnrolled": { en: "In your dictionary", es: "En tu diccionario" },
   // Tarjetas.
   "flashcards.cards.title": { en: "Cards", es: "Tarjetas" },
   "flashcards.cards.add": { en: "Add card", es: "Añadir tarjeta" },
@@ -1005,6 +1068,38 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.cards.pickDeck": {
     en: "Pick a manual deck to see and edit its cards.",
     es: "Elige un mazo manual para ver y editar sus tarjetas.",
+  },
+  // V3.80.0: el mazo recién creado se abre aquí con el anverso enfocado; esta
+  // línea es la respuesta a «creo un mazo y no sé cómo añadir palabras».
+  "flashcards.cards.createdHint": {
+    en: "Deck selected. Write the front and the back below; the card will be ready to study immediately.",
+    es: "Mazo seleccionado. Escribe abajo el anverso y el reverso; la tarjeta quedará lista para estudiar enseguida.",
+  },
+  "flashcards.cards.goToDecks": {
+    en: "Create a deck",
+    es: "Crear un mazo",
+  },
+  // V3.80.0: pegado masivo de tarjetas. Misma sintaxis que el pegado del léxico,
+  // y se muestra con un ejemplo: un formato que hay que adivinar no se usa.
+  "flashcards.cards.bulkTitle": {
+    en: "Paste a list",
+    es: "Pegar una lista",
+  },
+  "flashcards.cards.bulkHint": {
+    en: "One card per line, front,back (comma or tab). Lines starting with # are ignored. Same format as the word lists.",
+    es: "Una tarjeta por línea, anverso,reverso (coma o tabulador). Las líneas que empiezan por # se ignoran. Mismo formato que las listas de palabras.",
+  },
+  "flashcards.cards.bulkPlaceholder": {
+    en: "break a leg,mucha suerte\ntake off,despegar",
+    es: "break a leg,mucha suerte\ntake off,despegar",
+  },
+  "flashcards.cards.bulkAdd": {
+    en: "Add all",
+    es: "Añadir todas",
+  },
+  "flashcards.cards.bulkDone": {
+    en: "{n} cards added.",
+    es: "{n} tarjetas añadidas.",
   },
   "flashcards.cards.error": {
     en: "Could not save the card.",
@@ -1175,6 +1270,17 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.inventory.memoryTitle": {
     en: "FSRS state: {state} · due {due} · stability {stability} d · retrievability {retrievability}%",
     es: "Estado FSRS: {state} · vence {due} · estabilidad {stability} d · recordabilidad {retrievability}%",
+  },
+  // V3.80.0: la traducción propia, en SOLO LECTURA. Se ve aquí para saber qué
+  // reverso tiene ya la palabra; se corrige en la sesión de estudio, sobre la
+  // cara B revelada, que es donde el alumno ve el hueco y quiere taparlo.
+  "dictionary.inventory.ownTranslation": {
+    en: "Your reverse: {text}",
+    es: "Tu reverso: {text}",
+  },
+  "dictionary.inventory.ownTranslationTitle": {
+    en: "The reverse you wrote. It wins over the pack and the dictionary cache; it is edited while studying.",
+    es: "El reverso que escribiste. Manda sobre el pack y la caché del diccionario; se edita al estudiar.",
   },
   "dictionary.inventory.search": {
     en: "Search words",

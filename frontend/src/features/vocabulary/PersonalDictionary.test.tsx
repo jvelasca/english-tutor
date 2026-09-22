@@ -591,6 +591,34 @@ describe("PersonalDictionary · V3.78.0 inventario (buscador, filtros, memoria)"
 
     expect(ticket.textContent).toContain("Due now");
   });
+
+  it("muestra tu reverso en solo lectura y no lo pinta si no lo escribiste", async () => {
+    // V3.80.0: el inventario dice qué palabras ya tienen cara B propia. Se
+    // muestra, no se edita: el título declara dónde se corrige para no
+    // prometer un campo que aquí no existe.
+    const withOwnBack: Lexicon = {
+      ...INVENTORY,
+      items: [
+        { ...INVENTORY.items[0], translation: "aeropuerto" },
+        INVENTORY.items[1],
+      ],
+    };
+    routeFetch([{ url: "/api/vocabulary/lexicon", data: withOwnBack }]);
+    renderPanel(<PersonalDictionary userId="u1" showHeader={false} />);
+
+    const airport = (await screen.findByText("airport")).closest("li")!;
+    expect(airport.textContent).toContain("Your reverse: aeropuerto");
+    // El título declara dónde se corrige (no editable aquí, y se dice).
+    expect(
+      airport
+        .querySelector("p[title]")
+        ?.getAttribute("title"),
+    ).toContain("edited while studying");
+
+    // Una palabra sin traducción propia no arrastra la fila ni un hueco vacío.
+    const ticket = (await screen.findByText("ticket")).closest("li")!;
+    expect(ticket.textContent).not.toContain("Your reverse");
+  });
 });
 
 describe("PersonalDictionary · V3.33 paso Recognition", () => {

@@ -4,6 +4,72 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.80.0] — 2026-09-22
+
+**Release de PRODUCTO (minor) que rehace a fondo el estudio de Flashcards: la cara B deja de ser un
+callejón sin salida, el mazo pasa a ser UNA selección con un camino claro para meterle palabras, se
+puede pegar una lista de tarjetas y se ofrecen como mazos los packs que ya existen. CON migración de BD
+aditiva** (una columna: `vocabulary.translation TEXT NOT NULL DEFAULT ''`, con el `ALTER TABLE`
+idempotente de siempre, así que **una BD de V3.79.0 se abre sin que nadie pierda nada** y las filas
+viejas quedan en `''`, que es la lectura honesta de «no consta»), **SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar las
+evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** No añade ni retira un gate: G1–G7 siguen `pending`
+y el árbol que se certifica sigue siendo el de `v3.75.8`. **(A) «Mostrar respuesta» no mostraba respuesta
+porque el dato no existía, no porque fallara el pintado:** medido en la BD del alumno, **139 de 145**
+cartas del léxico no tenían traducción, y `card_face` solo miraba el catálogo de packs (75 pares) y la
+caché `dictionary_entries` (9 filas, se puebla al consultar) — `vocabulary` **no tenía columna donde
+guardar una traducción**, así que el dato que el alumno ya teclea al pegar una lista (`add_item`/
+`add_bulk` lo reciben desde V3.77.0) **se estaba tirando**. Ahora hay columna, la precedencia está
+**declarada** en `card_face` —**lo que escribió el alumno** → catálogo del pack (autoría curada) → caché
+del diccionario (generada)—, `PATCH /api/vocabulary/items` (`{word, translation}`) corrige **solo** la
+fila del usuario de la sesión (escribe, acota a 500 y es idempotente, pero **no crea vocabulario**: si la
+palabra no está en su léxico es 404, invariante D3) y `seed_study_items` guarda la traducción del pack al
+inscribirse, así que **añadir un pack deja sus palabras ya con reverso**. Sin ninguna de las tres fuentes
+`card_face` devuelve vacío **a propósito**: una tarjeta sin reverso es un dato, no un error que disimular
+con relleno. `user_id` deja de ser opcional en `card_face` porque la precedencia depende de un dato **por
+alumno** y una firma que lo omitiera mentiría sobre lo que hace. **(B) La sesión rellena el reverso al
+voltear y se puede corregir.** `StudySession` pide la traducción al voltear una tarjeta sin reverso con
+el cliente que ya existía (`lookupDictionaryWord`: caché global + generación del modelo local, timeout
+120 s) y la pinta con un «Generando el reverso con el modelo local…» honesto; a partir de ahí la caché la
+sirve gratis. **Si el modelo local no está, la sesión no se bloquea:** se dice qué pasa y se puede
+**calificar igual** —ese era el fallo de fondo, bloquear el estudio por un dato accesorio—. Un **lápiz
+sobre el reverso revelado** lo escribe o lo corrige, y su texto **pasa a mandar** sobre el generado; el
+lápiz **no** aparece en tarjetas manuales, porque ya tienen su reverso editable y su sitio es Tarjetas.
+`flashcards.study.noFace` deja de ser el estado normal y solo aparece si ni pidiéndolo ni escribiéndolo
+hay reverso. **(C) El mazo es UNA selección, no una por pestaña, y eso era el «creo un mazo y no sé cómo
+añadir palabras».** `FlashcardsScreen` guardaba `deckId` para Estudiar/Estadísticas pero `CardsTab` tenía
+**su propio** estado y arrancaba en `manual[0]` —el primero por orden alfabético, no el recién creado—:
+el backend servía y calificaba mazos manuales perfectamente y **faltaba el cableado**. Ahora la selección
+se sube a la pantalla (el patrón de Anki: el mazo es global, no un estado por pestaña) y se pasa a
+Estudiar, Tarjetas y Estadísticas; **crear un mazo** lo selecciona y salta a Tarjetas con el anverso
+enfocado más una línea de qué hacer ahora; **«Añadir tarjetas»** aparece en cada fila de mazo manual
+—dos acciones distintas que se necesitan las dos—; **estudiar un mazo vacío** no abre una sesión de 0,
+lo dice y ofrece añadir palabras; y si el **mazo automático** está vacío manda a Personal en vez de
+ofrecer un atajo inerte. **(D) Pegar una lista de tarjetas con el MISMO parser que el léxico:**
+`POST /api/vocabulary/decks/{deck_id}/cards/bulk` (`{text}`), una tarjeta por línea `anverso,reverso`
+(coma o tabulador, `#` comenta), con `_parse_bulk_lines` promovido a función pública (`parse_bulk_lines`)
+y usado por **los dos** —el alumno pega lo mismo en las dos pantallas y con dos parsers la sintaxis
+acabaría divergiendo—; lo que **no** se comparte es la validación, y a propósito (el léxico normaliza
+palabras; una tarjeta admite «break a leg»). La escritura va en **una transacción** (`create_cards`), no
+en un bucle de 40 conexiones, deduplica por anverso y **el recuento que se enseña es el que entró de
+verdad**, no el de las líneas pegadas. **(E) Mazos listos: los packs que ya existen** (comida, trabajo,
+viajes…) en la pestaña Mazos, **cero backend nuevo** —`GET /api/vocabulary/collections` y `POST
+.../enroll`—: sin activar → **Añadir** (materializa palabras + carta FSRS), activado → **Estudiar**, que
+abre el **mazo automático filtrado por ese pack** (`collection_id`, que la cola ya soportaba y StudyTab
+ya pintaba), sin copiar contenido; si el catálogo viniera vacío el bloque no se pinta. **Los cinco
+candados muerden, comprobado revirtiendo el código y no razonando sobre él:** devuelta la precedencia a
+«solo pack y caché», **4** tests de `test_back_face_v380.py` fallan (`assert '' == 'ancla'`); quitado el
+tabulador del parser compartido, **6** tests fallan; quitado `hydrate` del volteo, **3** de
+`StudySession`; quitado el `setDeckId` de `openCardsFor`, falla «crear un mazo lo selecciona…»; y pasado
+`null` en vez del `collection_id`, falla «un mazo listo… se estudia filtrado». Verificación: `pytest`
+**3008/3008** + `ruff` limpio · `tsc` limpio · `vitest` **965/965** (108 ficheros) · build correcto ·
+i18n `--strict` **1706** cadenas con 0 huérfanas / 0 usadas sin definir / 0 duplicadas · contraste 480
+pares con 0 bloqueantes · `check_release_consistency` OK en los **6 orígenes** · `validation_gate.py
+auto` **10/10** · launcher **205/205** · Playwright `vocabularyRoutesReview` + `drillProvenance` +
+`profileDialog` verdes. Tests nuevos: `backend/tests/test_back_face_v380.py` (**9**),
+`test_flashcards_v378.py` (**7**), `FlashcardsScreen.test.tsx` (**8**), `StudySession.test.tsx` (**7**),
+`PersonalDictionary.test.tsx` (**1**) y `api/vocabulary.test.ts` (**2**). Ver `release-notes-v3.80.0.md`.
+
 ## [3.79.0] — 2026-09-22
 
 **Release de PRODUCTO (patch) que cierra los DOS fallos que el alumno reportó en el perfil: el diálogo

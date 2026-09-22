@@ -311,6 +311,11 @@ async def get_lexicon(user_id: str) -> dict:
     V3.78.0: añade `memory` por fila —estado FSRS, `due_at`, `reps` y
     recuperabilidad—, que es lo que convierte PERSONAL en un inventario donde se
     ve la fuerza de memoria de cada palabra sin tener que entrar a estudiarla.
+
+    V3.80.0: expone `translation` por fila —la que escribió el alumno, `''` si no
+    escribió ninguna—. PERSONAL la muestra en **solo lectura** en este release:
+    se edita en la sesión de estudio, sobre la cara B revelada, que es donde el
+    alumno ve el hueco y quiere taparlo.
     """
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     # V3.35 (Longitudinal Learning Evidence): evidencia fina del ledger por ítem
@@ -333,6 +338,9 @@ async def get_lexicon(user_id: str) -> dict:
             "cefr": row.get("cefr", ""),
             "kind": row.get("kind", "word"),
             "source": row.get("source", "user"),
+            # V3.80.0: la traducción propia del alumno (`''` si no escribió
+            # ninguna). Manda sobre el pack y la caché al resolver la cara B.
+            "translation": str(row.get("translation") or ""),
             "status": lexicon.item_status(row),
             "recall": lexicon.item_recall(row),
             "next_review_days": lexicon.next_review_days(row),
@@ -2106,6 +2114,37 @@ async def _ensure_cached_content(
             "Diccionario: el vuelo de '%s' agotó el tope de espera", word
         )
         return None
+
+
+async def set_item_translation(
+    user_id: str, word: str, translation: str
+) -> dict | None:
+    """Corrige la traducción propia de una palabra del léxico (V3.80.0).
+
+    Devuelve `{'word', 'translation', 'updated'}` o `None` si la palabra no está
+    en el léxico del alumno. **No la añade**: editar una traducción es corregir
+    algo que ya existe, y crear vocabulario desde aquí sería una puerta trasera
+    al léxico que no ha pasado por ninguna actividad. Eso es la invariante D3 y
+    esta ruta no la toca.
+
+    Acepta `translation=''`: borrar la propia es una corrección legítima y
+    devuelve la precedencia al pack y a la caché del diccionario.
+    """
+    normalized = str(word or "").strip().lower()
+    if not normalized:
+        return None
+    updated = await run_in_threadpool(
+        vocabulary_repo.set_translation, user_id, normalized, translation
+    )
+    if not updated:
+        return None
+    return {
+        "word": normalized,
+        "translation": await run_in_threadpool(
+            vocabulary_repo.translation_for_word, user_id, normalized
+        ),
+        "updated": True,
+    }
 
 
 async def lookup_dictionary(

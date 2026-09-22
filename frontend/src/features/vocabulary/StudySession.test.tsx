@@ -5,10 +5,21 @@ import type { ReactElement } from "react";
 import { StudySession } from "./StudySession";
 import type { FlashcardStudyItem } from "../../types/api";
 import { I18nProvider } from "../../hooks/useI18n";
+import { lookupDictionaryWord, setVocabularyTranslation } from "../../api/vocabulary";
 
 vi.mock("../../components/ItemReplayButton", () => ({
   ItemReplayButton: () => <button type="button">audio</button>,
 }));
+
+// V3.80.0: la sesión hidrata la cara B y guarda la traducción propia. Se mockean
+// las dos llamadas para no depender de red y para poder afirmar QUÉ se pidió.
+vi.mock("../../api/vocabulary", () => ({
+  lookupDictionaryWord: vi.fn(),
+  setVocabularyTranslation: vi.fn(),
+}));
+
+const lookupMock = vi.mocked(lookupDictionaryWord);
+const saveMock = vi.mocked(setVocabularyTranslation);
 
 function renderSession(ui: ReactElement) {
   return render(
@@ -37,7 +48,10 @@ function card(overrides: Partial<FlashcardStudyItem> = {}): FlashcardStudyItem {
 describe("StudySession", () => {
   afterEach(() => {
     cleanup();
-    vi.clearAllMocks();
+    // `reset` (no `clear`): las implementaciones de los mocks de la sesión no
+    // deben sobrevivir de un test a otro, o una hidratación resuelta en un test
+    // se colaría en el siguiente y el orden de ejecución pasaría a importar.
+    vi.resetAllMocks();
   });
 
   it("voltea, delega el grado al contenedor y avanza", async () => {
@@ -140,9 +154,18 @@ describe("StudySession", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("dice que no hay cara cuando el ítem no trae dorso ni definición", () => {
+  it("dice que no hay cara cuando el ítem no trae dorso ni definición", async () => {
     // Una tarjeta de léxico sin traducción ni glosa es un caso real (la palabra
     // se importó sin traducción): se declara en vez de mostrar un volteo vacío.
+    // V3.80.0: primero se intenta generarla; el aviso es el final del camino, no
+    // la primera parada.
+    lookupMock.mockResolvedValue({
+      word: "airport",
+      translation: "",
+      definition: "",
+      definition_source: "none",
+    } as never);
+
     renderSession(
       <StudySession
         userId="u1"
@@ -155,9 +178,149 @@ describe("StudySession", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
     expect(
-      screen.getByText(
-        "No translation cached yet — grade to schedule the review anyway.",
+      screen.getByText("Generating the reverse with the local model…"),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "No reverse side yet — write it with the pencil, or grade to schedule the review anyway.",
       ),
     ).toBeTruthy();
+  });
+
+  // --- V3.80.0: la cara B deja de ser un callejón sin salida -----------------
+
+  it("al voltear sin reverso pide la traducción al diccionario y la pinta", async () => {
+    lookupMock.mockResolvedValue({
+      word: "airport",
+      translation: "aeropuerto",
+      definition: "A place where planes land.",
+      definition_source: "llm",
+    } as never);
+
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ back: "", definition: "" })]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    // Solo se pide para la tarjeta que se está mirando, con su cara A como clave.
+    expect(lookupMock).toHaveBeenCalledTimes(1);
+    expect(lookupMock.mock.calls[0][1]).toBe("airport");
+    expect(await screen.findByText("aeropuerto")).toBeTruthy();
+    expect(screen.getByText("A place where planes land.")).toBeTruthy();
+  });
+
+  it("con reverso ya servido no paga una generación", () => {
+    // El pack y la caché ya resolvieron la cara B: pedir otra cosa sería
+    // contradecir lo que el backend acaba de decidir.
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    expect(lookupMock).not.toHaveBeenCalled();
+  });
+
+  it("si el modelo no responde lo dice y la sesión se puede calificar igual", async () => {
+    lookupMock.mockRejectedValue(new Error("ollama caído"));
+
+    const onGrade = vi.fn().mockResolvedValue(undefined);
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ back: "", definition: "" })]}
+        deckName="Deck"
+        onGrade={onGrade}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    expect(
+      await screen.findByText(
+        "The local model did not answer. You can write the reverse yourself, or grade anyway.",
+      ),
+    ).toBeTruthy();
+    // Un reverso que falta no bloquea el repaso: la tarjeta se programa igual.
+    fireEvent.click(screen.getByText("Good"));
+    expect(onGrade).toHaveBeenCalledTimes(1);
+  });
+
+  it("el lápiz guarda la traducción propia y pasa a mandar en la sesión", async () => {
+    saveMock.mockResolvedValue({ word: "airport", translation: "mi aeropuerto", updated: true });
+
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct the reverse" }));
+
+    const field = screen.getByLabelText("Reverse side (Spanish)");
+    fireEvent.change(field, { target: { value: "mi aeropuerto" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(saveMock).toHaveBeenCalledWith("u1", "airport", "mi aeropuerto");
+    // Lo escrito sustituye a la cara de la sesión y se declara como propia.
+    expect(await screen.findByText("mi aeropuerto")).toBeTruthy();
+    expect(screen.getByText("Your version")).toBeTruthy();
+    expect(screen.queryByText("aeropuerto")).toBeNull();
+  });
+
+  it("el lápiz no se ofrece en tarjetas manuales (su sitio es Tarjetas)", () => {
+    // Una tarjeta manual no tiene fila de léxico que corregir: el PATCH daría
+    // 404. Ofrecer un lápiz que no puede guardar sería prometer de más.
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ card_type: "flashcard", card_id: "7", back: "" })]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    expect(screen.queryByRole("button", { name: "Write the reverse" })).toBeNull();
+  });
+
+  it("avisa si la traducción propia no se pudo guardar", async () => {
+    saveMock.mockRejectedValue(new Error("500"));
+
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct the reverse" }));
+    fireEvent.change(screen.getByLabelText("Reverse side (Spanish)"), {
+      target: { value: "otra" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("The reverse could not be saved.")).toBeTruthy();
+    // Y no se pinta como guardada: la cara sigue siendo la que había.
+    expect(screen.getByText("aeropuerto")).toBeTruthy();
   });
 });

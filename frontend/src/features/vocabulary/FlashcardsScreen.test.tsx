@@ -15,7 +15,7 @@
  *    filtrada y arranca la sesión.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { I18nProvider } from "../../hooks/useI18n";
 import type { FlashcardDeck, FlashcardQueue } from "../../types/api";
 import { FlashcardsScreen } from "./FlashcardsScreen";
@@ -29,9 +29,12 @@ vi.mock("../../api/vocabulary", () => ({
   reviewFlashcard: vi.fn(),
   listFlashcardCards: vi.fn(),
   createFlashcard: vi.fn(),
+  addFlashcardsBulk: vi.fn(),
   updateFlashcard: vi.fn(),
   deleteFlashcard: vi.fn(),
   getFlashcardStats: vi.fn(),
+  listVocabCollections: vi.fn(),
+  enrollVocabCollection: vi.fn(),
 }));
 
 vi.mock("../../components/ItemReplayButton", () => ({
@@ -41,12 +44,15 @@ vi.mock("../../components/ItemReplayButton", () => ({
 import {
   createFlashcard,
   createFlashcardDeck,
+  addFlashcardsBulk,
   deleteFlashcard,
   deleteFlashcardDeck,
+  enrollVocabCollection,
   getFlashcardQueue,
   getFlashcardStats,
   listFlashcardCards,
   listFlashcardDecks,
+  listVocabCollections,
   reviewFlashcard,
 } from "../../api/vocabulary";
 
@@ -163,6 +169,10 @@ describe("FlashcardsScreen", () => {
         { day: "2026-09-23", count: 0, total: 0, good: 0 },
       ],
     });
+    // V3.80.0: por defecto no hay packs en el catálogo, así que el bloque «Mazos
+    // listos» no se pinta (no se promete lo que no existe). Los tests que lo
+    // ejercitan ponen su propio catálogo.
+    vi.mocked(listVocabCollections).mockResolvedValue({ collections: [] });
   });
 
   afterEach(() => {
@@ -327,5 +337,236 @@ describe("FlashcardsScreen", () => {
       ),
     ).toBeTruthy();
     expect(listFlashcardDecks).not.toHaveBeenCalled();
+  });
+
+  // --- V3.80.0: el mazo es UNA selección y crear uno lleva a escribir --------
+
+  it("crear un mazo lo selecciona y abre Tarjetas con el anverso enfocado", async () => {
+    // La queja literal era «creo uno nuevo pero luego no sé cómo añadir
+    // palabras». El arreglo no es un texto de ayuda: es que el mazo creado sea
+    // el seleccionado y que el cursor esté donde hay que escribir.
+    const created: FlashcardDeck = {
+      ...MANUAL,
+      id: 9,
+      name: "Phrasal verbs",
+      card_count: 0,
+    };
+    vi.mocked(createFlashcardDeck).mockResolvedValue(created);
+    vi.mocked(listFlashcardDecks).mockResolvedValue({
+      auto_deck_id: 0,
+      decks: [AUTO, MANUAL, created],
+      fsrs_version: "test",
+    });
+    vi.mocked(listFlashcardCards).mockResolvedValue({ deck_id: 9, cards: [] } as never);
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.change(await screen.findByPlaceholderText("Deck name"), {
+      target: { value: "Phrasal verbs" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(
+      await screen.findByText(
+        "Deck selected. Write the front and the back below; the card will be ready to study immediately.",
+      ),
+    ).toBeTruthy();
+    await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 9));
+    expect(document.activeElement).toBe(
+      screen.getByPlaceholderText("What you see first…"),
+    );
+  });
+
+  it("«Añadir tarjetas» en la fila del mazo abre Tarjetas en ese mazo", async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    // El mazo automático no lo ofrece: sus tarjetas son el léxico.
+    expect(screen.getAllByRole("button", { name: "Add cards" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add cards" }));
+
+    await waitFor(() =>
+      expect(listFlashcardCards).toHaveBeenCalledWith("u1", 5),
+    );
+    expect(screen.getByRole("button", { name: "Cards" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("estudiar un mazo vacío no abre una sesión de 0: ofrece añadir tarjetas", async () => {
+    vi.mocked(getFlashcardQueue).mockResolvedValue(
+      queue({ deck: { ...MANUAL, card_count: 0 }, items: [] }),
+    );
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    const row = (await screen.findByText("Idioms")).closest("li")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Study" }));
+
+    expect(
+      await screen.findByText(
+        "This deck has no cards yet. Add the first one and it can be studied right away.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Start session/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add cards" }));
+    await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 5));
+  });
+
+  it("el mazo automático vacío manda al diccionario en vez de ofrecer botones inertes", async () => {
+    vi.mocked(getFlashcardQueue).mockResolvedValue(
+      queue({
+        deck: { ...AUTO, card_count: 0, due_count: 0, new_count: 0 },
+        items: [],
+      }),
+    );
+
+    renderScreen();
+    expect(
+      await screen.findByText(
+        "Your dictionary has no words yet. Add them in Personal and they will show up here.",
+      ),
+    ).toBeTruthy();
+    // No hay tarjetas manuales que añadir aquí: no se ofrece el atajo.
+    expect(screen.queryByRole("button", { name: "Add cards" })).toBeNull();
+  });
+
+  it("el mazo elegido en Tarjetas es el que estudia Estudiar (una sola selección)", async () => {    // Antes cada pestaña tenía su propio `deckId` y Tarjetas arrancaba en
+    // `manual[0]`: elegir un mazo en Tarjetas no cambiaba lo que se estudiaba.
+    const SECOND = { ...MANUAL, id: 6, name: "Travel", card_count: 0 };
+    vi.mocked(listFlashcardDecks).mockResolvedValue({
+      auto_deck_id: 0,
+      decks: [AUTO, MANUAL, SECOND],
+      fsrs_version: "test",
+    });
+    vi.mocked(listFlashcardCards).mockResolvedValue({ deck_id: 6, cards: [] } as never);
+    vi.mocked(getFlashcardQueue).mockResolvedValue(
+      queue({ deck: { ...SECOND, card_count: 0 }, items: [] }),
+    );
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    fireEvent.change(await screen.findByLabelText("Deck"), {
+      target: { value: "6" },
+    });
+    await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 6));
+
+    fireEvent.click(screen.getByRole("button", { name: "Study" }));
+    await waitFor(() =>
+      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 6, {
+        collectionId: null,
+      }),
+    );
+  });
+
+  // --- V3.80.0: pegar una lista de tarjetas --------------------------------
+
+  it("pegar una lista crea las tarjetas y declara cuántas entraron de verdad", async () => {
+    vi.mocked(addFlashcardsBulk).mockResolvedValue({
+      deck_id: 5,
+      added: ["break a leg", "take off"],
+      count: 2,
+    });
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    await screen.findByText("break a leg");
+
+    fireEvent.change(
+      screen.getByPlaceholderText(/break a leg/),
+      { target: { value: "break a leg,mucha suerte\ntake off,despegar" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add all" }));
+
+    await waitFor(() =>
+      expect(addFlashcardsBulk).toHaveBeenCalledWith(
+        "u1",
+        5,
+        "break a leg,mucha suerte\ntake off,despegar",
+      ),
+    );
+    // El recuento es el del servidor, no el de las líneas pegadas: con
+    // duplicados o líneas inválidas no coinciden, y prometer el segundo sería
+    // mentir.
+    expect(await screen.findByText("2 cards added.")).toBeTruthy();
+  });
+
+  it("si el pegado falla lo dice y no declara un recuento falso", async () => {
+    vi.mocked(addFlashcardsBulk).mockRejectedValue(new Error("500"));
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    await screen.findByText("break a leg");
+
+    fireEvent.change(
+      screen.getByPlaceholderText(/break a leg/),
+      { target: { value: "one,uno" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add all" }));
+
+    expect(await screen.findByText("Could not save the card.")).toBeTruthy();
+    expect(screen.queryByText(/cards added/)).toBeNull();
+  });
+
+  // --- V3.80.0: mazos listos ----------------------------------------------
+
+  it("un mazo listo sin activar se añade y ya activo se estudia filtrado", async () => {
+    const PACK = {
+      id: 3,
+      kind: "theme_pack",
+      slug: "travel",
+      title: "Travel",
+      title_es: "Viajes",
+      cefr_hint: "A2",
+      item_count: 12,
+      enrolled: false,
+      is_global: true,
+    };
+    // El catálogo se lee en vivo para que la recarga posterior al alta vea el
+    // pack ya activo, como lo vería contra el servidor de verdad.
+    let enrolled = false;
+    vi.mocked(listVocabCollections).mockImplementation(async () => ({
+      collections: [{ ...PACK, enrolled }],
+    }));
+    vi.mocked(enrollVocabCollection).mockResolvedValue({
+      collection_id: 3,
+      added: ["airport"],
+      count: 12,
+    });
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+
+    expect(await screen.findByText("Ready-made decks")).toBeTruthy();
+    const row = screen.getByText("Travel").closest("li") as HTMLElement;
+    // Añadir un pack es «añadir a mi diccionario»: se dice qué son y qué pasará.
+    expect(within(row).getByText("12 words · A2")).toBeTruthy();
+    expect(within(row).queryByText("In your dictionary")).toBeNull();
+
+    enrolled = true;
+    fireEvent.click(within(row).getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(enrollVocabCollection).toHaveBeenCalledWith("u1", 3));
+    // El recuento es el que devolvió el servidor.
+    expect(await screen.findByText(/12 added/)).toBeTruthy();
+
+    // Tras activarlo, la acción útil deja de ser «Añadir» (sería idempotente y
+    // añadiría 0): pasa a ser estudiar el mazo automático filtrado por el pack.
+    const enrolledRow = await waitFor(() => {
+      const item = screen.getByText("Travel").closest("li") as HTMLElement;
+      expect(within(item).getByText("In your dictionary")).toBeTruthy();
+      return item;
+    });
+    expect(within(enrolledRow).queryByRole("button", { name: "Add" })).toBeNull();
+    fireEvent.click(within(enrolledRow).getByRole("button", { name: "Study" }));
+
+    // Se estudia en el mazo automático (es el MISMO vocabulario, no una copia),
+    // con el `collection_id` que la cola ya soporta.
+    await waitFor(() =>
+      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
+        collectionId: 3,
+      }),
+    );
   });
 });

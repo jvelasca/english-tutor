@@ -15,8 +15,17 @@
  * El contenedor es quien pide la cola y quien califica: `StudySession` solo
  * pinta y avisa. Así el mismo componente sirve para el mazo automático y para
  * uno manual sin saber cuál es.
+ *
+ * V3.80.0 — **el mazo es UNA selección, no una por pestaña.** Antes `deckId`
+ * vivía en Estudiar/Estadísticas y `CardsTab` tenía el suyo, que además
+ * arrancaba en `manual[0]` (el primero por orden alfabético, no el que el
+ * alumno acababa de crear). Eso es exactamente lo que producía el «creo un mazo
+ * y no sé cómo añadir palabras»: el mazo recién creado no era el que Tarjetas
+ * miraba. Ahora la selección se sube a la pantalla —como en Anki: el mazo es
+ * global, no un estado por pestaña— y crear un mazo salta a Tarjetas con él
+ * seleccionado y el campo del anverso enfocado.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   BookOpen,
@@ -24,17 +33,21 @@ import {
   Layers,
   Plus,
   RefreshCw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import {
+  addFlashcardsBulk,
   createFlashcard,
   createFlashcardDeck,
   deleteFlashcard,
   deleteFlashcardDeck,
+  enrollVocabCollection,
   getFlashcardQueue,
   getFlashcardStats,
   listFlashcardCards,
   listFlashcardDecks,
+  listVocabCollections,
   reviewFlashcard,
   updateFlashcard,
   updateFlashcardDeck,
@@ -46,6 +59,7 @@ import type {
   FlashcardQueue,
   FlashcardStats,
   FlashcardStudyItem,
+  VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { Button } from "../../components/ui/button";
@@ -95,6 +109,36 @@ export function FlashcardsScreen({
   const [autoStart, setAutoStart] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [error, setError] = useState(false);
+  /**
+   * V3.80.0: cuántas veces se ha pedido «abre Tarjetas listo para escribir».
+   * Sube al crear un mazo y al pulsar «Añadir tarjetas»; Tarjetas lo usa para
+   * enfocar el anverso y declarar qué hacer ahora. Un nonce y no un booleano
+   * porque dos peticiones seguidas deben volver a enfocar.
+   */
+  const [addCardsNonce, setAddCardsNonce] = useState(0);
+
+  /** Abre Tarjetas con `id` seleccionado y el campo del anverso listo. */
+  const openCardsFor = useCallback((id: number) => {
+    setDeckId(id);
+    setCollection(null);
+    setTab("cards");
+    setAddCardsNonce((n) => n + 1);
+  }, []);
+
+  /**
+   * Abre Estudiar con un mazo (y, si procede, filtrado por una lista o pack) y
+   * arranca la sesión. Es el camino que comparten «Estudiar» de una fila de mazo
+   * y «Estudiar» de un mazo listo: la misma cola, el mismo motor.
+   */
+  const openStudy = useCallback(
+    (id: number, filter: CollectionFilter | null) => {
+      setDeckId(id);
+      setCollection(filter);
+      setAutoStart(true);
+      setTab("study");
+    },
+    [],
+  );
 
   const loadDecks = useCallback(async () => {
     if (!userId) return;
@@ -197,6 +241,7 @@ export function FlashcardsScreen({
           onAutoStarted={() => setAutoStart(false)}
           onClearCollection={() => setCollection(null)}
           reloadNonce={reloadNonce}
+          onAddCards={openCardsFor}
           onExit={() => {
             setAutoStart(false);
             reload();
@@ -211,15 +256,34 @@ export function FlashcardsScreen({
             void loadDecks();
             reload();
           }}
+          onAddCards={openCardsFor}
+          onDeckCreated={(id) => {
+            // V3.80.0: el mazo recién creado pasa a ser LA selección y se salta
+            // a Tarjetas con el anverso enfocado. Antes se creaba y el alumno se
+            // quedaba en Mazos sin saber cómo meterle palabras.
+            void loadDecks();
+            openCardsFor(id);
+            reload();
+          }}
           onStudyDeck={(id) => {
-            setDeckId(id);
-            setCollection(null);
-            setAutoStart(true);
-            setTab("study");
+            openStudy(id, null);
+          }}
+          onStudyCollection={(id, label) => {
+            // Un mazo listo se estudia en el mazo AUTOMÁTICO filtrado por el
+            // pack: son sus palabras, no una copia. No se duplica contenido.
+            openStudy(decks?.auto_deck_id ?? 0, { id, label });
           }}
         />
       ) : tab === "cards" ? (
-        <CardsTab userId={userId} decks={decks} reloadNonce={reloadNonce} />
+        <CardsTab
+          userId={userId}
+          decks={decks}
+          deckId={deckId}
+          onPick={setDeckId}
+          reloadNonce={reloadNonce}
+          addCardsNonce={addCardsNonce}
+          onGoToDecks={() => setTab("decks")}
+        />
       ) : (
         <StatsTab userId={userId} decks={decks} deckId={deckId} onPick={setDeckId} />
       )}
@@ -271,6 +335,7 @@ function StudyTab({
   onAutoStarted,
   onClearCollection,
   reloadNonce,
+  onAddCards,
   onExit,
 }: {
   userId: string;
@@ -282,6 +347,8 @@ function StudyTab({
   onAutoStarted: () => void;
   onClearCollection: () => void;
   reloadNonce: number;
+  /** V3.80.0: abre Tarjetas con este mazo listo para escribir su primera carta. */
+  onAddCards: (id: number) => void;
   onExit: () => void;
 }) {
   const { t } = useI18n();
@@ -443,9 +510,38 @@ function StudyTab({
             </p>
           ) : null}
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("flashcards.study.empty")}
-            </p>
+            // V3.80.0: «no hay nada pendiente» y «el mazo está vacío» son cosas
+            // distintas y solo una tiene arreglo aquí. Un mazo manual sin
+            // tarjetas ofrece el camino para meterlas; el automático vacío manda
+            // al diccionario, que es donde se añaden palabras. Decir «nada
+            // pendiente» en los dos casos dejaba al alumno sin saber qué hacer.
+            queue && queue.deck.card_count === 0 ? (
+              isAuto ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("flashcards.study.emptyAuto")}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    {t("flashcards.study.emptyDeck")}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-fit"
+                    onClick={() => onAddCards(deck)}
+                  >
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    {t("flashcards.study.addCards")}
+                  </Button>
+                </div>
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t("flashcards.study.empty")}
+              </p>
+            )
           ) : (
             <Button
               type="button"
@@ -473,12 +569,21 @@ function DecksTab({
   reloadNonce,
   onChanged,
   onStudyDeck,
+  onAddCards,
+  onDeckCreated,
+  onStudyCollection,
 }: {
   userId: string;
   decks: FlashcardDecks | null;
   reloadNonce: number;
   onChanged: () => void;
   onStudyDeck: (id: number) => void;
+  /** V3.80.0: ir a Tarjetas con ese mazo seleccionado y el anverso enfocado. */
+  onAddCards: (id: number) => void;
+  /** V3.80.0: el mazo recién creado, para seleccionarlo y saltar a Tarjetas. */
+  onDeckCreated: (id: number) => void;
+  /** V3.80.0: estudiar el mazo automático filtrado por un pack listo. */
+  onStudyCollection: (id: number, label: string) => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
@@ -497,9 +602,13 @@ function DecksTab({
     setBusy(true);
     setError(false);
     try {
-      await createFlashcardDeck(userId, { name: name.trim() });
+      const created = await createFlashcardDeck(userId, { name: name.trim() });
       setName("");
       onChanged();
+      // El mazo creado se abre directamente en Tarjetas: es donde se le meten
+      // palabras, y sin este salto el alumno se quedaba en Mazos mirando una
+      // fila vacía.
+      onDeckCreated(created.id);
     } catch {
       setError(true);
     } finally {
@@ -611,6 +720,17 @@ function DecksTab({
                     >
                       {t("flashcards.decks.study")}
                     </Button>
+                    {/* V3.80.0: el camino que faltaba. Estudiar y Añadir
+                        tarjetas son acciones distintas y las dos se necesitan. */}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onAddCards(deck.id)}
+                    >
+                      <Plus className="size-3.5" aria-hidden="true" />
+                      {t("flashcards.decks.addCards")}
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
@@ -654,6 +774,15 @@ function DecksTab({
         )}
       </Card>
 
+      {/* V3.80.0: los packs que ya existen, ofrecidos como mazos. Va pegado a la
+          lista de mazos porque es otra forma de conseguir uno. */}
+      <ReadyDecks
+        userId={userId}
+        reloadNonce={reloadNonce}
+        onChanged={onChanged}
+        onStudyCollection={onStudyCollection}
+      />
+
       <Card className="gap-2 p-5">
         <h3 className="text-sm font-semibold">{t("flashcards.decks.new")}</h3>
         <form
@@ -677,6 +806,149 @@ function DecksTab({
         </form>
       </Card>
     </div>
+  );
+}
+
+/**
+ * «Mazos listos»: los packs globales que YA existen (`theme_pack`), ofrecidos
+ * como mazos (V3.80.0).
+ *
+ * No crea contenido nuevo ni copia nada: **añadir** un pack materializa sus
+ * palabras en el léxico con su carta FSRS (lo que ya hacía `enroll`), y
+ * **estudiar** abre la sesión del mazo automático filtrada por ese pack, con el
+ * `collection_id` que la cola ya soporta.
+ *
+ * El mismo pack sigue apareciendo en el bloque «Añadir» de PERSONAL. No es
+ * duplicación accidental y por eso se declara aquí: uno es «añadir a mi
+ * diccionario» y el otro «empezar a estudiar»; consolidarlo queda aparcado.
+ */
+function ReadyDecks({
+  userId,
+  reloadNonce,
+  onChanged,
+  onStudyCollection,
+}: {
+  userId: string;
+  reloadNonce: number;
+  onChanged: () => void;
+  onStudyCollection: (id: number, label: string) => void;
+}) {
+  const { t, lang } = useI18n();
+  const [packs, setPacks] = useState<VocabCollection[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [error, setError] = useState(false);
+  const [lastAdded, setLastAdded] = useState<{ id: number; n: number } | null>(
+    null,
+  );
+
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      const data = await listVocabCollections(userId);
+      setPacks(data.collections.filter((c) => c.kind === "theme_pack"));
+    } catch {
+      setError(true);
+      setPacks([]);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void load();
+  }, [load, reloadNonce]);
+
+  async function handleEnroll(pack: VocabCollection) {
+    if (busyId != null) return;
+    setBusyId(pack.id);
+    setError(false);
+    try {
+      const result = await enrollVocabCollection(userId, pack.id);
+      setLastAdded({ id: pack.id, n: result.count });
+      await load();
+      // El léxico ha crecido: el mazo automático y las estadísticas cambian.
+      onChanged();
+    } catch {
+      setError(true);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Sin packs en el catálogo no se pinta un bloque vacío que prometa mazos.
+  if (packs.length === 0) return null;
+
+  return (
+    <Card className="gap-3 p-5">
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <Sparkles className="size-4 text-primary" aria-hidden="true" />
+        {t("flashcards.decks.readyTitle")}
+      </h2>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        {t("flashcards.decks.readyHint")}
+      </p>
+      {error ? (
+        <p className="text-sm text-muted-foreground">{t("dictionary.loadError")}</p>
+      ) : null}
+      <ul className="flex flex-col gap-2">
+        {packs.map((pack) => {
+          const label =
+            lang === "es" && pack.title_es ? pack.title_es : pack.title;
+          const justAdded = lastAdded?.id === pack.id;
+          return (
+            <li
+              key={pack.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
+            >
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-sm font-semibold">{label}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {t("flashcards.decks.readyItems")
+                    .replace("{n}", String(pack.item_count))
+                    .replace("{cefr}", pack.cefr_hint || "—")}
+                  {justAdded
+                    ? ` · ${t("flashcards.decks.readyAdded").replace(
+                        "{n}",
+                        String(lastAdded?.n ?? 0),
+                      )}`
+                    : ""}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {pack.enrolled ? (
+                  <>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "border-transparent bg-success/15 text-success",
+                      )}
+                    >
+                      {t("flashcards.decks.readyEnrolled")}
+                    </Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onStudyCollection(pack.id, label)}
+                    >
+                      {t("flashcards.decks.study")}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busyId != null}
+                    onClick={() => void handleEnroll(pack)}
+                  >
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    {t("flashcards.decks.readyAdd")}
+                  </Button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 
@@ -781,18 +1053,40 @@ const CARD_ORDERS: { id: CardOrder; labelKey: string }[] = [
 function CardsTab({
   userId,
   decks,
+  deckId,
+  onPick,
   reloadNonce,
+  addCardsNonce,
+  onGoToDecks,
 }: {
   userId: string;
   decks: FlashcardDecks | null;
+  /** V3.80.0: la selección compartida de la pantalla (una sola, como en Anki). */
+  deckId: number | null;
+  onPick: (id: number) => void;
   reloadNonce: number;
+  /** Sube al crear un mazo o al pulsar «Añadir tarjetas»: enfoca el anverso. */
+  addCardsNonce: number;
+  onGoToDecks: () => void;
 }) {
   const { t } = useI18n();
   const manual = useMemo(
     () => (decks?.decks ?? []).filter((d) => !d.is_auto),
     [decks],
   );
-  const [deckId, setDeckId] = useState<number | null>(null);
+  /**
+   * Si la selección compartida es un mazo manual, manda ella. Si no (p. ej. el
+   * automático, que es el defecto al abrir), Tarjetas mira el primero editable
+   * en su propio estado y **sin tocar la selección compartida**: asomarse a
+   * Tarjetas no debe cambiar por sorpresa el mazo que se estudia. Cuando el
+   * alumno elige en el desplegable, su elección sí se propaga a toda la pantalla.
+   */
+  const [localDeckId, setLocalDeckId] = useState<number | null>(null);
+  const shared = manual.find((d) => d.id === deckId) ?? null;
+  const local = manual.find((d) => d.id === localDeckId) ?? null;
+  const active = shared ?? local ?? manual[0] ?? null;
+  const activeId = active?.id ?? null;
+
   const [cards, setCards] = useState<FlashcardCard[]>([]);
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
@@ -802,29 +1096,35 @@ function CardsTab({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // V3.80.0: pegado masivo. `bulkResult` guarda cuántas entraron de verdad, que
+  // es lo único honesto que se puede decir después de pegar 40 líneas.
+  const [bulkText, setBulkText] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState(false);
+  const [bulkResult, setBulkResult] = useState<number | null>(null);
+  const frontRef = useRef<HTMLInputElement | null>(null);
 
+  // Al llegar desde «crear mazo» o «Añadir tarjetas», el anverso se enfoca solo:
+  // el siguiente paso del alumno es escribir, y pedirle un clic extra era parte
+  // del «creo un mazo y no sé cómo seguir».
   useEffect(() => {
-    setDeckId((current) =>
-      current != null && manual.some((d) => d.id === current)
-        ? current
-        : manual[0]?.id ?? null,
-    );
-  }, [manual]);
+    if (addCardsNonce > 0) frontRef.current?.focus();
+  }, [addCardsNonce, activeId]);
 
   const loadCards = useCallback(async () => {
-    if (deckId == null) {
+    if (activeId == null) {
       setCards([]);
       return;
     }
     setError(false);
     try {
-      const data = await listFlashcardCards(userId, deckId);
+      const data = await listFlashcardCards(userId, activeId);
       setCards(data.cards);
     } catch {
       setError(true);
       setCards([]);
     }
-  }, [userId, deckId]);
+  }, [userId, activeId]);
 
   useEffect(() => {
     void loadCards();
@@ -857,17 +1157,18 @@ function CardsTab({
   }, [cards, search, stateFilter, order]);
 
   async function handleAdd() {
-    if (deckId == null || !newFront.trim() || busy) return;
+    if (activeId == null || !newFront.trim() || busy) return;
     setBusy(true);
     setError(false);
     try {
-      await createFlashcard(userId, deckId, {
+      await createFlashcard(userId, activeId, {
         front: newFront.trim(),
         back: newBack.trim(),
       });
       setNewFront("");
       setNewBack("");
       await loadCards();
+      frontRef.current?.focus();
     } catch {
       setError(true);
     } finally {
@@ -876,11 +1177,11 @@ function CardsTab({
   }
 
   async function handleDelete(card: FlashcardCard) {
-    if (deckId == null || busy) return;
+    if (activeId == null || busy) return;
     setBusy(true);
     setError(false);
     try {
-      await deleteFlashcard(userId, deckId, card.id);
+      await deleteFlashcard(userId, activeId, card.id);
       await loadCards();
     } catch {
       setError(true);
@@ -889,12 +1190,39 @@ function CardsTab({
     }
   }
 
-  if (manual.length === 0 || deckId == null) {
+  async function handleBulkAdd() {
+    if (activeId == null || !bulkText.trim() || bulkBusy) return;
+    setBulkBusy(true);
+    setBulkError(false);
+    setBulkResult(null);
+    try {
+      const result = await addFlashcardsBulk(userId, activeId, bulkText);
+      setBulkText("");
+      setBulkResult(result.count);
+      await loadCards();
+    } catch {
+      setBulkError(true);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  if (manual.length === 0 || activeId == null) {
     return (
-      <Card className="p-5">
+      <Card className="flex flex-col gap-3 p-5">
         <p className="text-sm text-muted-foreground">
           {t("flashcards.cards.pickDeck")}
         </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-fit"
+          onClick={onGoToDecks}
+        >
+          <Plus className="size-3.5" aria-hidden="true" />
+          {t("flashcards.cards.goToDecks")}
+        </Button>
       </Card>
     );
   }
@@ -907,11 +1235,21 @@ function CardsTab({
           {t("flashcards.cards.title")}
         </h2>
 
+        {addCardsNonce > 0 ? (
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t("flashcards.cards.createdHint")}
+          </p>
+        ) : null}
+
         <div className="flex flex-col gap-2 sm:flex-row">
           <select
             aria-label={t("flashcards.study.deck")}
-            value={deckId ?? ""}
-            onChange={(e) => setDeckId(Number(e.target.value))}
+            value={active.id}
+            onChange={(e) => {
+              const id = Number(e.target.value);
+              setLocalDeckId(id);
+              onPick(id);
+            }}
             className={cn(INPUT, "sm:w-64")}
           >
             {manual.map((deck) => (
@@ -988,7 +1326,7 @@ function CardsTab({
                 {editingId === card.id ? (
                   <CardEditor
                     userId={userId}
-                    deckId={deckId}
+                    deckId={active.id}
                     card={card}
                     onSaved={async () => {
                       setEditingId(null);
@@ -1066,6 +1404,7 @@ function CardsTab({
           }}
         >
           <input
+            ref={frontRef}
             value={newFront}
             onChange={(e) => setNewFront(e.target.value)}
             placeholder={t("flashcards.cards.frontPlaceholder")}
@@ -1084,6 +1423,51 @@ function CardsTab({
             <Plus className="size-3.5" aria-hidden="true" />
             {t("flashcards.cards.save")}
           </Button>
+        </form>
+      </Card>
+
+      {/* V3.80.0: pegar una lista. La sintaxis es la MISMA que la del léxico
+          («una por línea, anverso,reverso»), y se dice con un ejemplo, porque un
+          formato que hay que adivinar es un formato que nadie usa. */}
+      <Card className="gap-2 p-5">
+        <h3 className="text-sm font-semibold">{t("flashcards.cards.bulkTitle")}</h3>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {t("flashcards.cards.bulkHint")}
+        </p>
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleBulkAdd();
+          }}
+        >
+          <textarea
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            placeholder={t("flashcards.cards.bulkPlaceholder")}
+            maxLength={20000}
+            rows={4}
+            className={cn(INPUT, "w-full font-mono text-xs")}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" size="sm" disabled={bulkBusy || !bulkText.trim()}>
+              <Plus className="size-3.5" aria-hidden="true" />
+              {t("flashcards.cards.bulkAdd")}
+            </Button>
+            {bulkResult != null ? (
+              <span className="text-xs text-muted-foreground">
+                {t("flashcards.cards.bulkDone").replace(
+                  "{n}",
+                  String(bulkResult),
+                )}
+              </span>
+            ) : null}
+            {bulkError ? (
+              <span className="text-xs text-destructive">
+                {t("flashcards.cards.error")}
+              </span>
+            ) : null}
+          </div>
         </form>
       </Card>
     </div>

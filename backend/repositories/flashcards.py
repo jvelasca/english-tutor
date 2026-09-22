@@ -228,6 +228,56 @@ def create_card(
     return get_card(user_id, card_id)
 
 
+def create_cards(
+    user_id: str, deck_id: int, cards: list[dict]
+) -> list[dict]:
+    """Alta masiva de tarjetas en un mazo: UNA transacción para todas (V3.80.0).
+
+    Pegar una lista de 40 tarjetas con `create_card` en bucle abriría 40
+    conexiones y 40 transacciones —el mismo defecto que V3.77.2 cerró para el
+    léxico—, así que el pegado masivo escribe en bloque. Devuelve las filas
+    creadas para que la pantalla pueda decir cuántas entraron de verdad y no
+    cuántas se intentaron.
+
+    No deduplica: eso es política de producto y vive en el dominio (junto con el
+    tope). Aquí solo se escribe lo que llega, y se ignoran las entradas sin
+    anverso.
+    """
+    if get_deck(user_id, deck_id) is None:
+        return []
+    now = _now()
+    created: list[dict] = []
+    with closing(_conn()) as conn, conn:
+        for raw in cards:
+            clean_front = " ".join(str(raw.get("front") or "").split())
+            if not clean_front:
+                continue
+            cur = conn.execute(
+                "INSERT INTO flashcard_cards "
+                "(user_id, deck_id, front, back, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    user_id,
+                    int(deck_id),
+                    clean_front,
+                    str(raw.get("back") or "").strip(),
+                    now,
+                    now,
+                ),
+            )
+            created.append(
+                {
+                    "id": int(cur.lastrowid),
+                    "deck_id": int(deck_id),
+                    "front": clean_front,
+                    "back": str(raw.get("back") or "").strip(),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+    return created
+
+
 def update_card(
     user_id: str, card_id: int, *, front: str, back: str
 ) -> dict | None:
