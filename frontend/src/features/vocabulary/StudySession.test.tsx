@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import type { ReactElement } from "react";
 import { StudySession } from "./StudySession";
 import type { FlashcardStudyItem } from "../../types/api";
@@ -322,5 +328,142 @@ describe("StudySession", () => {
     expect(await screen.findByText("The reverse could not be saved.")).toBeTruthy();
     // Y no se pinta como guardada: la cara sigue siendo la que había.
     expect(screen.getByText("aeropuerto")).toBeTruthy();
+  });
+
+  // --- V3.80.1: la carrera generación ↔ edición, y el badge al borrar ---------
+
+  it("una hidratación tardía no pisa la traducción que el alumno acaba de guardar", async () => {
+    // Carrera real: el modelo tarda, el alumno escribe y guarda su versión, y la
+    // respuesta del modelo llega después. Debe descartarse: la verdad es lo que
+    // el alumno acaba de escribir, no lo que el modelo generó tarde.
+    let resolveLookup: (value: unknown) => void = () => {};
+    lookupMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveLookup = resolve;
+      }) as never,
+    );
+    saveMock.mockResolvedValue({
+      word: "airport",
+      translation: "casa",
+      updated: true,
+    });
+
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ back: "", definition: "" })]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    // Mientras el modelo piensa, el lápiz se puede usar: eso es la carrera.
+    fireEvent.click(screen.getByRole("button", { name: "Write the reverse" }));
+    fireEvent.change(screen.getByLabelText("Reverse side (Spanish)"), {
+      target: { value: "casa" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("casa")).toBeTruthy();
+    expect(screen.getByText("Your version")).toBeTruthy();
+
+    // Ahora responde el modelo, tarde: su reverso NO puede sustituir al del alumno.
+    await act(async () => {
+      resolveLookup({
+        word: "airport",
+        translation: "aeropuerto",
+        definition: "A place where planes land.",
+        definition_source: "llm",
+      });
+    });
+
+    expect(screen.getByText("casa")).toBeTruthy();
+    expect(screen.queryByText("aeropuerto")).toBeNull();
+  });
+
+  it("borrar la traducción propia quita el badge y devuelve el reverso del pack", async () => {
+    // La API acepta `translation=''` para volver a la precedencia del pack. La
+    // pantalla no puede quedarse diciendo «Tu versión» sobre un texto borrado.
+    saveMock
+      .mockResolvedValueOnce({
+        word: "airport",
+        translation: "mi aeropuerto",
+        updated: true,
+      })
+      .mockResolvedValueOnce({
+        word: "airport",
+        translation: "",
+        updated: true,
+      });
+
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+
+    // 1) Escribe su versión: manda y se declara propia.
+    fireEvent.click(screen.getByRole("button", { name: "Correct the reverse" }));
+    fireEvent.change(screen.getByLabelText("Reverse side (Spanish)"), {
+      target: { value: "mi aeropuerto" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("mi aeropuerto")).toBeTruthy();
+    expect(screen.getByText("Your version")).toBeTruthy();
+
+    // 2) La borra: vuelve el reverso del pack y deja de ser «suya».
+    fireEvent.click(screen.getByRole("button", { name: "Correct the reverse" }));
+    fireEvent.change(screen.getByLabelText("Reverse side (Spanish)"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(saveMock).toHaveBeenLastCalledWith("u1", "airport", "");
+    expect(await screen.findByText("aeropuerto")).toBeTruthy();
+    expect(screen.queryByText("mi aeropuerto")).toBeNull();
+    expect(screen.queryByText("Your version")).toBeNull();
+  });
+
+  it("declara lang solo cuando el idioma se conoce, nunca en tarjetas manuales", () => {
+    // Una tarjeta manual puede ser de cualquier idioma: `lang="en"` sería mentir.
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ card_type: "flashcard", card_id: "7", back: "lucky" })]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+
+    const front = screen.getByText("airport");
+    const back = screen.getByText("lucky");
+    expect(front.getAttribute("lang")).toBeNull();
+    expect(back.getAttribute("lang")).toBeNull();
+  });
+
+  it("declara lang en→es en las tarjetas del léxico, que sí lo tienen por construcción", () => {
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+
+    expect(screen.getByText("airport").getAttribute("lang")).toBe("en");
+    expect(screen.getByText("aeropuerto").getAttribute("lang")).toBe("es");
   });
 });

@@ -205,7 +205,9 @@ async function openDrillFromQueue(page: Page) {
   // versión) y la cola de repaso vive en «Personal», que es el inventario. La
   // spec mide el drill, no la pestaña por defecto, así que entra al modo donde
   // está la cola en lugar de depender del orden de las pestañas.
-  await page.getByRole("button", { name: "Personal", exact: true }).first().click();
+  // V3.80.1: los modos del diccionario son pestañas ARIA reales (`role="tab"`),
+  // no grupos de botones.
+  await page.getByRole("tab", { name: "Personal", exact: true }).first().click();
   // El botón de práctica del ítem (`aria-pressed`) es la entrada al drill: se
   // localiza por su ATRIBUTO y no por su etiqueta, que depende del idioma y del
   // hecho de que el peldaño de recall oculta la palabra.

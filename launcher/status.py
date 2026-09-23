@@ -147,6 +147,38 @@ def _human_size(num: int) -> str:
     return f"{value:.1f} TB"
 
 
+def read_pending_requests(db_path: str) -> int | None:
+    """Solicitudes PENDIENTES de perfil, leídas de la BD en solo-lectura.
+
+    V3.77 prometió que el lanzador podría contar las pendientes «sin depender de
+    que el backend conteste» (`repositories/profile_requests.py`), y hasta ahora
+    no había ninguna función que lo hiciera: la sección «Perfiles» solo sabía
+    pedirlas por HTTP, y sin PIN configurado ni siquiera lo intentaba. El
+    resultado era que una baja registrada por el alumno podía quedarse invisible
+    en el lanzador, que es justo lo que la promesa decía evitar.
+
+    `None` significa «no se pudo leer» y `0` significa «la cola está vacía». No
+    se confunden a propósito: pintar 0 sin haber podido preguntar es afirmar que
+    no hay nada cuando lo que hay es un error, y esa es la mitad del fallo de
+    arriba. Tabla ausente → `0` (una BD anterior a V3.77 no tiene cola que
+    esperar), no `None`.
+    """
+    try:
+        with closing(_connect_readonly(db_path)) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='profile_requests' LIMIT 1"
+            ).fetchone()
+            if exists is None:
+                return 0
+            row = conn.execute(
+                "SELECT COUNT(*) FROM profile_requests WHERE status = 'pending'"
+            ).fetchone()
+        return int(row[0]) if row is not None else 0
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def read_db_info(db_path: str) -> dict:
     """Metadatos del archivo de base de datos (tamaño, tablas, modificación).
 

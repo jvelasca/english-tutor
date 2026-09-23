@@ -69,18 +69,20 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 is_test INTEGER NOT NULL DEFAULT 0,
-                -- V3.76 (Fase 3 del P0): hash del PIN del perfil. Cadena vacía =
-                -- perfil SIN PIN, que es el defecto y la compatibilidad hacia
-                -- atrás: los perfiles anteriores a esta columna entran como
-                -- siempre. El valor en claro no se guarda nunca (ver
-                -- `services/pins.py`) y la columna no se serializa en la API.
+                -- V3.76 (Fase 3 del P0): hash del PIN del perfil. V3.81 lo
+                -- RETIRA del producto (lo sustituye la contraseña de la cuenta,
+                -- `services/credentials.py`) pero la columna se conserva: en
+                -- SQLite borrarla sería reconstruir la tabla, y una copia antigua
+                -- restaurada sobre esta versión tiene que seguir abriendo. Ya no
+                -- se lee ni se escribe.
                 pin_hash TEXT NOT NULL DEFAULT '',
-                -- V3.77: `active` | `disabled`. **No** es un rol (el webmaster
-                -- no es un perfil: es quien ejecuta el lanzador, ver
-                -- `agentes/v377-perfiles-webmaster.md`); es el estado de
-                -- servicio del perfil. Desactivar es la mitad reversible de un
-                -- borrado: el perfil desaparece del selector y no puede abrir
-                -- sesión, pero su evidencia sigue intacta y se puede reactivar.
+                -- V3.77/V3.81: `active` | `disabled` | `unenrolled`. **No** es un
+                -- rol (el webmaster no es un perfil: es quien ejecuta la consola
+                -- de gestión, ver `agentes/v377-perfiles-webmaster.md`); es el
+                -- estado de servicio de la cuenta. `disabled` es la decisión del
+                -- webmaster y `unenrolled` la baja autoservicio del alumno; las
+                -- dos son reversibles, las dos sacan la cuenta del selector y las
+                -- dos cierran su sesión, pero su evidencia sigue intacta.
                 status TEXT NOT NULL DEFAULT 'active'
             )
             """
@@ -877,6 +879,77 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
             )
+        # V3.81 (Fase 3 del P0 de identidad): la CUENTA. El perfil **sin**
+        # credencial sigue siendo válido —`password_hash` vacío entra como
+        # siempre, el mismo criterio con el que V3.76 trataba `pin_hash` vacío—,
+        # así que esta migración no bloquea a nadie: los usuarios que ya existían
+        # siguen entrando igual hasta que el webmaster les asigne email y
+        # contraseña desde la consola de gestión.
+        #
+        # `pin_hash` **se conserva** aunque el producto ya no la lea: borrar una
+        # columna en SQLite es una reconstrucción de la tabla, y una copia antigua
+        # restaurada sobre esta versión tiene que seguir abriendo.
+        for column, ddl in (
+            # Identificador de la cuenta. Único de facto (lo vigila el índice de
+            # abajo); vacío = cuenta sin email, que es el estado heredado.
+            ("email", "TEXT NOT NULL DEFAULT ''"),
+            # Nulo = sin verificar. El chip «sin verificar» sale de aquí, y el
+            # webmaster puede sellarlo a mano en modo híbrido (sin SMTP).
+            ("email_verified_at", "TEXT"),
+            # El token de verificación se guarda **hasheado**: si alguien lee la
+            # BD no puede confirmar un email ajeno con lo que hay en la fila.
+            ("email_verify_token_hash", "TEXT NOT NULL DEFAULT ''"),
+            ("email_verify_sent_at", "TEXT"),
+            # Hash PBKDF2 (ver `services/credentials.py`). Vacío = sin credencial.
+            ("password_hash", "TEXT NOT NULL DEFAULT ''"),
+            # Contraseña temporal puesta por el webmaster: obliga a cambiarla
+            # antes de dejar usar la app.
+            ("must_change_password", "INTEGER NOT NULL DEFAULT 0"),
+            # Sube al cambiar la contraseña o al forzar la baja, y va dentro del
+            # token de sesión: es lo que hace que esas dos acciones tumben las
+            # sesiones abiertas **ya** en vez de cuando caduque la cookie.
+            ("auth_epoch", "INTEGER NOT NULL DEFAULT 0"),
+            # Baja autoservicio. No borra nada: marca la cuenta como retirada.
+            ("unenrolled_at", "TEXT"),
+        ):
+            if column not in user_cols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {column} {ddl}")
+
+        # Índice de unicidad del email: parcial, solo sobre las filas que tienen
+        # email (las cuentas heredadas con `''` no compiten entre sí). `NOCASE`
+        # porque las direcciones de correo no distinguen mayúsculas.
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email "
+            "ON users(email COLLATE NOCASE) WHERE email <> ''"
+        )
+
+        # V3.81: historial de lo que decide la administración (quién, cuándo y
+        # por qué). Es la mitad del «control y prioridad» que el webmaster pide:
+        # sin registro, forzar una baja o purgar es un acto sin rastro.
+        #
+        # La columna se llama `subject_id` y **no** `user_id` a propósito: el
+        # purgado borra dinámicamente las filas de toda tabla con `user_id`
+        # (`repositories/users.py::_purge_user_rows`), y el registro de un
+        # purgado es justo el que tiene que sobrevivir a él. Por eso también se
+        # guarda `subject_name`: el día que la fila de `users` ya no exista, el
+        # historial tiene que seguir siendo legible.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id TEXT NOT NULL DEFAULT '',
+                subject_name TEXT NOT NULL DEFAULT '',
+                action TEXT NOT NULL,
+                actor TEXT NOT NULL DEFAULT 'webmaster',
+                note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_events_subject "
+            "ON user_events(subject_id, created_at)"
+        )
 
         # V3.25 (F-K7/P2-01, fase 6): renombrado canónico de los contadores de
         # producción/input en `vocabulary`. El histórico pasó por

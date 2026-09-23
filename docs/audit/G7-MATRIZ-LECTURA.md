@@ -265,8 +265,16 @@ estimadores usan.
 - **Recordatorio del instrumento:** un `pass` **sin commit no se registra**, y sin
   `--notes` tampoco. Un `fail` o un `skip` son resultados válidos y se registran con
   su motivo; lo prohibido es declarar `pass` sin haberlo hecho.
-- **Árbol:** el que se certifica es el de `v3.76.0`, no el de `v3.75.8`: la campaña
-  tenía **0 `record`** cuando entró el PIN, así que no había nada que invalidar. El
-  pre-vuelo se repitió (**10/10**) y todo queda declarado en la sección
+- **Árbol:** el que se certifica es el de **`v3.81.0`** (re-anclaje del 2026-09-23,
+  tras V3.78.0/V3.79.0/V3.80.0/V3.80.1 y la Fase 3 del P0 —cuentas de usuario—), no
+  el de `v3.75.8` ni el de `v3.76.0`: la campaña tenía **0 `record`** cuando se movió
+  el árbol, así que no había nada que invalidar. Se ancla **por tag, sin fijar SHA a
+  mano** (regla de V3.73.5). Los dossiers de G7 **no** se re-derivan por estos
+  cambios, porque ninguna de esas releases toca currículum, corpus, evaluaciones ni
+  banco de listening, y los instrumentos del dossier no leen mazos, tarjetas,
+  traducción propia, cuentas ni correo. **Ojo con el contrato:** `v3.81.0` **retira**
+  `PUT /api/session/pin` y **cambia** `POST /api/session` (exige contraseña si la
+  cuenta la tiene), así que un instrumento de campo que abriera sesión con un
+  `user_id` a secas debe conocerlo. Todo queda declarado en la sección
   «Re-congelación» de `docs/audit/KIT-VALIDACION-GATES.md`. Los **7 gates siguen en
   `pending`**.

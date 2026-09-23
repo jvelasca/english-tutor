@@ -97,6 +97,57 @@ def test_read_db_details_missing_file_is_zeroed():
     assert set(details.values()) == {0}
 
 
+def _make_requests_table(db, rows):
+    """Crea `profile_requests` y siembra filas (kind, status)."""
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.execute(
+            "CREATE TABLE profile_requests ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, "
+            "display_name TEXT NOT NULL DEFAULT '', "
+            "user_id TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', "
+            "requested_at TEXT NOT NULL, status TEXT NOT NULL, "
+            "decided_at TEXT NOT NULL DEFAULT '', "
+            "decided_note TEXT NOT NULL DEFAULT '', "
+            "resolved_user_id TEXT NOT NULL DEFAULT '')"
+        )
+        for kind, req_status in rows:
+            conn.execute(
+                "INSERT INTO profile_requests (kind, requested_at, status) "
+                "VALUES (?, 'now', ?)",
+                (kind, req_status),
+            )
+
+
+def test_read_pending_requests_cuenta_solo_las_pendientes(tmp_path):
+    """V3.77 prometió este contador «sin depender del backend»; ahora existe."""
+    db = tmp_path / "t.db"
+    _make_db(db)
+    _make_requests_table(
+        db,
+        [
+            ("delete", "pending"),
+            ("create", "pending"),
+            ("create", "approved"),
+            ("delete", "rejected"),
+        ],
+    )
+
+    assert status.read_pending_requests(str(db)) == 2
+
+
+def test_read_pending_requests_sin_tabla_es_cero(tmp_path):
+    """Una BD anterior a V3.77 no tiene cola que esperar: 0, no «no se sabe»."""
+    db = tmp_path / "t.db"
+    _make_db(db)
+
+    assert status.read_pending_requests(str(db)) == 0
+
+
+def test_read_pending_requests_sin_bd_no_se_inventa_un_cero():
+    """No poder leer no es «la cola está vacía»: se dice `None`."""
+    assert status.read_pending_requests("Z:/no/existe/tutor.db") is None
+
+
 class _FakeResp:
     def __init__(self, payload=b"", code=200):
         self._payload = payload

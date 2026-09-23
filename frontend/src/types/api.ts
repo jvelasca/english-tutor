@@ -37,17 +37,28 @@ export interface User {
   /** V3.52.1: perfil de prueba (tests visuales); el backend no lo lista. */
   is_test?: boolean;
   /**
-   * V3.76 (Fase 3 del P0): el perfil tiene PIN. La puerta lo usa para saber si
-   * hay que pedirlo **antes** de abrir sesión; el hash no viaja nunca.
+   * V3.81 (Fase 3 del P0): la **cuenta**. `has_password` es lo que la puerta
+   * consulta para saber si tiene que pedir credencial al elegir a alguien; el
+   * hash no viaja nunca. El email es identificador y canal de verificación, no la
+   * forma de entrar (la entrada sigue siendo el selector con avatar).
    */
-  has_pin?: boolean;
+  email?: string;
+  email_verified?: boolean;
+  has_password?: boolean;
   /**
-   * V3.77: estado de servicio. La app y el selector solo reciben perfiles
-   * **activos** (los desactivados los filtra el backend), así que este campo es
-   * para el lanzador. Un perfil desactivado no abre sesión: el servidor responde
-   * `403 PROFILE_DISABLED`.
+   * La contraseña vigente es **temporal** (la puso el webmaster al asignar
+   * credenciales). La app obliga a cambiarla antes de dejar usar nada; el
+   * servidor lo hace cumplir con `403 PASSWORD_CHANGE_REQUIRED`.
    */
-  status?: "active" | "disabled";
+  must_change_password?: boolean;
+  /**
+   * V3.77/V3.81: estado de servicio. La app y el selector solo reciben cuentas
+   * **activas** (el backend filtra el resto), así que este campo es para la
+   * consola de gestión. Una cuenta fuera de servicio no abre sesión: el servidor
+   * responde `403 PROFILE_DISABLED` (desactivada) o `403 ACCOUNT_UNENROLLED`
+   * (baja autoservicio).
+   */
+  status?: "active" | "disabled" | "unenrolled";
   created_at: string;
 }
 

@@ -183,21 +183,37 @@ describe("FlashcardsScreen", () => {
   it("ofrece las cuatro subpestañas y entra por Estudiar", async () => {
     renderScreen();
 
-    expect(
-      await screen.findByRole("button", { name: "Study" }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("tab", { name: "Study" })).toBeTruthy();
     for (const name of ["Study", "Decks", "Cards", "Stats"]) {
-      expect(screen.getByRole("button", { name })).toBeTruthy();
+      expect(screen.getByRole("tab", { name })).toBeTruthy();
     }
-    expect(screen.getByRole("button", { name: "Study" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByRole("tab", { name: "Study" }).getAttribute("aria-selected"),
+    ).toBe("true");
     // La cola se pide para el mazo automático, que es donde cae el defecto.
     await waitFor(() =>
       expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
         collectionId: null,
       }),
     );
+  });
+
+  it("las vistas son pestañas ARIA y las flechas cambian de vista (V3.80.1)", async () => {
+    renderScreen();
+    const tablist = await screen.findByRole("tablist", {
+      name: "Flashcard views",
+    });
+    const tabs = within(tablist).getAllByRole("tab");
+    expect(tabs).toHaveLength(4);
+
+    const study = screen.getByRole("tab", { name: "Study" });
+    study.focus();
+    fireEvent.keyDown(study, { key: "ArrowRight" });
+
+    expect(await screen.findByPlaceholderText("Deck name")).toBeTruthy();
+    const decks = screen.getByRole("tab", { name: "Decks" });
+    expect(decks.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(decks);
   });
 
   it("estudiar califica por el endpoint del mazo y el resumen es alcanzable", async () => {
@@ -221,7 +237,7 @@ describe("FlashcardsScreen", () => {
 
   it("el mazo automático se ofrece pero no se puede borrar", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
 
     expect(await screen.findByText("My dictionary")).toBeTruthy();
     expect(
@@ -243,7 +259,7 @@ describe("FlashcardsScreen", () => {
   it("crear un mazo manda el nombre y recarga la lista", async () => {
     vi.mocked(createFlashcardDeck).mockResolvedValue(MANUAL);
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
 
     fireEvent.change(await screen.findByPlaceholderText("Deck name"), {
       target: { value: "Phrasal verbs" },
@@ -259,7 +275,7 @@ describe("FlashcardsScreen", () => {
 
   it("el navegador de tarjetas filtra por texto y borra la tarjeta elegida", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
 
     expect(await screen.findByText("break a leg")).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText("Search front or back…"), {
@@ -280,7 +296,7 @@ describe("FlashcardsScreen", () => {
   it("añadir una tarjeta exige anverso y lo envía con el dorso", async () => {
     vi.mocked(createFlashcard).mockResolvedValue({} as never);
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
     await screen.findByText("break a leg");
 
     fireEvent.change(screen.getByPlaceholderText("What you see first…"), {
@@ -301,7 +317,7 @@ describe("FlashcardsScreen", () => {
 
   it("las estadísticas muestran repasos, acierto y previsión", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Stats" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Stats" }));
 
     expect(await screen.findByText("Accuracy")).toBeTruthy();
     expect(screen.getByText("75%")).toBeTruthy();
@@ -323,9 +339,9 @@ describe("FlashcardsScreen", () => {
     );
     // Arranca sola: el alumno ya pidió estudiar al pulsar «Estudiar».
     expect(await screen.findByText("airport")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Study" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByRole("tab", { name: "Study" }).getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   it("sin perfil no pide nada y lo dice", async () => {
@@ -360,7 +376,7 @@ describe("FlashcardsScreen", () => {
     vi.mocked(listFlashcardCards).mockResolvedValue({ deck_id: 9, cards: [] } as never);
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
     fireEvent.change(await screen.findByPlaceholderText("Deck name"), {
       target: { value: "Phrasal verbs" },
     });
@@ -379,7 +395,7 @@ describe("FlashcardsScreen", () => {
 
   it("«Añadir tarjetas» en la fila del mazo abre Tarjetas en ese mazo", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
     // El mazo automático no lo ofrece: sus tarjetas son el léxico.
     expect(screen.getAllByRole("button", { name: "Add cards" })).toHaveLength(1);
 
@@ -388,9 +404,9 @@ describe("FlashcardsScreen", () => {
     await waitFor(() =>
       expect(listFlashcardCards).toHaveBeenCalledWith("u1", 5),
     );
-    expect(screen.getByRole("button", { name: "Cards" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByRole("tab", { name: "Cards" }).getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   it("estudiar un mazo vacío no abre una sesión de 0: ofrece añadir tarjetas", async () => {
@@ -399,7 +415,7 @@ describe("FlashcardsScreen", () => {
     );
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
     const row = (await screen.findByText("Idioms")).closest("li")!;
     fireEvent.click(within(row).getByRole("button", { name: "Study" }));
 
@@ -446,13 +462,13 @@ describe("FlashcardsScreen", () => {
     );
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
     fireEvent.change(await screen.findByLabelText("Deck"), {
       target: { value: "6" },
     });
     await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 6));
 
-    fireEvent.click(screen.getByRole("button", { name: "Study" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Study" }));
     await waitFor(() =>
       expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 6, {
         collectionId: null,
@@ -470,7 +486,7 @@ describe("FlashcardsScreen", () => {
     });
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
     await screen.findByText("break a leg");
 
     fireEvent.change(
@@ -496,7 +512,7 @@ describe("FlashcardsScreen", () => {
     vi.mocked(addFlashcardsBulk).mockRejectedValue(new Error("500"));
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Cards" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
     await screen.findByText("break a leg");
 
     fireEvent.change(
@@ -536,7 +552,7 @@ describe("FlashcardsScreen", () => {
     });
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
 
     expect(await screen.findByText("Ready-made decks")).toBeTruthy();
     const row = screen.getByText("Travel").closest("li") as HTMLElement;

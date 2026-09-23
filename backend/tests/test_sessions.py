@@ -29,6 +29,21 @@ def _setup(monkeypatch, tmp_path):
     return users_repo.create_user("Ana")["id"]
 
 
+def _con_password(uid: str, password: str) -> None:
+    """Deja la cuenta con credencial, que es el estado al que va el producto.
+
+    Se hace por repositorio (`set_password_hash`) y no por la API a propósito: es
+    la preparación del escenario, y meterla por la puerta probaría dos cosas a la
+    vez —el alta y la sesión— y un fallo en cualquiera de las dos culparía a la
+    equivocada.
+    """
+    from services import credentials
+
+    hashed = credentials.hash_password(password)
+
+    assert users_repo.set_password_hash(uid, hashed) is True
+
+
 def _cookie_header(response) -> str:
     return response.headers.get("set-cookie", "").lower()
 
@@ -158,29 +173,32 @@ def test_abrir_sesion_de_un_perfil_inexistente_da_404(monkeypatch, tmp_path):
         assert r.status_code == 404
 
 
-def test_el_perfil_de_la_sesion_declara_has_pin_y_nunca_el_hash(monkeypatch, tmp_path):
-    """V3.76: la puerta necesita saber si preguntar; el hash no sale de aquí.
+def test_la_cuenta_de_la_sesion_declara_has_password_y_nunca_el_hash(
+    monkeypatch, tmp_path
+):
+    """V3.81: la entrada necesita saber si pedir contraseña; el hash no sale de aquí.
 
     Se comprueba en las dos caras del contrato —`POST /api/session` y
-    `GET /api/session`— porque la lista de perfiles y la sesión son superficies
+    `GET /api/session`— porque la lista de cuentas y la sesión son superficies
     distintas y ninguna de las dos debe filtrarlo.
     """
-    from services import pins
+    from services import credentials
 
     uid = _setup(monkeypatch, tmp_path)
-    assert users_repo.set_pin_hash(uid, pins.hash_pin("4821")) is True
-    pins.reset_state()
+    _con_password(uid, "caballo-bateria-grapa")
+    credentials.reset_state()
 
     with TestClient(app) as client:
         abierta = client.post(
-            "/api/session", json={"user_id": uid, "pin": "4821"}
+            "/api/session",
+            json={"user_id": uid, "password": "caballo-bateria-grapa"},
         )
         assert abierta.status_code == 200
-        assert abierta.json()["has_pin"] is True
-        assert "pin_hash" not in abierta.text
+        assert abierta.json()["has_password"] is True
+        assert "password_hash" not in abierta.text
 
         leida = client.get("/api/session")
-        assert leida.json()["has_pin"] is True
+        assert leida.json()["has_password"] is True
         assert "pbkdf2" not in leida.text
 
 

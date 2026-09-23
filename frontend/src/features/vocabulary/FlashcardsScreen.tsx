@@ -62,6 +62,7 @@ import type {
   VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
+import { useTabList } from "../../hooks/useTabList";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -79,6 +80,9 @@ const TABS: { id: Tab; labelKey: string; Icon: typeof Layers }[] = [
   { id: "cards", labelKey: "flashcards.tabs.cards", Icon: BookOpen },
   { id: "stats", labelKey: "flashcards.tabs.stats", Icon: BarChart3 },
 ];
+
+/** Ids estables (a nivel de módulo) para el roving tabindex del hook. */
+const TAB_IDS = TABS.map((entry) => entry.id);
 
 /** Filtro por colección: solo aplica al mazo automático. */
 interface CollectionFilter {
@@ -103,6 +107,7 @@ export function FlashcardsScreen({
 }: FlashcardsScreenProps) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("study");
+  const { onKeyDown, register } = useTabList(TAB_IDS, tab, setTab);
   const [decks, setDecks] = useState<FlashcardDecks | null>(null);
   const [deckId, setDeckId] = useState<number | null>(null);
   const [collection, setCollection] = useState<CollectionFilter | null>(null);
@@ -185,9 +190,10 @@ export function FlashcardsScreen({
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <div
-        role="group"
+        role="tablist"
         aria-label={t("flashcards.viewsLabel")}
         className="flex flex-wrap items-center gap-1"
+        onKeyDown={onKeyDown}
       >
         {TABS.map((entry) => {
           const Icon = entry.Icon;
@@ -196,7 +202,12 @@ export function FlashcardsScreen({
             <button
               key={entry.id}
               type="button"
-              aria-pressed={active}
+              role="tab"
+              id={`flashcards-tab-${entry.id}`}
+              aria-selected={active}
+              aria-controls={`flashcards-panel-${entry.id}`}
+              tabIndex={active ? 0 : -1}
+              ref={register(entry.id)}
               onClick={() => setTab(entry.id)}
               className={cn(
                 "inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors",
@@ -212,7 +223,14 @@ export function FlashcardsScreen({
         })}
       </div>
 
-      {error ? (
+      <div
+        role="tabpanel"
+        id={`flashcards-panel-${tab}`}
+        aria-labelledby={`flashcards-tab-${tab}`}
+        tabIndex={0}
+        className="focus:outline-none"
+      >
+        {error ? (
         <Card className="gap-2 p-4">
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             {t("dictionary.loadError")}
@@ -287,6 +305,7 @@ export function FlashcardsScreen({
       ) : (
         <StatsTab userId={userId} decks={decks} deckId={deckId} onPick={setDeckId} />
       )}
+      </div>
     </div>
   );
 }
@@ -1336,9 +1355,7 @@ function CardsTab({
                 ) : (
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-col">
-                      <span className="text-sm font-semibold" lang="en">
-                        {card.front}
-                      </span>
+                      <span className="text-sm font-semibold">{card.front}</span>
                       {card.back ? (
                         <span className="text-sm text-muted-foreground">
                           {card.back}
@@ -1410,7 +1427,6 @@ function CardsTab({
             placeholder={t("flashcards.cards.frontPlaceholder")}
             maxLength={400}
             className={cn(INPUT, "flex-1")}
-            lang="en"
           />
           <input
             value={newBack}
@@ -1511,7 +1527,6 @@ function CardEditor({
         aria-label={t("flashcards.cards.front")}
         maxLength={400}
         className={cn(INPUT, "flex-1")}
-        lang="en"
       />
       <input
         value={back}

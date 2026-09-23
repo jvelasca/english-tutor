@@ -1874,6 +1874,21 @@ RUNTIME_TOUCHPOINTS: tuple[dict[str, object], ...] = (
         "hidden": False,
         "note": "Bootstrap EXPLICITO: modelo Whisper",
     },
+    {
+        "file": "services/mailer.py",
+        "needle": "smtplib.SMTP",
+        "kind": "internet",
+        "hidden": False,
+        "note": (
+            "V3.81: correo saliente para verificar el email de una cuenta. NO es "
+            "una dependencia oculta (no descarga nada a espaldas del alumno: sale "
+            "solo si el webmaster configura el SMTP y solo para avisar de algo que "
+            "el propio alumno acaba de pedir) y ADEMAS es OPCIONAL: sin SMTP "
+            "configurado (`config.smtp_settings()['configured']`) no se abre "
+            "ninguna conexion y la app funciona igual (la verificacion la sella el "
+            "webmaster a mano)"
+        ),
+    },
 )
 
 # Endpoint de Ollama: no vive en `config.py`, es el DEFAULT de la libreria. Se

@@ -231,10 +231,10 @@ describe("DictionaryLookup (V3.30)", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it("tras buscar, la X solo vacía el campo y conserva el resultado (V3.75.8)", async () => {
-    // Semántica fijada: la X prepara una consulta nueva, no la deshace. Borrar
-    // el texto no borra lo consultado, así que la tarjeta sigue a la vista
-    // (mientras no haya otra búsqueda, un error o una carga en curso).
+  it("tras buscar, la X limpia la búsqueda y el resultado, y vuelven los ejemplos (V3.80.1)", async () => {
+    // Semántica fijada en V3.80.1: la X es «limpiar búsqueda Y resultado», no
+    // «vaciar el campo dejando la tarjeta anterior». Un campo vacío con un
+    // resultado viejo debajo es un estado que miente.
     const fn = routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
     renderPanel(<DictionaryLookup userId="u1" />);
 
@@ -248,12 +248,14 @@ describe("DictionaryLookup (V3.30)", () => {
 
     expect(input.value).toBe("");
     expect(screen.queryByRole("button", { name: "Clear the search" })).toBeNull();
-    // El resultado de la última consulta permanece: no es «nueva consulta».
-    expect(screen.getByRole("heading", { name: "coffee" })).toBeTruthy();
+    // El resultado se va con la búsqueda...
+    expect(screen.queryByRole("heading", { name: "coffee" })).toBeNull();
     expect(
-      screen.getByText("A hot drink made from roasted coffee beans."),
-    ).toBeTruthy();
-    // Y borrar no dispara ninguna consulta nueva.
+      screen.queryByText("A hot drink made from roasted coffee beans."),
+    ).toBeNull();
+    // ...y vuelven los ejemplos, que es el estado honesto de «nueva consulta».
+    expect(screen.getByText("Try an example")).toBeTruthy();
+    // Borrar no dispara ninguna consulta nueva.
     expect(fn.mock.calls.map((call) => String(call[0])).filter((url) =>
       url.includes("/dictionary"),
     ).length).toBe(1);

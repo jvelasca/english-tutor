@@ -40,6 +40,10 @@ NON_PRODUCT_NETWORK_FILES = frozenset(
         "download_models.py",  # bootstrap explícito de instalación
         "scripts/smoke_test.py",  # herramienta de desarrollo
         "scripts/audit_dossier.py",  # el propio instrumento (sonda de loopback)
+        # V3.81: verificación end-to-end que arranca el backend en un puerto local
+        # sobre una COPIA de la BD. No es producto ni instalación: no lo ejecuta
+        # nadie al usar la app, y su única conexión es contra su propio backend.
+        "scripts/e2e_accounts_v381.py",
     }
 )
 

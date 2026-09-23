@@ -1,11 +1,19 @@
-"""Esquemas Pydantic de usuarios (perfiles locales)."""
+"""Esquemas Pydantic de usuarios (V3.81: la cuenta)."""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from services.credentials import PASSWORD_MAX_CHARS
+
 # Límite para la imagen de avatar (data URL). Suficiente para una miniatura
 # redimensionada en el cliente (~128 px) y evita abusos de tamaño en la BD.
 MAX_AVATAR_IMAGE_CHARS = 500_000
+
+# Topes de forma para email y contraseña. La **política** de la contraseña la
+# decide `services.credentials.is_valid_password` (longitud mínima y lista de
+# obvias); aquí solo se acota lo que Pydantic deja pasar antes de tocar el KDF.
+MAX_EMAIL_CHARS = 254
+MAX_PASSWORD_CHARS = PASSWORD_MAX_CHARS
 
 
 class User(BaseModel):
@@ -17,21 +25,34 @@ class User(BaseModel):
     # V3.52.1: perfil de PRUEBA (tests visuales). Nunca aparece en el selector
     # de la app; se expone para que los tests puedan localizar y limpiar el suyo.
     is_test: bool = False
-    # V3.76 (Fase 3 del P0): ¿este perfil tiene PIN? La puerta necesita saber si
-    # preguntarlo. Se expone el **booleano**, jamás el hash.
-    has_pin: bool = False
-    # V3.77: `active` | `disabled`. La app y el selector solo ven perfiles
-    # activos (el repositorio los filtra), así que este campo lo lee el lanzador
-    # para poder mostrar y reactivar los desactivados.
+    # V3.81 (Fase 3 del P0): la cuenta. `has_password` es el booleano que la UI
+    # necesita para saber si tiene que pedir credencial al elegirla; el hash no
+    # sale nunca de la BD (misma doctrina que el PIN en V3.76).
+    email: str = ""
+    email_verified: bool = False
+    has_password: bool = False
+    # Contraseña temporal puesta por el webmaster: la app obliga a cambiarla
+    # antes de dejar usar nada.
+    must_change_password: bool = False
+    # V3.77/V3.81: `active` | `disabled` | `unenrolled`. La app y el selector solo
+    # ven cuentas activas (el repositorio las filtra), así que este campo lo lee
+    # la consola de gestión para poder mostrar y reactivar las demás.
     status: str = "active"
     created_at: str
 
 
 class UserCreate(BaseModel):
-    # `max_length` alineado con `UserUpdate`: `POST /api/users` no exige
-    # credencial, así que sin tope se pueden crear nombres de tamaño arbitrario.
+    """Alta de la **primera** cuenta en el propio equipo (`POST /api/users`).
+
+    V3.81: es el registro autoservicio. Nace con email y contraseña, así que la
+    puerta de entrada ya no ofrece «un nombre y a correr»: eso es exactamente el
+    «sin cuentas» que la Fase 3 viene a cerrar.
+    """
+
     name: str = Field(min_length=1, max_length=80)
-    # Solo los tests lo marcan; la app siempre crea perfiles reales.
+    email: str = Field(min_length=3, max_length=MAX_EMAIL_CHARS)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)
+    # Solo los tests lo marcan; la app siempre crea cuentas reales.
     is_test: bool = False
 
 
@@ -43,36 +64,50 @@ class UserUpdate(BaseModel):
 
 
 class SessionCreate(BaseModel):
-    """Cuerpo de `POST /api/session`: el perfil que la petición **reclama**.
+    """Cuerpo de `POST /api/session`: la cuenta que la petición **reclama**.
 
-    No es una credencial por sí mismo —desde V3.76 puede acompañarse de una
-    (`pin`) si el perfil la tiene— y conviene no confundirlo: es la declaración
-    de con quién quieres abrir sesión, y el servidor la firma. Lo que cambia
-    respecto a V3.73.x es que, a partir de ahí, la identidad viaja en una cookie
-    que el cliente **no puede forjar**, en vez de en la URL
-    (`docs/audit/PLAN-P0-IDENTIDAD.md` §4).
-
-    V3.76: si el perfil tiene PIN y no se envía (o no cuadra), la respuesta es
-    401 con `PIN_REQUIRED` / `PIN_INVALID` para que la UI pueda pedirlo. Un
-    perfil sin PIN sigue abriendo con el cuerpo de siempre.
+    V3.81: si la cuenta tiene contraseña, es obligatoria. Lo que cambia respecto a
+    V3.73.x es que ya no basta con **nombrar** a alguien: hay que demostrar que se
+    es quien dice ser. Las cuentas heredadas sin contraseña (`has_password` falso)
+    siguen abriendo con el cuerpo de siempre mientras el webmaster no les asigne
+    credenciales, que es la compatibilidad declarada de esta release.
     """
 
     user_id: str = Field(min_length=1, max_length=64)
-    # 4-6 dígitos. El tope de longitud lo valida `services/pins.is_valid_pin`,
-    # que es también quien da formato al freno de intentos.
-    pin: str | None = Field(default=None, max_length=16)
+    password: str | None = Field(default=None, max_length=MAX_PASSWORD_CHARS)
 
 
-class PinSet(BaseModel):
-    """Poner, cambiar o retirar el PIN del perfil **de la sesión**.
+class PasswordChange(BaseModel):
+    """Cambiar la contraseña de la cuenta **de la sesión** (V3.81).
 
-    `current_pin` solo es obligatorio al cambiar o retirar un PIN que ya existía:
-    pedirlo es lo que impide que quien se siente delante de un equipo con sesión
-    abierta ponga su propio PIN y se quede el perfil. `new_pin` vacío retira el
-    PIN (el perfil vuelve a entrar sin credencial, con su consecuencia
-    declarada).
+    `current_password` solo es obligatorio si la cuenta ya tenía contraseña:
+    pedirla es lo que impide que quien se sienta delante de un equipo con la
+    sesión abierta ponga su propia contraseña y se quede la cuenta.
     """
 
-    current_pin: str | None = Field(default=None, max_length=16)
-    new_pin: str = Field(default="", max_length=16)
+    current_password: str | None = Field(default=None, max_length=MAX_PASSWORD_CHARS)
+    new_password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)
 
+
+class EmailChange(BaseModel):
+    """Cambiar el email de la cuenta **de la sesión**. Exige re-autenticarse.
+
+    Sin la contraseña, un equipo con la sesión abierta bastaría para apuntar la
+    verificación a un correo ajeno.
+    """
+
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)
+    email: str = Field(min_length=3, max_length=MAX_EMAIL_CHARS)
+
+
+class UnenrollRequest(BaseModel):
+    """Baja autoservicio. Exige la contraseña por el mismo motivo que el cambio de
+    email: darse de baja es una decisión, no un descuido de quien pasa por delante."""
+
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)
+
+
+class EmailVerify(BaseModel):
+    """Token de verificación tal como llega del enlace del correo."""
+
+    token: str = Field(min_length=8, max_length=256)

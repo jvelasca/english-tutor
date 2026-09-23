@@ -1,7 +1,10 @@
 # English Tutor (100% local)
 
 App para conversar con un modelo de IA **local** (Ollama), pensada para convertirse en un
-profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
+profesor de inglés totalmente local. Sin coste, sin cuentas **en la nube** y con todo el
+procesamiento en tu equipo. Desde V3.81 cada persona tiene **cuenta local con contraseña**
+(nombre + email + contraseña), se la crea ella misma y puede darse de baja; la única salida
+opcional a la red es el correo de verificación, y solo si se configura un SMTP.
 
 ## Documentación (leer primero)
 
@@ -13,7 +16,7 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.80.0**.
+- Última versión estable: **v3.81.0**.
 
 ## Estructura
 
@@ -30,8 +33,11 @@ profesor de inglés totalmente local. Sin Internet, sin cuentas, sin costes.
 - **Memoria e historial**: conversaciones guardadas en SQLite (sidebar).
 - **Modo profesor (M4)**: 4 modos de tutor (conversación, gramática, ejercicios, pronunciación)
   y **corrección de pronunciación** (graba y recibe una puntuación).
-- **Multi-usuario (M7)**: perfiles locales con conversaciones e historial **independientes**
-  (selector de perfil en la cabecera, aislamiento total de datos entre usuarios).
+- **Cuentas locales (M7 · V3.81)**: cada persona tiene **cuenta con contraseña** (nombre, email y
+  contraseña), se la crea ella misma desde la puerta de entrada y puede **darse de baja** sin que se
+  borre nada; el lanzador («Gestión de la APP») resuelve la cola de solicitudes, asigna o restablece
+  credenciales, verifica emails, activa/desactiva, fuerza bajas con motivo, enseña el historial y
+  purga. Conversaciones e historial quedan **aislados** por cuenta.
 - **Diseño y UX (M8)**: tema claro/oscuro, responsive (móvil/escritorio), accesibilidad
   y sistema de tokens de diseño.
 - **Voz continua / manos libres (M10)**: modo conversación por voz sin pulsar botones
@@ -339,11 +345,12 @@ npm run dev         # Vite en https://localhost:5173 con proxy /api
 > **El perfil activo no viaja en la URL.** Desde V3.75 la identidad la fija el
 > servidor al abrir sesión (`POST /api/session`, cookie `et_session` `HttpOnly` y
 > firmada) y los endpoints que antes llevaban `?user_id=<id>` la leen de ahí: sin
-> sesión válida responden **401 `SESSION_REQUIRED`**. Sigue **sin haber
-> autenticación**: cualquier cliente que alcance la API puede pedir sesión para un
-> perfil existente (es «sin cuentas» por diseño), y de ahí que la **frontera de
-> red** —loopback por defecto, LAN opt-in— sea la que decide quién alcanza la API
-> (`docs/audit/PLAN-P0-IDENTIDAD.md`).
+> sesión válida responden **401 `SESSION_REQUIRED`**. Desde **V3.81** abrir sesión
+> con una cuenta que tiene credencial **exige su contraseña**, y hay registro
+> autoservicio (`POST /api/users`), baja autoservicio (`POST /api/account/unenroll`)
+> y salir (`POST /api/session/logout`). Lo que **no** hay es cuentas en la nube: todo
+> vive en la BD local, y la **frontera de red** —loopback por defecto, LAN opt-in—
+> sigue decidiendo quién alcanza la API (`docs/audit/PLAN-P0-IDENTIDAD.md`).
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 

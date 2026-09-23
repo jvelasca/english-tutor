@@ -4,14 +4,19 @@
 > Mantenido por el gerente del proyecto.
 
 ## 1. Visión
-Profesor/asistente de inglés que conversa por voz y texto, **100% local** (sin Internet,
-sin cuentas, sin costes). Arranca con diálogo por texto, luego voz, y evoluciona hacia un tutor
+Profesor/asistente de inglés que conversa por voz y texto, **100% local**: sin coste, sin
+cuentas **en la nube** y con todo el procesamiento en el equipo. Arranca con diálogo por texto, luego voz, y evoluciona hacia un tutor
 completo.
 
 ## 2. Principio rector: 100% local
 - Todo el procesamiento (LLM, voz→texto, texto→voz) corre en la máquina del usuario.
 - En desarrollo se aprovecha todo (GPU, servicios locales, etc.).
-- Única excepción admitida: la descarga inicial de modelos y dependencias.
+- Excepciones admitidas, **declaradas y fail-closed**: (a) la descarga inicial de modelos y
+  dependencias; y (b) el **correo saliente** de verificación de email (V3.81), que solo existe
+  si el webmaster configura un SMTP —sin SMTP **no se abre ninguna conexión**— y que está
+  declarado como salida a Internet en `backend/scripts/audit_dossier.py::RUNTIME_TOUCHPOINTS`
+  (`kind: "internet"`). `backend/tests/test_mailer_v381.py` fija las dos mitades: que sin
+  configurar no se toca `smtplib` y que un fallo de envío no tumba la acción que lo pedía.
 - Prohibido depender de APIs en la nube (Google STT, Microsoft TTS, OpenAI, etc.).
 
 ## 3. Stack (fijado)
@@ -113,14 +118,30 @@ completo.
 - Los tests son parte de la definición de "terminado": ninguna feature se da por acabada sin sus tests.
 - Los tests deben ser **rápidos y deterministas** (sin depender de la red ni de modelos externos).
 
-## 13. Multi-usuario (seguimiento independiente)
-- La app admite **varios usuarios locales** (perfiles), cada uno con su propio espacio:
-  conversaciones, progreso, correcciones, puntuaciones de pronunciación y ajustes,
-  **totalmente independientes** entre sí.
-- Sin cuentas en la nube (coherente con la premisa 2): los perfiles son locales y se
-  seleccionan de forma simple al abrir la app.
+## 13. Multi-usuario con cuenta local (seguimiento independiente)
+- La app admite **varios usuarios locales**, cada uno con su propio espacio: conversaciones,
+  progreso, correcciones, puntuaciones de pronunciación y ajustes, **totalmente independientes**
+  entre sí.
+- **Desde V3.81 la identidad es una cuenta con credencial propia** (nombre + email + contraseña),
+  no un nombre elegido de una lista: cualquiera puede **crearse una cuenta** desde la app
+  (registro autoservicio, en loopback) y **darse de baja** por sí mismo. Entrar sin contraseña
+  solo lo permite una cuenta **heredada** sin credencial (`password_hash == ''`): es una deuda
+  declarada y el lanzador la enseña como tarea pendiente.
+- **La baja autoservicio no borra nada**: la cuenta deja de operar y sus sesiones se cierran,
+  pero la evidencia se conserva. Borrar de verdad (purgar) es una acción **administrativa**, con
+  copia previa, confirmación por nombre y registro en el historial.
+- **Sin cuentas en la nube** (coherente con la premisa 2): las cuentas, los hashes y los datos
+  viven en la BD local. El **email** es PII nueva y es una **señal**, no un muro: si no hay SMTP
+  configurado, el webmaster sella la verificación a mano desde el lanzador.
+- La contraseña se guarda **hasheada** (PBKDF2-HMAC-SHA256 con sal por usuario, iteraciones
+  declaradas en el propio valor) y tanto el cambio de contraseña como una baja forzada
+  **tumban las sesiones abiertas** al instante (época de autenticación), no al caducar la cookie.
 - **Aislamiento total de datos entre usuarios**: nada de un usuario puede verse desde otro.
 - El seguimiento de progreso (historial, estadísticas, logros) es **por usuario**.
+- El **lanzador** («Gestión de la APP») tiene el control y la prioridad: resuelve la cola de
+  solicitudes, crea cuentas, asigna o restablece credenciales, verifica emails a mano,
+  desactiva, reactiva, **fuerza la baja con motivo**, edita datos, enseña el historial, purga y
+  configura el correo. Es el único sitio desde el que se borra a una persona.
 
 ## 14. Diseño y UX nivel "top del mercado"
 - La interfaz aspira al nivel de las mejores apps del mercado (p. ej. ChatGPT, Duolingo,
@@ -141,7 +162,7 @@ completo.
   AI Teacher por lección) es accesible para cualquier perfil local.
 - La capa comercial (`subscriptions`/`entitlements`) queda **diferida** hasta que exista
   contenido que la justifique, y no se referencia en la UI.
-- Coherente con la premisa 2 (100% local, sin cuentas, sin costes).
+- Coherente con la premisa 2 (100% local, sin costes y sin cuentas **en la nube**).
 
 ## 16. Nivel "mejor de cada plataforma profesional"
 - La UI toma como referencia lo mejor de las apps profesionales del sector
@@ -150,8 +171,8 @@ completo.
 - Se elige lo mejor de cada plataforma: claridad de progreso (árbol de niveles y
   seguimiento por objetivo), indicadores visuales por estado (acertado / fallado / a
   repasar), y navegación por pestañas con indicador de nivel CEFR.
-- El resultado debe sentirse "PRO" sin sacrificar las premisas de localidad, privacidad
-  y ausencia de cuentas.
+- El resultado debe sentirse "PRO" sin sacrificar las premisas de localidad, privacidad y
+  ausencia de cuentas **en la nube** —la cuenta es local y, desde V3.81, con contraseña propia—.
 
 ## 17. Documentación accesible y Ayuda para no ingenieros
 - La documentación de `docs/` es la fuente de verdad técnica. La **Ayuda** de la app

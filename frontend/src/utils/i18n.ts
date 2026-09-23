@@ -2041,34 +2041,46 @@ const STRINGS: Record<string, Entry> = {
     es: "Abre la URL LAN en Safari. En la página «Esta conexión no es privada», pulsa Mostrar detalles y luego Visitar este sitio web. Si el micrófono no funciona, ve a Ajustes → Safari → Avanzado → Funciones experimentales y asegúrate de que el acceso al micrófono esté habilitado para este sitio.",
   },
 
-  // Menú de usuario
-  "user.profile": { en: "Profile", es: "Perfil" },
-  "user.profiles": { en: "Profiles", es: "Perfiles" },
-  "user.profileTitle": { en: "User profile", es: "Perfil de usuario" },
-  "user.editProfile": { en: "Edit profile", es: "Editar perfil" },
+  // Menú de cuenta y usuarios.
+  //
+  // V3.81 (renombrada de textos, decisión tomada): lo que antes se llamaba
+  // «perfil» en la UI ahora se llama **usuario** o **cuenta**, que es lo que la
+  // gente entiende. El código sigue llamándolo `users` (ya era su nombre) y el
+  // concepto distinto «perfil auditivo» no se toca: no es lo mismo y renombrarlo
+  // habría sido el error que esta decisión evita.
+  "user.profile": { en: "Account", es: "Cuenta" },
+  "user.profiles": { en: "Users", es: "Usuarios" },
+  "user.profileTitle": { en: "Account and users", es: "Cuenta y usuarios" },
+  "user.editProfile": { en: "Edit user", es: "Editar usuario" },
   "user.name": { en: "Name", es: "Nombre" },
-  // Puerta de perfil al arrancar en un navegador sin usuario definido.
-  "user.chooseTitle": { en: "Choose your profile", es: "Elige tu perfil" },
+  // Puerta de entrada al arrancar en un navegador sin sesión abierta.
+  "user.chooseTitle": { en: "Choose your user", es: "Elige tu usuario" },
   "user.choosePrompt": {
-    en: "Select a user or ask for a new one to start.",
-    es: "Selecciona un usuario o pide uno nuevo para empezar.",
+    en: "Select a user to start, or create an account.",
+    es: "Selecciona un usuario para empezar, o crea una cuenta.",
   },
   "user.noProfilesYet": {
-    en: "There are no profiles yet. Ask for the first one below.",
-    es: "Todavía no hay perfiles. Pide el primero abajo.",
+    en: "There are no users yet. Create the first one below.",
+    es: "Todavía no hay usuarios. Crea el primero abajo.",
   },
-  // V3.77: un perfil nuevo lo autoriza el webmaster desde el lanzador, así que
-  // la app **pide** en vez de crear. Los textos lo dicen sin rodeos: quien lee
-  // «solicitud enviada» tiene que saber que todavía no puede entrar y a quién
-  // tiene que pedírselo.
-  "user.requestProfile": { en: "Ask for a profile", es: "Pedir un perfil" },
+  // V3.80.2: la lista no se pudo leer del backend (servidor caído, arrancando o
+  // a medias). Antes esto se pintaba igual que «no hay usuarios», y esa
+  // confusión dejaba la puerta sin ninguna salida.
+  "user.loadFailed": {
+    en: "Could not read the user list. Is the server running?",
+    es: "No se pudo leer la lista de usuarios. ¿Está activo el servidor?",
+  },
+  // V3.77: dar de alta a alguien que **no está en el equipo** lo autoriza el
+  // webmaster. V3.81: desde el propio equipo sí se puede crear la cuenta, así que
+  // el texto dice las dos cosas en vez de mandar a pedir siempre.
+  "user.requestProfile": { en: "Ask for a user", es: "Pedir un usuario" },
   "user.requestHint": {
-    en: "A new profile is approved by the webmaster from the launcher, on the computer that runs the app.",
-    es: "Un perfil nuevo lo autoriza el webmaster desde el lanzador, en el equipo donde corre la app.",
+    en: "From this computer you can create the account yourself. From another device on the network, the webmaster has to approve it from the management console.",
+    es: "Desde este equipo puedes crear tú la cuenta. Desde otro dispositivo de la red, la tiene que autorizar el webmaster desde el programa de gestión.",
   },
   "user.requestSent": {
-    en: "Request sent. The webmaster has to approve it from the launcher before you can use it.",
-    es: "Solicitud enviada. El webmaster tiene que autorizarla desde el lanzador para que puedas usarla.",
+    en: "Request sent. The webmaster has to approve it from the management console before you can use it.",
+    es: "Solicitud enviada. El webmaster tiene que autorizarla desde el programa de gestión para que puedas usarla.",
   },
   "user.requestDuplicate": {
     en: "There is already a pending request with that name.",
@@ -2086,57 +2098,133 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not send the request. Is the server running?",
     es: "No se pudo enviar la solicitud. ¿Está activo el servidor?",
   },
+  // Alta de una cuenta nueva (V3.81). El email es identificador y canal de
+  // verificación, **no** la forma de entrar: la entrada sigue siendo el selector.
+  "user.createAccount": { en: "Create account", es: "Crear cuenta" },
+  "user.backToUsers": { en: "Back to users", es: "Volver a los usuarios" },
+  "user.email": { en: "Email", es: "Email" },
+  "user.emailHint": {
+    en: "Used to verify the account. It is not needed to use the app if there is no mail configured: the webmaster confirms it.",
+    es: "Sirve para verificar la cuenta. No hace falta para usar la app si no hay correo configurado: lo confirma el webmaster.",
+  },
+  "user.password": { en: "Password", es: "Contraseña" },
+  "user.passwordRepeat": { en: "Repeat the password", es: "Repite la contraseña" },
+  "user.passwordHint": {
+    en: "At least 8 characters. Choose a definitive one: the webmaster can reset it, but nobody else can read it.",
+    es: "Mínimo 8 caracteres. Elige una definitiva: el webmaster puede restablecerla, pero nadie más puede leerla.",
+  },
+  "user.passwordMismatch": {
+    en: "The two passwords do not match.",
+    es: "Las dos contraseñas no coinciden.",
+  },
+  "user.forgotPassword": {
+    en: "I forgot my password",
+    es: "He olvidado la contraseña",
+  },
+  "user.forgotPasswordHint": {
+    en: "The webmaster resets it from the management console and gives you a temporary one. There is no recovery email: the app is local and may not have mail configured.",
+    es: "El webmaster la restablece desde el programa de gestión y te da una temporal. No hay correo de recuperación: la app es local y puede no tener correo configurado.",
+  },
 
-  // PIN opcional por perfil (V3.76, Fase 3 del P0 de identidad).
-  // Honestidad en el propio texto: no es una contraseña de cuenta ni una
-  // identidad, es una llave de la puerta que el dueño del perfil activa.
-  "pin.title": { en: "Enter your PIN", es: "Introduce tu PIN" },
-  "pin.prompt": {
-    en: "This profile asks for a PIN. It is 4 to 6 digits.",
-    es: "Este perfil pide un PIN. Tiene entre 4 y 6 dígitos.",
+  // Paso de contraseña de la puerta (V3.81; sustituye al paso de PIN de V3.76).
+  // Honestidad en el propio texto: ya no es «una llave de la puerta», es la
+  // credencial de la cuenta.
+  "password.title": { en: "Enter your password", es: "Introduce tu contraseña" },
+  "password.prompt": {
+    en: "This account has a password. It is yours alone: the webmaster cannot read it.",
+    es: "Esta cuenta tiene contraseña. Es solo tuya: el webmaster no puede leerla.",
   },
-  "pin.label": { en: "PIN", es: "PIN" },
-  "pin.submit": { en: "Continue", es: "Continuar" },
-  "pin.back": { en: "Back to profiles", es: "Volver a los perfiles" },
-  "pin.invalid": {
-    en: "That PIN is not right.",
-    es: "Ese PIN no es correcto.",
+  "password.label": { en: "Password", es: "Contraseña" },
+  "password.submit": { en: "Sign in", es: "Entrar" },
+  "password.back": { en: "Back to users", es: "Volver a los usuarios" },
+  "password.invalid": {
+    en: "That password is not right.",
+    es: "Esa contraseña no es correcta.",
   },
-  "pin.throttled": {
+  "password.throttled": {
     en: "Too many attempts. Wait a moment and try again.",
     es: "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
   },
-  "pin.format": {
-    en: "The PIN must be 4 to 6 digits.",
-    es: "El PIN debe tener entre 4 y 6 dígitos.",
+
+  // Cuenta (V3.81): cambiar contraseña y email, verificar, y darse de baja.
+  // Todo esto vive en el menú de cuenta, no en Ajustes: son cosas de identidad,
+  // y Ajustes es de la app.
+  "account.title": { en: "Account", es: "Cuenta" },
+  "account.ok": { en: "Verified", es: "Verificado" },
+  "account.unverified": { en: "Email not verified", es: "Email sin verificar" },
+  "account.verifyResend": { en: "Resend verification", es: "Reenviar verificación" },
+  "account.verifySent": {
+    en: "Verification link sent to your email.",
+    es: "Enlace de verificación enviado a tu email.",
+  },
+  // Modo híbrido, dicho sin fingir: sin SMTP no sale ningún correo y la
+  // verificación la firma el webmaster. Un mensaje que prometiera un envío
+  // inexistente sería la peor clase de mentira: la que hace esperar.
+  "account.verifyManual": {
+    en: "There is no mail configured on this computer, so nothing was sent. Ask the webmaster to confirm it from the management console.",
+    es: "En este equipo no hay correo configurado, así que no se ha enviado nada. Pide al webmaster que lo confirme desde el programa de gestión.",
+  },
+  "account.changePassword": { en: "Change password", es: "Cambiar contraseña" },
+  "account.currentPassword": { en: "Current password", es: "Contraseña actual" },
+  "account.newPassword": { en: "New password", es: "Contraseña nueva" },
+  "account.changeEmail": { en: "Change email", es: "Cambiar email" },
+  "account.newEmail": { en: "New email", es: "Email nuevo" },
+  "account.save": { en: "Save", es: "Guardar" },
+  "account.saved": { en: "Saved.", es: "Guardado." },
+  // Cambio forzado: la contraseña temporal del webmaster se cambia antes de
+  // dejar usar la app, que es lo que la convierte en temporal de verdad.
+  "account.mustChangeTitle": {
+    en: "Change your password",
+    es: "Cambia tu contraseña",
+  },
+  "account.mustChangeBody": {
+    en: "The webmaster gave you a temporary password. Choose one of your own to continue.",
+    es: "El webmaster te dio una contraseña temporal. Elige una tuya para continuar.",
+  },
+  "account.signOut": { en: "Sign out", es: "Salir" },
+  "account.deleteSection": { en: "Delete my account", es: "Darse de baja" },
+  "account.deleteExplain": {
+    en: "Deleting your account closes it, but does not erase your data: your progress stays and only the webmaster can purge it, with a previous backup.",
+    es: "Darte de baja cierra tu cuenta, pero no borra tus datos: tu progreso se queda y solo el webmaster puede purgarlo, con copia previa.",
+  },
+  "account.deleteConfirm": {
+    en: "Confirm with your password.",
+    es: "Confirma con tu contraseña.",
+  },
+  "account.deleteButton": { en: "Delete my account", es: "Darme de baja" },
+  "account.emailTaken": {
+    en: "That email is already in use.",
+    es: "Ese email ya está en uso.",
+  },
+  "account.emailFormat": {
+    en: "That email does not look valid.",
+    es: "Ese email no parece válido.",
+  },
+  "account.passwordFormat": {
+    en: "The password needs at least 8 characters.",
+    es: "La contraseña necesita al menos 8 caracteres.",
+  },
+  "account.passwordInvalid": {
+    en: "That password is not right.",
+    es: "Esa contraseña no es correcta.",
+  },
+  "account.passwordRequired": {
+    en: "Your password is required.",
+    es: "Hace falta tu contraseña.",
+  },
+  "account.nameTaken": {
+    en: "There is already a user with that name.",
+    es: "Ya hay un usuario con ese nombre.",
+  },
+  "account.error": {
+    en: "Could not complete the change. Is the server running?",
+    es: "No se pudo completar el cambio. ¿Está activo el servidor?",
   },
 
-  // Ajustes → PIN del perfil activo.
-  "settings.pin.title": { en: "PIN for this profile", es: "PIN de este perfil" },
-  "settings.pin.explain": {
-    en: "Optional. When a PIN is set, this profile asks for it before opening a session in a browser that does not have it saved yet. It is a lock on the door, not an account: there is no recovery, and it does not protect against someone using your own unlocked device.",
-    es: "Opcional. Con PIN, este perfil lo pide antes de abrir sesión en un navegador que todavía no lo tenga guardado. Es una llave de la puerta, no una cuenta: no hay recuperación y no protege frente a quien use tu propio equipo desbloqueado.",
-  },
-  "settings.pin.current": { en: "Current PIN", es: "PIN actual" },
-  "settings.pin.new": { en: "New PIN (blank removes it)", es: "PIN nuevo (vacío lo retira)" },
-  "settings.pin.save": { en: "Save PIN", es: "Guardar PIN" },
-  "settings.pin.active": {
-    en: "PIN active: this profile asks for it when a session is opened.",
-    es: "PIN activo: este perfil lo pide al abrir sesión.",
-  },
-  "settings.pin.inactive": {
-    en: "No PIN: this profile opens without asking for anything.",
-    es: "Sin PIN: este perfil entra sin pedir nada.",
-  },
-  "settings.pin.saved": { en: "PIN saved.", es: "PIN guardado." },
-  "settings.pin.removed": { en: "PIN removed.", es: "PIN retirado." },
-  "settings.pin.error": {
-    en: "Could not save the PIN. Is the server running?",
-    es: "No se pudo guardar el PIN. ¿Está activo el servidor?",
-  },
-
-  // Diálogo de perfil
-  "profile.editTitle": { en: "Edit profile", es: "Editar perfil" },
+  // Diálogo de usuario (avatar, nombre, color). V3.81: los textos dicen
+  // «usuario», no «perfil»: en la UI «perfil» queda reservado para el perfil
+  // auditivo, que es otra cosa.
+  "profile.editTitle": { en: "Edit user", es: "Editar usuario" },
   "profile.uploadImage": { en: "Upload image", es: "Subir imagen" },
   "profile.removeImage": { en: "Remove image", es: "Quitar imagen" },
   "profile.name": { en: "Name", es: "Nombre" },
@@ -2151,28 +2239,32 @@ const STRINGS: Record<string, Entry> = {
     es: "No se pudo procesar la imagen.",
   },
   "profile.saveError": {
-    en: "Could not save the profile.",
-    es: "No se pudo guardar el perfil.",
+    en: "Could not save the user.",
+    es: "No se pudo guardar el usuario.",
   },
   // V3.77: pedir la baja. Ni la app ni el alumno borran nada: la solicitud va al
   // webmaster, y aprobarla **desactiva** (reversible). El texto no promete más de
   // lo que pasa, porque el alumno ya no ve el final del proceso.
-  "profile.deleteSection": { en: "Remove this profile", es: "Dar de baja este perfil" },
+  //
+  // V3.81: existe además la baja inmediata, en el menú de cuenta. Esta se queda
+  // para quien no tiene la contraseña a mano o quiere que quede constancia de la
+  // petición; las dos acaban en el mismo sitio (el webmaster decide si purga).
+  "profile.deleteSection": { en: "Ask to remove this user", es: "Pedir dar de baja este usuario" },
   "profile.deleteExplain": {
-    en: "The webmaster can remove this profile from the launcher. Your progress is kept unless the data is purged, which is a separate step.",
-    es: "El webmaster puede dar de baja este perfil desde el lanzador. Tu progreso se conserva salvo que se purgue, que es un paso aparte.",
+    en: "The webmaster can remove this user from the management console. Your progress is kept unless the data is purged, which is a separate step.",
+    es: "El webmaster puede dar de baja este usuario desde el programa de gestión. Tu progreso se conserva salvo que se purgue, que es un paso aparte.",
   },
   "profile.requestDelete": {
-    en: "Ask to remove my profile",
-    es: "Pedir dar de baja mi perfil",
+    en: "Ask the webmaster to remove me",
+    es: "Pedir al webmaster que me dé de baja",
   },
   "profile.deleteSent": {
-    en: "Request sent. The webmaster will see it in the launcher.",
-    es: "Solicitud enviada. El webmaster la verá en el lanzador.",
+    en: "Request sent. The webmaster will see it in the management console.",
+    es: "Solicitud enviada. El webmaster la verá en el programa de gestión.",
   },
   "profile.deleteDuplicate": {
-    en: "You have already asked for this profile to be removed.",
-    es: "Ya has pedido dar de baja este perfil.",
+    en: "You have already asked for this user to be removed.",
+    es: "Ya has pedido dar de baja este usuario.",
   },
   "profile.deleteFull": {
     en: "There are too many pending requests. Try again later.",

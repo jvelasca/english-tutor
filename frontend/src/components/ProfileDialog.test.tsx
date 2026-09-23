@@ -53,7 +53,7 @@ function renderDialog(
 }
 
 const requestButton = () =>
-  screen.getByRole("button", { name: "Ask to remove my profile" }) as HTMLButtonElement;
+  screen.getByRole("button", { name: "Ask the webmaster to remove me" }) as HTMLButtonElement;
 
 describe("ProfileDialog · pedir la baja", () => {
   afterEach(() => {
@@ -139,7 +139,7 @@ describe("ProfileDialog · pedir la baja", () => {
     fireEvent.click(requestButton());
 
     expect(
-      await screen.findByText("You have already asked for this profile to be removed."),
+      await screen.findByText("You have already asked for this user to be removed."),
     ).toBeTruthy();
   });
 });

@@ -30,7 +30,7 @@
  * El resumen y el arranque los controla el contenedor con la `key`: una sesión
  * nueva remonta el componente, así que no hay que «resetear» estado por efecto.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Layers, Pencil, RefreshCw } from "lucide-react";
 import type { FlashcardStudyItem } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
@@ -108,6 +108,47 @@ export function StudySession({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
+  /**
+   * V3.80.1: candado contra la carrera generación ↔ edición.
+   *
+   * `hydrate()` es una promesa que puede tardar (modelo local) y el lápiz se
+   * puede usar mientras está en vuelo. Sin esto, la respuesta tardía del modelo
+   * podía pisar la traducción que el alumno acababa de guardar, dejando en
+   * pantalla un valor que contradecía la fuente de verdad que él mismo había
+   * editado.
+   *
+   * - `hydrationEpoch`: sube al guardar una traducción propia (y al borrarla) e
+   *   invalida cualquier hidratación pendiente de ESA tarjeta.
+   * - `ownBacksRef`: espejo síncrono de `ownBacks`, porque dentro del closure
+   *   async el estado de React puede estar desfasado.
+   */
+  const hydrationEpoch = useRef<Record<string, number>>({});
+  const ownBacksRef = useRef<Record<string, true>>({});
+
+  /** Marca (o desmarca) la traducción propia de una tarjeta, estado y ref a la vez. */
+  function markOwnBack(itemKey: string, own: boolean) {
+    if (own) {
+      ownBacksRef.current[itemKey] = true;
+      setOwnBacks((m) => ({ ...m, [itemKey]: true }));
+      return;
+    }
+    delete ownBacksRef.current[itemKey];
+    setOwnBacks((m) => {
+      const next = { ...m };
+      delete next[itemKey];
+      return next;
+    });
+  }
+
+  /** Olvida el resultado (o el fallo) de la hidratación de una tarjeta. */
+  function clearLookupState(itemKey: string) {
+    setLookupStates((m) => {
+      const next = { ...m };
+      delete next[itemKey];
+      return next;
+    });
+  }
+
   const current = items[index] ?? null;
   const key = current ? cardKey(current) : "";
   const face = key ? faces[key] : undefined;
@@ -118,7 +159,12 @@ export function StudySession({
   // El lápiz solo se ofrece en tarjetas del léxico: son las únicas cuya
   // traducción propia tiene fila que corregir. El reverso de una tarjeta
   // manual se edita en la pestaña Tarjetas, que es su sitio.
-  const canEdit = current?.card_type === "lexicon";
+  //
+  // V3.80.1: de ahí sale también el `lang`. Una tarjeta de léxico es EN→ES por
+  // construcción; una manual puede contener cualquier idioma, así que declarar
+  // `lang` en ella sería mentir. Se omite cuando no se conoce.
+  const isLexicon = current?.card_type === "lexicon";
+  const canEdit = isLexicon;
 
   /**
    * Pide el reverso al diccionario cuando la tarjeta viene sin él.
@@ -127,15 +173,33 @@ export function StudySession({
    * traducción o caché) es la verdad y no se sustituye por otra generación.
    * Tampoco reintenta una tarjeta ya resuelta o ya fallida: insistir con el
    * modelo caído solo añadiría esperas a la sesión.
+   *
+   * `force` (V3.80.1) se usa tras borrar la traducción propia: la tarjeta vuelve
+   * a quedar sin reverso y hay que reintentar la caché aunque una hidratación
+   * anterior hubiera marcado la tarjeta como resuelta.
    */
-  async function hydrate(item: FlashcardStudyItem, itemKey: string) {
+  async function hydrate(
+    item: FlashcardStudyItem,
+    itemKey: string,
+    force = false,
+  ) {
     if (item.back || item.card_type !== "lexicon") return;
-    if (faces[itemKey] || lookupStates[itemKey] || generatingKey === itemKey) {
+    if (
+      !force &&
+      (faces[itemKey] || lookupStates[itemKey] || generatingKey === itemKey)
+    ) {
       return;
     }
+    // V3.80.1: foto del turno de hidratación. Si al volver ha cambiado (el
+    // alumno guardó o borró su traducción), esta respuesta ya no vale.
+    const epoch = hydrationEpoch.current[itemKey] ?? 0;
+    const stale = () =>
+      (hydrationEpoch.current[itemKey] ?? 0) !== epoch ||
+      Boolean(ownBacksRef.current[itemKey]);
     setGeneratingKey(itemKey);
     try {
       const entry = await lookupDictionaryWord(userId, item.front);
+      if (stale()) return;
       const translation = (entry.translation ?? "").trim();
       const definition = (entry.definition ?? "").trim();
       if (translation || definition) {
@@ -149,9 +213,11 @@ export function StudySession({
         setLookupStates((m) => ({ ...m, [itemKey]: "empty" }));
       }
     } catch {
-      setLookupStates((m) => ({ ...m, [itemKey]: "failed" }));
+      if (!stale()) {
+        setLookupStates((m) => ({ ...m, [itemKey]: "failed" }));
+      }
     } finally {
-      setGeneratingKey("");
+      setGeneratingKey((k) => (k === itemKey ? "" : k));
     }
   }
 
@@ -190,17 +256,48 @@ export function StudySession({
     setSaving(true);
     setSaveError(false);
     const translation = draft.trim();
+    // Foto de la tarjeta: el guardado es asíncrono y la sesión puede avanzar
+    // (o no) mientras está en vuelo; esto escribe siempre en la correcta.
+    const item = current;
+    const itemKey = key;
     try {
-      await setVocabularyTranslation(userId, current.front, translation);
-      // Lo escrito manda: la cara de esta sesión pasa a ser la del alumno, y la
-      // definición del modelo (si la había) se conserva como apoyo.
-      setFaces((m) => ({ ...m, [key]: { back: translation, definition } }));
-      setOwnBacks((m) => ({ ...m, [key]: true }));
-      setLookupStates((m) => {
-        const next = { ...m };
-        delete next[key];
-        return next;
-      });
+      await setVocabularyTranslation(userId, item.front, translation);
+      // V3.80.1 (P1): guardar o borrar invalida cualquier hidratación en vuelo
+      // de esta tarjeta. Su respuesta tardía ya no puede pisar esta decisión.
+      hydrationEpoch.current[itemKey] =
+        (hydrationEpoch.current[itemKey] ?? 0) + 1;
+      clearLookupState(itemKey);
+      // El turno de generación ya no manda: se retira el «Generando…» para que
+      // la cara del alumno (o la del pack, al borrar) se vea de inmediato.
+      setGeneratingKey((k) => (k === itemKey ? "" : k));
+      if (translation) {
+        // Lo escrito manda: la cara de esta sesión pasa a ser la del alumno, y
+        // la definición del modelo (si la había) se conserva como apoyo.
+        setFaces((m) => ({
+          ...m,
+          [itemKey]: { back: translation, definition },
+        }));
+        markOwnBack(itemKey, true);
+      } else {
+        // V3.80.1 (P2): borrar la traducción propia NO la deja marcada como
+        // propia —eso diría «Tu versión» sobre un texto que ya no existe—: la
+        // precedencia vuelve al pack o a la caché, así que se recupera la cara
+        // efectiva que sirvió el backend y se reintenta la caché si no la había.
+        markOwnBack(itemKey, false);
+        if (item.back) {
+          setFaces((m) => ({
+            ...m,
+            [itemKey]: { back: item.back, definition },
+          }));
+        } else {
+          setFaces((m) => {
+            const next = { ...m };
+            delete next[itemKey];
+            return next;
+          });
+          void hydrate(item, itemKey, true);
+        }
+      }
       setEditing(false);
     } catch {
       setSaveError(true);
@@ -265,7 +362,10 @@ export function StudySession({
         )}
         aria-label={t("flashcards.study.flip")}
       >
-        <span className="text-2xl font-bold tracking-tight" lang="en">
+        <span
+          className="text-2xl font-bold tracking-tight"
+          lang={isLexicon ? "en" : undefined}
+        >
           {current.front}
         </span>
         {flipped ? (
@@ -277,12 +377,18 @@ export function StudySession({
               </span>
             ) : null}
             {!generating && back ? (
-              <span className="text-lg font-semibold" lang="es">
+              <span
+                className="text-lg font-semibold"
+                lang={isLexicon ? "es" : undefined}
+              >
                 {back}
               </span>
             ) : null}
             {!generating && definition ? (
-              <span className="text-sm text-muted-foreground" lang="en">
+              <span
+                className="text-sm text-muted-foreground"
+                lang={isLexicon ? "en" : undefined}
+              >
                 {definition}
               </span>
             ) : null}

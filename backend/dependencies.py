@@ -67,32 +67,79 @@ async def current_user(request: Request) -> dict:
     cookie o la firma no cuadra; 404 si el perfil de una sesión válida ya no
     existe (mismo contrato que antes).
 
+    V3.81: además de la firma se comprueba la **época de autenticación**. Es lo
+    que hace que cambiar la contraseña o forzar una baja cierren las sesiones
+    abiertas de esa cuenta **en la siguiente petición**, no cuando caduque la
+    cookie (un año). Se responde 401 `SESSION_STALE` y no 403 para que la UI sepa
+    que lo que toca es volver a entrar, no pedir permiso.
+
     El `?user_id=` que aceptaba hasta V3.74 **ya no se lee**: era la
     vulnerabilidad —cualquiera que alcanzara la API podía pedir los datos de otro
     perfil con solo cambiar un parámetro—, y dejarlo como respaldo habría sido
     cambiar la forma del arreglo sin arreglarlo (`PLAN-P0-IDENTIDAD.md` §4).
     """
-    user_id = sessions.verify(request.cookies.get(sessions.SESSION_COOKIE))
-    if user_id is None:
+    resolved = sessions.verify_session(request.cookies.get(sessions.SESSION_COOKIE))
+    if resolved is None:
         raise HTTPException(status_code=401, detail="SESSION_REQUIRED")
+    user_id, epoch = resolved
     user = await user_service.get_user(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    current_epoch = await user_service.get_auth_epoch(user_id)
+    if current_epoch is None or current_epoch != epoch:
+        # Sesión de una credencial que ya no es la vigente: la contraseña cambió
+        # o la cuenta se dio de baja. Es un 401 porque lo que toca es volver a
+        # entrar, no pedir permiso.
+        raise HTTPException(status_code=401, detail="SESSION_STALE")
     if user_service.is_disabled(user):
-        # V3.77: un perfil desactivado deja de poder usar su sesión, aunque la
+        # V3.77: una cuenta desactivada deja de poder usar su sesión, aunque la
         # cookie siga siendo válida — desactivar tiene que surtir efecto **ya**,
         # no cuando caduque la sesión. Se distingue de `SESSION_REQUIRED` para
         # que la UI pueda decir por qué y no parezca que se ha caído la conexión.
         raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
+    if user_service.is_unenrolled(user):
+        # V3.81: la baja autoservicio. Mismo efecto que desactivar, distinto
+        # motivo: aquí el que decidió fue el propio alumno.
+        raise HTTPException(status_code=403, detail="ACCOUNT_UNENROLLED")
+    if (
+        user_service.is_password_change_due(user)
+        and request.url.path not in _PASSWORD_CHANGE_ALLOWED_PATHS
+    ):
+        # V3.81: la contraseña temporal del webmaster obliga a cambiarla **antes**
+        # de usar nada. La exención es literal y corta (la propia sesión y el
+        # cambio de contraseña) porque todo lo demás es «usar la app», y una
+        # contraseña que sobrevive al primer acceso deja de ser temporal.
+        raise HTTPException(status_code=403, detail="PASSWORD_CHANGE_REQUIRED")
     return user
+
+
+# Lo único que se puede hacer con una contraseña temporal puesta: consultar quién
+# eres (para que la UI sepa qué pedirte) y cambiarla. Se declara aquí arriba, junto
+# a la comprobación que lo usa, y no disperso por los routers.
+_PASSWORD_CHANGE_ALLOWED_PATHS = frozenset({"/api/session", "/api/session/password"})
 
 
 async def current_user_optional(request: Request) -> dict | None:
     """Igual que `current_user`, pero **sin** sesión resuelve `None` en vez de 401:
-    para los endpoints que saben funcionar sin perfil (su semántica no cambia)."""
-    if sessions.verify(request.cookies.get(sessions.SESSION_COOKIE)) is None:
-        return None
-    return await current_user(request)
+    para los endpoints que saben funcionar sin perfil (su semántica no cambia).
+
+    V3.81: también resuelve `None` —y no un error— cuando la sesión existe pero su
+    época quedó atrás o la cuenta está fuera de servicio. Para estos endpoints el
+    resultado es el mismo que no tener sesión: no hay datos que atribuir a nadie, y
+    devolver 403 haría que un chat o una lectura sin perfil fallaran por un estado
+    de cuenta que no les afecta.
+
+    **El 404 sí se propaga**: una sesión válida cuyo usuario ya no existe (se purgó
+    desde la consola) es un fallo distinto —la identidad que el cliente cree tener
+    ha dejado de existir— y su contrato está fijado por tests. Convertirlo en
+    `None` sería contar dos cosas distintas con la misma moneda.
+    """
+    try:
+        return await current_user(request)
+    except HTTPException as exc:
+        if exc.status_code in (401, 403):
+            return None
+        raise
 
 
 _ALLOWED_AUDIO_TYPES = {

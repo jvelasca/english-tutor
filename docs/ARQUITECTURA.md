@@ -32,6 +32,7 @@ backend/
 │   ├── progress.py      # GET /api/progress, GET /api/progress/history (F6; perfil de la sesión)
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
 │   ├── session.py       # POST/GET/DELETE /api/session (V3.75: firma la cookie et_session)
+│   │                    #   + PUT /api/session/password; GET/POST /api/account/* (V3.81)
 │   ├── settings.py      # GET/PUT /api/settings (preferencias; solo las del propio perfil)
 │   ├── users.py         # GET/POST /api/users, PATCH /api/users/{id} (solo el propio perfil)
 │   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
@@ -84,6 +85,7 @@ backend/
 │   ├── academy.py       # mastery determinista (EMA+racha), gating, progresión, evaluación (puro)
 │   ├── cefr.py          # constantes CEFR + corte único de banda (level_for_numeric) + recommendations (puros)
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
+│   ├── credentials.py   # PBKDF2, política de contraseña, freno de intentos y tokens de email (V3.81)
 │   ├── curriculum.py    # carga/validación del currículum JSON + ASSESSABLE/PERFORMANCE_SKILLS
 │   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
 │   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
@@ -91,6 +93,7 @@ backend/
 │   ├── interaction.py   # evidencia objetiva de interacción (turnos/latencia) (puro, V1.16)
 │   ├── listening.py     # banco de preguntas + score_answer + progresión por nivel (puro, F8)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
+│   ├── mailer.py        # correo saliente fail-closed: verificación y prueba de SMTP (V3.81)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
 │   ├── network.py       # get_lan_ip + URLs de acceso LAN
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
@@ -217,12 +220,15 @@ frontend/src/
 │   ├── listening.ts     # getListeningQuestion + audio por voz + submitListeningAnswer (F8, V3.75.5).
 │   ├── pronunciation.ts # checkPronunciation (audio + texto → score).
 │   ├── progress.ts      # getProgress + getProgressHistory (resumen + histórico) (F6).
-│   ├── session.ts       # openSession + getSession + closeSession (V3.75).
+│   ├── session.ts       # openSession + getSession + closeSession; y la cuenta (V3.81):
+│   │                    #   createAccount, changePassword, changeEmail, unenrollAccount,
+│   │                    #   resendVerification, verifyEmail
 │   ├── settings.ts      # getSettings + putSettings (preferencias del perfil de la sesión).
 │   ├── users.ts         # listUsers, createUser, updateUser.
 │   └── voz.ts           # transcribe + tts (envía la voz pedida, validada en el backend).
 ├── components/          # Presentación pura (reciben props, no hacen fetch).
 │   ├── Academy.tsx      # currículum CEFR: niveles, objetivos, mastery y examen (núcleo Academy)
+│   ├── AccountDialog.tsx # la cuenta (V3.81): contraseña, email, baja en dos pasos y salir
 │   ├── AppearancePanel.tsx # panel de apariencia: tema, acento, tamaño, densidad (M16)
 │   ├── ChatMessage.tsx
 │   ├── Composer.tsx
@@ -234,6 +240,8 @@ frontend/src/
 │   ├── MicButton.tsx
 │   ├── ModeBar.tsx      # selector de modo de tutor
 │   ├── ProfileDialog.tsx # editar perfil: nombre, avatar, color (M14)
+│   ├── ProfileGate.tsx  # puerta de entrada (V3.80.2/V3.81): selector de cuentas, contraseña
+│   │                    #   y alta; distingue «sin cuentas», «no cargó» y error
 │   ├── ProgressDashboard.tsx # dashboard de progreso real: tendencias, racha, dominio, hitos (F6)
 │   ├── PronunciationPractice.tsx # feedback fonético + fluidez (WPM) (F7/F8)
 │   ├── ResizeHandle.tsx # asa redimensionable entre paneles (M14)
@@ -246,7 +254,9 @@ frontend/src/
 ├── hooks/               # Estado y lógica de UI.
 │   ├── useAppearance.ts # apariencia por usuario: tema/acento/tamaño/densidad/esquema de niveles + persistencia (M16)
 │   ├── useChat.ts       # incluye estado de usuario y aislamiento por perfil
+│   ├── useDictionaryView.ts # modo del diccionario (consulta/personal/flashcards) + persistencia
 │   ├── useHandsFree.ts  # bucle de voz continua + VAD por energía (M10)
+│   ├── useTabList.ts    # semántica de `tablist` de verdad: roving tabindex + flechas/Home/End (V3.80.1)
 │   └── useVoiceChoice.ts # store de módulo: catálogo + pareja A/B del perfil + lectura al repetir + persistencia (V3.75.5/V3.75.6)
 ├── types/               # Tipos compartidos (espejo de los schemas del backend).
 │   └── api.ts           # incluye User y user_id en ConversationMeta
@@ -254,6 +264,8 @@ frontend/src/
 │   ├── appearance.ts    # presets de acento/tamaño/densidad/esquema de niveles + parse/serialize (M16)
 │   ├── avatar.ts        # color/emoji/iniciales deterministas (M14)
 │   ├── cefr.ts          # cefrLevelKey/levelClass/bandToLevelKey, cefrLabel, bandLabel (F4/F8)
+│   ├── credentials.ts   # forma de la contraseña y del email, espejo del backend (V3.81)
+│   ├── dictionaryView.ts # los tres modos del diccionario: parse/serialize + puente con settings
 │   ├── fluency.ts       # wpmLabel, fluencyLevelLabel (F8)
 │   ├── image.ts         # resizeImageToDataUrl (M14)
 │   ├── layout.ts        # dimensiones de paneles + clamp/parse/serialize (M14)
@@ -343,8 +355,8 @@ launcher/
                          #         test_ui/test_state_store/test_config_store/
                          #         test_process_manager/test_preflight_v373/
                          #         test_lan_ip_v373/test_lan_mode/
-                         #         test_admin_pin/test_admin_client) — 188
-                         #         funciones de test (205 casos con parametrización), en CI
+                         #         test_admin_pin/test_admin_client) — 227
+                         #         funciones de test (244 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 
@@ -352,20 +364,40 @@ launcher/
 - **`launcher.py`**: GUI `tkinter` (ventana de estado con servicios, BD y usuarios; botones
   Iniciar/Detener/Abrir/Actualizar; paneles colapsables). Solo orquesta; no contiene lógica de
   negocio.
-- **`ui.py`**: constantes de estilo (colores, iconos, puntos de estado) y lectura de logs.
+- **`ui.py`**: constantes de estilo (colores, iconos, puntos de estado), lectura de logs y las
+  **vistas puras** de la consola «Usuarios»: la cola de solicitudes (`pending_view`: la frase y
+  las filas que el webmaster ve, para poder probar sin pantalla que un fallo no se pinta como
+  «sin solicitudes»), la fila de cuenta (`user_row` con su etiqueta de nombre duplicado, email y
+  contraseña), las tareas pendientes (`accounts_tasks`), el historial (`event_row`), el motivo por
+  el que una cuenta todavía no se puede purgar (`purge_block_reason`) y la frase del correo, que
+  **concilia** lo que el launcher guarda con lo que el servidor en marcha ve
+  (`smtp_reconcile_label`, V3.81): el backend resuelve el SMTP de su entorno al arrancar, así que
+  los dos estados pueden discrepar y enseñar el local como si fuera el del servidor sería el mismo
+  error que V3.80.1 arregló en la cola.
 - **`core.py`**: funciones puras y testables (resolver rutas, construir comandos, normalizar
   estado de salud y contadores).
 - **`process_manager.py`**: prepara el entorno (genera el certificado TLS autofirmado y
   compila `frontend/dist` si falta) y gestiona el ciclo de vida del **proceso de
   producto** (uvicorn), con matado del árbol de procesos en Windows (`taskkill /T /F`).
 - **`status.py`**: obtiene el estado real: `/api/health/dependencies` (HTTP) y consultas de
-  solo lectura a la BD SQLite (contadores globales y usuarios).
-- **`admin.py`** (V3.77): el **único** sitio del launcher que escribe en el producto. Habla
-  con `/api/admin/*` con el PIN en la cabecera `X-Admin-Pin`, y devuelve `AdminResult` en vez
-  de lanzar, para que la GUI pueda enseñar «no se pudo» sin que se le caiga el hilo. No toca
-  la BD directamente aunque tenga el fichero a mano: el borrado de un perfil tiene que pasar
-  por el mismo sitio que el resto (validación, copia previa, tabla de solicitudes) o habría dos
-  definiciones de «purgar» y la del launcher sería la que nadie prueba.
+  solo lectura a la BD SQLite (contadores globales, usuarios y **solicitudes de perfil
+  pendientes** —esta última se lee siempre, con PIN o sin él, porque es lo que hace visible
+  que alguien ha pedido algo—).
+- **`admin.py`** (V3.77, ampliado en V3.81): el **único** sitio del launcher que escribe en el
+  producto. Habla con `/api/admin/*` con el PIN en la cabecera `X-Admin-Pin`, y devuelve
+  `AdminResult` en vez de lanzar, para que la GUI pueda enseñar «no se pudo» sin que se le caiga
+  el hilo. No toca la BD directamente aunque tenga el fichero a mano: el borrado de una cuenta
+  tiene que pasar por el mismo sitio que el resto (validación, copia previa, tabla de solicitudes,
+  registro de auditoría) o habría dos definiciones de «purgar» y la del launcher sería la que
+  nadie prueba. V3.81 le da la superficie entera de la gestión de cuentas: resolver la cola
+  (`pending_requests`, `approve_request`, `reject_request`), crear (`create_user`), asignar o
+  **restablecer** la credencial (`set_credentials`, que es también la recuperación de contraseña),
+  sellar el email a mano (`verify_email`, la otra mitad del modo híbrido), editar datos
+  (`edit_user`, solo los campos presentes), el ciclo de servicio (`set_user_status`), **forzar la
+  baja con motivo** (`force_unenroll`), el historial (`user_history`, que sobrevive a la purga),
+  el borrado irreversible (`purge_user`, con `confirm_name` y espera larga porque el backend copia
+  antes) y el correo saliente (`smtp_config`, `test_smtp`). El **PIN de perfil desapareció** con
+  V3.81: aprobar un alta crea la cuenta **sin** credencial y asignarla es una decisión aparte.
 - **`browser_cookies.py`**: diagnóstico (solo lectura) de las cookies de los navegadores
   soportados, para orientar problemas de acceso local. Informa de **si hay sesión**
   (`et_session`) y **enmascara su valor**: es un token firmado y verlo en pantalla sería
@@ -373,15 +405,21 @@ launcher/
 - **`state_store.py`**: persistencia de la disposición visual (tamaño/posición de ventana y
   paneles colapsados) en `state.json`.
 - **`config_store.py`** (V3.75.3): persistencia de las **preferencias** del launcher en
-  `config.json`, separada del estado visual a propósito. Hoy guarda dos: el modo LAN
-  (`{"lan": false}` por defecto, fail-closed) y el **PIN de administración** (`{"admin_pin":
-  ""}`, también fail-closed, V3.77). Se lee **al arrancar**, antes de construir la interfaz
-  (`LauncherApp.__init__` → `core.apply_lan_config` / `core.apply_admin_config`), y se escribe
-  **en cada cambio** (`toggle_lan_mode`, `set_admin_pin`), no al cerrar: reabrir el launcher
-  conserva el modo declarado y el panel de acceso ya lo muestra. El PIN se declara además en el
-  entorno para que `backend_env()` lo herede al arrancar uvicorn: sin eso, el launcher tendría
-  un PIN y el backend otro. Reexpone la decisión de §5.8 de
-  `docs/audit/PLAN-P0-IDENTIDAD.md`; el detalle y su porqué están ahí.
+  `config.json`, separada del estado visual a propósito. Guarda el modo LAN (`{"lan": false}` por
+  defecto, fail-closed), el **PIN de administración** (`{"admin_pin": ""}`, también fail-closed,
+  V3.77) y, desde V3.81, los ajustes **no secretos** del correo saliente (`smtp_host`,
+  `smtp_port`, `smtp_user`, `smtp_sender`): la **contraseña** del SMTP no vive aquí sino en
+  `data/mail.secret`, la misma familia que `session.secret` y por tanto **fuera de las copias**
+  (`services/backup.py::_NON_PORTABLE_TOP_NAMES`). Se lee **al arrancar**, antes de construir la
+  interfaz (`LauncherApp.__init__` → `core.apply_lan_config` / `core.apply_admin_config` /
+  `core.apply_smtp_config`), y se escribe **en cada cambio** (`toggle_lan_mode`, `set_admin_pin`,
+  `set_smtp_settings`), no al cerrar: reabrir el launcher conserva el modo declarado y el panel de
+  acceso ya lo muestra. El PIN y el SMTP se declaran además en el entorno para que `backend_env()`
+  los herede al arrancar uvicorn: sin eso, el launcher tendría un PIN y el backend otro. Y como el
+  backend **en marcha** no vuelve a leer el entorno, el launcher **reinicia el servidor** al
+  guardar o retirar el PIN o el correo (igual que al cambiar el modo LAN), en vez de limitarse a
+  pedirlo por texto. Reexpone la decisión de §5.8 de `docs/audit/PLAN-P0-IDENTIDAD.md`; el detalle
+  y su porqué están ahí.
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
   puerto en el firewall.
 
@@ -438,9 +476,11 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
   corta con **403** en métodos no seguros) y el patrón de `CORSMiddleware`; un
   candado comprueba que dicen lo mismo sobre los mismos orígenes. El propio
   equipo (loopback) entra en los dos modos: la frontera es la LAN, no lo local.
-- Mientras no exista autenticación por perfil (**P0 abierto**, ver
-  `docs/audit/PARKED.md`), cualquiera que alcance el puerto ve y escribe los datos
-  del alumno: por eso exponerse es una decisión explícita. `/api/network` informa
+- Mientras queden cuentas **sin credencial** (heredadas; **P0 en curso**, ver
+  `docs/audit/PARKED.md`), cualquiera que alcance el puerto ve los **nombres** de
+  todas las cuentas y puede entrar con esas: desde V3.81 una cuenta **con**
+  contraseña no se abre sin ella, pero la frontera real sigue siendo la **red**, así
+  que exponerse continúa siendo una decisión explícita. `/api/network` informa
   del modo, y ni el panel del launcher ni `ConnectDeviceCard` anuncian una URL de
   LAN cuando no responde.
 - Fijado por test en `backend/tests/test_lan_mode.py` y
@@ -462,10 +502,13 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
   en cada petición: sin cookie, manipulada o caducada ⇒ **401 `SESSION_REQUIRED`**.
   El `?user_id=` de la URL ya **no** significa nada.
 - **Qué cierra y qué no.** Cierra el **alcance** (el cliente no elige ni puede
-  forjar la identidad), **no** el acceso: `POST /api/session` acepta cualquier
-  `user_id` existente y `GET/POST /api/users` siguen sin credencial —el producto es
-  «sin cuentas, sin contraseñas» por diseño—. Autenticar de verdad es la Fase 3 del
-  P0, una decisión de producto (`docs/audit/PLAN-P0-IDENTIDAD.md`).
+  forjar la identidad). Desde V3.81 cierra también el **acceso** de las cuentas que
+  tienen credencial: `POST /api/session` **exige la contraseña** y responde **401
+  `PASSWORD_REQUIRED` / `PASSWORD_INVALID`** sin ella. Lo que queda abierto a
+  propósito es la cuenta **heredada** sin credencial (`password_hash == ''`), que
+  entra como siempre para no dejar a nadie fuera de sus datos: es una deuda
+  declarada, visible en la consola de gestión, y el objetivo es llevarla a cero
+  (`docs/audit/PLAN-P0-IDENTIDAD.md`).
 - **Bordes de autorización:** `PATCH /api/users/{id}` y `PUT /api/settings` exigen
   sesión y que el id coincida con el de la sesión del propio perfil (si no, **403**).
 - **El secreto de firma** vive en `backend/data/session.secret` (gitignored) y
@@ -477,7 +520,7 @@ El producto se ejecuta como **un solo proceso** que arranca el launcher:
   de cookie, 401), `test_identity_source.py` (el `?user_id=` no manda) y
   `test_users_self_only.py` (403 al editar lo ajeno). El adaptador de
   `backend/tests/conftest.py` traduce el `?user_id=` de las suites históricas a una
-  sesión firmada, para que las 109 suites prueben el camino nuevo sin reescribirse.
+  sesión firmada, para que las suites históricas prueben el camino nuevo sin reescribirse.
 
 ### Superficie sin sesión: declarada y acotada (V3.75, cierra VG-N6)
 
@@ -487,24 +530,40 @@ forma explícita** —y se fijan por test— por tres razones: (1) son **reconoc
 barato** (modelos instalados, IP/hostname de LAN, trabajos de generación en curso,
 rechazos por rate limit de 60 s) que **no** permite leer ni escribir datos de ningún
 alumno; (2) quien puede alcanzarlas ya está dentro para todo lo demás —la frontera
-real es la **red** (loopback por defecto, LAN opt-in), no esta lista—; y (3) el
-producto **no tiene cuentas** que exigirles (Fase 3 del P0).
+real es la **red** (loopback por defecto, LAN opt-in), no esta lista—; y (3) las
+rutas que sí son de datos siguen exigiendo sesión firmada, y desde V3.81 **enumerar
+nombres ya no basta para entrar**: sin la contraseña, la lista de cuentas no abre
+ninguna.
 
 **Responden sin sesión** (y deben seguir haciéndolo: el launcher y la puerta de
-perfil las usan antes de que exista ningún perfil): `/` · `/api` · `/api/health` ·
+cuenta las usan antes de que exista ninguna sesión): `/` · `/api` · `/api/health` ·
 `/api/health/live` · `/api/health/ready` · `/api/health/dependencies` ·
-`/api/models` · `/api/network` · `/api/system/status` · `GET/POST /api/users` ·
-`POST /api/session` (abrir sesión es justo lo que aún no existe).
+`/api/models` · `/api/network` · `/api/system/status` · `GET /api/users` ·
+`POST /api/users` (V3.81: **registro**, ver más abajo) · `POST /api/session` (abrir
+sesión es justo lo que aún no existe) · `POST /api/account/verify` (V3.81: el enlace
+del correo puede abrirse en otro navegador).
+
+**`GET /api/users` enumera nombres, no correos.** La puerta es un **selector** con
+avatares y tiene que pintar los nombres antes de que haya sesión, así que los
+nombres viajan; el **email** no, salvo el de la **propia** cuenta (el de la sesión,
+que ya lo conoce). Sin ese recorte, cualquier dispositivo de la red podría cosechar
+los correos de toda la casa sin escribir una contraseña. El recorte se hace en el
+borde HTTP (`routers/users.py::_without_foreign_email`) y no en el repositorio,
+porque la consola de gestión lee las **mismas** filas detrás del candado de
+administración y necesita el email entero.
 
 **Exigen sesión firmada** (401 `SESSION_REQUIRED`): todo lo que lee o escribe datos
 del alumno (`/api/settings`, `/api/profile`, `/api/progress`, `/api/conversations`,
 `/api/vocabulary`, `/api/grammar/errors`, `/api/academy/*`, `/api/listening/*`,
-`/api/pronunciation`, `/api/chat`…) y **`PUT /api/session/pin`** (V3.76: cambiar un
-secreto del perfil). **Exigen PIN de administración**
-(`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*` y
-`/api/system/restore`.
+`/api/pronunciation`, `/api/chat`…) y, desde V3.81, lo que toca la **cuenta**:
+`PUT /api/session/password` (cambiar un secreto: sustituye a `PUT /api/session/pin`,
+retirado con el PIN), `POST /api/session/logout`,
+`POST /api/account/resend-verification` (emite tokens) y `POST /api/account/unenroll`
+(saca a alguien del producto). **Exigen PIN de administración**
+(`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*`,
+`/api/system/restore` y todo `/api/admin/*`.
 
-**V3.77 — la única escritura sin sesión, y por qué se acepta.**
+**V3.77 — la escritura anónima inerte, y por qué se acepta.**
 `POST /api/profile-requests` responde **sin sesión** porque quien pide un perfil
 todavía no tiene ninguno: exigirle identidad para pedir identidad sería un círculo.
 Se acepta con cuatro acotaciones, todas activas y con test propio
@@ -517,6 +576,17 @@ una petición que puede rechazar. La de baja (`POST /api/profile-requests/delete
 **sí** exige sesión, y no lleva `{id}` en la ruta: no existe la forma de pedir la
 baja del perfil de otro.
 
+**V3.81 — las escrituras sin sesión, enumeradas y con candado.** Son cuatro, y cada
+una tiene su razón: `POST /api/users` (**registro**: quien se da de alta todavía no
+tiene sesión, y lo que lo acota no es una cookie sino la **frontera de equipo**,
+`config.is_admin_loopback_host`), `POST /api/account/verify` (**confirmación del
+email**: el enlace puede abrirse en otro navegador y lo que autoriza es un token de
+un solo uso con caducidad, no la cookie), `POST /api/session` (abrir sesión es justo
+lo que aún no existe) y `POST /api/profile-requests` (la solicitud inerte de arriba).
+Las otras dos rutas de cuenta —`resend-verification` y `unenroll`— **sí** exigen
+sesión, y se comprueban en el **mismo** test para que la lista no crezca sin querer:
+`backend/tests/test_public_surface.py::test_las_escrituras_sin_sesion_estan_declaradas_y_son_solo_dos`.
+
 **V3.77 — la administración de perfiles es local por construcción.**
 `/api/admin/*` (crear, desactivar, purgar y resolver solicitudes) exige **dos**
 llaves: el PIN de administración **y** que la petición llegue del propio equipo
@@ -524,47 +594,66 @@ llaves: el PIN de administración **y** que la petición llegue del propio equip
 constante sin fuente: `config.admin_pin()` lee `ENGLISH_TUTOR_ADMIN_PIN`, que es
 como lo declara el lanzador al arrancar el backend. Sigue siendo **fail-closed**:
 sin PIN declarado, la administración está deshabilitada, no abierta. Y `POST
-/api/users` deja de ser un alta abierta por LAN: crear un perfil es una decisión
-del webmaster; por la red se pasa a **solicitar**.
+/api/users` deja de ser un alta abierta por **LAN**: crear un perfil es una decisión
+del webmaster; por la red se pasa a **solicitar**. (V3.81 conserva ese reparto —el
+**registro** autoservicio llega, pero solo desde el propio equipo, que es la misma
+frontera con otro nombre— y le añade la credencial: ver «Credencial por cuenta».)
 
-Cuando llegue la **Fase 3** (autenticación real), cada ruta de la primera lista
-recibe su credencial o pasa a admin; hasta entonces la lista está escrita aquí y
-`backend/tests/test_public_surface.py` la comprueba en las dos direcciones (que lo
-declarado sin sesión siga respondiendo, y que lo declarado con sesión **no** salga
-sin ella), además de fallar si esta sección desaparece del documento.
-`PUT /api/session/pin` se comprueba en un **test aparte** y no en esa lista: se
-recorre con `GET` y esa ruta responde **405**, no 401, así que mezclarlas habría
-debilitado el candado.
+`backend/tests/test_public_surface.py` comprueba la lista en las dos direcciones (que
+lo declarado sin sesión siga respondiendo, y que lo declarado con sesión **no** salga
+sin ella), fija aparte que las escrituras sin sesión sean **las declaradas** y falla
+si esta sección desaparece del documento. `PUT /api/session/password` se comprueba en
+un **test aparte** y no en esa lista: se recorre con `GET` y esa ruta responde
+**405**, no 401, así que mezclarlas habría debilitado el candado.
 
-### PIN opcional por perfil (V3.76 · Fase 3 del P0, mitigación y no autenticación)
+### Credencial por cuenta (V3.81 · Fase 3 del P0, decisión de producto)
 
-`POST /api/session` acepta un `pin` **opcional**. Si el perfil tiene PIN
-(`users.pin_hash != ''`) y no se envía o no cuadra, responde **`401
-PIN_REQUIRED` / `401 PIN_INVALID`**; con el freno de intentos activo,
-**`429 PIN_THROTTLED`** con `Retry-After`. Un perfil **sin** PIN abre como siempre:
-es una **mitigación opt-in**, no un cambio del modelo de identidad.
+`POST /api/session` **exige `password`** cuando la cuenta tiene credencial
+(`users.password_hash != ''`): sin ella o si no cuadra, **`401 PASSWORD_REQUIRED` /
+`401 PASSWORD_INVALID`**, y con el freno de intentos activo
+**`429 PASSWORD_THROTTLED`** con `Retry-After`. Una cuenta **heredada** sin
+credencial abre como siempre. El **PIN de perfil desapareció** como concepto
+(`PUT /api/session/pin` retirado; la columna `pin_hash` se queda en la BD sin
+leerse, para no reescribir el pasado): era una mitigación opt-in y esto es identidad,
+que es justo lo que la Fase 3 pedía.
 
-- **El hash**: `backend/services/pins.py`, **PBKDF2-HMAC-SHA256** (200 000
-  iteraciones, sal por perfil, iteraciones dentro del valor) y comparación con
-  `hmac.compare_digest`. Stdlib puro. `User.has_pin` es lo único que viaja; el
-  repositorio **saca el hash** del diccionario del perfil (`_row_to_user`) para que
-  no pueda serializarse por descuido.
-- **El freno**: 5 fallos no frenan; después el retardo dobla (1 s, 2 s, 4 s…) con
-  techo de 300 s, **por perfil** y **se limpia al acertar**. Es la pieza que
-  sostiene un PIN de 4-6 dígitos; `/api/session` entra además en `_PATH_LIMITS`
-  (120/min) como primera valla, no como defensa.
-- **Poner, cambiar y retirar**: `PUT /api/session/pin`, **bajo la sesión** y sin
-  `{id}` en la ruta; cambiar o retirar **exige el PIN anterior**. El hash **sí**
-  viaja en el backup (es estado del perfil, dentro de la BD) mientras
-  `session.secret` seguirá sin viajar.
-- **Lo que NO es** (y está declarado en `docs/audit/PARKED.md`): no hay identidad de
-  persona ni recuperación, la cookie de un año protege ante otro equipo sin la
-  cookie y no ante quien use tu equipo desbloqueado, `GET /api/users` sigue
-  enumerando nombres, el freno vive en memoria del proceso y el **P0 sigue abierto
-  para el producto** porque quien no active el PIN entra sin credencial.
-- Fijado por test en `backend/tests/test_pin.py` (31 casos), y en frontend por
-  `api/session.test.ts`, `utils/session.test.ts`, `utils/pin.test.ts`,
-  `components/ProfileGate.test.tsx` y `hooks/useChat.test.tsx`.
+- **El hash y el freno**: `backend/services/credentials.py`, **PBKDF2-HMAC-SHA256**
+  (200 000 iteraciones, sal por cuenta, iteraciones dentro del valor) y comparación
+  con `hmac.compare_digest`. Stdlib puro. El freno (5 fallos no frenan; después el
+  retardo dobla con techo de 300 s, **por cuenta** y se limpia al acertar) es la
+  pieza que sostiene la política de contraseña; `/api/session` sigue en
+  `_PATH_LIMITS` como primera valla, no como defensa.
+- **La política** (`credentials.is_valid_password`) rechaza lo corto, lo que lleva
+  espacios en los extremos y lo de un solo carácter repetido; la lista de
+  contraseñas obvias vive **solo** en el servidor, que es quien decide —repetirla
+  también en la UI sería duplicar una lista que se desincroniza—.
+- **Revocación efectiva**: el token de sesión lleva la **época de autenticación**
+  (`users.auth_epoch`) y `dependencies.current_user` la compara en cada petición
+  —una lectura que ya hacía—, así que cambiar la contraseña o **forzar la baja**
+  tumban las sesiones vivas al instante y no al caducar la cookie (un año).
+- **Registro, verificación y baja**: `POST /api/users` (nombre + email + contraseña,
+  acotado por `is_admin_loopback_host` y por el cupo de `security._PATH_LIMITS`),
+  `POST /api/account/verify` (token de un solo uso, **hasheado** y con caducidad),
+  `POST /api/account/resend-verification` y `POST /api/account/unenroll` (**baja
+  autoservicio**: exige la contraseña, cierra la sesión y **no borra nada** — solo el
+  webmaster purga, desde la consola, con copia previa).
+- **El email es PII nueva y es una señal, no un muro**: sin SMTP configurado no se
+  envía nada y el webmaster sella la verificación a mano (modo híbrido, y la UI lo
+  dice con esas palabras). El correo saliente es la **segunda excepción de red** del
+  producto, declarada en `RUNTIME_TOUCHPOINTS` y **fail-closed**
+  (`services/mailer.py`: sin configuración no abre ninguna conexión, y un fallo de
+  envío se registra sin romper la petición).
+- **Lo que NO hay** (y está declarado en `docs/audit/PARKED.md`): recuperación de
+  contraseña por correo —la restablece el webmaster—, segundo factor, verificación
+  **obligatoria** para usar la app, y `GET /api/users` sigue enumerando **nombres** de
+  toda la red (nunca correos: ver arriba). El hash de la contraseña **sí** viaja en
+  el backup (es estado de la cuenta) mientras `session.secret` y `mail.secret` siguen
+  sin viajar.
+- Fijado por test en `backend/tests/test_accounts_v381.py`, `test_credentials.py`,
+  `test_mailer_v381.py`, `test_public_surface.py` y `test_sessions.py`; y en frontend
+  por `api/session.test.ts`, `utils/session.test.ts`, `utils/credentials.test.ts`,
+  `components/ProfileGate.test.tsx`, `components/AccountDialog.test.tsx` y
+  `hooks/useChat.test.tsx`.
 
 ### Voz: el cliente puede pedir una voz, y sólo una instalada (V3.75.5)
 

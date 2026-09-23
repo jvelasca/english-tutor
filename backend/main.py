@@ -19,6 +19,7 @@ from domain.errors import (
 )
 from repositories.db import init_db
 from routers.academy import router as academy_router
+from routers.account import router as account_router
 from routers.admin import router as admin_router
 from routers.assessment import router as assessment_router
 from routers.audio_library import router as audio_library_router
@@ -176,6 +177,7 @@ app.include_router(users_router)
 app.include_router(voices_router)
 app.include_router(vocabulary_router)
 app.include_router(academy_router)
+app.include_router(account_router)
 app.include_router(assessment_router)
 app.include_router(audio_library_router)
 app.include_router(system_router)

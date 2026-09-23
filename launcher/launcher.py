@@ -29,12 +29,21 @@ from tkinter import messagebox, simpledialog, ttk
 
 from admin import (
     approve_request,
-    create_profile,
-    list_profiles,
+    create_user,
+    edit_user,
+    force_unenroll,
     pending_requests,
-    purge_profile,
+    purge_user,
     reject_request,
-    set_profile_status,
+    set_credentials,
+    set_user_status,
+    smtp_config,
+    test_smtp,
+    user_history,
+    verify_email,
+)
+from admin import (
+    list_users as list_admin_users,
 )
 from browser_cookies import (
     collect_cookies,
@@ -46,6 +55,7 @@ from core import (
     admin_pin,
     app_summary,
     apply_admin_config,
+    apply_smtp_config,
     apply_stored_lan_config,
     author_line,
     db_summary,
@@ -57,9 +67,12 @@ from core import (
     lan_mode,
     lan_url,
     local_url,
+    mail_secret,
     mdns_available,
     port_in_use,
     set_admin_pin,
+    set_smtp_settings,
+    smtp_settings,
     toggle_lan_config,
     user_overview,
 )
@@ -73,6 +86,7 @@ from status import (
     read_db_counts,
     read_db_details,
     read_db_info,
+    read_pending_requests,
     read_users,
 )
 from ui import (
@@ -80,27 +94,33 @@ from ui import (
     COLORS,
     SECTION_ICONS,
     SERVICE_ICONS,
+    accounts_tasks,
     admin_state_label,
     backend_failure_hint,
+    duplicate_user_ids,
+    event_row,
     interface_state,
-    pending_summary,
-    profile_row,
+    pending_view,
+    purge_block_reason,
     read_log_tail,
-    request_row,
     server_activity,
+    smtp_reconcile_label,
+    smtp_state_label,
     status_color,
     status_dot,
+    user_row,
+    user_row_label,
 )
 
 REFRESH_MS = 2000
 POLL_MS = 100
-# V3.77: cada cuánto se pregunta al backend si han llegado solicitudes de perfil.
+# V3.77: cada cuánto se pregunta al backend si han llegado solicitudes de alta/baja.
 # Es un solo GET y es lo que hace que «la solicitud llegue al webmaster» de
 # verdad: sin esto habría que pulsar «Actualizar» para enterarse. Más lento que
 # el refresco general a propósito —una cola de solicitudes no cambia cada dos
 # segundos— y lo bastante vivo para que el contador no se quede viejo mientras
 # alguien la mira.
-PROFILES_MS = 15000
+ACCOUNTS_MS = 15000
 BROWSER_DELAY_S = 2.0
 
 # Reloj animado mostrado en la cabecera mientras se arranca/para/reinicia.
@@ -179,16 +199,20 @@ class LauncherApp:
         # (`backend_env` copia este entorno). Sin PIN no hay administración, y el
         # launcher lo dice en la propia sección en vez de fallar al pulsar.
         apply_admin_config(self._config)
+        # V3.81: los ajustes SMTP guardados viajan al backend por el mismo canal
+        # (mismo patrón, mismo motivo). La contraseña **no** viene de aquí: vive en
+        # `data/mail.secret`, que el backend lee por su cuenta.
+        apply_smtp_config(self._config)
         self._sections_map: dict[str, Collapsible] = {}
         self._spinner_id: str | None = None
         self._spinner_idx = 0
         self._action_running = False
-        # Estado de la sección «Perfiles»: lo que hay pintado (para saber sobre
-        # qué fila actúa un botón) y lo que vamos a pedirle al backend.
+        # Estado de la consola «Usuarios»: lo que hay pintado (para saber sobre qué
+        # fila actúa un botón) y lo que vamos a pedirle al backend.
         self._pending_rows: list[dict] = []
-        self._profile_rows: list[dict] = []
-        self._profiles_busy = False
-        root.title("English Tutor — Launcher")
+        self._user_rows: list[dict] = []
+        self._admin_busy = False
+        root.title("English Tutor — Gestión de la APP")
         # La ventana es redimensionable; el tamaño y la posición del divisor se
         # restauran del estado persistido (state.json) y se guardan al cerrar.
         root.resizable(True, True)
@@ -200,8 +224,8 @@ class LauncherApp:
         # Programar desde el hilo principal (antes de mainloop es seguro).
         root.after(0, self.refresh)
         root.after(POLL_MS, self._poll_queue)
-        # V3.77: la cola de solicitudes se refresca sola (ver `PROFILES_MS`).
-        root.after(PROFILES_MS, self._poll_profiles)
+        # V3.77: la cola de solicitudes se refresca sola (ver `ACCOUNTS_MS`).
+        root.after(ACCOUNTS_MS, self._poll_accounts)
 
     def _apply_window_icon(self) -> None:
         """Icono de la ventana (icon.ico); si falta, se usa el icono por defecto."""
@@ -481,10 +505,11 @@ class LauncherApp:
         self._build_activity(self._col_left)
         self._build_access(self._col_left)
         self._build_database(self._col_left)
-        # V3.77: «Perfiles» va arriba de «Usuarios» porque es donde el webmaster
-        # tiene algo que hacer; «Usuarios» es el recuento de lo que hay.
-        self._build_profiles(self._col_right)
+        # V3.81: «Usuarios» es la **consola de gestión** y va arriba porque es
+        # donde el webmaster tiene algo que hacer; «Actividad por usuario» es el
+        # recuento de lo que hay, leído de la BD sin depender del backend.
         self._build_users(self._col_right)
+        self._build_user_activity(self._col_right)
         self._build_cookies(self._col_right)
         self._build_logs(self._col_right)
 
@@ -662,7 +687,8 @@ class LauncherApp:
             self._access_note.configure(
                 text=(
                     "🔓 Red local activa: cualquiera en esta red puede abrir la app "
-                    "y ver los perfiles (todavía no hay contraseñas). Primera "
+                    "y ver las cuentas (la entrada por LAN está cerrada: sigue "
+                    "haciendo falta pedir el alta). Primera "
                     "conexión desde un móvil: instala/confía el certificado local "
                     "(Ayuda → Conectar un dispositivo)."
                 )
@@ -737,21 +763,23 @@ class LauncherApp:
         )
         self._db_file_label.pack(anchor="w", fill="x", pady=(6, 0))
 
-    def _build_profiles(self, parent: tk.Misc) -> None:
-        """Perfiles (V3.77): solicitudes que resolver y perfiles que gestionar.
+    def _build_users(self, parent: tk.Misc) -> None:
+        """Usuarios (V3.81): la consola de gestión — solicitudes y cuentas.
 
         Es la mitad visible de la decisión de producto: **el webmaster no es un rol
-        de la app, es quien ejecuta este launcher**. Aquí están las cuatro cosas que
-        solo él puede hacer: resolver solicitudes, crear un perfil, desactivarlo o
-        reactivarlo, y purgarlo.
+        de la app, es quien ejecuta este programa**. Aquí están las cosas que solo él
+        puede hacer: resolver solicitudes, crear cuentas, asignar o restablecer
+        credenciales, verificar el email a mano, desactivar, reactivar, **forzar la
+        baja con motivo**, editar los datos, leer el historial, purgar y configurar
+        el correo.
 
         Todo lo que escribe pasa por `admin.py` (HTTP con el PIN), nunca por la BD
         directamente, aunque el launcher tenga el fichero a mano: el borrado tiene
         que pasar por el mismo sitio que el resto (validación, copia previa, tabla
-        de solicitudes) o habría dos definiciones de «purgar» y la de aquí sería la
-        que nadie prueba.
+        de solicitudes, registro de auditoría) o habría dos definiciones de «purgar»
+        y la de aquí sería la que nadie prueba.
         """
-        sec = self._section(parent, "Perfiles")
+        sec = self._section(parent, "Usuarios")
 
         # --- Candado: el PIN de administración ---
         pin_box = ttk.Frame(sec.body, style="Card.TFrame")
@@ -794,6 +822,24 @@ class LauncherApp:
             command=self.clear_admin_pin,
         ).pack(side="left", padx=(6, 0))
 
+        # --- Correo saliente (modo híbrido de verificación) ---
+        self._smtp_var = tk.StringVar(value=smtp_state_label(False, False))
+        self._smtp_label = ttk.Label(
+            sec.body,
+            textvariable=self._smtp_var,
+            style="DimCard.TLabel",
+            wraplength=COLUMN_W - 30,
+        )
+        self._smtp_label.pack(anchor="w", fill="x", padx=14, pady=(8, 0))
+        smtp_row = ttk.Frame(sec.body, style="Card.TFrame")
+        smtp_row.pack(fill="x", padx=14, pady=(4, 0))
+        ttk.Button(
+            smtp_row,
+            text="📧 Configurar correo…",
+            style="Ghost.TButton",
+            command=self.configure_smtp_dialog,
+        ).pack(side="left")
+
         # --- Solicitudes pendientes ---
         self._pending_var = tk.StringVar(value="Solicitudes: …")
         ttk.Label(
@@ -807,7 +853,7 @@ class LauncherApp:
         )
         for column, title, width, anchor in (
             ("kind", "Tipo", 90, "w"),
-            ("who", "Perfil", 250, "w"),
+            ("who", "Cuenta", 250, "w"),
             ("when", "Llegó", 130, "e"),
         ):
             self._pending_tree.heading(column, text=title)
@@ -829,53 +875,98 @@ class LauncherApp:
             command=self.reject_selected_request,
         ).pack(side="left", padx=(6, 0))
 
-        # --- Perfiles existentes ---
+        # --- Cuentas existentes ---
+        self._accounts_var = tk.StringVar(value="Cuentas: …")
         ttk.Label(
-            sec.body, text="Perfiles", style="Service.TLabel"
+            sec.body, textvariable=self._accounts_var, style="Service.TLabel"
         ).pack(anchor="w", padx=14, pady=(12, 0))
         profiles_wrap = ttk.Frame(sec.body, style="Card.TFrame")
         profiles_wrap.pack(fill="both", expand=True, padx=14, pady=(4, 0))
         self._profiles_tree = ttk.Treeview(
             profiles_wrap,
-            columns=("name", "status", "pin", "created"),
+            columns=("name", "status", "email", "credential", "created"),
             show="headings",
             height=6,
         )
         for column, title, width, anchor in (
-            ("name", "Nombre", 190, "w"),
+            ("name", "Nombre", 170, "w"),
             ("status", "Estado", 100, "w"),
-            ("pin", "Credencial", 90, "w"),
-            ("created", "Creado", 120, "e"),
+            ("email", "Email", 190, "w"),
+            ("credential", "Contraseña", 110, "w"),
+            ("created", "Creada", 110, "e"),
         ):
             self._profiles_tree.heading(column, text=title)
             self._profiles_tree.column(column, width=width, anchor=anchor)
         self._profiles_tree.pack(fill="both", expand=True)
 
-        profile_row_buttons = ttk.Frame(sec.body, style="Card.TFrame")
-        profile_row_buttons.pack(fill="x", padx=14, pady=(6, 0))
+        # Primera fila de botones: la identidad y la credencial.
+        account_row_1 = ttk.Frame(sec.body, style="Card.TFrame")
+        account_row_1.pack(fill="x", padx=14, pady=(6, 0))
         ttk.Button(
-            profile_row_buttons,
-            text="➕ Crear…",
+            account_row_1,
+            text="➕ Crear cuenta…",
             style="Ghost.TButton",
-            command=self.create_profile_dialog,
+            command=self.create_user_dialog,
         ).pack(side="left")
         ttk.Button(
-            profile_row_buttons,
-            text="⏸️ Desactivar / ▶️ Reactivar",
+            account_row_1,
+            text="🔑 Credenciales…",
             style="Ghost.TButton",
-            command=self.toggle_profile_status,
+            command=self.credentials_dialog,
         ).pack(side="left", padx=(6, 0))
         ttk.Button(
-            profile_row_buttons,
+            account_row_1,
+            text="✉️ Verificar email",
+            style="Ghost.TButton",
+            command=self.verify_email_selected,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            account_row_1,
+            text="✏️ Editar…",
+            style="Ghost.TButton",
+            command=self.edit_user_dialog,
+        ).pack(side="left", padx=(6, 0))
+
+        # Segunda fila: el ciclo de servicio y el borrado.
+        account_row_2 = ttk.Frame(sec.body, style="Card.TFrame")
+        account_row_2.pack(fill="x", padx=14, pady=(6, 0))
+        ttk.Button(
+            account_row_2,
+            text="▶️ Reactivar",
+            style="Ghost.TButton",
+            command=self.reactivate_selected_user,
+        ).pack(side="left")
+        ttk.Button(
+            account_row_2,
+            text="⏸️ Desactivar",
+            style="Ghost.TButton",
+            command=self.deactivate_selected_user,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            account_row_2,
+            text="🚫 Forzar baja…",
+            style="Ghost.TButton",
+            command=self.force_unenroll_selected_user,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            account_row_2,
+            text="🕘 Historial…",
+            style="Ghost.TButton",
+            command=self.user_history_dialog,
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            account_row_2,
             text="🗑️ Purgar…",
             style="Danger.TButton",
-            command=self.purge_selected_profile,
+            command=self.purge_selected_user,
         ).pack(side="left", padx=(6, 0))
 
         self._profiles_note_var = tk.StringVar(
             value=(
-                "Purgar es irreversible: se lleva toda la evidencia del perfil. "
-                "Se toma una copia de seguridad antes de borrar."
+                "Dar de baja o desactivar no borra nada: la cuenta deja de operar y "
+                "sus datos se conservan. Purgar sí es irreversible (se lleva toda la "
+                "evidencia) y exige que la cuenta esté fuera de servicio; el backend "
+                "toma antes una copia de seguridad."
             )
         )
         ttk.Label(
@@ -885,13 +976,38 @@ class LauncherApp:
             wraplength=COLUMN_W - 30,
         ).pack(anchor="w", fill="x", padx=14, pady=(6, 12))
 
-    # --- Perfiles: candado de administración (V3.77) ---
+        # El estado del correo depende solo de la configuración local, así que se
+        # pinta al construir en vez de esperar a un refresco de red.
+        self._refresh_smtp_state()
+
+    # --- Usuarios: candado de administración (V3.77) ---
     def _refresh_admin_state(self) -> None:
         self._admin_state_var.set(admin_state_label(bool(admin_pin(self._config))))
         activated = bool(admin_pin(self._config))
         self._admin_state_label.configure(
             foreground=COLORS["success"] if activated else COLORS["warning"]
         )
+
+    def _apply_admin_pin_change(self, applied: str, pending: str) -> None:
+        """Aplica al backend un cambio del PIN: reinicia, o avisa si no corre.
+
+        `set_admin_pin` declara el PIN en el entorno del launcher y `backend_env()`
+        copia ese entorno al **arrancar** el backend. Consecuencia: el PIN del
+        backend en marcha no cambia hasta que se reinicia. Antes la GUI se limitaba
+        a pedirlo por texto («Reinicia el servidor para que el backend lo
+        aplique») y quien no lo hiciera se comía un 401 en cada consulta de la cola
+        sin entender por qué. Se hace como el cambio de modo LAN: reiniciar cuando
+        el servidor está en marcha y decir que se aplicará al arrancar cuando no.
+        """
+        self._refresh_admin_state()
+        if self.pm.backend_running() or fetch_health() is not None:
+            self.restart()
+            self._msg.set(applied)
+            return
+        self._msg.set(pending)
+        # Sin servidor no hay nada que reiniciar, pero la sección sí puede
+        # repintarse (el contador de la BD no depende del backend).
+        self._load_accounts()
 
     def save_admin_pin(self) -> None:
         """Guarda el PIN del campo (o retira la administración si está vacío)."""
@@ -906,12 +1022,11 @@ class LauncherApp:
             )
             return
         self._admin_pin_var.set("")
-        self._refresh_admin_state()
-        self._msg.set(
-            "PIN de administración guardado. Reinicia el servidor para que el "
-            "backend lo aplique."
+        self._apply_admin_pin_change(
+            "PIN de administración guardado: reiniciando el servidor para "
+            "aplicarlo…",
+            "PIN de administración guardado. Se aplicará al arrancar la app.",
         )
-        self.refresh()
 
     def generate_admin_pin_value(self) -> None:
         """Rellena el campo con un PIN aleatorio (lo guarda quien lo confirme)."""
@@ -922,47 +1037,59 @@ class LauncherApp:
         """Retira la administración (vuelve a estar deshabilitada, no abierta)."""
         if not messagebox.askyesno(
             "Retirar el PIN de administración",
-            "Sin PIN, la administración de perfiles queda DESHABILITADA (fallar "
-            "cerrado): no podrás crear, desactivar ni borrar perfiles hasta que "
+            "Sin PIN, la administración de cuentas queda DESHABILITADA (fallar "
+            "cerrado): no podrás crear cuentas, asignar credenciales, forzar bajas "
+            "ni purgar datos hasta que "
             "pongas otro.\n\n¿Retirar el PIN?",
             parent=self.root,
         ):
             return
         set_admin_pin("", self._config)
         self._admin_pin_var.set("")
-        self._refresh_admin_state()
-        self._msg.set("Administración deshabilitada (sin PIN).")
-        self.refresh()
+        self._apply_admin_pin_change(
+            "Administración deshabilitada (sin PIN): reiniciando el servidor…",
+            "Administración deshabilitada (sin PIN). Se aplicará al arrancar la app.",
+        )
 
-    # --- Perfiles: lectura ---
-    def _poll_profiles(self) -> None:
-        """Refresco periódico de la cola de solicitudes, sin bloquear la ventana."""
-        self._load_profiles()
-        self.root.after(PROFILES_MS, self._poll_profiles)
+    # --- Usuarios: lectura ---
+    def _poll_accounts(self) -> None:
+        """Refresco periódico de la consola, sin bloquear la ventana."""
+        self._load_accounts()
+        self.root.after(ACCOUNTS_MS, self._poll_accounts)
 
-    def _load_profiles(self) -> None:
-        if self._profiles_busy:
+    def _load_accounts(self) -> None:
+        if self._admin_busy:
             return
-        self._profiles_busy = True
+        self._admin_busy = True
         pin = admin_pin(self._config)
 
         def work() -> None:
-            # Sin PIN no se llama al backend: la administración está deshabilitada
-            # y pedirla solo generaría un 401 cada quince segundos.
+            # El contador se lee SIEMPRE de la BD en solo-lectura, haya PIN o no.
+            # Sin PIN no se llama al backend —la administración está cerrada y
+            # pedirla solo generaría un 401 cada quince segundos—, pero el
+            # contador es justo lo que hace visible que alguien ha pedido algo: si
+            # solo se leyera con PIN, una baja registrada por el alumno podía
+            # quedarse invisible en el lanzador, que es el fallo que motivó esta
+            # ampliación de V3.80.1.
+            db_count = read_pending_requests(str(DB_PATH))
             if not pin:
-                self._queue.put(("profiles", (None, None, None)))
+                self._queue.put(("accounts", (None, None, None, db_count, None)))
                 return
             pending = pending_requests(pin)
-            profiles = list_profiles(pin)
-            self._queue.put(("profiles", (pending, profiles, None)))
+            accounts = list_admin_users(pin)
+            # El correo lo resuelve el **backend**, de su entorno, no del JSON de
+            # aquí: se pide en la misma pasada para no abrir un ciclo de sondeo
+            # propio —el backend es loopback y ya se le hacen dos llamadas—.
+            smtp = smtp_config(pin)
+            self._queue.put(("accounts", (pending, accounts, None, db_count, smtp)))
 
         threading.Thread(target=work, daemon=True).start()
 
     def _run_admin_action(self, call, success_message) -> None:
         """Ejecuta una acción admin en un hilo y refresca la sección al terminar."""
-        if self._profiles_busy:
+        if self._admin_busy:
             return
-        self._profiles_busy = True
+        self._admin_busy = True
         pin = admin_pin(self._config)
 
         def work() -> None:
@@ -977,56 +1104,103 @@ class LauncherApp:
                 # Tras escribir, se relee: el contador y las filas tienen que
                 # reflejar el estado del backend, no lo que creíamos que iba a pasar.
                 pending = pending_requests(pin)
-                profiles = list_profiles(pin)
-                self._queue.put(("profiles", (pending, profiles, message)))
+                accounts = list_admin_users(pin)
+                db_count = read_pending_requests(str(DB_PATH))
+                self._queue.put(
+                    (
+                        "accounts",
+                        (pending, accounts, message, db_count, smtp_config(pin)),
+                    )
+                )
             else:
                 self._queue.put(("admin_msg", (message,)))
                 # La lista puede haberse quedado vieja (p. ej. si la solicitud ya
                 # estaba resuelta desde otro sitio): se relee igual.
                 self._queue.put(
                     (
-                        "profiles",
-                        (pending_requests(pin), list_profiles(pin), None),
+                        "accounts",
+                        (
+                            pending_requests(pin),
+                            list_admin_users(pin),
+                            None,
+                            read_pending_requests(str(DB_PATH)),
+                            smtp_config(pin),
+                        ),
                     )
                 )
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _apply_profiles(self, pending, profiles, message) -> None:
-        """Pinta la sección «Perfiles» (hilo principal)."""
-        self._profiles_busy = False
+    def _apply_accounts(
+        self, pending, profiles, message, db_count=None, smtp=None
+    ) -> None:
+        """Pinta la consola «Usuarios» (hilo principal).
 
-        if pending is None or profiles is None:
-            self._pending_var.set(
-                pending_summary(0) if pending is None else ""
-            )
-            if pending is None and profiles is None:
-                self._pending_var.set("Solicitudes: administración deshabilitada")
-            self._pending_rows = []
-            self._profile_rows = []
-            self._pending_tree.delete(*self._pending_tree.get_children())
-            self._profiles_tree.delete(*self._profiles_tree.get_children())
-            if message:
-                self._msg.set(str(message))
-            return
+        La frase y las filas las decide `ui.pending_view`, que separa los estados
+        que aquí se confundían: sin PIN con pendientes, consulta fallida y consulta
+        correcta. Este método ya no compone la frase a mano ni puede volver a
+        pintar «Sin solicitudes pendientes» cuando lo que ha pasado es un 401, un
+        403 o un servidor caído.
 
-        # Las bajas guardan el `user_id`: se traduce a nombre con los perfiles ya
-        # cargados para que la cola se pueda leer sin descifrar identificadores.
-        names = {
-            str(u.get("id")): str(u.get("name")) for u in profiles.data.get("users", [])
-        }
-        self._pending_rows = list(pending.data.get("requests", []))
-        self._profile_rows = list(profiles.data.get("users", []))
+        `smtp` es la respuesta del backend sobre el correo, que puede discrepar de
+        lo que el launcher tiene guardado (lo ve al arrancar, no en cada cambio):
+        la frase se concilia en `ui.smtp_reconcile_label` en vez de enseñar lo
+        local como si fuera el estado del servidor.
+        """
+        self._admin_busy = False
 
+        pin_set = pending is not None and profiles is not None
+        requests = list(pending.data.get("requests", [])) if pin_set else []
+        # Las bajas guardan el `user_id`: se traduce a nombre con las cuentas ya
+        # cargadas para que la cola se pueda leer sin descifrar identificadores.
+        self._pending_rows = requests
+        self._user_rows = (
+            list(profiles.data.get("users", [])) if profiles is not None else []
+        )
+        names = {str(u.get("id")): str(u.get("name")) for u in self._user_rows}
+        # Las dos llamadas tienen que ir bien: sin la lista de cuentas, una baja
+        # se leería como «(cuenta que ya no existe)» cuando lo que ha fallado es la
+        # consulta. Mejor decir que no se pudo consultar.
+        ok = pin_set and bool(pending.ok) and bool(profiles.ok)
+        error = ""
+        if pin_set and not ok:
+            error = pending.message() if not pending.ok else profiles.message()
+        frase, filas = pending_view(
+            pin_set=pin_set,
+            db_count=db_count,
+            ok=ok,
+            error=error,
+            requests=requests,
+            names=names,
+        )
+
+        self._pending_var.set(frase)
         self._pending_tree.delete(*self._pending_tree.get_children())
-        for request in self._pending_rows:
-            self._pending_tree.insert("", "end", values=request_row(request, names))
+        for fila in filas:
+            self._pending_tree.insert("", "end", values=fila)
 
+        # V3.81: la lista de cuentas lleva su propia frase, que es la **lista de
+        # tareas** (cuántas siguen sin contraseña y sin verificar). Se pinta
+        # aparte de la cola de solicitudes porque una puede estar vacía mientras la
+        # otra tiene trabajo.
+        data = profiles.data if profiles is not None else {}
+        self._accounts_var.set(
+            "Cuentas: sin datos (define el PIN para verlas)"
+            if profiles is None or not profiles.ok
+            else (
+                f"Cuentas ({len(self._user_rows)}) · "
+                + accounts_tasks(
+                    int(data.get("without_password", 0)),
+                    int(data.get("unverified_email", 0)),
+                )
+            )
+        )
+        duplicates = duplicate_user_ids(self._user_rows)
         self._profiles_tree.delete(*self._profiles_tree.get_children())
-        for profile in self._profile_rows:
-            self._profiles_tree.insert("", "end", values=profile_row(profile))
+        for user in self._user_rows:
+            self._profiles_tree.insert("", "end", values=user_row(user, duplicates))
 
-        self._pending_var.set(pending_summary(int(pending.data.get("pending", 0))))
+        self._refresh_smtp_state(smtp)
         if message:
             self._msg.set(str(message))
 
@@ -1038,15 +1212,15 @@ class LauncherApp:
         index = self._pending_tree.index(selection[0])
         return self._pending_rows[index] if index < len(self._pending_rows) else None
 
-    def _selected_profile(self) -> dict | None:
+    def _selected_user(self) -> dict | None:
         selection = self._profiles_tree.selection()
         if not selection:
-            self._msg.set("Selecciona un perfil de la lista.")
+            self._msg.set("Selecciona una cuenta de la lista.")
             return None
         index = self._profiles_tree.index(selection[0])
-        return self._profile_rows[index] if index < len(self._profile_rows) else None
+        return self._user_rows[index] if index < len(self._user_rows) else None
 
-    # --- Perfiles: acciones ---
+    # --- Usuarios: acciones ---
     def approve_selected_request(self) -> None:
         request = self._selected_pending()
         if request is None:
@@ -1056,17 +1230,17 @@ class LauncherApp:
             nombre = next(
                 (
                     str(u.get("name"))
-                    for u in self._profile_rows
+                    for u in self._user_rows
                     if str(u.get("id")) == str(request.get("user_id"))
                 ),
-                "(perfil ya inexistente)",
+                "(cuenta ya inexistente)",
             )
             if not messagebox.askyesno(
                 "Aprobar la baja",
-                f"Se DESACTIVARÁ el perfil «{nombre}»: dejará de aparecer y no "
-                "podrá abrir sesión, pero su evidencia se conserva y se puede "
-                "reactivar.\n\nPara borrarla de verdad hay que purgar el perfil, "
-                "que es un paso aparte.\n\n¿Aprobar la baja?",
+                f"Se DESACTIVARÁ la cuenta «{nombre}»: dejará de aparecer y no "
+                "podrá abrir sesión, pero sus datos se conservan y se puede "
+                "reactivar.\n\nPara borrarla de verdad hay que purgarla, que es un "
+                "paso aparte.\n\n¿Aprobar la baja?",
                 parent=self.root,
             ):
                 return
@@ -1092,85 +1266,449 @@ class LauncherApp:
             "Solicitud rechazada.",
         )
 
-    def create_profile_dialog(self) -> None:
+    def create_user_dialog(self) -> None:
+        """Alta directa con credenciales (no pasa por la cola de solicitudes).
+
+        Se piden los tres datos y la contraseña se puede **dejar vacía**: entonces
+        el backend genera una temporal legible y marca la cuenta con
+        `must_change_password`, así que el webmaster la entrega sin inventarse nada
+        y sin llegar a saber nunca la contraseña definitiva del alumno. La temporal
+        solo viene una vez, en la respuesta, y se enseña aquí.
+        """
         name = simpledialog.askstring(
-            "Crear un perfil", "Nombre del perfil:", parent=self.root
+            "Crear una cuenta", "Nombre de la cuenta:", parent=self.root
         )
         if not name or not name.strip():
             return
-        pin = simpledialog.askstring(
-            "PIN del perfil (opcional)",
-            "PIN de 4-6 dígitos para que el perfil pida credencial al entrar.\n"
-            "Déjalo vacío si no quieres PIN:",
+        email = simpledialog.askstring(
+            "Crear una cuenta",
+            "Email (sirve para verificar y recuperar; se puede dejar vacío):",
             parent=self.root,
         )
-        if pin is None:
+        if email is None:
+            return
+        password = simpledialog.askstring(
+            "Crear una cuenta",
+            "Contraseña (déjala vacía y genero yo una temporal para entregar):",
+            parent=self.root,
+        )
+        if password is None:
             return
         self._run_admin_action(
-            lambda configured: create_profile(
-                configured, name.strip(), profile_pin=pin.strip()
+            lambda pin: create_user(
+                pin, name.strip(), email=email.strip(), password=password.strip()
             ),
-            f"Perfil «{name.strip()}» creado.",
+            f"Cuenta «{name.strip()}» creada.",
         )
 
-    def toggle_profile_status(self) -> None:
-        profile = self._selected_profile()
-        if profile is None:
+    def credentials_dialog(self) -> None:
+        """Asigna o **restablece** la credencial: es la recuperación de contraseña.
+
+        El producto no promete un correo de recuperación (puede no haber SMTP), y
+        no prometerlo es más honesto que prometerlo y no cumplirlo: quien olvide su
+        contraseña se la pide al webmaster, que la restablece aquí con una temporal.
+        """
+        user = self._selected_user()
+        if user is None:
             return
-        user_id = str(profile["id"])
-        if str(profile.get("status")) == "active":
+        name = str(user.get("name") or "")
+        email = simpledialog.askstring(
+            "Credenciales de la cuenta",
+            f"Email de «{name}»:",
+            initialvalue=str(user.get("email") or ""),
+            parent=self.root,
+        )
+        if email is None or not email.strip():
+            return
+        password = simpledialog.askstring(
+            "Credenciales de la cuenta",
+            "Contraseña nueva (vacío = genero una temporal y la enseño aquí):",
+            parent=self.root,
+        )
+        if password is None:
+            return
+        self._run_admin_action(
+            lambda pin: set_credentials(
+                pin, str(user["id"]), email=email.strip(), password=password.strip()
+            ),
+            f"Credencial de «{name}» actualizada.",
+        )
+
+    def verify_email_selected(self) -> None:
+        """Sella el email a mano: la mitad híbrida del plan.
+
+        Sin SMTP configurado el enlace de verificación no sale de ningún sitio, así
+        que el webmaster confirma —normalmente con la persona delante— y la cuenta
+        deja de arrastrar el chip de «sin verificar». Sin esto, la verificación
+        sería un muro en una app que se promete local.
+        """
+        user = self._selected_user()
+        if user is None:
+            return
+        name = str(user.get("name") or "")
+        if not user.get("email"):
+            messagebox.showinfo(
+                "Sin email que verificar",
+                f"«{name}» no tiene email. Asígnale unas credenciales primero y "
+                "después podrás verificar el correo.",
+                parent=self.root,
+            )
+            return
+        if not messagebox.askyesno(
+            "Verificar el email a mano",
+            f"¿Confirmas que el email de «{name}» es suyo?\n\n{user.get('email')}",
+            parent=self.root,
+        ):
+            return
+        self._run_admin_action(
+            lambda pin: verify_email(pin, str(user["id"])),
+            f"Email de «{name}» verificado a mano.",
+        )
+
+    def edit_user_dialog(self) -> None:
+        """El webmaster edita los datos con la misma autoridad que su dueño.
+
+        Y una más: puede corregir el **email**, cosa que el alumno solo puede hacer
+        con su contraseña delante (y que reinicia la verificación, porque el sello
+        pertenecía al correo anterior).
+        """
+        user = self._selected_user()
+        if user is None:
+            return
+        name = simpledialog.askstring(
+            "Editar la cuenta",
+            "Nombre:",
+            initialvalue=str(user.get("name") or ""),
+            parent=self.root,
+        )
+        if name is None or not name.strip():
+            return
+        email = simpledialog.askstring(
+            "Editar la cuenta",
+            "Email (cambiarlo reinicia su verificación):",
+            initialvalue=str(user.get("email") or ""),
+            parent=self.root,
+        )
+        if email is None:
+            return
+        emoji = simpledialog.askstring(
+            "Editar la cuenta",
+            "Avatar (emoji; vacío = sin cambio):",
+            parent=self.root,
+        )
+        if emoji is None:
+            return
+        fields: dict = {"name": name.strip(), "email": email.strip()}
+        if emoji.strip():
+            fields["avatar_emoji"] = emoji.strip()
+        self._run_admin_action(
+            lambda pin: edit_user(pin, str(user["id"]), **fields),
+            f"Cuenta «{name.strip()}» editada.",
+        )
+
+    def reactivate_selected_user(self) -> None:
+        """Devuelve la cuenta al servicio (desactivada **o** dada de baja)."""
+        user = self._selected_user()
+        if user is None:
+            return
+        name = str(user.get("name") or "")
+        if str(user.get("status")) == "active":
+            self._msg.set(f"«{name}» ya está activa.")
+            return
+        self._run_admin_action(
+            lambda pin: set_user_status(pin, str(user["id"]), "active"),
+            f"Cuenta «{name}» reactivada.",
+        )
+
+    def deactivate_selected_user(self) -> None:
+        user = self._selected_user()
+        if user is None:
+            return
+        name = str(user.get("name") or "")
+        if str(user.get("status")) != "active":
+            self._msg.set(
+                f"«{name}» no está activa. Usa «Reactivar» para devolverla al "
+                "servicio."
+            )
+            return
+        if not messagebox.askyesno(
+            "Desactivar la cuenta",
+            f"«{name}» saldrá del selector y no podrá abrir sesión. Sus datos se "
+            "conservan y puedes reactivarla cuando quieras.\n\n¿Desactivar?",
+            parent=self.root,
+        ):
+            return
+        self._run_admin_action(
+            lambda pin: set_user_status(pin, str(user["id"]), "disabled"),
+            f"Cuenta «{name}» desactivada.",
+        )
+
+    def force_unenroll_selected_user(self) -> None:
+        """**Fuerza** la baja con motivo obligatorio.
+
+        Va aparte de «desactivar» a propósito: forzar la baja tiene que poder
+        explicarse después («¿por qué me sacasteis?»), y el motivo queda en el
+        historial. Sin motivo, esto sería un botón anónimo.
+        """
+        user = self._selected_user()
+        if user is None:
+            return
+        name = str(user.get("name") or "")
+        reason = simpledialog.askstring(
+            "Forzar la baja",
+            f"«{name}» dejará de operar y se cerrarán sus sesiones al instante. No "
+            "se borra nada: sus datos se conservan.\n\nMotivo (obligatorio, queda "
+            "en el historial):",
+            parent=self.root,
+        )
+        if reason is None:
+            return
+        if not reason.strip():
+            self._msg.set("Sin motivo no se fuerza la baja: es lo que la explica.")
+            return
+        self._run_admin_action(
+            lambda pin: force_unenroll(pin, str(user["id"]), reason.strip()),
+            f"Baja forzada de «{name}» (motivo guardado).",
+        )
+
+    def user_history_dialog(self) -> None:
+        """Historial de auditoría en una ventana aparte (solo lectura).
+
+        Es lo que responde «¿quién hizo esto y por qué?», incluso después de purgar
+        la cuenta: los eventos no se borran con ella.
+        """
+        user = self._selected_user()
+        if user is None:
+            return
+        pin = admin_pin(self._config)
+        if not pin:
+            self._msg.set("Define un PIN de administración primero.")
+            return
+        name = str(user.get("name") or "")
+        # La llamada es corta y de solo lectura, pero es red: se hace en un hilo
+        # como todas las demás y la ventana se pinta desde el hilo principal.
+        def work() -> None:
+            self._queue.put(("history", (name, user_history(pin, str(user["id"])))))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_history_window(self, name: str, result) -> None:
+        """Ventana de historial (hilo principal). `result` es un `AdminResult`."""
+        win = tk.Toplevel(self.root)
+        win.title(f"Historial — {name}")
+        win.geometry("760x420")
+        frame = ttk.Frame(win, style="Card.TFrame")
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        if not result.ok:
+            ttk.Label(
+                frame, text=result.message(), style="Service.TLabel", wraplength=700
+            ).pack(anchor="w")
+            return
+        events = list(result.data.get("events", []))
+        ttk.Label(
+            frame,
+            text=f"{len(events)} movimiento(s), del más reciente al más antiguo.",
+            style="DimCard.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
+        cols = ("when", "what", "who", "note")
+        tree = ttk.Treeview(frame, columns=cols, show="headings", height=14)
+        for column, title, width, anchor in (
+            ("when", "Cuándo", 130, "w"),
+            ("what", "Qué", 220, "w"),
+            ("who", "Quién", 110, "w"),
+            ("note", "Motivo", 260, "w"),
+        ):
+            tree.heading(column, text=title)
+            tree.column(column, width=width, anchor=anchor)
+        for event in events:
+            tree.insert("", "end", values=event_row(event))
+        tree.pack(fill="both", expand=True)
+
+    def configure_smtp_dialog(self) -> None:
+        """Configura el correo saliente (modo híbrido) con prueba de envío.
+
+        La contraseña se guarda en `data/mail.secret` y **no** en el JSON del
+        launcher ni en el entorno: es la misma familia de secreto que la clave TLS,
+        y `services/backup.py` la deja fuera de las copias. Aquí se pide y se
+        escribe, pero no se vuelve a enseñar.
+        """
+        current = smtp_settings(self._config)
+        host = simpledialog.askstring(
+            "Correo saliente",
+            "Servidor SMTP (vacío = apagar el correo y verificar a mano):",
+            initialvalue=current["host"],
+            parent=self.root,
+        )
+        if host is None:
+            return
+        host = host.strip()
+        if not host:
             if not messagebox.askyesno(
-                "Desactivar el perfil",
-                f"«{profile.get('name')}» saldrá del selector y no podrá abrir "
-                "sesión. Su evidencia se conserva y puedes reactivarlo cuando "
-                "quieras.\n\n¿Desactivar?",
+                "Apagar el correo",
+                "Se guardará sin servidor: no se enviará ninguna verificación y "
+                "las sellarás a mano desde esta consola.\n\n¿Continuar?",
                 parent=self.root,
             ):
                 return
-            target = "disabled"
-            message = f"Perfil «{profile.get('name')}» desactivado."
-        else:
-            target = "active"
-            message = f"Perfil «{profile.get('name')}» reactivado."
-        self._run_admin_action(
-            lambda pin: set_profile_status(pin, user_id, target),
-            message,
+            self._save_smtp(
+                host="", port=current["port"], user="", sender="", password=""
+            )
+            return
+        port = simpledialog.askstring(
+            "Correo saliente",
+            "Puerto (587 con STARTTLS es lo normal; 465 con TLS implícito):",
+            initialvalue=str(current["port"]),
+            parent=self.root,
+        )
+        if port is None:
+            return
+        user = simpledialog.askstring(
+            "Correo saliente",
+            "Usuario (vacío si el servidor no pide autenticación):",
+            initialvalue=current["user"],
+            parent=self.root,
+        )
+        if user is None:
+            return
+        sender = simpledialog.askstring(
+            "Correo saliente",
+            "Remitente (lo que verá quien reciba el correo):",
+            initialvalue=current["sender"] or user,
+            parent=self.root,
+        )
+        if sender is None:
+            return
+        # La contraseña se pregunta con `show="•"` para que no quede en pantalla.
+        password = simpledialog.askstring(
+            "Correo saliente",
+            "Contraseña del SMTP (vacío = borrar la guardada):",
+            show="•",
+            parent=self.root,
+        )
+        if password is None:
+            return
+        self._save_smtp(
+            host=host, port=port, user=user, sender=sender, password=password
         )
 
-    def purge_selected_profile(self) -> None:
+    def _save_smtp(
+        self, *, host: str, port, user: str, sender: str, password: str
+    ) -> None:
+        """Guarda el SMTP, lo declara en el entorno y ofrece una prueba de envío."""
+        if (
+            set_smtp_settings(
+                self._config,
+                host=host,
+                port=port,
+                user=user,
+                sender=sender,
+                password=password,
+            )
+            is None
+        ):
+            self._msg.set(
+                "Ese correo no vale: revisa el puerto (1-65535) y que haya "
+                "servidor y remitente."
+            )
+            return
+        self._refresh_smtp_state()
+        # Probar el correo es la única forma de saber que funciona: la alternativa
+        # —confiar en que el host y el puerto están bien— se descubre fallando
+        # cuando alguien espera una verificación que nunca llega.
+        if host and messagebox.askyesno(
+            "Probar el envío",
+            "¿Mando un correo de prueba ahora, para comprobar que funciona?",
+            parent=self.root,
+        ):
+            to = simpledialog.askstring(
+                "Correo de prueba",
+                "Dirección a la que mando la prueba:",
+                initialvalue=sender or user,
+                parent=self.root,
+            )
+            if to and to.strip():
+                self._run_admin_action(
+                    lambda pin: test_smtp(pin, to.strip()),
+                    "Correo de prueba enviado. Revisa esa bandeja.",
+                )
+                return
+        self._refresh_smtp_state()
+        if not (self.pm.backend_running() or fetch_health() is not None):
+            self._msg.set(
+                "Correo configurado. Se aplicará al arrancar la app."
+                if host
+                else "Correo apagado: la verificación la sellarás a mano."
+            )
+            return
+        self.restart()
+        self._msg.set(
+            "Correo configurado: reiniciando el servidor para aplicarlo…"
+            if host
+            else "Correo apagado: reiniciando el servidor…"
+        )
+
+    def _refresh_smtp_state(self, backend=None) -> None:
+        """Repinta la línea de estado del correo (configurado / con contraseña).
+
+        `backend` es la lectura de `GET /api/admin/smtp` cuando se ha podido hacer
+        (hilo de sondeo, con PIN). Sin ella —al construir la sección, o sin PIN— se
+        enseña el estado local, que es todo lo que se sabe sin preguntar.
+        """
+        settings = smtp_settings(self._config)
+        view = backend.data if (backend is not None and backend.ok) else None
+        self._smtp_var.set(
+            smtp_reconcile_label(settings["configured"], bool(mail_secret()), view)
+        )
+
+    def purge_selected_user(self) -> None:
         """Purga irreversible: confirmación por nombre + copia que hace el backend."""
-        profile = self._selected_profile()
+        profile = self._selected_user()
         if profile is None:
             return
         user_id = str(profile["id"])
         name = str(profile.get("name") or "")
-        if str(profile.get("status")) == "active":
+        bloqueo = purge_block_reason(profile)
+        if bloqueo:
             messagebox.showinfo(
-                "Desactiva antes de purgar",
-                "Purgar se lleva toda la evidencia del perfil. Desactívalo primero "
-                "y comprueba que nadie lo echa de menos; después, purga.",
-                parent=self.root,
+                "Fuera de servicio antes de purgar", bloqueo, parent=self.root
             )
             return
         typed = simpledialog.askstring(
-            "Purgar el perfil",
+            "Purgar la cuenta",
             f"Esto borra «{name}» y TODA su evidencia (progreso, mastery, "
             "conversaciones, grabaciones). Es irreversible.\n\nEl backend tomará "
             "una copia de seguridad antes de borrar.\n\nEscribe el nombre exacto "
-            "del perfil para confirmar:",
+            "de la cuenta para confirmar:",
             parent=self.root,
         )
         if typed is None or typed.strip() != name:
             if typed is not None:
                 self._msg.set("El nombre no coincide: no se ha purgado nada.")
             return
+        success = f"Cuenta «{name}» purgada (con copia de seguridad previa)."
+        if self._session_open:
+            # La cookie del navegador sigue siendo válida pero apunta a una cuenta
+            # que ya no existe: la app se quedará en la puerta hasta que se
+            # recargue. Se avisa aquí porque es el único momento en que alguien
+            # puede relacionar las dos cosas.
+            success += (
+                " Ojo: la sesión abierta en el navegador ya no vale; si la app "
+                "estaba abierta, recárgala y elige otra cuenta."
+            )
         self._run_admin_action(
-            lambda pin: purge_profile(pin, user_id, name),
-            f"Perfil «{name}» purgado (con copia de seguridad previa).",
+            lambda pin: purge_user(pin, user_id, name),
+            success,
         )
 
-    def _build_users(self, parent: tk.Misc) -> None:
-        sec = self._section(parent, "Usuarios")
+    def _build_user_activity(self, parent: tk.Misc) -> None:
+        """Actividad por usuario, **leída de la BD** (no depende del backend).
+
+        Es información distinta de la consola: aquí no se administra nada, se mira
+        cuánto hay de cada uno, y se puede leer con el servidor apagado. Se llama
+        «Actividad por usuario» y no «Usuarios» porque ese nombre es ahora el de la
+        consola de gestión, que es donde el webmaster tiene algo que hacer.
+        """
+        sec = self._section(parent, "Actividad por usuario")
         wrap = ttk.Frame(sec.body, style="Card.TFrame")
         wrap.pack(fill="both", expand=True, padx=14, pady=(4, 12))
         cols = ("name", "conversations", "messages")
@@ -1192,6 +1730,10 @@ class LauncherApp:
             anchor="w"
         )
         self._session_var = tk.StringVar(value="")
+        # V3.80.2: ¿hay una sesión abierta en algún navegador? Se guarda para
+        # poder avisar al purgar: esa cookie pasa a apuntar a un usuario que ya
+        # no existe, así que la app se quedará en la puerta hasta recargar.
+        self._session_open = False
         self._session_label = ttk.Label(
             wrap, textvariable=self._session_var, style="Status.TLabel"
         )
@@ -1270,13 +1812,17 @@ class LauncherApp:
         if kind == "refresh":
             self._apply(*item[1])
             self.root.after(REFRESH_MS, self._next_refresh)
-        elif kind == "profiles":
-            # V3.77: resultado de una lectura/acción de la sección «Perfiles».
-            self._apply_profiles(*item[1])
+        elif kind == "accounts":
+            # V3.81: resultado de una lectura/acción de la consola «Usuarios».
+            self._apply_accounts(*item[1])
+        elif kind == "history":
+            # Ventana de historial (solo lectura): se pinta en el hilo principal,
+            # que es el único que puede tocar tkinter.
+            self._show_history_window(*item[1])
         elif kind == "admin_msg":
-            # Solo el mensaje: lo usa el guardado del PIN, que no cambia datos del
-            # backend y por tanto no necesita volver a pedir la lista.
-            self._profiles_busy = False
+            # Solo el mensaje: lo usa una acción de administración que no llegó a
+            # ejecutarse (sin PIN) o que falló y ya trae su propio «accounts».
+            self._admin_busy = False
             self._msg.set(str(item[1]))
         elif kind == "error":
             self._action_running = False
@@ -1291,6 +1837,10 @@ class LauncherApp:
             if item[1]:
                 webbrowser.open(frontend_url())
             self.refresh()
+            # La consola «Usuarios» depende del backend (PIN y cola), así que un
+            # arranque o un reinicio la deja obsoleta: se relee sin esperar al
+            # siguiente ciclo de sondeo.
+            self._load_accounts()
         elif kind == "stopped":
             self._action_running = False
             self.refresh()
@@ -1500,9 +2050,20 @@ class LauncherApp:
             )
 
         self._tree.delete(*self._tree.get_children())
-        for u in user_overview(users):
+        # V3.80.2: los nombres repetidos se marcan. El selector de la app y esta
+        # tabla identifican a los usuarios por nombre, así que dos «J.A» hacen
+        # imposible saber a quién se le está dando de baja o purgando.
+        overview = user_overview(users)
+        duplicates = duplicate_user_ids(overview)
+        for u in overview:
             self._tree.insert(
-                "", "end", values=("👤 " + u["name"], u["conversations"], u["messages"])
+                "",
+                "end",
+                values=(
+                    user_row_label(u, duplicates),
+                    u["conversations"],
+                    u["messages"],
+                ),
             )
 
         self._apply_cookies(cookies, cookies_summary)
@@ -1536,6 +2097,7 @@ class LauncherApp:
         # V3.75: se informa de **si hay sesión**, no de qué perfil es. El perfil va
         # dentro del token firmado y esta pantalla no lo descifra (no debe: el token
         # en claro sería una sesión copiable de la pantalla).
+        self._session_open = bool(summary.get("session_open"))
         if summary["session_open"]:
             self._session_label.configure(foreground=COLORS["success"])
             self._session_var.set("🔑 Sesión abierta en el navegador")

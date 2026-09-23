@@ -1,10 +1,14 @@
 """Persistencia de los ajustes del launcher (JSON, sin dependencias externas).
 
 V3.75.3: el launcher recuerda **la última configuración usada**, no solo la
-geometría de la ventana (`state_store.py`). Hoy guarda una sola preferencia —el
-modo LAN (`ENGLISH_TUTOR_LAN`)— que antes vivía únicamente en el entorno del
-proceso y se perdía al cerrar: activar «red local» y reabrir el launcher
-devolvía el modo desactivado.
+geometría de la ventana (`state_store.py`). Hoy guarda dos familias de
+preferencia: el **modo LAN** (`ENGLISH_TUTOR_LAN`), que antes vivía únicamente en
+el entorno del proceso y se perdía al cerrar —activar «red local» y reabrir el
+launcher devolvía el modo desactivado—, y, desde V3.81, el **candado de
+administración** (`admin_pin`) con los ajustes **no secretos** del correo saliente
+(`smtp_host`, `smtp_port`, `smtp_user`, `smtp_sender`). La contraseña del SMTP no
+está aquí: vive en `backend/data/mail.secret`, fuera de git y fuera de las copias
+(ver `core.set_smtp_settings`).
 
 Este fichero es **configuración**, no estado visual, y por eso vive aparte de
 `state.json`: se lee al arrancar antes de pintar la interfaz (el panel de acceso
@@ -33,6 +37,14 @@ DEFAULTS: dict = {
     # habilita poniendo uno aquí. Vive en este fichero, que está ignorado por git y
     # no viaja en los backups (`launcher/config.json`), nunca en el repositorio.
     "admin_pin": "",
+    # V3.81: correo saliente (verificación de email, modo híbrido). Son los ajustes
+    # **no secretos**: la contraseña vive en `backend/data/mail.secret` y no toca
+    # este fichero (ver `core.set_smtp_settings`). Vacío = sin SMTP, y sin SMTP la
+    # app funciona igual: el webmaster sella la verificación a mano.
+    "smtp_host": "",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_sender": "",
 }
 
 
@@ -63,6 +75,19 @@ def load_config(path: Path | None = None) -> dict:
     admin_pin = data.get("admin_pin")
     if isinstance(admin_pin, str):
         config["admin_pin"] = admin_pin
+
+    # V3.81: correo saliente. Mismo criterio de parser: cadenas para el host, el
+    # usuario y el remitente (un número escrito a mano no se convierte), y el
+    # puerto solo como entero **no booleano** — en Python `True` es un `int`, así
+    # que sin la comprobación un `"smtp_port": true` colaría como puerto 1.
+    for key in ("smtp_host", "smtp_user", "smtp_sender"):
+        value = data.get(key)
+        if isinstance(value, str):
+            config[key] = value
+
+    smtp_port = data.get("smtp_port")
+    if isinstance(smtp_port, int) and not isinstance(smtp_port, bool):
+        config["smtp_port"] = smtp_port
 
     return config
 

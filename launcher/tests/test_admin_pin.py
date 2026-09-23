@@ -107,3 +107,20 @@ def test_generate_admin_pin_ofrece_siempre_un_pin_valido():
     """El botón «Generar» no puede proponer algo que el propio candado rechace."""
     for _ in range(20):
         assert core.is_valid_admin_pin(core.generate_admin_pin())
+
+
+def test_el_pin_llega_al_backend_al_arrancar_por_eso_hay_que_reiniciar(tmp_path):
+    """Guardar declara el PIN en el entorno; `backend_env()` lo copia al arrancar.
+
+    Es la razón por la que el lanzador **reinicia** al guardar o retirar el PIN: el
+    backend que ya está en marcha no vuelve a leer el entorno, así que hasta el
+    reinicio `/api/admin/*` responde 401 y la cola de solicitudes parece vacía.
+    """
+    env: dict[str, str] = {}
+    core.set_admin_pin(_PIN, dict(config_store.DEFAULTS), tmp_path / "c.json", env)
+
+    assert core.backend_env(env)[core.ADMIN_PIN_ENV] == _PIN
+
+    # Retirar también viaja: el backend reiniciado queda cerrado de verdad.
+    core.set_admin_pin("", {}, tmp_path / "c.json", env)
+    assert core.ADMIN_PIN_ENV not in core.backend_env(env)

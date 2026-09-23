@@ -313,6 +313,192 @@ def set_admin_pin(
     return config
 
 
+# --- Correo saliente (V3.81) ---------------------------------------------------
+#
+# El producto puede **no tener Internet**, así que la verificación de email es una
+# señal, no un muro: sin SMTP configurado la app funciona igual y la verificación
+# la sella el webmaster a mano. Esta es la mitad pura del cableado: qué ajustes
+# valen, dónde se guardan y cómo llegan al backend.
+#
+# La separación es deliberada y no una manía: **host, puerto, usuario y remitente**
+# van a `config.json` (configuración, se puede leer y copiar sin peligro), y la
+# **contraseña** va a `backend/data/mail.secret`, que está ignorado por git y que
+# `services/backup.py` deja fuera de las copias, igual que `session.secret` y la
+# clave TLS. Una copia puede acabar en un USB o en una nube, y ahí una contraseña
+# de correo en claro es el material con el que se ataca esa cuenta.
+SMTP_HOST_ENV = "ENGLISH_TUTOR_SMTP_HOST"
+SMTP_PORT_ENV = "ENGLISH_TUTOR_SMTP_PORT"
+SMTP_USER_ENV = "ENGLISH_TUTOR_SMTP_USER"
+SMTP_FROM_ENV = "ENGLISH_TUTOR_SMTP_FROM"
+
+# Ruta de la contraseña del SMTP: la misma que lee `services/mailer.py`
+# (`config.DATA_DIR / config.SMTP_SECRET_NAME`). Si se cambia una, la otra deja de
+# encontrarla, y el síntoma sería un «no se pudo enviar» sin explicación.
+MAIL_SECRET_PATH = BACKEND_DIR / "data" / "mail.secret"
+
+# 587 (SUBMISSION con STARTTLS) es el que usan los proveedores normales; el 465
+# implícito se soporta tecleándolo, que es la razón de exponer el puerto.
+DEFAULT_SMTP_PORT = 587
+
+
+def is_valid_smtp_port(port: object) -> bool:
+    """¿Sirve como puerto SMTP? Entero entre 1 y 65535.
+
+    Se rechaza el 0 y lo que no sea entero: un puerto inventado no da un error de
+    configuración, da un «no se pudo enviar» que parece un problema de credenciales.
+    """
+    if isinstance(port, bool):
+        return False
+    try:
+        value = int(port)
+    except (TypeError, ValueError):
+        return False
+    return 1 <= value <= 65535
+
+
+def is_valid_smtp_settings(host: str, sender: str) -> bool:
+    """¿Hay SMTP utilizable? Se exige host **y** remitente.
+
+    Es la misma condición que `backend/config.py::smtp_settings` deriva en
+    `configured`, escrita aquí para que la consola pueda decir «falta el remitente»
+    antes de mandar una prueba condenada.
+    """
+    return bool(str(host).strip() and str(sender).strip())
+
+
+def smtp_settings(config: dict | None = None) -> dict:
+    """Ajustes SMTP declarados en el launcher (contraseña **no** incluida).
+
+    Se leen de `config.json` y no del entorno a propósito: el entorno es el canal
+    por el que el launcher **declara** al backend, no una fuente de verdad para la
+    consola. Si se leyeran del entorno, un `ENGLISH_TUTOR_SMTP_HOST` heredado de un
+    arranque manual aparecería en la pantalla como si estuviera guardado.
+    """
+    stored = config if isinstance(config, dict) else {}
+    host = str(stored.get("smtp_host") or "").strip()
+    user = str(stored.get("smtp_user") or "").strip()
+    sender = str(stored.get("smtp_sender") or "").strip() or user
+    port = stored.get("smtp_port")
+    if not is_valid_smtp_port(port):
+        port = DEFAULT_SMTP_PORT
+    return {
+        "host": host,
+        "port": int(port),
+        "user": user,
+        "sender": sender,
+        "configured": is_valid_smtp_settings(host, sender),
+    }
+
+
+def mail_secret() -> str:
+    """Contraseña del SMTP guardada, o `""`. Nunca se enseña (solo `bool`)."""
+    try:
+        if not MAIL_SECRET_PATH.is_file():
+            return ""
+        return MAIL_SECRET_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def write_mail_secret(password: str, path: Path | None = None) -> bool:
+    """Escribe (o retira, con `""`) la contraseña del SMTP. `False` si no se pudo.
+
+    Se escribe **en cada guardado** y no al cerrar: una credencial de correo no
+    debería depender de que la ventana se cierre bien. Los permisos se aprietan a
+    `0o600` donde el sistema los respete (en Windows el flag es inocuo, y por eso
+    no se exige que funcione).
+    """
+    target = path or MAIL_SECRET_PATH
+    try:
+        if not password:
+            target.unlink(missing_ok=True)
+            return True
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(password, encoding="utf-8")
+        try:
+            target.chmod(0o600)
+        except OSError:
+            pass
+        return True
+    except OSError:
+        return False
+
+
+def _declare_smtp(config: dict, env: dict[str, str]) -> None:
+    """Declara (o retira) los ajustes SMTP en el entorno. Sin host, se retira todo.
+
+    Retirar de verdad —y no escribir cadenas vacías— es lo que hace que apagar el
+    correo se note: si solo se vaciara el JSON, un `ENGLISH_TUTOR_SMTP_HOST`
+    heredado seguiría ahí y la consola diría «sin correo» mientras el backend
+    seguiría enviando.
+    """
+    settings = smtp_settings(config)
+    if not settings["configured"]:
+        for name in (SMTP_HOST_ENV, SMTP_PORT_ENV, SMTP_USER_ENV, SMTP_FROM_ENV):
+            env.pop(name, None)
+        return
+    env[SMTP_HOST_ENV] = settings["host"]
+    env[SMTP_PORT_ENV] = str(settings["port"])
+    env[SMTP_USER_ENV] = settings["user"]
+    env[SMTP_FROM_ENV] = settings["sender"]
+
+
+def apply_smtp_config(config: dict, env: dict[str, str] | None = None) -> None:
+    """Declara en el entorno los ajustes SMTP al arrancar.
+
+    `backend_env()` copia este entorno al arrancar el backend, así que declararlo
+    aquí es lo que hace que el correo del launcher y el del backend sean el mismo.
+    Mismo patrón que `apply_admin_config`.
+    """
+    source = os.environ if env is None else env
+    _declare_smtp(config, source)
+
+
+def set_smtp_settings(
+    config: dict,
+    *,
+    host: str,
+    port: object,
+    user: str,
+    sender: str,
+    password: str | None = None,
+    path: Path | None = None,
+    secret_path: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> dict | None:
+    """Guarda los ajustes SMTP (y la contraseña, si se da). `None` si no valen.
+
+    `password=None` significa «no la toques» (dejar la que hubiera) y `""` significa
+    «bórrala». La distinción importa: la consola nunca enseña la contraseña, así que
+    no puede reenviarla al guardar; si `""` se tratara como «no la toques», apagar
+    el correo dejaría la credencial guardada y el `GET` seguiría diciendo que hay.
+    """
+    from config_store import save_config
+
+    normalized_host = str(host).strip()
+    normalized_sender = str(sender).strip() or str(user).strip()
+    if normalized_host and not is_valid_smtp_settings(
+        normalized_host, normalized_sender
+    ):
+        return None
+    if normalized_host and not is_valid_smtp_port(port):
+        return None
+
+    config["smtp_host"] = normalized_host
+    config["smtp_port"] = int(port) if is_valid_smtp_port(port) else DEFAULT_SMTP_PORT
+    config["smtp_user"] = str(user).strip()
+    config["smtp_sender"] = normalized_sender
+
+    if password is not None:
+        if not write_mail_secret(password, secret_path):
+            return None
+
+    source = os.environ if env is None else env
+    _declare_smtp(config, source)
+    save_config(config, path)
+    return config
+
+
 def backend_command() -> list[str]:
     """Comando para arrancar el backend con el venv del proyecto (uvicorn).
 

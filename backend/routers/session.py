@@ -1,18 +1,22 @@
-"""Sesión del perfil activo (Fase 2 del P0 de identidad, V3.75; PIN en V3.76).
+"""Sesión de la cuenta activa (Fase 2 del P0, V3.75; credencial real en V3.81).
 
 Cuatro verbos y una idea: la identidad la **firma el servidor**. `POST` la abre
-(cookie `et_session`, `HttpOnly`), `GET` la consulta, `PUT`/`DELETE` sobre
-`/api/session/pin` ponen y retiran el PIN del perfil de la sesión.
+(cookie `et_session`, `HttpOnly`), `GET` la consulta, `PUT /password` cambia la
+credencial y `DELETE` la cierra.
 
-**Lo que este router NO es:** autenticación de persona. `POST` acepta un
-`user_id` y, **si el perfil tiene PIN**, exige además ese PIN (401
-`PIN_REQUIRED`/`PIN_INVALID`); si no lo tiene, la puerta sigue abierta como
-siempre —es «sin cuentas, sin contraseñas» por diseño, y el PIN es una
-mitigación **opcional que el alumno activa**, no un cambio de ese contrato—.
-Quien pueda alcanzar la API puede pedir sesión para un perfil sin PIN; lo que ya
-no puede es **elegir** la identidad en cada petición ni forjar una sesión sin el
-secreto del equipo. La Frontera de red (loopback por defecto, V3.74) es la otra
-mitad de esta historia.
+**Lo que este router ya no es (V3.81).** Hasta V3.80 `POST` aceptaba un `user_id`
+y, si la cuenta tenía PIN, además ese PIN. Eso era una llave de puerta, no una
+credencial: cualquiera con acceso a la API abría sesión como cualquier cuenta sin
+PIN. Ahora, si la cuenta tiene contraseña, la petición **tiene que traerla** y se
+verifica contra un hash PBKDF2 con sal por cuenta y freno de intentos. La
+compatibilidad se mantiene para las cuentas heredadas (`has_password` falso), que
+es el estado en el que quedan los usuarios anteriores a esta release hasta que el
+webmaster les asigne credenciales desde la consola de gestión — así nadie queda
+fuera de la app por actualizar.
+
+El cierre de sesión sigue siendo `DELETE /api/session` (existe desde V3.75 y es
+lo que llama `closeSession()` en el frontend): no se añade un `POST
+/api/session/logout` porque serían dos rutas para el mismo efecto.
 """
 from __future__ import annotations
 
@@ -20,8 +24,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from dependencies import current_user
 from domain import users as user_service
-from schemas.users import PinSet, SessionCreate, User
-from services import pins, sessions
+from schemas.users import EmailChange, PasswordChange, SessionCreate, User
+from services import credentials, sessions
 
 router = APIRouter()
 
@@ -32,7 +36,7 @@ def _is_https(request: Request) -> bool:
     `Secure` impide que la cookie viaje por HTTP en claro, pero si se pusiera
     siempre el navegador la **descartaría** en el modo de desarrollo (Vite sirve
     por HTTP), y la sesión no se abriría nunca. Por eso se decide por petición,
-    igual que hacía la cookie de perfil que esta fase retira.
+    igual que hacía la cookie de perfil que la Fase 2 retiró.
     """
     forwarded = request.headers.get("x-forwarded-proto", "")
     return request.url.scheme == "https" or forwarded.split(",")[0].strip() == "https"
@@ -54,77 +58,84 @@ def _set_session_cookie(response: Response, request: Request, token: str) -> Non
 async def open_session(
     body: SessionCreate, request: Request, response: Response
 ) -> dict:
-    """Abre sesión para un perfil existente (404 si no existe).
+    """Abre sesión para una cuenta existente (404 si no existe).
 
-    V3.76: si el perfil tiene PIN, la petición debe traerlo. Los tres desenlaces
-    son distinguibles a propósito, para que la UI sepa qué pintar:
+    V3.81: si la cuenta tiene contraseña, es obligatoria. Los desenlaces son
+    distinguibles a propósito, para que la UI sepa qué pintar:
 
-    - `401 PIN_REQUIRED` — el perfil tiene PIN y la petición no lo traía.
-    - `401 PIN_INVALID`  — llegó un PIN y no cuadra (nunca se dice si «casi»).
-    - `429 PIN_THROTTLED` — el freno de `services/pins.py` está activo; incluye
-      `Retry-After` para que la UI pueda contar los segundos.
+    - `401 PASSWORD_REQUIRED` — la cuenta tiene contraseña y no se envió ninguna.
+    - `401 PASSWORD_INVALID`  — llegó una y no cuadra (nunca se dice si «casi»).
+    - `429 PASSWORD_THROTTLED` — el freno de `services/credentials.py` está
+      activo; incluye `Retry-After` para que la UI pueda contar los segundos.
+    - `403 PROFILE_DISABLED` / `403 ACCOUNT_UNENROLLED` — la cuenta está fuera de
+      servicio; se comprueba **antes** de gastar KDF y de contar intentos.
     """
     user = await user_service.get_user(body.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    # V3.77: un perfil desactivado no abre sesión. Se comprueba **antes** del PIN
-    # a propósito: no tiene sentido gastar KDF en un perfil fuera de servicio, y
-    # el freno por perfil no debe contar intentos de algo que no puede entrar.
     if user_service.is_disabled(user):
         raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
+    if user_service.is_unenrolled(user):
+        raise HTTPException(status_code=403, detail="ACCOUNT_UNENROLLED")
 
-    await _require_pin_if_set(body.user_id, body.pin)
+    await _require_password_if_set(body.user_id, body.password)
 
-    _set_session_cookie(response, request, sessions.issue(user["id"]))
+    epoch = await user_service.get_auth_epoch(body.user_id) or 0
+    _set_session_cookie(response, request, sessions.issue(user["id"], epoch=epoch))
     return user
 
 
-async def _require_pin_if_set(uid: str, pin: str | None) -> None:
-    """Puerta del PIN. Sin PIN guardado no hace nada (compatibilidad total)."""
-    stored = await user_service.get_pin_hash(uid)
+async def _require_password_if_set(uid: str, password: str | None) -> None:
+    """Puerta de la contraseña. Sin credencial guardada no hace nada.
+
+    Es deliberado que una cuenta heredada (`password_hash` vacío) siga entrando
+    sin pedir nada: la alternativa —cerrar la puerta a todo el mundo al
+    actualizar— convertiría una mejora de seguridad en un bloqueo. El precio está
+    declarado: hasta que el webmaster asigne credenciales, esas cuentas siguen
+    abriéndose nombrando. La consola de gestión las lista precisamente para que
+    ese número llegue a cero.
+    """
+    stored = await user_service.get_password_hash(uid)
     if not stored:
-        # Perfil sin PIN: `has_pin` es False y esta rama es la de siempre. Un
-        # `pin` enviado de más se ignora en vez de fallar: no hay nada que
-        # comprobar y responder 401 aquí sería castigar un campo inocuo.
         return
 
-    espera = pins.seconds_to_wait(uid)
+    espera = credentials.seconds_to_wait(uid)
     if espera > 0:
         raise HTTPException(
             status_code=429,
-            detail="PIN_THROTTLED",
+            detail="PASSWORD_THROTTLED",
             headers={"Retry-After": str(int(espera) + 1)},
         )
-    if pin is None:
-        raise HTTPException(status_code=401, detail="PIN_REQUIRED")
-    if not pins.verify_pin(stored, pin):
-        pins.note_failure(uid)
-        raise HTTPException(status_code=401, detail="PIN_INVALID")
-    pins.note_success(uid)
+    if password is None:
+        raise HTTPException(status_code=401, detail="PASSWORD_REQUIRED")
+    if not credentials.verify_password(stored, password):
+        credentials.note_failure(uid)
+        raise HTTPException(status_code=401, detail="PASSWORD_INVALID")
+    credentials.note_success(uid)
 
 
 @router.get("/api/session", response_model=User)
-async def read_session(request: Request) -> dict:
-    """El perfil de la sesión (401 `SESSION_REQUIRED` si no hay sesión válida)."""
-    user_id = sessions.verify(request.cookies.get(sessions.SESSION_COOKIE))
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="SESSION_REQUIRED")
-    user = await user_service.get_user(user_id)
-    if user is None:
-        # El perfil se borró con la sesión abierta: se responde igual que en el
-        # resto de la API (404), no se finge una sesión válida.
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if user_service.is_disabled(user):
-        # V3.77: desactivado es «no hay sesión que valga»; la UI desmonta la
-        # sesión y vuelve a la puerta de perfil, que ya no lo lista.
-        raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
+async def read_session(user: dict = Depends(current_user)) -> dict:
+    """La cuenta de la sesión.
+
+    Delegar en `current_user` no es un atajo: es la garantía de que este endpoint
+    y el resto de la API **contestan lo mismo** sobre quién eres (401 sin sesión,
+    401 `SESSION_STALE` si la credencial cambió, 404 si la cuenta ya no existe,
+    403 si está desactivada o dada de baja). Antes tenía su propia copia de esas
+    reglas, y esa duplicación es justo lo que se desincroniza.
+    """
     return user
 
 
 @router.delete("/api/session")
 async def close_session(request: Request, response: Response) -> dict:
-    """Cierra sesión: caduca la cookie en el navegador."""
+    """Cierra sesión: caduca la cookie en el navegador.
+
+    No hace falta consultar el servidor para esto: el token es autocontenido y
+    caduca solo. Borrar la cookie es suficiente y es lo que la UI necesita en el
+    caso normal («Salir»).
+    """
     response.delete_cookie(
         sessions.SESSION_COOKIE,
         path="/",
@@ -135,28 +146,80 @@ async def close_session(request: Request, response: Response) -> dict:
     return {"closed": True}
 
 
-@router.put("/api/session/pin", response_model=User)
-async def set_pin(body: PinSet, user: dict = Depends(current_user)) -> dict:
-    """Pone, cambia o retira el PIN del perfil **de la sesión** (V3.76).
+@router.put("/api/session/password", response_model=User)
+async def change_password(
+    body: PasswordChange,
+    request: Request,
+    response: Response,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Cambia la contraseña de la cuenta **de la sesión**.
 
-    Solo el tuyo: no hay `{id}` en la ruta, así que no existe la forma de tocar
-    el PIN de otro perfil ni por descuido. Cambiar o retirar un PIN existente
-    exige el anterior, con la misma puerta y el mismo freno que abrir sesión: sin
-    eso, quien se siente delante de un equipo con sesión abierta podría poner su
-    propio PIN y quedarse el perfil.
+    Solo la tuya: no hay `{id}` en la ruta, así que no existe la forma de tocar
+    la credencial de otra cuenta ni por descuido. Si ya había contraseña hay que
+    demostrar la actual, con la misma puerta y el mismo freno que abrir sesión:
+    sin eso, quien se siente delante de un equipo con la sesión abierta podría
+    poner su propia contraseña y quedarse la cuenta.
 
-    `new_pin` vacío retira el PIN (el perfil vuelve a entrar sin credencial).
+    Al cambiarla sube la época de autenticación, así que **todas** las sesiones
+    abiertas de esa cuenta dejan de valer… incluida esta. Por eso se reemite la
+    cookie aquí mismo: quien acaba de cambiar su contraseña no debe verse fuera
+    de su propia app (y si el cambio lo hizo porque sospechaba de otro, el otro
+    sí se queda fuera, que es el objetivo).
     """
-    await _require_pin_if_set(user["id"], body.current_pin)
+    uid = user["id"]
+    stored = await user_service.get_password_hash(uid) or ""
+    if stored:
+        await _require_password_if_set(uid, body.current_password)
 
-    if body.new_pin == "":
-        await user_service.set_pin_hash(user["id"], "")
-    else:
-        if not pins.is_valid_pin(body.new_pin):
-            raise HTTPException(status_code=400, detail="PIN_FORMAT")
-        await user_service.set_pin_hash(user["id"], pins.hash_pin(body.new_pin))
+    if not credentials.is_valid_password(body.new_password):
+        raise HTTPException(status_code=400, detail="PASSWORD_FORMAT")
 
-    actualizado = await user_service.get_user(user["id"])
+    await user_service.set_password_hash(
+        uid, credentials.hash_password(body.new_password), must_change=False
+    )
+    await user_service.record_event(
+        subject_id=uid,
+        subject_name=user["name"],
+        action=user_service.EVENT_PASSWORD_CHANGED,
+    )
+
+    epoch = await user_service.get_auth_epoch(uid) or 0
+    _set_session_cookie(response, request, sessions.issue(uid, epoch=epoch))
+    actualizado = await user_service.get_user(uid)
     if actualizado is None:  # carrera con un borrado: mismo contrato que el resto
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return actualizado
+
+
+@router.put("/api/session/email", response_model=User)
+async def change_email(
+    body: EmailChange, user: dict = Depends(current_user)
+) -> dict:
+    """Cambia el email de la cuenta **de la sesión**.
+
+    Exige la contraseña aunque ya haya sesión: apuntar la verificación a un correo
+    distinto es la forma de quedarse una cuenta (se pide el restablecimiento al
+    email nuevo). Un email nuevo siempre nace **sin verificar**.
+    """
+    uid = user["id"]
+    stored = await user_service.get_password_hash(uid) or ""
+    if stored:
+        await _require_password_if_set(uid, body.password)
+
+    email = credentials.normalize_email(body.email)
+    if not email:
+        raise HTTPException(status_code=400, detail="EMAIL_FORMAT")
+    if await user_service.email_in_use(email, exclude_uid=uid):
+        raise HTTPException(status_code=409, detail="EMAIL_TAKEN")
+
+    actualizado = await user_service.set_email(uid, email)
+    if actualizado is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    await user_service.record_event(
+        subject_id=uid,
+        subject_name=user["name"],
+        action=user_service.EVENT_EDITED,
+        note=f"email → {email}",
+    )
     return actualizado

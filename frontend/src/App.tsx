@@ -20,9 +20,11 @@ import {
 } from "./router/learnHub";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ProfileGate } from "./components/ProfileGate";
+import { AccountDialog } from "./components/AccountDialog";
 import { DegradedVoiceNotice } from "./components/DegradedVoiceNotice";
 import { VoiceDownloadDialog } from "./components/VoiceDownloadDialog";
 import { completeSessionStep } from "./api/academy";
+import { isLocalDevice } from "./utils/localDevice";
 import type { Section } from "./utils/sections";
 import type { NextBestActivity, SessionStep, TutorMode } from "./types/api";
 
@@ -81,9 +83,13 @@ export default function App() {
     users,
     currentUserId,
     usersLoaded,
+    // V3.80.2: si la lista no se pudo leer, la puerta ofrece reintentar.
+    usersLoadFailed,
+    reloadUsers,
     selectUser,
-    // V3.77: la app ya no crea perfiles; los pide, y el webmaster los autoriza
-    // desde el lanzador.
+    // V3.77: la app ya no crea cuentas a la primera; las pide, y el webmaster las
+    // autoriza desde el programa de gestión. V3.81 añade el **registro** desde el
+    // propio equipo, que es el camino nuevo, y deja la petición para la LAN.
     requestProfileForGate,
     requestProfileRemoval,
     editUser,
@@ -91,17 +97,32 @@ export default function App() {
     refreshEvents,
     startLesson,
     completeLesson,
-    // V3.76 (Fase 3 del P0): paso de PIN de la puerta de perfil.
-    pinPromptUserId,
-    pinFeedback,
-    submitPin,
-    cancelPin,
-    setProfilePin,
+    // V3.81 (Fase 3 del P0): paso de contraseña de la puerta y ciclo de vida de
+    // la cuenta.
+    passwordPromptUserId,
+    passwordFeedback,
+    submitPassword,
+    cancelPassword,
+    createAccountForGate,
+    mustChangePassword,
+    changePasswordNow,
+    changeEmailNow,
+    resendVerificationNow,
+    unenrollNow,
+    signOut,
   } = chat;
 
-  const pinUser = pinPromptUserId
-    ? (users.find((u) => u.id === pinPromptUserId) ?? null)
+  const passwordUser = passwordPromptUserId
+    ? (users.find((u) => u.id === passwordPromptUserId) ?? null)
     : null;
+
+  // La cuenta del diálogo sale de la lista local, que es la que se refresca con
+  // cada respuesta del servidor (cambiar contraseña, email). El email ajeno llega
+  // vacío a propósito: el backend solo devuelve el de la propia cuenta.
+  const accountUser = currentUserId
+    ? (users.find((u) => u.id === currentUserId) ?? null)
+    : null;
+  const [accountOpen, setAccountOpen] = useState(false);
 
   const appearance = useAppearance(currentUserId);
   const handsFree = useHandsFree(chat.sendText);
@@ -308,6 +329,7 @@ export default function App() {
               onRequestUser={requestProfileForGate}
               onEditUser={editUser}
               onRequestDeleteUser={requestProfileRemoval}
+              onOpenAccount={() => setAccountOpen(true)}
               handsFreeEnabled={handsFree.enabled}
               handsFreeStatus={handsFree.status}
               handsFreeMicError={handsFree.micError}
@@ -338,23 +360,47 @@ export default function App() {
         <DegradedVoiceNotice />
         <VoiceDownloadDialog />
 
-        {/* Al arrancar en un navegador nuevo sin ningún perfil definido (sin
-            sesión abierta y varios perfiles, o todavía sin perfiles), se pide
-            elegir o crear uno antes de usar la app.
+        {/* Al arrancar en un navegador nuevo sin ninguna cuenta definida (sin
+            sesión abierta y varias cuentas, o todavía sin ninguna), se pide elegir
+            o crear una antes de usar la app.
 
-            V3.76: la misma puerta se muestra cuando hay un perfil esperando su
-            PIN (`pinPromptUserId`), incluso si ya había uno activo: cambiar de
-            perfil en el selector es una acción del alumno y el paso de PIN no
-            puede quedar invisible detrás de la app. */}
-        {usersLoaded && (!currentUserId || pinPromptUserId) && (
+            V3.81: la misma puerta se muestra cuando hay una cuenta esperando su
+            contraseña (`passwordPromptUserId`), incluso si ya había otra activa:
+            cambiar de cuenta en el selector es una acción del alumno y el paso de
+            contraseña no puede quedar invisible detrás de la app. */}
+        {usersLoaded && (!currentUserId || passwordPromptUserId) && (
           <ProfileGate
             users={users}
             onSelect={selectUser}
             onRequest={requestProfileForGate}
-            pinUser={pinUser}
-            pinFeedback={pinFeedback}
-            onSubmitPin={submitPin}
-            onCancelPin={cancelPin}
+            onCreateAccount={createAccountForGate}
+            canCreateAccount={isLocalDevice()}
+            passwordUser={passwordUser}
+            passwordFeedback={passwordFeedback}
+            onSubmitPassword={submitPassword}
+            onCancelPassword={cancelPassword}
+            loadFailed={usersLoadFailed}
+            onRetry={() => void reloadUsers()}
+          />
+        )}
+
+        {/* V3.81: la cuenta del alumno. Se abre desde el menú de usuario y, con
+            contraseña temporal puesta por el webmaster, se abre **sola** y no se
+            puede cerrar sin cambiarla (el servidor lo exige igual con
+            `403 PASSWORD_CHANGE_REQUIRED`, así que esto solo evita el choque). */}
+        {accountUser && (accountOpen || mustChangePassword) && (
+          <AccountDialog
+            user={accountUser}
+            forced={mustChangePassword}
+            onClose={() => setAccountOpen(false)}
+            onChangePassword={changePasswordNow}
+            onChangeEmail={changeEmailNow}
+            onResendVerification={resendVerificationNow}
+            onUnenroll={unenrollNow}
+            onSignOut={() => {
+              setAccountOpen(false);
+              void signOut();
+            }}
           />
         )}
 
@@ -371,8 +417,6 @@ export default function App() {
             onSelectModel={selectModel}
             onFavoriteModel={makeFavorite}
             userId={currentUserId}
-            hasPin={Boolean(users.find((u) => u.id === currentUserId)?.has_pin)}
-            onSetPin={setProfilePin}
             onClose={() => setSettingsOpen(false)}
           />
         )}

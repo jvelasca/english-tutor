@@ -1,4 +1,21 @@
-"""Repositorio de usuarios (SQLite)."""
+"""Repositorio de usuarios (SQLite).
+
+V3.81 (Fase 3 del P0 de identidad): el «perfil» es una **cuenta**. La fila de
+`users` guarda ahora también el email, el hash de la contraseña, el estado de
+verificación del correo y la época de autenticación, y el historial de lo que
+decide la administración vive en `user_events`.
+
+Dos invariantes que este módulo sostiene y que conviene leer antes de tocarlo:
+
+1. **Los secretos no salen del diccionario del perfil.** `password_hash`,
+   `auth_epoch` y `email_verify_token_hash` se leen para derivar
+   `has_password`, pero se retiran antes de devolver la fila: exponerlos en
+   `GET /api/users` no aporta nada y le da material al atacante. Es la misma
+   doctrina con la que V3.76 trataba `pin_hash`.
+2. **`pin_hash` sigue en la tabla y ya no se lee.** Retirar la columna exigiría
+   reconstruir la tabla en SQLite, y una copia antigua restaurada sobre esta
+   versión tiene que seguir abriendo.
+"""
 from __future__ import annotations
 
 import uuid
@@ -6,38 +23,160 @@ from contextlib import closing
 
 from repositories.db import _conn, _now
 
+# Columnas que forman el perfil que la API sirve. `email_verified_at` viaja
+# porque es informativo (cuándo se verificó), no porque sea un secreto.
 _COLUMNS = (
-    "id, name, avatar_color, avatar_emoji, avatar_image, is_test, created_at, status"
+    "id, name, avatar_color, avatar_emoji, avatar_image, is_test, created_at, "
+    "status, email, email_verified_at, must_change_password"
 )
 
-# V3.76: `pin_hash` se LEE para saber si el perfil tiene PIN, pero **nunca** sale
-# en el diccionario del perfil: de él solo se deriva `has_pin`. Exponerlo en
-# `GET /api/users` no aporta nada y le da material al atacante.
-_PIN_COLUMN = "pin_hash"
+# Columnas de secreto: se LEEN para derivar los booleanos del perfil
+# (`has_password`) y para validar la época de las sesiones, pero **nunca** salen
+# en el diccionario.
+_SECRET_COLUMNS = "password_hash, auth_epoch, email_verify_token_hash"
 
-# V3.77: estado de servicio del perfil. Son los dos únicos valores válidos y
-# viven aquí (no en el esquema) para que el repositorio los pueda comparar sin
-# inventarse cadenas sueltas por el código.
+_SELECT = f"{_COLUMNS}, {_SECRET_COLUMNS}"
+
+# V3.77 + V3.81: estado de servicio de la cuenta. `unenrolled` es la baja
+# **autoservicio** (el propio usuario se retira) y `disabled` es la decisión del
+# webmaster; las dos sacan la cuenta del selector y le cierran la sesión, y las
+# dos son reversibles. `active` es la única que puede tener sesión.
 STATUS_ACTIVE = "active"
 STATUS_DISABLED = "disabled"
-STATUSES = (STATUS_ACTIVE, STATUS_DISABLED)
+STATUS_UNENROLLED = "unenrolled"
+# Estados que el webmaster puede poner con `set_status` (la baja autoservicio
+# tiene su propia función: no es una decisión suya).
+STATUSES = (STATUS_ACTIVE, STATUS_DISABLED, STATUS_UNENROLLED)
+
+# Acciones que se registran en `user_events`. Son códigos y no texto libre para
+# que el lanzador pueda contarlas y traducirlas sin inventarse cadenas.
+EVENT_CREDENTIALS = "credentials"  # el webmaster asigna email + contraseña
+EVENT_EMAIL_VERIFIED = "email_verified"
+EVENT_PASSWORD_CHANGED = "password_changed"
+EVENT_UNENROLLED = "unenrolled"  # el propio usuario pide la baja
+EVENT_ENROLLED = "reenrolled"
+EVENT_DISABLED = "disabled"
+EVENT_FORCE_UNENROLLED = "force_unenrolled"  # el webmaster da de baja
+EVENT_PURGED = "purged"
+EVENT_EDITED = "edited"
+EVENT_CREATED = "created"
 
 
 def _row_to_user(row: object) -> dict:
-    """Fila de `users` → perfil de la API, con `has_pin` en vez del hash."""
+    """Fila de `users` → perfil de la API, con los secretos retirados."""
     data = dict(row)  # type: ignore[arg-type]
-    pin_hash = data.pop(_PIN_COLUMN, "") or ""
-    data["has_pin"] = bool(pin_hash)
+    data["has_password"] = bool(data.pop("password_hash", "") or "")
+    # La época solo la usan las sesiones (`get_auth_epoch`): fuera del perfil.
+    data.pop("auth_epoch", None)
+    data.pop("email_verify_token_hash", None)
+    data["email_verified"] = bool(data.get("email_verified_at"))
+    data["must_change_password"] = bool(data.get("must_change_password"))
     return data
 
 
-def create_user(name: str, is_test: bool = False) -> dict:
+def _fold_name(name: str) -> str:
+    """Nombre comparable: espacios colapsados y sin distinguir mayúsculas.
+
+    Es la misma normalización que aplica el dominio al normalizar un nombre
+    (`normalize_name`), **duplicada** aquí a propósito: el repositorio no puede
+    importar el dominio (sería un ciclo) y una regla de unicidad que solo
+    funcionara en la capa de arriba no serviría.
+    """
+    return " ".join((name or "").split()).casefold()
+
+
+def name_in_use(name: str, *, exclude_uid: str | None = None) -> bool:
+    """¿Otro usuario **activo** ya se llama así? (V3.80.2)
+
+    El selector pinta los usuarios por nombre y con dos «J.A» no hay forma de
+    saber cuál es cuál, así que el nombre se trata como identificador visible.
+    Los perfiles de **prueba** quedan fuera a propósito (`is_test`): los crea y
+    los borra el teardown de los tests visuales, y hacerlos chocar con esta
+    regla convertiría un residuo de test en un alta rota.
+    """
+    folded = _fold_name(name)
+    if not folded:
+        return False
+    return any(
+        user["id"] != exclude_uid and _fold_name(user["name"]) == folded
+        for user in list_users(include_test=False, include_disabled=False)
+    )
+
+
+def email_in_use(email: str, *, exclude_uid: str | None = None) -> bool:
+    """¿Otra cuenta ya usa ese email? (V3.81)
+
+    La BD tiene un índice único `NOCASE` que es la garantía de verdad; esto es la
+    comprobación previa que permite dar un 409 legible en vez de un error de
+    integridad. Se normaliza en minúsculas, igual que se guarda.
+    """
+    text = (email or "").strip().lower()
+    if not text:
+        return False
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT id FROM users WHERE email <> '' AND email = ? COLLATE NOCASE "
+            "AND id <> ? LIMIT 1",
+            (text, exclude_uid or ""),
+        ).fetchone()
+    return row is not None
+
+
+def find_by_email(email: str) -> dict | None:
+    """Cuenta por email (normalizado), o `None`. Lo usa el login opcional."""
+    text = (email or "").strip().lower()
+    if not text:
+        return None
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_SELECT} FROM users WHERE email = ? COLLATE NOCASE LIMIT 1",
+            (text,),
+        ).fetchone()
+    return _row_to_user(row) if row is not None else None
+
+
+def find_by_email_token(token_hash: str) -> dict | None:
+    """Cuenta cuya verificación pendiente es ese token (hasheado), o `None`.
+
+    Se busca por el hash, nunca por el token en claro: en la BD no hay nada que
+    permita confirmar un email ajeno aunque alguien lea la fila.
+    """
+    if not token_hash:
+        return None
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_SELECT} FROM users WHERE email_verify_token_hash = ? LIMIT 1",
+            (token_hash,),
+        ).fetchone()
+    return _row_to_user(row) if row is not None else None
+
+
+def create_user(
+    name: str,
+    is_test: bool = False,
+    *,
+    email: str = "",
+    password_hash: str = "",
+    must_change_password: bool = False,
+) -> dict:
+    """Alta. Con `email`/`password_hash` nace una cuenta con credencial."""
     uid = uuid.uuid4().hex
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
-            "INSERT INTO users (id, name, created_at, is_test) VALUES (?, ?, ?, ?)",
-            (uid, name, now, 1 if is_test else 0),
+            "INSERT INTO users "
+            "(id, name, created_at, is_test, email, password_hash, "
+            "must_change_password) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                uid,
+                name,
+                now,
+                1 if is_test else 0,
+                email,
+                password_hash,
+                1 if must_change_password else 0,
+            ),
         )
     return {
         "id": uid,
@@ -46,7 +185,11 @@ def create_user(name: str, is_test: bool = False) -> dict:
         "avatar_emoji": "",
         "avatar_image": "",
         "is_test": is_test,
-        "has_pin": False,
+        "has_password": bool(password_hash),
+        "email": email,
+        "email_verified": False,
+        "email_verified_at": None,
+        "must_change_password": bool(must_change_password),
         "created_at": now,
         "status": STATUS_ACTIVE,
     }
@@ -55,16 +198,17 @@ def create_user(name: str, is_test: bool = False) -> dict:
 def list_users(
     include_test: bool = False, include_disabled: bool = False
 ) -> list[dict]:
-    """Perfiles locales. Por defecto EXCLUYE los de prueba y los desactivados.
+    """Cuentas locales. Por defecto EXCLUYE las de prueba y las no activas.
 
     V3.52.1: los perfiles de test (p. ej. «Visual Tester» de los tests visuales
     de Playwright) no deben aparecer en el selector de la app. Con
     `include_test=True` se listan también (lo usan los propios tests para
     localizar/limpiar su perfil).
 
-    V3.77: un perfil **desactivado** tampoco aparece en el selector —eso es
-    justo lo que significa desactivar— y `include_disabled=True` lo recupera
-    para el lanzador, que es quien puede reactivarlo o purgarlo.
+    V3.77/V3.81: una cuenta **desactivada** o **dada de baja** tampoco aparece en
+    el selector —eso es justo lo que significa— y `include_disabled=True` la
+    recupera para la consola de gestión, que es quien puede reactivarla o
+    purgarla.
     """
     clauses: list[str] = []
     if not include_test:
@@ -74,8 +218,7 @@ def list_users(
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     with closing(_conn()) as conn:
         rows = conn.execute(
-            f"SELECT {_COLUMNS}, {_PIN_COLUMN} FROM users{where} "
-            "ORDER BY created_at ASC"
+            f"SELECT {_SELECT} FROM users{where} ORDER BY created_at ASC"
         ).fetchall()
     return [_row_to_user(r) for r in rows]
 
@@ -83,33 +226,137 @@ def list_users(
 def get_user(uid: str) -> dict | None:
     with closing(_conn()) as conn:
         row = conn.execute(
-            f"SELECT {_COLUMNS}, {_PIN_COLUMN} FROM users WHERE id = ?", (uid,)
+            f"SELECT {_SELECT} FROM users WHERE id = ?", (uid,)
         ).fetchone()
     return _row_to_user(row) if row is not None else None
 
 
-def get_pin_hash(uid: str) -> str | None:
-    """Hash del PIN del perfil (`""` si no tiene), o `None` si no existe.
+# --- Secreto de la cuenta ----------------------------------------------------
 
-    Consulta aparte a propósito: separa «quién es este perfil» (lo que la API
+
+def get_password_hash(uid: str) -> str | None:
+    """Hash de la contraseña (`""` si no tiene credencial), o `None` si no existe.
+
+    Consulta aparte a propósito: separa «quién es esta cuenta» (lo que la API
     sirve) de «con qué secreto entra» (lo que solo mira la apertura de sesión).
     """
     with closing(_conn()) as conn:
         row = conn.execute(
-            f"SELECT {_PIN_COLUMN} FROM users WHERE id = ?", (uid,)
+            "SELECT password_hash FROM users WHERE id = ?", (uid,)
         ).fetchone()
     if row is None:
         return None
-    return row[_PIN_COLUMN] or ""
+    return row["password_hash"] or ""
 
 
-def set_pin_hash(uid: str, pin_hash: str) -> bool:
-    """Escribe (o retira, con `""`) el hash del PIN. `False` si no existe."""
+def get_auth_epoch(uid: str) -> int | None:
+    """Época de autenticación, o `None` si la cuenta no existe.
+
+    Va dentro del token de sesión: cuando cambia la contraseña o se fuerza una
+    baja, sube, y **todas** las sesiones abiertas dejan de valer en la siguiente
+    petición. Sin esto, forzar una baja no surtiría efecto hasta que caducara la
+    cookie (un año).
+    """
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT auth_epoch FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+    if row is None:
+        return None
+    return int(row["auth_epoch"] or 0)
+
+
+def set_password_hash(
+    uid: str, password_hash: str, *, must_change: bool = False
+) -> bool:
+    """Escribe la contraseña (o la retira, con `""`) y sube la época.
+
+    Subir la época en **cualquier** cambio es la decisión, no un efecto colateral:
+    si alguien cambia la contraseña es porque sospecha que otro la sabe, así que
+    dejar viva la sesión del intruso sería cerrar la puerta con él dentro.
+    """
     if get_user(uid) is None:
         return False
     with closing(_conn()) as conn, conn:
-        conn.execute("UPDATE users SET pin_hash = ? WHERE id = ?", (pin_hash, uid))
+        conn.execute(
+            "UPDATE users SET password_hash = ?, must_change_password = ?, "
+            "auth_epoch = auth_epoch + 1 WHERE id = ?",
+            (password_hash, 1 if must_change else 0, uid),
+        )
     return True
+
+
+def set_credentials(
+    uid: str, *, email: str, password_hash: str, must_change: bool = True
+) -> dict | None:
+    """Email + contraseña de golpe (el webmaster, desde la consola). Atómico.
+
+    Se hace en una sola escritura a propósito: un email sin contraseña (o al
+    revés) dejaría la cuenta en un estado que el webmaster no pidió y que nadie
+    sabría deshacer desde la UI.
+    """
+    if get_user(uid) is None:
+        return None
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET email = ?, password_hash = ?, "
+            "email_verified_at = NULL, email_verify_token_hash = '', "
+            "must_change_password = ?, auth_epoch = auth_epoch + 1 WHERE id = ?",
+            (email, password_hash, 1 if must_change else 0, uid),
+        )
+    return get_user(uid)
+
+
+def set_email(uid: str, email: str, *, verified: bool = False) -> dict | None:
+    """Cambia el email y reinicia su verificación. `None` si no existe."""
+    if get_user(uid) is None:
+        return None
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET email = ?, email_verified_at = ?, "
+            "email_verify_token_hash = '' WHERE id = ?",
+            (email, _now() if verified and email else None, uid),
+        )
+    return get_user(uid)
+
+
+def set_email_verification(uid: str, token_hash: str) -> bool:
+    """Guarda el token de verificación (hasheado) y cuándo se emitió."""
+    if get_user(uid) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET email_verify_token_hash = ?, "
+            "email_verify_sent_at = ? WHERE id = ?",
+            (token_hash, _now(), uid),
+        )
+    return True
+
+
+def get_email_verification(uid: str) -> tuple[str, str] | None:
+    """`(token_hash, sent_at)` de la verificación pendiente, o `None`."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT email_verify_token_hash, email_verify_sent_at FROM users "
+            "WHERE id = ?",
+            (uid,),
+        ).fetchone()
+    if row is None:
+        return None
+    return (row["email_verify_token_hash"] or "", row["email_verify_sent_at"] or "")
+
+
+def mark_email_verified(uid: str) -> dict | None:
+    """Sella el email como verificado y consume el token (de un solo uso)."""
+    if get_user(uid) is None:
+        return None
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET email_verified_at = ?, email_verify_token_hash = '' "
+            "WHERE id = ?",
+            (_now(), uid),
+        )
+    return get_user(uid)
 
 
 def update_user(
@@ -139,9 +386,9 @@ def update_user(
 
 
 def set_status(uid: str, status: str) -> dict | None:
-    """Desactiva o reactiva un perfil. `None` si no existe o el estado no vale.
+    """Desactiva o reactiva una cuenta. `None` si no existe o el estado no vale.
 
-    Desactivar es la mitad **reversible** de un borrado: el perfil sale del
+    Desactivar es la mitad **reversible** de un borrado: la cuenta sale del
     selector y no puede abrir sesión, pero no se toca ni una fila de su
     evidencia. Es el camino por defecto del webmaster.
     """
@@ -154,13 +401,82 @@ def set_status(uid: str, status: str) -> dict | None:
     return get_user(uid)
 
 
+def set_unenrolled(uid: str, *, enrolled: bool) -> dict | None:
+    """Baja autoservicio (y su vuelta). Sube la época: la sesión se cierra ya.
+
+    No borra nada: marca `unenrolled_at` y el estado. Los datos del alumno se
+    quedan donde están y solo el webmaster decide después si se purgan.
+    """
+    if get_user(uid) is None:
+        return None
+    with closing(_conn()) as conn, conn:
+        if enrolled:
+            conn.execute(
+                "UPDATE users SET status = ?, unenrolled_at = NULL, "
+                "auth_epoch = auth_epoch + 1 WHERE id = ?",
+                (STATUS_ACTIVE, uid),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET status = ?, unenrolled_at = ?, "
+                "auth_epoch = auth_epoch + 1 WHERE id = ?",
+                (STATUS_UNENROLLED, _now(), uid),
+            )
+    return get_user(uid)
+
+
+# --- Historial de la administración ------------------------------------------
+
+
+def record_event(
+    *,
+    subject_id: str,
+    subject_name: str,
+    action: str,
+    note: str = "",
+    actor: str = "webmaster",
+) -> None:
+    """Anota una decisión de la administración (o un hito de la cuenta).
+
+    Nunca lanza hacia fuera por un fallo al anotar: perder una línea de historial
+    es malo, pero tumbar la acción que ya se ejecutó es peor (el webmaster
+    creería que no se hizo y la repetiría).
+    """
+    try:
+        with closing(_conn()) as conn, conn:
+            conn.execute(
+                "INSERT INTO user_events "
+                "(subject_id, subject_name, action, actor, note, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (subject_id, subject_name, action, actor, note, _now()),
+            )
+    except Exception:  # noqa: BLE001 - ver docstring
+        pass
+
+
+def list_events(subject_id: str, limit: int = 50) -> list[dict]:
+    """Historial de una cuenta, del más reciente al más antiguo."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT id, subject_id, subject_name, action, actor, note, created_at "
+            "FROM user_events WHERE subject_id = ? "
+            "ORDER BY created_at DESC, id DESC LIMIT ?",
+            (subject_id, int(limit)),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def _purge_user_rows(conn, uid: str) -> None:
-    """Borra las filas de TODAS las tablas con `user_id` para un perfil.
+    """Borra las filas de TODAS las tablas con `user_id` para una cuenta.
 
     Se enumeran dinámicamente (igual que `scripts/purge_virtual_testers.py`)
     porque el esquema **no** tiene `ON DELETE CASCADE` salvo en `messages`, y se
     abre la conexión con las FKs desactivadas para que el orden de borrado no
     importe. No borra la fila de `users`: eso lo decide quien llama.
+
+    `user_events` **no** entra aquí aunque hable de la misma cuenta: su columna es
+    `subject_id` a propósito, para que el registro de un purgado sobreviva al
+    purgado (es el registro que responde «¿quién borró esto y por qué?»).
     """
     names = [
         r[0]
@@ -208,12 +524,13 @@ def delete_test_user(uid: str) -> bool:
 
 
 def purge_user(uid: str) -> bool:
-    """Borra un perfil REAL y toda su evidencia (V3.77). Irreversible.
+    """Borra una cuenta REAL y toda su evidencia (V3.77). Irreversible.
 
     Es la mitad **no reversible** del borrado y por eso no la llama nadie por su
-    cuenta: el webmaster la ejecuta desde el lanzador, tras una confirmación por
-    nombre y **después** de que `services.backup` haya tomado una copia. Admite
-    cualquier perfil, también uno desactivado (es el caso normal).
+    cuenta: el webmaster la ejecuta desde la consola de gestión, tras una
+    confirmación por nombre y **después** de que `services.backup` haya tomado una
+    copia. Admite cualquier cuenta, también una desactivada o dada de baja (es el
+    caso normal).
     """
     if get_user(uid) is None:
         return False

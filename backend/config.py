@@ -30,7 +30,7 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 
-VERSION = "3.80.0"
+VERSION = "3.81.0"
 
 # Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
 # mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo
@@ -162,6 +162,56 @@ ADMIN_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"}
 def is_admin_loopback_host(host: str | None) -> bool:
     """¿La petición llega desde el propio equipo? (fail-closed: `None` no)."""
     return str(host or "").strip().lower() in ADMIN_LOOPBACK_HOSTS
+
+
+# --- Correo saliente (V3.81, verificación de email opcional) -------------------
+# La verificación de email es una **señal**, no un muro: el producto es local y
+# puede no tener SMTP. Sin configurar, `services/mailer.py` no envía nada y la app
+# sigue funcionando igual —el webmaster sella la verificación a mano desde la
+# consola de gestión—. Eso es el «híbrido» que se decidió para esta fase.
+#
+# La configuración no secreta la declara el lanzador en el entorno del backend que
+# él mismo arranca (mismo canal que `ENGLISH_TUTOR_ADMIN_PIN`); la **contraseña**
+# del SMTP no viaja por el entorno ni por el JSON del lanzador: vive en
+# `data/mail.secret`, en la misma familia que `session.secret` y por tanto fuera
+# de las copias (`services/backup.py::_NON_PORTABLE_TOP_NAMES`).
+SMTP_HOST_ENV = "ENGLISH_TUTOR_SMTP_HOST"
+SMTP_PORT_ENV = "ENGLISH_TUTOR_SMTP_PORT"
+SMTP_USER_ENV = "ENGLISH_TUTOR_SMTP_USER"
+SMTP_FROM_ENV = "ENGLISH_TUTOR_SMTP_FROM"
+SMTP_SECRET_NAME = "mail.secret"
+
+# Puerto por defecto: 587 (SUBMISSION con STARTTLS) es el que usan los proveedores
+# normales; el 465 implícito se soporta poniéndolo a mano, que es la razón de
+# exponer el puerto en vez de fijarlo.
+DEFAULT_SMTP_PORT = 587
+
+
+def smtp_settings(env: dict[str, str] | None = None) -> dict:
+    """Config del SMTP (`configured` falso mientras no haya host y remitente).
+
+    Se resuelve **en cada llamada**, no al importar: una decisión de entorno no se
+    cachea (misma doctrina que `lan_mode()` y `admin_pin()`), y así el webmaster
+    puede configurar el correo sin reiniciar el backend.
+    """
+    source = os.environ if env is None else env
+    host = (source.get(SMTP_HOST_ENV) or "").strip()
+    user = (source.get(SMTP_USER_ENV) or "").strip()
+    sender = (source.get(SMTP_FROM_ENV) or "").strip() or user
+    raw_port = (source.get(SMTP_PORT_ENV) or "").strip()
+    try:
+        port = int(raw_port) if raw_port else DEFAULT_SMTP_PORT
+    except ValueError:
+        port = DEFAULT_SMTP_PORT
+    return {
+        "host": host,
+        "port": port,
+        "user": user,
+        "sender": sender,
+        # Sin host o sin remitente no hay envío posible: es la única condición que
+        # se exige, y por eso `configured` es derivado y no un campo aparte.
+        "configured": bool(host and sender),
+    }
 
 
 # V3.77: topes de las solicitudes de perfil. Son la valla de un endpoint que

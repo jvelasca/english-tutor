@@ -1,18 +1,24 @@
-"""Solicitudes de perfil y su resolución (V3.77).
+"""Solicitudes de cuenta y su resolución (V3.77 · cuentas en V3.81).
 
 Este módulo es la **frontera** entre lo que el alumno puede pedir y lo que el
 webmaster puede decidir, y lo dice en la forma de sus funciones:
 
-- `request_*` solo **registra** una petición. Nunca crea ni borra un perfil, ni
+- `request_*` solo **registra** una petición. Nunca crea ni borra una cuenta, ni
   toca una fila de evidencia. Cualquiera puede llamarlas (la de alta, incluso sin
   sesión) y lo peor que puede pasar es que la cola de pendientes crezca.
-- `approve_*` y `reject_*` **resuelven** una petición y son las únicas que
-  cambian el mundo. Solo las llama el router de administración, que exige PIN y
-  que la petición venga del propio equipo.
+- `approve_*` y `reject_*` **resuelven** una petición. Solo las llama el router de
+  administración, que exige PIN de administración y que la petición venga del
+  propio equipo.
+- V3.81 añade las operaciones de **consola de gestión** (`set_credentials`,
+  `verify_email_by_hand`, `force_unenroll`, `reenroll`, `edit_user`, `history`),
+  que son las que le dan al webmaster «control y prioridad sobre todo». Todas
+  anotan lo que hacen en `user_events`: una decisión que se le impone a un alumno
+  tiene que poder explicarse después.
 
-Aprobar un alta crea el perfil. Aprobar un **borrado** *desactiva*: es la mitad
-reversible de la decisión, y la irreversible (purgar) es un acto aparte, con
-confirmación por nombre y copia previa, que el webmaster ejecuta cuando quiere
+Aprobar un alta crea la cuenta **sin credencial** (y la consola ofrece asignarla).
+Aprobar un **borrado** *desactiva*: es la mitad reversible de la decisión, y la
+irreversible (purgar) es un acto aparte, con confirmación por nombre y copia
+previa, que el webmaster ejecuta cuando quiere
 (`agentes/v377-perfiles-webmaster.md`).
 """
 from __future__ import annotations
@@ -26,7 +32,6 @@ from domain import users as user_service
 from repositories import profile_requests as requests_repo
 from repositories import users as users_repo
 from services import backup as backup_service
-from services import pins
 
 # Desenlaces de una petición. Son códigos y no excepciones porque el router los
 # tiene que traducir a estados HTTP distintos (201, 409, 422, 429) y quien decide
@@ -119,21 +124,24 @@ async def count_pending() -> int:
     return await run_in_threadpool(requests_repo.count_pending)
 
 
-async def approve(
-    request_id: int, *, pin: str = "", note: str = ""
-) -> dict | None:
+async def approve(request_id: int, *, note: str = "") -> dict | None:
     """Resuelve una petición **hacia delante**. `None` si no está pendiente.
 
     El orden importa: primero se hace el efecto y solo después se marca la
-    petición como resuelta. Al revés, un fallo al crear el perfil dejaría la
-    petición «aprobada» sin perfil y el webmaster no tendría forma de reintentar.
+    petición como resuelta. Al revés, un fallo al crear la cuenta dejaría la
+    petición «aprobada» sin cuenta y el webmaster no tendría forma de reintentar.
+
+    V3.81: aprobar un alta crea la cuenta **sin credencial** y la consola ofrece a
+    continuación asignarle email y contraseña temporal. Son dos decisiones
+    distintas —«esta persona puede tener cuenta» y «con qué entra»— y juntarlas
+    obligaba a teclear el PIN antes de saber si la cuenta se iba a crear siquiera.
     """
     request = await run_in_threadpool(requests_repo.get_request, request_id)
     if request is None or request["status"] != requests_repo.STATUS_PENDING:
         return None
 
     if request["kind"] == requests_repo.KIND_CREATE:
-        created = await create_profile(request["display_name"], pin=pin)
+        created = await create_profile(request["display_name"])
         if created is None:
             return None
         resolved = await run_in_threadpool(
@@ -152,6 +160,13 @@ async def approve(
     )
     if disabled is None:
         return None
+    if disabled is not None:
+        await user_service.record_event(
+            subject_id=target,
+            subject_name=disabled["name"],
+            action=user_service.EVENT_DISABLED,
+            note=normalize_note(note),
+        )
     resolved = await run_in_threadpool(
         requests_repo.resolve,
         request_id,
@@ -171,45 +186,229 @@ async def reject(request_id: int, note: str = "") -> dict | None:
     )
 
 
-async def create_profile(name: str, *, pin: str = "") -> dict | None:
-    """Alta directa del webmaster. `None` si el nombre no sirve o el PIN no vale.
+async def create_profile(
+    name: str,
+    *,
+    email: str = "",
+    password_hash: str = "",
+    must_change: bool = True,
+) -> dict | None:
+    """Alta del webmaster. `None` si el nombre no sirve o el email ya está cogido.
 
-    El PIN es **opcional** aquí igual que en el alta del primer arranque: si el
-    webmaster no lo pone, el perfil entra sin credencial (la consecuencia que
-    V3.76 ya declaró). Si lo pone, se guarda hasheado con `services.pins`.
+    V3.81: la cuenta puede nacer **con** credenciales (nombre + email + contraseña
+    ya hasheada) o **sin** ellas. Sin credencial es el caso de una petición
+    aprobada: entra en la lista de tareas de la consola («asígnale contraseña»)
+    mientras la compatibilidad le siga permitiendo entrar nombrando.
+
+    La comprobación de email duplicado no es cosmética: el índice único de la BD
+    lo rechazaría al escribir, y sin esta comprobación el error llegaría como un
+    `IntegrityError` sin mensaje útil.
     """
     clean = normalize_name(name)
     if not clean:
         return None
-    if pin and not pins.is_valid_pin(pin):
+    if email and await user_service.email_in_use(email):
         return None
-    created = await user_service.create_user(clean)
-    if pin:
-        await user_service.set_pin_hash(created["id"], pins.hash_pin(pin))
-        created = await user_service.get_user(created["id"]) or created
+    created = await user_service.create_user(
+        clean,
+        email=email,
+        password_hash=password_hash,
+        must_change_password=must_change if password_hash else False,
+    )
+    await user_service.record_event(
+        subject_id=created["id"],
+        subject_name=created["name"],
+        action=user_service.EVENT_CREATED,
+        note=email,
+    )
     return created
 
 
-async def set_status(user_id: str, status: str) -> dict | None:
-    """Desactiva o reactiva un perfil (el webmaster, desde el lanzador)."""
-    return await run_in_threadpool(users_repo.set_status, user_id, status)
+async def set_credentials(
+    user_id: str, *, email: str, password: str, must_change: bool = True
+) -> dict | None:
+    """Asigna o restablece email + contraseña de una cuenta (consola de gestión).
+
+    Devuelve la cuenta actualizada o `None` si el email no vale o ya lo usa otra.
+    La contraseña llega **en claro** desde el router y se hashea aquí mismo: es el
+    único punto donde existe sin hash, y vive solo el tiempo de esta llamada.
+    """
+    from services import credentials  # import local: evita el ciclo con el router
+
+    clean = credentials.normalize_email(email)
+    if not clean or not credentials.is_valid_password(password):
+        return None
+    if await user_service.email_in_use(clean, exclude_uid=user_id):
+        return None
+    updated = await user_service.set_credentials(
+        user_id,
+        email=clean,
+        password_hash=credentials.hash_password(password),
+        must_change=must_change,
+    )
+    if updated is None:
+        return None
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=updated["name"],
+        action=user_service.EVENT_CREDENTIALS,
+        note=f"{clean}{' · temporal' if must_change else ''}",
+    )
+    return updated
+
+
+async def verify_email_by_hand(user_id: str) -> dict | None:
+    """Sella el email sin pasar por el correo (modo híbrido, sin SMTP).
+
+    Es la pieza que hace que la verificación no sea un muro: en una instalación de
+    casa sin proveedor de correo, el webmaster confirma a mano —habitualmente
+    porque tiene delante a la persona— y el resto del producto no se entera.
+    """
+    user = await user_service.get_user(user_id)
+    if user is None:
+        return None
+    if not user.get("email"):
+        return None
+    updated = await user_service.mark_email_verified(user_id)
+    if updated is None:
+        return None
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=updated["name"],
+        action=user_service.EVENT_EMAIL_VERIFIED,
+        note=updated.get("email", ""),
+    )
+    return updated
+
+
+async def force_unenroll(user_id: str, reason: str) -> dict | None:
+    """**Fuerza** la baja de una cuenta. El motivo es obligatorio y queda escrito.
+
+    No es lo mismo que desactivar: desactivar es «esta cuenta está fuera de
+    servicio» (una decisión de mantenimiento, reversible y silenciosa) y forzar la
+    baja es «esta persona deja la app», con un motivo que el alumno puede
+    preguntar. Las dos cierran la sesión al instante (suben la época).
+    """
+    motivo = normalize_note(reason) or "sin motivo indicado"
+    updated = await user_service.set_unenrolled(user_id, enrolled=False)
+    if updated is None:
+        return None
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=updated["name"],
+        action=user_service.EVENT_FORCE_UNENROLLED,
+        note=motivo,
+    )
+    return updated
+
+
+async def reenroll(user_id: str, note: str = "") -> dict | None:
+    """Reinscribe una cuenta dada de baja (o desactivada) y la deja activa."""
+    updated = await user_service.set_unenrolled(user_id, enrolled=True)
+    if updated is None:
+        return None
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=updated["name"],
+        action=user_service.EVENT_ENROLLED,
+        note=normalize_note(note),
+    )
+    return updated
+
+
+async def edit_user(user_id: str, fields: dict) -> dict | None:
+    """Edición de los datos de una cuenta por parte del webmaster.
+
+    Tiene la misma autoridad que el propio alumno (nombre y avatar) y una más: el
+    **email**, que el alumno solo puede cambiar con su contraseña delante. Si el
+    email cambia, su verificación se reinicia —heredar el sello del correo
+    anterior convertiría apuntar a otro correo en un atajo para saltarse el
+    trámite—.
+    """
+    current = await user_service.get_user(user_id)
+    if current is None:
+        return None
+
+    email = fields.pop("email", None)
+    changed: list[str] = []
+    # Un nombre repetido rompería la regla del selector; se comprueba también al
+    # editar, no solo al crear (si no, la regla tendría una puerta abierta).
+    new_name = fields.get("name")
+    if new_name is not None and await user_service.name_in_use(
+        new_name, exclude_uid=user_id
+    ):
+        return None
+
+    updated = await user_service.update_user(user_id, fields)
+    if updated is None:
+        return None
+    changed.extend(f"{k}={v}" for k, v in fields.items() if v is not None)
+
+    if email is not None:
+        from services import credentials
+
+        clean = credentials.normalize_email(email)
+        if not clean or await user_service.email_in_use(clean, exclude_uid=user_id):
+            return None
+        with_email = await user_service.set_email(user_id, clean)
+        if with_email is None:
+            return None
+        updated = with_email
+        changed.append(f"email={clean}")
+        # Cambiar el email **reinicia** la verificación: el sello pertenecía al
+        # correo anterior, no a la persona.
+        await user_service.set_email_verification(user_id, "")
+
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=updated["name"],
+        action=user_service.EVENT_EDITED,
+        note=" · ".join(changed)[:200],
+    )
+    return updated
+
+
+async def history(user_id: str, limit: int = 50) -> list[dict]:
+    return await user_service.list_events(user_id, limit)
+
+
+async def set_status(user_id: str, status: str, note: str = "") -> dict | None:
+    """Desactiva o reactiva una cuenta (el webmaster, desde la consola).
+
+    V3.81 añade el valor `unenrolled` a los estados válidos, pero forzar la baja
+    tiene su propia función (`force_unenroll`) porque **exige motivo**. Aquí solo
+    se registran `active` y `disabled`; cualquier otro valor lo rechaza el
+    repositorio.
+    """
+    updated = await run_in_threadpool(users_repo.set_status, user_id, status)
+    if updated is None:
+        return None
+    if status != users_repo.STATUS_ACTIVE:
+        await user_service.record_event(
+            subject_id=user_id,
+            subject_name=updated["name"],
+            action=user_service.EVENT_DISABLED,
+            note=normalize_note(note),
+        )
+    return updated
 
 
 async def purge_profile(user_id: str, confirm_name: str) -> dict | None:
-    """Borra un perfil **y toda su evidencia**. Irreversible.
+    """Borra una cuenta **y toda su evidencia**. Irreversible.
 
     Cuatro cosas tienen que cuadrar antes de que se borre nada:
 
-    1. El perfil existe.
+    1. La cuenta existe.
     2. `confirm_name` coincide con su nombre: es lo que impide que un clic de más
-       o un id copiado por error se lleve por delante al perfil equivocado. La
+       o un id copiado por error se lleve por delante a la cuenta equivocada. La
        comparación ignora mayúsculas y espacios sobrantes (no es un examen de
        tecleo, es una confirmación de intención).
-    3. El perfil está **desactivado**. Purgar un perfil activo es destruir
-       evidencia de alguien que puede estar usándola ahora mismo; pasar por la
-       desactivación obliga a que exista un momento —y un día— en que la decisión
-       se puede deshacer. Es barato para el webmaster (dos clics) y es la
-       diferencia entre un borrado deliberado y un clic de más.
+    3. La cuenta está **fuera de servicio** (desactivada o dada de baja, V3.81).
+       Purgar una cuenta activa es destruir evidencia de alguien que puede estar
+       usándola ahora mismo; pasar por la desactivación o por la baja obliga a que
+       exista un momento —y un día— en que la decisión se puede deshacer. Es
+       barato para el webmaster (dos clics) y es la diferencia entre un borrado
+       deliberado y un clic de más.
     4. **La copia**: se toma un backup ZIP antes de purgar y se devuelve su
        nombre. Si la copia falla, no se purga. Es la única red que existe, y por
        eso la copia manda sobre la comodidad.
@@ -223,9 +422,22 @@ async def purge_profile(user_id: str, confirm_name: str) -> dict | None:
         user["name"]
     ).casefold():
         return None
-    if user.get("status") != users_repo.STATUS_DISABLED:
+    if user.get("status") not in (
+        users_repo.STATUS_DISABLED,
+        users_repo.STATUS_UNENROLLED,
+    ):
         return None
     snapshot = await run_in_threadpool(backup_service.create_backup)
+    # El registro se escribe **antes** de borrar: `user_events` no entra en la
+    # purga (su columna es `subject_id`), así que sobrevive y es lo que responde
+    # después a «¿quién borró esta cuenta y cuándo?». Se guarda el nombre porque
+    # a partir de aquí la fila de `users` ya no existe para consultarlo.
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=user["name"],
+        action=user_service.EVENT_PURGED,
+        note=f"copia {snapshot.get('name', '')}",
+    )
     if not await run_in_threadpool(users_repo.purge_user, user_id):
         return None
     return {

@@ -2,6 +2,7 @@ import { BookOpen, Layers, Search } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
+import { useTabList } from "../../hooks/useTabList";
 import type { DictionaryView } from "../../utils/dictionaryView";
 import { cn } from "../../lib/utils";
 import { PersonalDictionary } from "./PersonalDictionary";
@@ -21,6 +22,9 @@ const VIEWS: {
     Icon: Layers,
   },
 ];
+
+/** Ids estables (a nivel de módulo) para el roving tabindex del hook. */
+const VIEW_IDS = VIEWS.map((entry) => entry.id);
 
 /** Petición de estudio: qué mazo/léxico abrir en Flashcards y con qué etiqueta. */
 interface StudyFocus {
@@ -55,6 +59,7 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
   const { t } = useI18n();
   const { view, setView } = useDictionaryView(userId);
   const [focus, setFocus] = useState<StudyFocus>(NO_FOCUS);
+  const { onKeyDown, register } = useTabList(VIEW_IDS, view, setView);
 
   const openStudy = useCallback(
     (opts: { collectionId?: number | null; label?: string } = {}) => {
@@ -81,9 +86,10 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
         </header>
 
         <div
-          role="group"
+          role="tablist"
           aria-label={t("dictionary.viewsLabel")}
           className="bg-secondary mb-4 flex w-fit items-center gap-1 rounded-md p-1"
+          onKeyDown={onKeyDown}
         >
           {VIEWS.map((entry) => {
             const isActive = view === entry.id;
@@ -92,7 +98,12 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
               <button
                 key={entry.id}
                 type="button"
-                aria-pressed={isActive}
+                role="tab"
+                id={`dictionary-tab-${entry.id}`}
+                aria-selected={isActive}
+                aria-controls={`dictionary-panel-${entry.id}`}
+                tabIndex={isActive ? 0 : -1}
+                ref={register(entry.id)}
                 onClick={() => setView(entry.id)}
                 className={cn(
                   "inline-flex min-h-9 items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors",
@@ -108,7 +119,13 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
           })}
         </div>
 
-        <div className="min-h-0 flex-1">
+        <div
+          role="tabpanel"
+          id={`dictionary-panel-${view}`}
+          aria-labelledby={`dictionary-tab-${view}`}
+          tabIndex={0}
+          className="min-h-0 flex-1 focus:outline-none"
+        >
           {view === "lookup" ? (
             /* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
                vista de consulta no repite cabecera (antes había dos `h1` en la

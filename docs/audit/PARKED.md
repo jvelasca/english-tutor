@@ -1714,6 +1714,164 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   cuidado). Se declara medido: falló una vez con la app viva y pasó en la segunda
   pasada con la app ociosa. `[VALIDACIÓN]`
 
+## V3.80.1 — Estabilización pre-freeze: la carrera cara B, el badge, la X, las pestañas, el `lang` y la cola del lanzador (2026-09-22)
+
+> Origen: **la auditoría externa de V3.80.0**. Veredicto: la release está
+> técnicamente bien planteada y soluciona problemas reales, pero **no se debe
+> congelar todavía**: hay una carrera real en la UI (P1) y tres P2 de pulido. Esta
+> release los cierra **sin añadir funcionalidad**, más un sexto hallazgo de **uso
+> real** (una baja de perfil invisible en el lanzador) que era una promesa
+> incumplida del lanzador, no del flujo del alumno. Notas en
+> `release-notes-v3.80.1.md`.
+
+### Cerrado en V3.80.1 (deja de ser deuda)
+
+- **La carrera generación ↔ edición de la cara B (P1).** Una respuesta tardía de
+  `hydrate()` podía pisar la traducción que el alumno acababa de guardar. Se
+  cierra con token por tarjeta (`hydrationEpoch`) + espejo síncrono (`ownBacksRef`)
+  y con retirar el spinner de esa tarjeta al guardar. Candado con promesa diferida.
+- **El badge «Tu versión» sobre una traducción borrada (P2).** Guardar `""` ya no
+  deja la tarjeta marcada como propia: se restaura la cara efectiva del backend
+  (o se reintenta la caché).
+- **La `X` del diccionario limpiaba el campo pero no el resultado (P2).** Ahora
+  limpia búsqueda y resultado y devuelve el estado honesto de «nueva consulta».
+- **La semántica ARIA de los dos selectores tipo pestaña (P2).** Los tres modos y
+  las cuatro vistas son `tablist`/`tab`/`tabpanel` reales con roving tabindex y
+  teclado (`useTabList`).
+- **El `lang` de las tarjetas manuales (P2).** Solo se declara cuando el idioma se
+  conoce (léxico); en las manuales se omite.
+- **No había sonda visual permanente de Diccionario ni de Flashcards.** Se añaden
+  `dictionarySmoke.spec.ts` y `flashcardsSmoke.spec.ts`, permanentes y en los tres
+  breakpoints —el hueco que V3.80.0 había declarado—.
+- **La cola de solicitudes de perfil no se veía en el lanzador si no había PIN,
+  y una consulta fallida se pintaba como cola vacía.** Era una capacidad
+  **declarada y no implementada** desde V3.77 («contar las pendientes sin depender
+  del backend»). Se cierra con `status.read_pending_requests` (contador
+  solo-lectura, `0` = vacía y `None` = no se pudo leer), `ui.pending_view` (los
+  estados no se confunden; un fallo dice el motivo) y el reinicio automático al
+  guardar o retirar el PIN, para que el backend en marcha lo aplique de verdad.
+
+### Sigue abierto (esto **no** lo cierra)
+
+- **El timeout de hidratación de la cara B sigue siendo el global de 120 s.** Un
+  timeout **corto** específico de Flashcards (para no dejar el spinner eterno
+  cuando el modelo está *lento* en vez de caído, y para fallar antes a «No consta»)
+  queda aparcado: cambiar el timeout global afecta a toda la app y no es una
+  estabilización. `[PRODUCTO]`
+- **No hay idioma por mazo.** El `lang` de una tarjeta manual se omite porque no
+  se conoce; una configuración de idioma por mazo (con su valor por defecto y su
+  herencia) es funcionalidad nueva y queda aparcada. `[PRODUCTO]`
+- **El mismo pack sigue listado en dos sitios** (PERSONAL para añadir, Mazos para
+  estudiar). Sigue siendo la duplicación **declarada** de V3.80.0; no se consolida
+  aquí. `[UI]`
+- **El barrido visual completo sigue con flakiness local** cuando el arnés corre
+  en paralelo sobre esta máquina: la tanda completa da **54 pasan / 2 fallan /
+  28 omiten**, y los dos que fallan (`keyboard.spec.ts`, del hub de `/#/aprender`,
+  y `resize.spec.ts`, del panel de conversaciones) **pasan en aislamiento con y
+  sin los cambios de esta release**, y el conjunto que falla se mueve al repetir.
+  La causa es del entorno —el Vite local proxea `/api` a un `:8000` que aquí sirve
+  **HTTPS**—, y la autoridad del barrido completo sigue siendo el CI. Las dos
+  specs nuevas son deterministas (mockean todo su `/api`) y dan **6/6 en los tres
+  breakpoints**. `[VALIDACIÓN]`
+- **Los mocks de `/api/**` deben anclarse al ORIGEN, no a globs por endpoint.**
+  Aprendido al escribir los dos specs nuevos: `**​/api/settings*` casa también con
+  el módulo de la app `/src/api/settings.ts` y, al servirle JSON, **la app no
+  arranca**. Queda documentado en los dos specs y en `release-notes-v3.80.1.md`
+  (la trampa ya estaba escrita en `drillProvenance.spec.ts`; sigue sin haber un
+  helper compartido que la haga imposible de repetir). `[VALIDACIÓN]`
+- **La cola de solicitudes sigue exigiendo PIN para leerse en detalle y
+  resolverse.** Sin PIN, el lanzador ahora **cuenta y anuncia** las pendientes
+  leyendo la BD en solo-lectura, pero ver la fila y aprobar/rechazar sigue detrás
+  del doble candado (PIN + loopback). Es una decisión deliberada —**contar no es
+  decidir**—, y lo que se cierra en (G) es la mentira («sin solicitudes» cuando
+  había una), no el candado. `[PRODUCTO]`
+- **La base de certificación se re-ancla a `v3.80.1`, pero G1–G7 siguen
+  `pending`.** El pre-vuelo del nuevo árbol **no se ha ejecutado** (exige
+  hardware): esta release solo mueve el ancla documental por tag (regla V3.73.5) y
+  lo declara en `docs/audit/KIT-VALIDACION-GATES.md`. `[VALIDACIÓN]`
+- **Todo lo declarado abierto en V3.80.0 sigue abierto** y no se toca aquí (copiar
+  un pack a un mazo editable, límites propios por pack, plantillas/cloze/import,
+  el reverso generado no editable desde PERSONAL, etc.).
+
+## V3.81.0 — Gestión de usuarios: cuentas con contraseña, alta y baja autoservicio y la consola del lanzador (Fase 3 del P0) · 2026-09-23
+
+> Release que publica **dos lotes**: la estabilización pre-freeze (preparada como
+> `v3.80.1`) y **la Fase 3 del P0 de identidad**. Lo que sigue son **deudas
+> declaradas**, no olvidos. Detalle en `release-notes-v3.81.0.md`.
+
+### Cerrado en V3.81.0 (deja de ser deuda)
+
+- **«Sin cuentas, sin contraseñas» deja de ser la premisa del producto.** `docs/PREMISAS.md`
+  §13 se reescribe: la cuenta es local, con **nombre + email + contraseña**, y la
+  premisa que sobrevive es «**sin cuentas en la nube**» (coherente con la 2). El
+  briefing de §15 de `docs/audit/PLAN-P0-IDENTIDAD.md` queda **cerrado** con la
+  decisión y su implementación en §16.
+- **El PIN de perfil (V3.76) se retira como concepto.** `PUT /api/session/pin`
+  desaparece, `services/pins.py` y `backend/tests/test_pin.py` se **borran** y
+  `pin_hash` se conserva en la tabla **sin leerse** (borrar una columna de una BD
+  viva es riesgo con cero beneficio). El relevo es `services/credentials.py`.
+- **La contraseña de la cuenta sustituye al PIN**, con política de forma, freno
+  de intentos **por cuenta** y **revocación efectiva** (época de autenticación:
+  cambiar la contraseña o forzar la baja tumban las sesiones vivas al instante).
+- **`GET /api/users` deja de filtrar correos.** Sigue enumerando **nombres** sin
+  sesión (la puerta los necesita), pero el email de las demás cuentas se recorta
+  en el borde HTTP. Era PII nueva sobre la única superficie sin sesión.
+- **La mentira del lanzador sobre la cola de solicitudes (V3.80.1, apartado G)**
+  se conserva cerrada y ahora la cola **es** la consola de Usuarios.
+
+### Lo que sigue abierto o aparcado (deuda declarada)
+
+- **Las cuentas heredadas sin credencial siguen entrando sin contraseña.** Es la
+  deuda central de esta release: `password_hash == ''` abre como siempre para no
+  dejar a nadie fuera de sus datos, así que **el P0 sigue abierto para esas
+  cuentas**, no para el producto. La consola de Usuarios las lista como tarea
+  pendiente; llevarlas a cero es trabajo de uso, no de código. `[PRODUCTO]`
+- **No hay recuperación de contraseña por correo.** La restablece el webmaster
+  desde la consola y la entrega como **temporal** (`must_change_password`, que el
+  servidor hace cumplir con `403 PASSWORD_CHANGE_REQUIRED`). Un flujo de
+  «olvidé mi contraseña» con token por email exigiría decidir la caducidad y el
+  freno del propio flujo: funcionalidad nueva, no estabilización. `[PRODUCTO]`
+- **No hay segundo factor** (TOTP, passkeys) ni **verificación obligatoria** para
+  usar la app: el email es una **señal**, y sin SMTP configurado la verificación
+  la firma el webmaster a mano. `[PRODUCTO]`
+- **`GET /api/users` sigue enumerando nombres en modo LAN.** Es consecuencia
+  declarada del diseño de selector (Netflix-style) y lo que la acota es que cada
+  cuenta con credencial **no entra** sin su contraseña. Quien quiera cerrar
+  también los nombres tiene la vía del modo LAN con solicitudes. `[PRODUCTO]`
+- **El hash de la contraseña viaja en el backup** (es estado de la cuenta, dentro
+  de la BD); `session.secret` y `mail.secret` **no**. Quien reciba un backup puede
+  atacar la contraseña **fuera de línea**, sin el freno del servidor. `[SEGURIDAD]`
+- **El freno de intentos vive en memoria del proceso**: un reinicio lo vacía. Es
+  el mismo límite declarado del PIN en V3.76. `[SEGURIDAD]`
+- **La verificación por email depende de SMTP.** Sin él la app funciona igual y la
+  UI lo dice con esas palabras («no hay correo configurado, pídele al webmaster
+  que lo confirme»); prometer un envío que no existe sería la peor clase de
+  mentira: la que hace esperar. `[PRODUCTO]`
+- **La consola de Usuarios sigue detrás del doble candado** (PIN de administración
+  + loopback). Sin PIN se **cuenta** la cola leyendo la BD, pero ver el detalle,
+  resolver, editar, forzar una baja o purgar exige PIN. `[PRODUCTO]`
+- **La purga exige que la cuenta esté dada de baja o desactivada**, hace copia
+  previa y pide confirmación por nombre. No hay purga «a un clic» y es deliberado.
+  `[PRODUCTO]`
+- **El transporte del correo no está probado contra un servidor real** en esta
+  máquina: los candados cubren el modo fail-closed, la negociación STARTTLS/TLS
+  implícito y la autenticación con y sin contraseña, pero una prueba contra un
+  SMTP de verdad (y contra un proveedor que exija OAuth en vez de contraseña de
+  aplicación) queda **pendiente de acción humana**. `[VALIDACIÓN]`
+- **La prueba manual end-to-end se hizo sobre una COPIA de la BD real**, no sobre
+  la BD en uso (el gerente lo pidió así), y quedó **reproducible**: el guion
+  `backend/scripts/e2e_accounts_v381.py` copia la BD a un temporal, levanta el
+  backend de verdad y recorre el contrato entero (**62/62 pasos**, con el sha256
+  de la BD original comprobado al final). Queda pendiente repetirla sobre la BD de
+  uso el día que se actualice el equipo de verdad. `[VALIDACIÓN]`
+- **La base de certificación se re-ancla a `v3.81.0`, pero G1–G7 siguen
+  `pending`.** El pre-vuelo del nuevo árbol sigue **sin ejecutarse** (exige
+  hardware): esta release solo mueve el ancla documental por tag (regla V3.73.5) y
+  lo declara en `docs/audit/KIT-VALIDACION-GATES.md`. `[VALIDACIÓN]`
+- **Todo lo declarado abierto en V3.80.0 y V3.80.1 sigue abierto** y no se toca
+  aquí (timeout corto de hidratación, idioma por mazo, el pack listado en dos
+  sitios, la duplicación de plantillas/cloze/import, etc.).
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

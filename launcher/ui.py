@@ -42,8 +42,8 @@ SECTION_ICONS = {
     "Actividad del servidor": "📊",
     "Acceso a la app": "📡",
     "Base de datos": "💾",
-    "Perfiles": "🔐",
     "Usuarios": "👥",
+    "Actividad por usuario": "📈",
     "Cookies navegador": "🍪",
     "Registros": "📄",
 }
@@ -123,15 +123,157 @@ def server_activity(status: dict | None) -> tuple[str, int]:
     return line, rejected
 
 
-# --- Perfiles y solicitudes (V3.77) -----------------------------------------
+# --- Cuentas y solicitudes (V3.77, V3.81) -------------------------------------
 #
-# Vistas puras de lo que el webmaster ve en la sección «Perfiles». Se separan de
-# la GUI por la razón de siempre: la disposición de la ventana no se puede probar
-# sin pantalla, pero **lo que dice cada fila sí**, y es justo donde un cambio
-# puede mentir al usuario («Desactivado» pintado como activo, una baja mostrada
-# sin nombre de perfil, un contador mal).
+# Vistas puras de lo que el webmaster ve en la sección «Usuarios» (la consola de
+# gestión). Se separan de la GUI por la razón de siempre: la disposición de la
+# ventana no se puede probar sin pantalla, pero **lo que dice cada fila sí**, y es
+# justo donde un cambio puede mentir al usuario («Desactivado» pintado como
+# activo, una cuenta sin contraseña pintada como protegida, una baja mostrada sin
+# nombre, un contador mal).
 REQUEST_KIND_LABELS = {"create": "🆕 Alta", "delete": "🗑️ Baja"}
-PROFILE_STATUS_LABELS = {"active": "Activo", "disabled": "Desactivado"}
+USER_STATUS_LABELS = {
+    "active": "Activo",
+    "disabled": "Desactivado",
+    "unenrolled": "Dado de baja",
+}
+
+# Acciones de `user_events` (códigos, ver `repositories/users.py`) traducidas a lo
+# que lee una persona. El historial es lo que responde «¿por qué mi cuenta está
+# así?», así que no puede salir en códigos.
+EVENT_ACTION_LABELS = {
+    "created": "🆕 Cuenta creada",
+    "credentials": "🔑 Credencial asignada",
+    "password_changed": "🔒 Contraseña cambiada",
+    "email_verified": "✉️ Email verificado",
+    "unenrolled": "🚪 Baja pedida por el alumno",
+    "force_unenrolled": "🚫 Baja forzada por el webmaster",
+    "reenrolled": "↩️ Cuenta reactivada",
+    "disabled": "⏸️ Cuenta desactivada",
+    "edited": "✏️ Datos editados",
+    "purged": "🗑️ Datos purgados",
+}
+
+
+def _fold_user_name(user: dict) -> str:
+    """Nombre comparable: espacios colapsados y sin distinguir mayúsculas."""
+    return " ".join(str(user.get("name", "")).split()).casefold()
+
+
+def duplicate_user_ids(users: list[dict]) -> set[str]:
+    """Ids de los usuarios que comparten nombre con otro (V3.80.2).
+
+    El nombre se compara colapsando espacios y sin distinguir mayúsculas, que es
+    la misma regla con la que el backend rechaza un alta repetida: si el alta no
+    admite «ana» junto a «Ana  », el marcado tiene que verlas igual.
+    """
+    counts: dict[str, int] = {}
+    for user in users:
+        folded = _fold_user_name(user)
+        if folded:
+            counts[folded] = counts.get(folded, 0) + 1
+    return {
+        str(user.get("id"))
+        for user in users
+        if _fold_user_name(user) and counts[_fold_user_name(user)] > 1
+    }
+
+
+def user_row_label(user: dict, duplicates: set[str]) -> str:
+    """Etiqueta de la fila de un usuario, marcando los nombres repetidos.
+
+    La app y esta tabla pintan a los usuarios **por nombre**: con dos «J.A» el
+    webmaster no puede saber a cuál le está dando de baja, que es exactamente el
+    error que esta consola existe para evitar. Se marca y no se renombra nada
+    por su cuenta: renombrar es una decisión suya.
+    """
+    name = str(user.get("name", ""))
+    if str(user.get("id")) in duplicates:
+        return f"⚠️ {name} (nombre repetido)"
+    return f"👤 {name}"
+
+
+def credential_label(user: dict) -> str:
+    """¿La cuenta tiene contraseña? Se informa como sello, **nunca** como valor.
+
+    Es la columna que convierte el agujero de seguridad en una tarea visible: una
+    cuenta sin contraseña entra nombrando, y mientras el contador no llegue a cero
+    el webmaster tiene trabajo pendiente aquí.
+    """
+    if user.get("has_password"):
+        return "🔑 Con contraseña"
+    return "⚠️ Sin contraseña"
+
+
+def email_label(user: dict) -> str:
+    """Email con su sello de verificación, o «—» si la cuenta no tiene.
+
+    El chip «sin verificar» no es un error: en modo híbrido una cuenta funciona
+    sin verificar, y lo que hace este texto es que el webmaster pueda sellarla a
+    mano cuando tenga a la persona delante.
+    """
+    email = str(user.get("email") or "")
+    if not email:
+        return "—"
+    if user.get("email_verified"):
+        return f"✉️ {email}"
+    return f"✉️ {email} · sin verificar"
+
+
+def user_row(user: dict, duplicates: set[str]) -> tuple[str, str, str, str, str]:
+    """Fila de una cuenta: (nombre, estado, email, credencial, creado).
+
+    El orden de las columnas es el del árbol de la consola. La credencial va como
+    booleano y el email con su sello, nunca el hash ni la contraseña: el backend no
+    los manda, y esta pantalla no inventa una forma de mostrarlos.
+    """
+    status = str(user.get("status") or "active")
+    return (
+        user_row_label(user, duplicates),
+        USER_STATUS_LABELS.get(status, status),
+        email_label(user),
+        credential_label(user),
+        str(user.get("created_at") or "").replace("T", " ")[:16],
+    )
+
+
+def accounts_tasks(without_password: int, unverified_email: int) -> str:
+    """Lista de tareas del webmaster, en una frase.
+
+    Los dos números que importan de verdad: cuentas **sin contraseña** (heredadas,
+    siguen entrando nombrando) y cuentas con email **sin verificar** (en modo
+    híbrido, las sella él). Un contador que se ve es un contador que baja; si esto
+    dijera «todo en orden» con cuentas sin credencial, la consola estaría mintiendo
+    justo en el punto que esta release viene a cerrar.
+    """
+    if without_password <= 0 and unverified_email <= 0:
+        return "✅ Todas las cuentas tienen contraseña y email verificado."
+    partes = []
+    if without_password == 1:
+        partes.append("1 cuenta sin contraseña")
+    elif without_password > 1:
+        partes.append(f"{without_password} cuentas sin contraseña")
+    if unverified_email == 1:
+        partes.append("1 email sin verificar")
+    elif unverified_email > 1:
+        partes.append(f"{unverified_email} emails sin verificar")
+    return "⚠️ Pendiente: " + " · ".join(partes) + "."
+
+
+def event_row(event: dict) -> tuple[str, str, str, str]:
+    """Fila del historial: (cuándo, qué, quién, motivo).
+
+    Una acción desconocida se enseña **en crudo** en vez de ocultarse: si el
+    backend añade un tipo de evento y esta tabla no lo conoce, quien mire el
+    historial tiene que ver que pasó algo, no una fila vacía.
+    """
+    action = str(event.get("action") or "")
+    return (
+        str(event.get("created_at") or "").replace("T", " ")[:16],
+        EVENT_ACTION_LABELS.get(action, action),
+        str(event.get("actor") or ""),
+        str(event.get("note") or ""),
+    )
 
 
 def pending_summary(count: int) -> str:
@@ -149,14 +291,14 @@ def request_row(
     """Fila de una solicitud: (tipo, a quién se refiere, cuándo llegó).
 
     En una baja, la solicitud guarda el `user_id`, no el nombre: se traduce con
-    `names` (el mapa de la lista de perfiles ya cargada) para que el webmaster no
-    tenga que decidir sobre un identificador. Si el perfil ya no está, se dice
-    «(perfil que ya no existe)» en vez de enseñar el id crudo.
+    `names` (el mapa de la lista de cuentas ya cargada) para que el webmaster no
+    tenga que decidir sobre un identificador. Si la cuenta ya no está, se dice
+    «(cuenta que ya no existe)» en vez de enseñar el id crudo.
     """
     kind = REQUEST_KIND_LABELS.get(str(request.get("kind")), str(request.get("kind")))
     if request.get("kind") == "delete":
         uid = str(request.get("user_id") or "")
-        target = (names or {}).get(uid) or "(perfil que ya no existe)"
+        target = (names or {}).get(uid) or "(cuenta que ya no existe)"
     else:
         target = str(request.get("display_name") or "")
         if request.get("note"):
@@ -165,19 +307,63 @@ def request_row(
     return (kind, target, when)
 
 
-def profile_row(profile: dict) -> tuple[str, str, str, str]:
-    """Fila de un perfil: (nombre, estado, PIN, creado).
+def pending_view(
+    *,
+    pin_set: bool,
+    db_count: int | None,
+    ok: bool,
+    error: str = "",
+    requests: list[dict] | None = None,
+    names: dict[str, str] | None = None,
+) -> tuple[str, list[tuple[str, str, str]]]:
+    """Qué decir de la cola de solicitudes: (frase del contador, filas).
 
-    El PIN se informa como booleano —«Con PIN» / «Sin PIN»— y nunca como valor:
-    el backend no lo manda en claro ni hasheado, y esta pantalla no inventa una
-    forma de mostrarlo.
+    Existe por un fallo concreto y no por gusto de partir la GUI: `_apply_profiles`
+    decidía la frase en línea y **nunca miraba si la consulta al backend había
+    fallado**, así que un 401 (administración sin PIN), un 403 (petición que no
+    viene del equipo) o un servidor caído se pintaban como «Sin solicitudes
+    pendientes» con la lista vacía — indistinguible de una cola realmente vacía.
+    Aquí los estados no se pueden confundir porque cada uno se decide aparte:
+
+    - **Sin PIN**: no se consulta al backend (fail-closed), pero el contador sí se
+      lee de la BD en solo-lectura. Si hay pendientes, se dice cuántas hay y que
+      hace falta el PIN para verlas y resolverlas: es la frase que faltaba cuando
+      la baja del alumno «no aparecía».
+    - **Sin PIN y sin poder leer la BD** (`db_count is None`): cerrada *y* sin
+      contador. Se admite que no se sabe.
+    - **Con PIN y consulta fallida**: el motivo, no un cero. `error` es la frase
+      que ya resuelve `AdminResult.message()` para 401/403/red.
+    - **Con PIN y consulta correcta**: el contador de las filas que se van a
+      pintar (`len(requests)`, para que el número y la lista no se contradigan) y
+      las filas vía `request_row`.
+
+    Función pura: sin tkinter, sin red. La GUI solo pinta lo que devuelve.
     """
-    status = str(profile.get("status") or "active")
+    rows = requests or []
+    if not pin_set:
+        if db_count is None:
+            return (
+                "🔒 Administración deshabilitada y no se pudo leer el contador "
+                "de solicitudes (¿BD no accesible?)",
+                [],
+            )
+        if db_count > 0:
+            return (
+                f"🗳️ {pending_summary(db_count)} · define el PIN de administración "
+                "para ver y resolverlas",
+                [],
+            )
+        return (
+            "🔒 Administración deshabilitada: define un PIN para ver y resolver "
+            "la cola",
+            [],
+        )
+    if not ok:
+        motivo = error or "el servidor no dio detalle"
+        return (f"⚠️ No se pudo consultar la cola: {motivo}", [])
     return (
-        "👤 " + str(profile.get("name") or ""),
-        PROFILE_STATUS_LABELS.get(status, status),
-        "🔑 Con PIN" if profile.get("has_pin") else "Sin PIN",
-        str(profile.get("created_at") or "").replace("T", " ")[:16],
+        pending_summary(len(rows)),
+        [request_row(request, names) for request in rows],
     )
 
 
@@ -186,9 +372,79 @@ def admin_state_label(pin_set: bool) -> str:
     if pin_set:
         return "🔐 Administración habilitada (PIN configurado)"
     return (
-        "🔒 Administración deshabilitada: define un PIN para poder crear, "
-        "desactivar o borrar perfiles"
+        "🔒 Administración deshabilitada: define un PIN para poder crear "
+        "cuentas, asignar credenciales, forzar bajas y purgar datos"
     )
+
+
+def smtp_state_label(configured: bool, has_password: bool) -> str:
+    """Estado del correo saliente, en una frase.
+
+    Se distinguen **tres** estados y no dos: «configurado» es tener host y
+    remitente; tener contraseña guardada es otra cosa (un servidor local de
+    reenvío no la necesita). Confundirlos mandaría al webmaster a buscar una
+    contraseña que su servidor no pide, o a creer que el correo funciona sin
+    remitente.
+    """
+    if not configured:
+        return (
+            "📭 Correo sin configurar: no se envía nada y la verificación la "
+            "sellamos a mano."
+        )
+    if has_password:
+        return "📬 Correo configurado (con contraseña guardada)."
+    return "📬 Correo configurado (el servidor no pide contraseña)."
+
+
+def smtp_reconcile_label(
+    local_configured: bool, has_password: bool, backend: dict | None
+) -> str:
+    """Frase del correo, conciliando lo que el launcher guarda y lo que el
+    servidor **en marcha** ve.
+
+    Son dos cosas distintas y por eso pueden discrepar, que es lo que esta función
+    existe para no esconder: el launcher escribe el JSON y le pasa los ajustes al
+    backend **al arrancarlo**, así que un cambio recién guardado no lo ve el
+    servidor hasta que reinicia —`_save_smtp` reinicia, pero la frase tiene que
+    decir la verdad también durante ese hueco—, y unas variables de entorno
+    puestas a mano no pasan por esta consola. Enseñar el estado local como si
+    fuera el del servidor es exactamente el error que V3.80.1 tuvo que arreglar en
+    la cola de solicitudes (un «cero» que no se había preguntado).
+
+    `backend` es la respuesta de `GET /api/admin/smtp`, o `None` cuando **no se
+    pudo preguntar** (sin PIN, servidor caído): ahí se enseña lo local y no se
+    afirma nada sobre el servidor.
+    """
+    base = smtp_state_label(local_configured, has_password)
+    if backend is None:
+        return base
+    if bool(backend.get("configured")) == local_configured:
+        return base
+    if local_configured:
+        return (
+            base + " El servidor en marcha todavía no lo ve: se aplica al arrancar."
+        )
+    return (
+        "📬 El servidor tiene correo configurado (variables de entorno), pero no "
+        "está guardado en esta consola: aquí no se puede gestionar."
+    )
+
+
+def purge_block_reason(user: dict) -> str:
+    """Por qué no se puede purgar todavía, o `""` si sí se puede.
+
+    El backend exige la cuenta **fuera de servicio** para purgar: borrar todo
+    rastro de una persona no se hace sin un paso previo revisable. La consola lo
+    comprueba antes de pedir la confirmación por nombre, para no hacer teclear un
+    nombre y luego rechazarlo.
+    """
+    status = str(user.get("status") or "active")
+    if status == "active":
+        return (
+            "Antes de purgar hay que dejar la cuenta fuera de servicio "
+            "(desactivarla o darle de baja) y comprobar que nadie la echa de menos."
+        )
+    return ""
 
 
 def interface_state(served: bool, dist_available: bool) -> str:

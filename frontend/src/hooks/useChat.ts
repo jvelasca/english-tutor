@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getModels, streamChat } from "../api/chat";
 import { completeLesson as completeLessonRequest } from "../api/academy";
-import { getSession, openSession, SessionPinError, setSessionPin } from "../api/session";
+import {
+  changeEmail as changeEmailApi,
+  changePassword as changePasswordApi,
+  closeSession,
+  createAccount as createAccountApi,
+  getSession,
+  openSession,
+  resendVerification as resendVerificationApi,
+  SessionPasswordError,
+  unenrollAccount,
+} from "../api/session";
 import {
   createConversation,
   deleteConversation,
@@ -19,6 +29,7 @@ import { getProgressHistory } from "../api/progress";
 import { getSettings, saveSettings } from "../api/settings";
 import { analyzeText, getEvents, getProfile } from "../api/learning";
 import { deriveTitle } from "../utils/title";
+import { ApiError } from "../api/client";
 import { turnTelemetry } from "../utils/telemetry";
 import { nextDefaultUserName } from "../utils/users";
 import { planSession } from "../utils/session";
@@ -54,10 +65,33 @@ const TUTOR_MODES: TutorMode[] = [
 ];
 
 /**
- * Por qué la puerta está pidiendo el PIN (V3.76). `null` = pidiéndolo por
- * primera vez (o tras un arranque, que es el caso normal de un perfil con PIN).
+ * Por qué la puerta está pidiendo la contraseña (V3.81; sustituye al PIN de
+ * V3.76). `null` = pidiéndola por primera vez (o tras un arranque, que es el caso
+ * normal de una cuenta con credencial).
  */
-export type PinFeedback = "pin-invalid" | "pin-throttled" | null;
+export type PasswordFeedback = "password-invalid" | "password-throttled" | null;
+
+/** Cómo terminó el alta de una cuenta desde la puerta. */
+export type CreateAccountOutcome =
+  | { ok: true; user: User }
+  | {
+      ok: false;
+      reason:
+        | "name-taken"
+        | "email-taken"
+        | "email-format"
+        | "password-format"
+        | "not-local"
+        | "error";
+    };
+
+/** Cómo terminó una acción del diálogo de cuenta. */
+export type AccountActionOutcome =
+  | { ok: true; user: User }
+  | {
+      ok: false;
+      reason: "password-invalid" | "password-required" | "invalid" | "error";
+    };
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -75,13 +109,25 @@ export function useChat() {
   // true cuando la lista de perfiles ya se ha cargado del backend (permite al
   // App distinguir "cargando" de "no hay ningún perfil seleccionado").
   const [usersLoaded, setUsersLoaded] = useState(false);
-  // V3.76 (Fase 3 del P0): perfil que está esperando su PIN y por qué. Que el
-  // PIN se pida es un estado de la **app**, no de un componente: así los tres
-  // caminos que abren sesión (arranque, selector y alta) piden lo mismo y la
-  // puerta solo tiene que pintarlo.
-  const [pinPromptUserId, setPinPromptUserId] = useState<string | null>(null);
-  const [pinFeedback, setPinFeedback] = useState<PinFeedback>(null);
-  const [pinRetryAfter, setPinRetryAfter] = useState(0);
+  // V3.80.2: ¿falló la sonda de usuarios? La puerta lo usa para ofrecer
+  // «Reintentar» en vez de decir «no hay perfiles»: confundir las dos cosas es
+  // exactamente lo que dejaba al alumno sin salida.
+  const [usersLoadFailed, setUsersLoadFailed] = useState(false);
+  // V3.81 (Fase 3 del P0): cuenta que está esperando su contraseña y por qué.
+  // Que la contraseña se pida es un estado de la **app**, no de un componente:
+  // así los tres caminos que abren sesión (arranque, selector y alta) piden lo
+  // mismo y la puerta solo tiene que pintarlo.
+  const [passwordPromptUserId, setPasswordPromptUserId] = useState<string | null>(
+    null,
+  );
+  const [passwordFeedback, setPasswordFeedback] =
+    useState<PasswordFeedback>(null);
+  const [passwordRetryAfter, setPasswordRetryAfter] = useState(0);
+  // V3.81: la contraseña vigente es temporal (la puso el webmaster) y hay que
+  // cambiarla antes de usar nada. Se aprende de la respuesta del servidor, nunca
+  // se adivina; el servidor lo hace cumplir igual con `403
+  // PASSWORD_CHANGE_REQUIRED`, esto solo es para no llegar a ese 403.
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [history, setHistory] = useState<ProgressHistory | null>(null);
   const [events, setEvents] = useState<LearningEvent[]>([]);
   const [bucket, setBucket] = useState<Bucket>("week");
@@ -189,91 +235,109 @@ export function useChat() {
   }, [models, model, favoriteModel]);
 
   /**
-   * Abre sesión para un perfil y, si el servidor pide PIN, deja la app en el
-   * paso de PIN en vez de fallar en silencio (V3.76).
+   * Abre sesión para una cuenta y, si el servidor pide contraseña, deja la app en
+   * el paso de contraseña en vez de fallar en silencio (V3.81; misma pieza que en
+   * V3.76 pedía el PIN).
    *
-   * Es el **único** camino que abre sesión: el arranque, el selector de perfil y
-   * el alta comparten esta función, así que la política del PIN no puede quedar
-   * despareja entre ellos. Devuelve si el perfil quedó activo.
+   * Es el **único** camino que abre sesión: el arranque, el selector de cuenta y
+   * el alta comparten esta función, así que la política de credencial no puede
+   * quedar despareja entre ellos. Devuelve si la cuenta quedó activa.
    */
   const openProfile = useCallback(
-    async (userId: string, pin?: string): Promise<boolean> => {
+    async (userId: string, password?: string): Promise<boolean> => {
       try {
-        const user = await openSession(userId, pin);
-        setPinPromptUserId(null);
-        setPinFeedback(null);
-        setPinRetryAfter(0);
+        const user = await openSession(userId, password);
+        setPasswordPromptUserId(null);
+        setPasswordFeedback(null);
+        setPasswordRetryAfter(0);
+        setMustChangePassword(user.must_change_password === true);
         setCurrentUserId(user.id);
         return true;
       } catch (err) {
-        if (err instanceof SessionPinError) {
-          // «Falta el PIN» no es un error que pintar: es el paso siguiente.
-          setPinPromptUserId(userId);
-          setPinFeedback(
-            err.reason === "pin-required"
+        if (err instanceof SessionPasswordError) {
+          // «Falta la contraseña» no es un error que pintar: es el paso siguiente.
+          setPasswordPromptUserId(userId);
+          setPasswordFeedback(
+            err.reason === "password-required"
               ? null
-              : err.reason === "pin-throttled"
-                ? "pin-throttled"
-                : "pin-invalid",
+              : err.reason === "password-throttled"
+                ? "password-throttled"
+                : "password-invalid",
           );
-          setPinRetryAfter(err.retryAfterSeconds);
+          setPasswordRetryAfter(err.retryAfterSeconds);
           return false;
         }
-        /* backend no disponible: no se cambia de perfil ni se pide PIN */
+        /* backend no disponible: no se cambia de cuenta ni se pide contraseña */
         return false;
       }
     },
     [],
   );
 
-  const cancelPin = useCallback(() => {
-    setPinPromptUserId(null);
-    setPinFeedback(null);
-    setPinRetryAfter(0);
+  const cancelPassword = useCallback(() => {
+    setPasswordPromptUserId(null);
+    setPasswordFeedback(null);
+    setPasswordRetryAfter(0);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // V3.75 (Fase 2 del P0): quién es el perfil activo lo dice **el
-        // servidor**, no el navegador. La sesión viaja en una cookie
-        // `et_session` HttpOnly que JavaScript no puede leer (ese es el punto:
-        // antes bastaba con reescribir `et_user_id` para suplantar un perfil),
-        // así que se **pregunta** con `GET /api/session`.
-        const [existing, session] = await Promise.all([listUsers(), getSession()]);
-        if (cancelled) return;
-        setUsers(existing);
-        // Resolución del perfil inicial (sesión del servidor → perfil único → null)
-        // y, con ella, si hay que **abrir** sesión o basta con adoptarla. La
-        // decisión es pura y tiene test propio (`utils/session.ts`): es el punto
-        // donde un fallo se ve como «todo normal» mientras cada petición da 401.
-        const plan = planSession(existing, session?.id ?? null);
-        if (plan.action === "none") return;
-        if (plan.action === "adopt") {
-          setCurrentUserId(plan.userId);
-          return;
-        }
-        if (plan.action === "pin") {
-          // V3.76: el perfil tiene PIN. No se lanza un `POST` condenado a 401
-          // —su error lo tragaría el `catch` de abajo y el arranque se vería
-          // como «no ha pasado nada»—: se pide el PIN y se espera.
-          setPinPromptUserId(plan.userId);
-          return;
-        }
-        // Perfil resuelto **sin** sesión abierta (equipo recién instalado, o tras
-        // un `DELETE /api/session`): se abre aquí antes de pintar nada.
+  /**
+   * Carga los usuarios y resuelve el perfil inicial.
+   *
+   * V3.80.2: las dos sondas viajan juntas en el tiempo pero **no** comparten
+   * destino. Antes un `Promise.all` las ataba: un 404 de `GET /api/session`
+   * (sesión abierta para un usuario que el webmaster acaba de purgar desde el
+   * lanzador) rechazaba la promesa conjunta y `setUsers` no llegaba a
+   * ejecutarse, así que la app caía en «Elige tu perfil» con la lista **vacía**
+   * y sin forma de salir. Con `allSettled` la lista se puebla igual, y el fallo
+   * de la sonda se declara en `usersLoadFailed` para que la puerta pueda ofrecer
+   * reintentar en vez de mentir con un «no hay perfiles».
+   *
+   * Se expone como `reloadUsers` porque ese reintento es del alumno: sin él, un
+   * backend que tardó en arrancar dejaría la puerta otra vez sin salida.
+   */
+  const loadUsers = useCallback(async () => {
+    setUsersLoaded(false);
+    try {
+      // V3.75 (Fase 2 del P0): quién es el perfil activo lo dice **el
+      // servidor**, no el navegador. La sesión viaja en una cookie
+      // `et_session` HttpOnly que JavaScript no puede leer (ese es el punto:
+      // antes bastaba con reescribir `et_user_id` para suplantar un perfil),
+      // así que se **pregunta** con `GET /api/session`.
+      const [usersResult, sessionResult] = await Promise.allSettled([
+        listUsers(),
+        getSession(),
+      ]);
+      const existing = usersResult.status === "fulfilled" ? usersResult.value : [];
+      const session =
+        sessionResult.status === "fulfilled" ? sessionResult.value : null;
+      setUsers(existing);
+      setUsersLoadFailed(usersResult.status === "rejected");
+      // Resolución del perfil inicial (sesión del servidor → perfil único → null)
+      // y, con ella, si hay que **abrir** sesión o basta con adoptarla. La
+      // decisión es pura y tiene test propio (`utils/session.ts`): es el punto
+      // donde un fallo se ve como «todo normal» mientras cada petición da 401.
+      const plan = planSession(existing, session?.id ?? null);
+      if (plan.action === "adopt") {
+        setCurrentUserId(plan.userId);
+        setMustChangePassword(session?.must_change_password === true);
+      } else if (plan.action === "password") {
+        // V3.81: la cuenta tiene contraseña. No se lanza un `POST` condenado a
+        // 401 —su error lo tragaría el `catch` de abajo y el arranque se vería
+        // como «no ha pasado nada»—: se pide la contraseña y se espera.
+        setPasswordPromptUserId(plan.userId);
+      } else if (plan.action === "open") {
+        // Cuenta resuelta **sin** sesión abierta y **sin** credencial (el caso
+        // heredado): se abre aquí antes de pintar nada.
         await openProfile(plan.userId);
-      } catch {
-        /* backend no disponible: se queda sin perfiles cargados */
-      } finally {
-        if (!cancelled) setUsersLoaded(true);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } finally {
+      setUsersLoaded(true);
+    }
   }, [openProfile]);
+
+  useEffect(() => {
+    void loadUsers();
+  }, [loadUsers]);
 
   // Carga las preferencias persistidas del usuario (modelo, modo, layout).
   useEffect(() => {
@@ -437,12 +501,12 @@ export function useChat() {
 
   const selectUser = useCallback(
     (userId: string) => {
-      // V3.75: elegir perfil es **abrir sesión** en el servidor. Antes esto
+      // V3.75: elegir usuario es **abrir sesión** en el servidor. Antes esto
       // escribía la cookie `et_user_id`, que el propio cliente podía reescribir
-      // para suplantar a otro perfil; ahora la firma el servidor y el estado local
-      // se fija con el perfil que **él** devuelve, no con lo que pide el cliente.
-      // V3.76: si el perfil tiene PIN, el servidor responde 401 `PIN_REQUIRED` y
-      // `openProfile` deja la app en el paso de PIN.
+      // para suplantar a otra cuenta; ahora la firma el servidor y el estado local
+      // se fija con la cuenta que **él** devuelve, no con lo que pide el cliente.
+      // V3.81: si la cuenta tiene contraseña, el servidor responde 401
+      // `PASSWORD_REQUIRED` y `openProfile` deja la app en el paso de contraseña.
       void openProfile(userId);
     },
     [openProfile],
@@ -505,30 +569,125 @@ export function useChat() {
   );
 
   /**
-   * Pone, cambia o retira el PIN del perfil de la sesión (V3.76).
+   * Alta de una cuenta nueva desde la propia puerta (V3.81).
    *
-   * Devuelve el resultado para que Ajustes pueda decir qué pasó sin inventarse
-   * los mensajes: `ok`, PIN actual incorrecto, freno activo o avería. El perfil
-   * devuelto trae `has_pin` ya actualizado, y con él se refresca la lista local:
-   * la puerta tiene que saber si preguntar sin volver a pedir `GET /api/users`.
+   * Sustituye al «pide un perfil» de V3.77 como camino principal: cualquiera que
+   * esté delante de este equipo puede crearse una cuenta con contraseña y email.
+   * Si el backend responde 403 es que la petición no viene del propio equipo (modo
+   * LAN): entonces lo que toca es **pedir**, y el componente ya ofrece esa vía.
+   *
+   * Al terminar bien, la cuenta queda con sesión abierta: quien acaba de
+   * registrarse no tiene que volver a escribir lo que ya escribió.
    */
-  const setProfilePin = useCallback(
+  const createAccountForGate = useCallback(
     async (
-      currentPin: string | null,
-      newPin: string,
-    ): Promise<"ok" | "pin-invalid" | "pin-throttled" | "error"> => {
+      name: string,
+      email: string,
+      password: string,
+    ): Promise<CreateAccountOutcome> => {
       try {
-        const updated = await setSessionPin(currentPin, newPin);
-        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-        return "ok";
+        const user = await createAccountApi(name.trim(), email.trim(), password);
+        await openProfile(user.id, password);
+        return { ok: true, user };
       } catch (err) {
-        if (err instanceof SessionPinError) {
-          return err.reason === "pin-throttled" ? "pin-throttled" : "pin-invalid";
+        if (err instanceof ApiError) {
+          const mapped: Record<string, CreateAccountOutcome & { ok: false }> = {
+            USER_NAME_TAKEN: { ok: false, reason: "name-taken" },
+            EMAIL_TAKEN: { ok: false, reason: "email-taken" },
+            EMAIL_FORMAT: { ok: false, reason: "email-format" },
+            PASSWORD_FORMAT: { ok: false, reason: "password-format" },
+          };
+          if (err.status === 403) return { ok: false, reason: "not-local" };
+          const hit = mapped[err.detail];
+          if (hit) return hit;
         }
-        return "error";
+        return { ok: false, reason: "error" };
+      }
+    },
+    [openProfile],
+  );
+
+  /**
+   * Salir: cierra la sesión en el servidor (caduca la cookie) y vacía el estado
+   * local para que la puerta vuelva a pedir cuenta.
+   *
+   * V3.81 lo usa por primera vez: `closeSession()` existía desde V3.75 sin que
+   * nadie la llamara, así que en un producto con selector de cuentas compartido en
+   * casa **no había forma de salir** salvo borrar las cookies a mano.
+   */
+  const signOut = useCallback(async () => {
+    await closeSession().catch(() => {
+      /* sin backend la cookie también caduca sola: la UI sale igual */
+    });
+    setCurrentUserId(null);
+    setPasswordPromptUserId(null);
+    setPasswordFeedback(null);
+    setPasswordRetryAfter(0);
+    setMustChangePassword(false);
+    await loadUsers();
+  }, [loadUsers]);
+
+  /**
+   * Cambia la contraseña de la cuenta de la sesión. Al terminar, la app relee la
+   * cuenta: si la contraseña era temporal, el aviso de cambio forzado desaparece
+   * con la misma respuesta que lo levantó.
+   */
+  const changePasswordNow = useCallback(
+    async (
+      currentPassword: string | null,
+      newPassword: string,
+    ): Promise<AccountActionOutcome> => {
+      try {
+        const updated = await changePasswordApi(currentPassword, newPassword);
+        setMustChangePassword(updated.must_change_password === true);
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        return { ok: true, user: updated };
+      } catch (err) {
+        return { ok: false, reason: accountFailure(err) };
       }
     },
     [],
+  );
+
+  /** Cambia el email de la cuenta de la sesión (exige la contraseña). */
+  const changeEmailNow = useCallback(
+    async (password: string, email: string): Promise<AccountActionOutcome> => {
+      try {
+        const updated = await changeEmailApi(password, email.trim());
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        return { ok: true, user: updated };
+      } catch (err) {
+        return { ok: false, reason: accountFailure(err) };
+      }
+    },
+    [],
+  );
+
+  /** Reenvía el enlace de verificación. `sent: false` = no hay SMTP (híbrido). */
+  const resendVerificationNow = useCallback(async (): Promise<boolean> => {
+    const res = await resendVerificationApi();
+    return res.sent;
+  }, []);
+
+  /**
+   * Baja autoservicio: cierra la cuenta (sin borrar nada) y deja la app en la
+   * puerta. Se limpia el estado local igual que en `signOut` porque el servidor ya
+   * retiró la cookie: seguir pintando la app con una sesión que no existe sería
+   * mentir hasta el siguiente 403.
+   */
+  const unenrollNow = useCallback(
+    async (password: string): Promise<AccountActionOutcome> => {
+      try {
+        const res = await unenrollAccount(password);
+        setCurrentUserId(null);
+        setMustChangePassword(false);
+        await loadUsers();
+        return { ok: true, user: res.user };
+      } catch (err) {
+        return { ok: false, reason: accountFailure(err) };
+      }
+    },
+    [loadUsers],
   );
 
   // V3.77: la app ya no crea perfiles. Lo que hace es **pedirlos**, y el
@@ -705,14 +864,25 @@ export function useChat() {
     users,
     currentUserId,
     usersLoaded,
-    // V3.76 (Fase 3 del P0): estado del paso de PIN y las acciones que lo
-    // cierran. La puerta de perfil los pinta; el resto de la app no los toca.
-    pinPromptUserId,
-    pinFeedback,
-    pinRetryAfter,
-    submitPin: openProfile,
-    cancelPin,
-    setProfilePin,
+    // V3.80.2: la puerta distingue «no hay usuarios» de «no se pudo cargar» y
+    // puede volver a intentarlo sin recargar la página.
+    usersLoadFailed,
+    reloadUsers: loadUsers,
+    // V3.81 (Fase 3 del P0): estado del paso de contraseña y las acciones que lo
+    // cierran, más el ciclo de vida de la cuenta. La puerta de entrada y el menú
+    // de cuenta los pintan; el resto de la app no los toca.
+    passwordPromptUserId,
+    passwordFeedback,
+    passwordRetryAfter,
+    submitPassword: openProfile,
+    cancelPassword,
+    createAccountForGate,
+    mustChangePassword,
+    changePasswordNow,
+    changeEmailNow,
+    resendVerificationNow,
+    unenrollNow,
+    signOut,
     bottomRef,
     send,
     sendText,
@@ -739,3 +909,30 @@ export function useChat() {
 }
 
 export type ChatApi = ReturnType<typeof useChat>;
+
+/**
+ * Traduce un fallo de la API al desenlace que el diálogo de cuenta sabe pintar.
+ *
+ * Se decide aquí, una sola vez, en vez de en cada componente: `PASSWORD_INVALID`
+ * (la contraseña actual no cuadra) y `PASSWORD_REQUIRED` (hace falta y no llegó)
+ * son desenlaces **de producto** y merecen su propio texto; el resto es avería.
+ * Un `PASSWORD_THROTTLED` cae en `password-invalid` a propósito: el mensaje que
+ * la UI tiene para él habla del freno, y decir «espera un momento» es más útil
+ * que «algo falló».
+ */
+function accountFailure(err: unknown): "password-invalid" | "password-required" | "invalid" | "error" {
+  if (err instanceof ApiError) {
+    if (err.detail === "PASSWORD_INVALID" || err.detail === "PASSWORD_THROTTLED") {
+      return "password-invalid";
+    }
+    if (err.detail === "PASSWORD_REQUIRED") return "password-required";
+    if (
+      err.detail === "EMAIL_FORMAT" ||
+      err.detail === "EMAIL_TAKEN" ||
+      err.detail === "PASSWORD_FORMAT"
+    ) {
+      return "invalid";
+    }
+  }
+  return "error";
+}

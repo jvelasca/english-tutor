@@ -42,9 +42,16 @@ _DB_ARCNAME = "data/tutor.db"
 # - `session.secret` (V3.75): la clave con la que se firman las sesiones. Un ZIP
 #   sin cifrar con esta clave dentro permite **forjar sesiones** para cualquier
 #   perfil, así que es la misma familia de secreto que `key.pem`.
-# En la restauración se conservan los tres: son estado del equipo, y borrarlos
-# dejaría al producto sin HTTPS, sin copias o sin poder validar una sesión abierta.
-_NON_PORTABLE_TOP_NAMES = frozenset({"backups", "certs", "session.secret"})
+# - `mail.secret` (V3.81): la contraseña del SMTP. En una copia sin cifrar es una
+#   credencial de correo en claro, y una copia puede acabar en un USB, en una
+#   nube o en un correo — que es exactamente el material con el que se ataca esa
+#   cuenta. Se queda fuera por el mismo motivo que la clave TLS.
+# En la restauración se conservan los cuatro: son estado del equipo, y borrarlos
+# dejaría al producto sin HTTPS, sin copias, sin poder validar una sesión abierta
+# o sin poder mandar correo.
+_NON_PORTABLE_TOP_NAMES = frozenset(
+    {"backups", "certs", "session.secret", "mail.secret"}
+)
 
 # Cotas de la restauración. El tope de 512 MB del router es del ZIP
 # **comprimido**; sin cota del expandido, un ZIP de pocos MB con ratio alto llena

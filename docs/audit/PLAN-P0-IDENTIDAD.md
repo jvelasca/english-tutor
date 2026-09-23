@@ -5,18 +5,19 @@
 > diseño concreto que se propone ejecutar, con su coste, su orden y sus criterios
 > de aceptación.
 >
-> **Estado:** **Fase 1 PUBLICADA como `v3.74.0`** y **Fase 2 IMPLEMENTADA en el
-> árbol de `v3.75.0`** (§14), junto con los dos P3 que quedaban abiertos
-> (`VG-N5` y `VG-N6`). La **Fase 3** (autenticación real) sigue fuera y sigue
-> siendo una decisión de producto. La congelación de la candidata `v3.75.8`
-> (2026-09-20) volvió a verificarla: el briefing para cerrarla está en **§15**.
+> **Estado:** **Fase 1 PUBLICADA como `v3.74.0`**, **Fase 2 IMPLEMENTADA en
+> `v3.75.0`** (§14) y **Fase 3 IMPLEMENTADA en `v3.81.0`** (§16). El briefing para
+> decidirla es **§15**; su primera respuesta fue la mitigación opt-in de §15.1
+> (`v3.76.0`) y la segunda, **cuentas reales** con la deuda declarada, está en
+> **§16**.
 >
 > **Punto de partida:** `v3.74.0` · árbol con el lote V3.73.7 (`v3.73.7`) **y** la
 > Fase 1 (`v3.74.0`) publicados **por separado**, cada uno medido en su propio
 > árbol (3.73.7: 2817 / 717 / 113 · 3.74.0: 2840 / 719 / 139).
 >
-> **Alcance aprobado:** **Fase 1 + Fase 2.** La Fase 3 (autenticación real) queda
-> fuera y requiere decisión de producto.
+> **Alcance aprobado:** **Fase 1 + Fase 2.** (La Fase 3 quedó **fuera** en el
+> alcance original por ser decisión de producto; se aprobó después y está
+> implementada en `v3.81.0`, §16.)
 >
 > **Fecha:** 2026-09-18 · **Autor:** agente de la sesión de auditoría.
 
@@ -736,3 +737,69 @@ fondo —**¿tendrá el producto cuentas?**— **no** se ha tomado y sigue en
 - `GET /api/users` sigue enumerando nombres (ahora con `has_pin`).
 - El freno vive **en memoria del proceso**: un reinicio lo vacía.
 - Quien reciba un backup puede atacar el PIN **sin el freno** (fuera de línea).
+
+---
+
+## 16 · Fase 3 implementada — cuentas reales (2026-09-23, `v3.81.0`)
+
+> **Estado: Fase 3 CERRADA**, con una deuda declarada que se enumera abajo. El
+> gerente decidió (2026-09-22) que el producto **sí tiene cuentas**: nombre +
+> email + contraseña, registro autoservicio, baja autoservicio y una consola de
+> gestión con la última palabra. Notas completas en `release-notes-v3.81.0.md`.
+
+**La decisión, en cinco líneas.**
+
+1. **Credencial por cuenta** (contraseña), no por dispositivo ni PIN: es la
+   respuesta a «¿tendrá el producto cuentas?», la pregunta que §15 eligió no
+   tomar y que §15.1 dejó aparcada.
+2. **Registro autoservicio desde el propio equipo**: cualquiera puede crearse una
+   cuenta y empezar a usar la app; por la red se sigue **solicitando**.
+3. **El email es señal, no muro**: SMTP opcional; sin SMTP el webmaster sella la
+   verificación a mano y la UI lo dice con esas palabras.
+4. **Darse de baja no borra nada**: cierra la cuenta y sus sesiones; purgar es del
+   webmaster, con copia previa y confirmación por nombre.
+5. **El PIN desaparece** como concepto: `PUT /api/session/pin` se retira y
+   `test_pin.py` se elimina; `pin_hash` se conserva en la tabla sin leerse.
+
+**Lo que cambia en el contrato y en el código.**
+
+| Pieza | Antes (§15.1) | Ahora (`v3.81.0`) |
+|---|---|---|
+| Abrir sesión | `POST /api/session {user_id}` + PIN **opcional** | exige `password` si la cuenta tiene credencial: 401 `PASSWORD_REQUIRED` / `PASSWORD_INVALID`, 429 `PASSWORD_THROTTLED` |
+| Alta | del webmaster (por LAN se solicita) | **registro autoservicio** en loopback (`POST /api/users`) + solicitud por red |
+| Credencial | `services/pins.py` (PIN 4-6 dígitos) | `services/credentials.py` (PBKDF2-HMAC-SHA256, política, freno por cuenta y tokens de email) |
+| Identidad de la cuenta | nombre | nombre + **email** (PII nueva), con verificación opcional por token |
+| Baja | no existía | `POST /api/account/unenroll`: autoservicio, exige la contraseña, **no borra** |
+| Revocación | freno en memoria | **época de autenticación** (`users.auth_epoch`, comprobada en `dependencies.current_user`): cambiar la contraseña o forzar la baja tumban las sesiones vivas al instante |
+| Contraseña temporal | — | `must_change_password` + **403 `PASSWORD_CHANGE_REQUIRED`** en cada petición hasta cambiarla |
+| Gestión | panel de perfiles | consola de **Usuarios**: cola de solicitudes, alta, credenciales, verificación manual, activar/desactivar, baja forzada con motivo, historial (`user_events`), purga y SMTP |
+| Superficie sin sesión | 1 escritura (`profile-requests`) | **4 declaradas** (`users`, `account/verify`, `session`, `profile-requests`) con candado en `test_public_surface.py` |
+| Red saliente | ninguna | **correo** (segunda excepción declarada en `RUNTIME_TOUCHPOINTS`, fail-closed) |
+
+**Lo que queda abierto (declarado, no maquillado).**
+
+1. **Las cuentas heredadas sin credencial siguen entrando sin contraseña.**
+   `password_hash == ''` abre como siempre, para no dejar a nadie fuera de sus
+   datos. El **P0 sigue abierto para ellas**: la consola las enseña como tarea
+   pendiente y el objetivo es llevarlas a cero.
+2. **`GET /api/users` sigue enumerando nombres** sin sesión (la puerta es un
+   selector). Se recorta el **email** de las demás cuentas; los nombres no.
+3. **No hay recuperación de contraseña por correo**: la restablece el webmaster
+   desde la consola y la entrega como contraseña **temporal**.
+4. **No hay segundo factor** ni verificación **obligatoria** para usar la app.
+5. **El hash de la contraseña sí viaja en el backup** (es estado de la cuenta);
+   `session.secret` y `mail.secret` no.
+6. **El freno vive en memoria del proceso** y quien tenga un backup puede
+   atacarlo fuera de línea (mismo límite que §15.1).
+7. **El correo saliente depende de que el webmaster configure SMTP**; sin él la
+   app funciona igual y la verificación es manual.
+
+**Pregunta 3 de §15 (disparador de reapertura), cerrada.** El disparador era
+«que el producto tenga que saber quién es una persona». Se ha cruzado: un email y
+una contraseña son identidad de persona, así que la Fase 3 se ha implementado. El
+emparejamiento por **dispositivo** sigue **descartado**.
+
+**Verificación.** En `release-notes-v3.81.0.md`: suites completas (backend,
+frontend, launcher), `ruff`/`tsc`, gates y consistencia de versiones, **mordida**
+de los candados nuevos y prueba manual end-to-end sobre una **copia** de la BD
+real.

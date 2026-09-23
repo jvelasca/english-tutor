@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 /**
- * Puerta de perfil con PIN (V3.76, Fase 3 del P0 de identidad).
+ * Puerta de entrada: elegir cuenta, entrar con contraseña o crear una (V3.81).
  *
- * Lo que se fija aquí no es «hay un campo de PIN», sino que la puerta **no
- * promete lo que no puede cumplir**: no deja enviar un PIN con mala forma (el
- * backend lo rechazaría con 400), no se queda muda cuando el PIN no cuadra, y
- * ofrece volver en vez de atrapar al alumno en la pantalla.
+ * Lo que se fija aquí no es «hay un campo de contraseña», sino que la puerta **no
+ * promete lo que no puede cumplir**: no deja enviar una contraseña con mala forma
+ * (el backend la rechazaría con 400), no se queda muda cuando no cuadra, no ofrece
+ * crear una cuenta desde la LAN (fuera del equipo el backend responde 403) y no
+ * atrapa a nadie en la pantalla.
  *
- * Quién decide que hace falta PIN es el servidor: estos tests reciben el estado
- * ya resuelto por props (que es como se lo pasa `useChat`), porque lo que se
+ * Quién decide que hace falta contraseña es el servidor: estos tests reciben el
+ * estado ya resuelto por props (que es como se lo pasa `useChat`), porque lo que se
  * prueba es el contrato de la vista.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,14 +18,14 @@ import { I18nProvider } from "../hooks/useI18n";
 import type { ProfileRequest, User } from "../types/api";
 import { ProfileGate } from "./ProfileGate";
 
-function user(id: string, name: string, hasPin = false): User {
+function user(id: string, name: string, hasPassword = false): User {
   return {
     id,
     name,
     avatar_color: "",
     avatar_emoji: "",
     avatar_image: "",
-    has_pin: hasPin,
+    has_password: hasPassword,
     created_at: "2026-01-01T00:00:00Z",
   };
 }
@@ -61,85 +62,175 @@ const PEDIDA: ProfileRequest = {
   resolved_user_id: "",
 };
 
-describe("ProfileGate · lista de perfiles", () => {
-  it("elegir un perfil avisa con su id", () => {
+describe("ProfileGate · lista de cuentas", () => {
+  it("elegir una cuenta avisa con su id", () => {
     const onSelect = vi.fn();
     renderGate({ onSelect });
     fireEvent.click(screen.getByRole("option", { name: /Beto/ }));
     expect(onSelect).toHaveBeenCalledWith("b");
   });
 
-  it("sin paso de PIN no aparece el campo", () => {
+  it("sin paso de contraseña no aparece el campo", () => {
     renderGate();
-    expect(screen.queryByLabelText("PIN")).toBeNull();
+    expect(screen.queryByLabelText("Password")).toBeNull();
   });
 });
 
-describe("ProfileGate · paso de PIN (V3.76)", () => {
-  const pinInput = () => screen.getByLabelText("PIN") as HTMLInputElement;
-  const submit = () => screen.getByRole("button", { name: "Continue" });
+describe("ProfileGate · paso de contraseña (V3.81)", () => {
+  const passwordInput = () => screen.getByLabelText("Password") as HTMLInputElement;
+  const submit = () => screen.getByRole("button", { name: "Sign in" });
 
-  it("pide el PIN del perfil que lo tiene", () => {
-    renderGate({ pinUser: ANA });
+  it("pide la contraseña de la cuenta que la tiene", () => {
+    renderGate({ passwordUser: ANA });
     expect(screen.getByText("Ana")).toBeTruthy();
-    expect(pinInput().type).toBe("password");
-    // El formulario de «crear perfil» no se ofrece mientras se teclea el PIN:
-    // no son dos cosas que se puedan hacer a la vez.
+    expect(passwordInput().type).toBe("password");
+    // El formulario de «pedir cuenta» no se ofrece mientras se teclea: no son dos
+    // cosas que se puedan hacer a la vez.
     expect(screen.queryByLabelText("Name")).toBeNull();
   });
 
-  it("no deja enviar hasta que el PIN tiene 4 dígitos", () => {
-    renderGate({ pinUser: ANA, onSubmitPin: async () => false });
+  it("no deja enviar con el campo vacío", () => {
+    renderGate({ passwordUser: ANA, onSubmitPassword: async () => false });
     expect((submit() as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(pinInput(), { target: { value: "123" } });
-    expect((submit() as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(pinInput(), { target: { value: "1234" } });
+    fireEvent.change(passwordInput(), { target: { value: "c" } });
     expect((submit() as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("solo acepta dígitos y como mucho 6", () => {
-    renderGate({ pinUser: ANA });
-    fireEvent.change(pinInput(), { target: { value: "12a34b5678" } });
-    expect(pinInput().value).toBe("123456");
-  });
-
-  it("envía el PIN del perfil correcto", async () => {
-    const onSubmitPin = vi.fn().mockResolvedValue(true);
-    renderGate({ pinUser: ANA, onSubmitPin });
-    fireEvent.change(pinInput(), { target: { value: "4821" } });
+  it("envía la contraseña de la cuenta correcta", async () => {
+    const onSubmitPassword = vi.fn().mockResolvedValue(true);
+    renderGate({ passwordUser: ANA, onSubmitPassword });
+    fireEvent.change(passwordInput(), { target: { value: "caballo-bateria" } });
     fireEvent.click(submit());
-    expect(onSubmitPin).toHaveBeenCalledWith("a", "4821");
+    expect(onSubmitPassword).toHaveBeenCalledWith("a", "caballo-bateria");
   });
 
-  it("un PIN incorrecto no se queda en silencio", () => {
-    renderGate({ pinUser: ANA, pinFeedback: "pin-invalid" });
-    expect(screen.getByText("That PIN is not right.")).toBeTruthy();
+  it("una contraseña incorrecta no se queda en silencio", () => {
+    renderGate({ passwordUser: ANA, passwordFeedback: "password-invalid" });
+    expect(screen.getByText("That password is not right.")).toBeTruthy();
   });
 
   it("el freno se explica con su propio mensaje", () => {
-    renderGate({ pinUser: ANA, pinFeedback: "pin-throttled" });
+    renderGate({ passwordUser: ANA, passwordFeedback: "password-throttled" });
     expect(
       screen.getByText("Too many attempts. Wait a moment and try again."),
     ).toBeTruthy();
   });
 
-  it("se puede volver sin quedarse atrapado en el paso de PIN", () => {
-    const onCancelPin = vi.fn();
-    renderGate({ pinUser: ANA, onCancelPin });
-    fireEvent.click(screen.getByRole("button", { name: "Back to profiles" }));
-    expect(onCancelPin).toHaveBeenCalled();
+  it("dice quién puede restablecerla, porque no hay correo garantizado", () => {
+    renderGate({ passwordUser: ANA });
+    // Dos textos hablan del webmaster en este paso (el aviso y la ayuda). Se fija
+    // el de la recuperación, que es el que dice qué hacer si no te acuerdas.
+    expect(screen.getByText(/resets it from the management console/)).toBeTruthy();
+  });
+
+  it("se puede volver sin quedarse atrapado en el paso de contraseña", () => {
+    const onCancelPassword = vi.fn();
+    renderGate({ passwordUser: ANA, onCancelPassword });
+    fireEvent.click(screen.getByRole("button", { name: "Back to users" }));
+    expect(onCancelPassword).toHaveBeenCalled();
   });
 });
 
-describe("ProfileGate · pedir un perfil (V3.77)", () => {
-  const nameInput = () => screen.getByLabelText("Name") as HTMLInputElement;
-  const submit = () => screen.getByRole("button", { name: "Ask for a profile" });
+describe("ProfileGate · crear una cuenta en el equipo (V3.81)", () => {
+  const openCreate = () =>
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-  it("no ofrece «crear»: la app pide, no crea", () => {
-    // La ruta que creaba perfiles desde el navegador ya no es la del alumno
-    // (el backend la cierra fuera del equipo), así que la puerta no la promete.
+  it("no ofrece crear cuenta desde la LAN: el backend la cerraría con 403", () => {
+    renderGate({ canCreateAccount: false, onCreateAccount: async () => ({ ok: true, user: BETO }) });
+    expect(screen.queryByRole("button", { name: "Create account" })).toBeNull();
+  });
+
+  it("en el equipo ofrece el alta y pide nombre, email y contraseña", () => {
+    renderGate({
+      canCreateAccount: true,
+      onCreateAccount: async () => ({ ok: true, user: BETO }),
+    });
+    openCreate();
+    expect(screen.getByLabelText("Name")).toBeTruthy();
+    expect(screen.getByLabelText("Email")).toBeTruthy();
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+    expect(screen.getByLabelText("Repeat the password")).toBeTruthy();
+  });
+
+  it("no manda el alta con dos contraseñas distintas", async () => {
+    const onCreateAccount = vi.fn();
+    renderGate({ canCreateAccount: true, onCreateAccount });
+    openCreate();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "marta@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "caballo-bateria" },
+    });
+    fireEvent.change(screen.getByLabelText("Repeat the password"), {
+      target: { value: "caballo-bateriaX" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(onCreateAccount).not.toHaveBeenCalled();
+    expect(await screen.findByText(/do not match/)).toBeTruthy();
+  });
+
+  it("no manda el alta con un email que no lo es", async () => {
+    const onCreateAccount = vi.fn();
+    renderGate({ canCreateAccount: true, onCreateAccount });
+    openCreate();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "marta" } });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "caballo-bateria" },
+    });
+    fireEvent.change(screen.getByLabelText("Repeat the password"), {
+      target: { value: "caballo-bateria" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(onCreateAccount).not.toHaveBeenCalled();
+    expect(await screen.findByText(/does not look valid/)).toBeTruthy();
+  });
+
+  it("no manda el alta con una contraseña corta", async () => {
+    const onCreateAccount = vi.fn();
+    renderGate({ canCreateAccount: true, onCreateAccount });
+    openCreate();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "marta@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "corta" } });
+    fireEvent.change(screen.getByLabelText("Repeat the password"), {
+      target: { value: "corta" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(onCreateAccount).not.toHaveBeenCalled();
+  });
+
+  it("cuenta el nombre o el email ya usados con mensajes distintos", async () => {
+    const onCreateAccount = vi.fn().mockResolvedValue({ ok: false, reason: "email-taken" });
+    renderGate({ canCreateAccount: true, onCreateAccount });
+    openCreate();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "marta@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "caballo-bateria" },
+    });
+    fireEvent.change(screen.getByLabelText("Repeat the password"), {
+      target: { value: "caballo-bateria" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(await screen.findByText("That email is already in use.")).toBeTruthy();
+  });
+});
+
+describe("ProfileGate · pedir una cuenta (V3.77)", () => {
+  const nameInput = () => screen.getByLabelText("Name") as HTMLInputElement;
+  const submit = () => screen.getByRole("button", { name: "Ask for a user" });
+
+  it("sigue existiendo la vía de pedir, que es la de la LAN", () => {
+    // Desde otro dispositivo no se crea nada: se deja una solicitud que el
+    // webmaster resuelve. Ese camino no desaparece con el registro local.
     renderGate();
-    expect(screen.queryByRole("button", { name: "Create profile" })).toBeNull();
     expect(submit()).toBeTruthy();
   });
 
@@ -152,7 +243,7 @@ describe("ProfileGate · pedir un perfil (V3.77)", () => {
 
     expect(onRequest).toHaveBeenCalledWith("Ana");
     expect(await screen.findByText(/Request sent/)).toBeTruthy();
-    // Y no desaparece: no hay perfil al que entrar todavía, así que la puerta se
+    // Y no desaparece: no hay cuenta a la que entrar todavía, así que la puerta se
     // queda explicando que falta la autorización del webmaster.
     expect(nameInput().disabled).toBe(true);
     expect((submit() as HTMLButtonElement).disabled).toBe(true);
@@ -182,9 +273,7 @@ describe("ProfileGate · pedir un perfil (V3.77)", () => {
     });
     fireEvent.change(nameInput(), { target: { value: "Ana" } });
     fireEvent.click(submit());
-    expect(
-      await screen.findByText(/too many pending requests/i),
-    ).toBeTruthy();
+    expect(await screen.findByText(/too many pending requests/i)).toBeTruthy();
     unmount();
 
     renderGate({ onRequest: async () => ({ ok: false, reason: "offline" }) });
@@ -215,5 +304,33 @@ describe("ProfileGate · pedir un perfil (V3.77)", () => {
   it("la puerta dice a quién hay que pedirle la autorización", () => {
     renderGate();
     expect(screen.getByText(/webmaster/)).toBeTruthy();
+  });
+});
+
+describe("ProfileGate · la lista que no se pudo leer (V3.80.2)", () => {
+  it("no confunde «no hay usuarios» con «no se pudo leer»", () => {
+    renderGate({ users: [], loadFailed: true });
+    expect(screen.getByRole("alert")).toBeTruthy();
+    // La mentira que dejaba al alumno sin salida era pintar «todavía no hay
+    // usuarios» cuando lo que había era un fallo de lectura.
+    expect(screen.queryByText(/no users yet/i)).toBeNull();
+  });
+
+  it("ofrece reintentar en el sitio y avisa al hacerlo", () => {
+    const onRetry = vi.fn();
+    renderGate({ users: [], loadFailed: true, onRetry });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("con la lista cargada bien, el aviso no aparece", () => {
+    renderGate();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("option", { name: /Ana/ })).toBeTruthy();
+  });
+
+  it("ni se ofrece reintentar cuando no hace falta", () => {
+    renderGate();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   });
 });

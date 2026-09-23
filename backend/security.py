@@ -67,11 +67,18 @@ _PATH_LIMITS: dict[str, int] = {
     "/api/translate": 120,
     "/api/voices/download": 10,
     # V3.76: abrir sesión pasa a ser un punto con secreto (el PIN opcional del
-    # perfil). Este tope **no** es la defensa —lo es el freno por perfil de
-    # `services/pins.py`, porque el cupo por IP es holgado a propósito y una
-    # familia tras un NAT comparte IP—: es la primera valla, para que una
-    # máquina que barre PINs a toda velocidad ni siquiera llegue al KDF.
+    # perfil; la contraseña de la cuenta desde V3.81). Este tope **no** es la
+    # defensa —lo es el freno por cuenta de `services/credentials.py`, porque el
+    # cupo por IP es holgado a propósito y una familia tras un NAT comparte IP—:
+    # es la primera valla, para que una máquina que barre contraseñas a toda
+    # velocidad ni siquiera llegue al KDF.
     "/api/session": 120,
+    # V3.81: el alta de cuenta (`POST /api/users`) es el otro punto sin sesión con
+    # coste real: hashea una contraseña a 200.000 iteraciones antes de decir que
+    # sí. Comparte prefijo con el listado del selector (`GET /api/users`), que es
+    # una lectura barata y poco frecuente, así que el cupo se pone holgado: acota
+    # un barrido sin rozar una app que se abre varias veces al día.
+    "/api/users": 60,
     # V3.77: pedir un perfil es la única escritura de la app que **no** exige
     # sesión (quien la pide no tiene perfil todavía). Es una petición humana de
     # teclado, no una ruta de sondeo, así que un cupo estrecho no molesta a nadie

@@ -14,15 +14,16 @@ interface UserMenuProps {
   currentUserId: string | null;
   onSelect: (id: string) => void;
   /**
-   * V3.77: **pide** un perfil (ya no lo crea). El menú cuenta el desenlace en el
+   * V3.77: **pide** una cuenta (ya no la crea). El menú cuenta el desenlace en el
    * propio desplegable porque no hay otra pantalla donde contarlo.
    */
   onRequest: (name: string) => Promise<ProfileRequestOutcome>;
   onEdit: (id: string, patch: UserPatch) => Promise<User | null>;
-  /** Pedir la baja del perfil de la sesión (el webmaster la resuelve). */
+  /** Pedir la baja de la cuenta de la sesión (el webmaster la resuelve). */
   onRequestDelete?: (note: string) => Promise<ProfileRequestOutcome>;
+  /** V3.81: abre el diálogo de cuenta (contraseña, email, baja y Salir). */
+  onOpenAccount?: () => void;
 }
-
 export function UserMenu({
   users,
   currentUserId,
@@ -30,6 +31,7 @@ export function UserMenu({
   onRequest,
   onEdit,
   onRequestDelete,
+  onOpenAccount,
 }: UserMenuProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -186,6 +188,23 @@ export function UserMenu({
           >
             {t("user.editProfile")}
           </button>
+
+          {/* V3.81: la cuenta. Sustituye a la pestaña «PIN» de Ajustes, que
+              desaparece: contraseña, email, verificación, baja y Salir son cosas
+              de identidad y viven donde vive la identidad (el propio usuario). */}
+          {onOpenAccount && (
+            <button
+              type="button"
+              className="user-menu-action"
+              disabled={!current}
+              onClick={() => {
+                onOpenAccount();
+                setOpen(false);
+              }}
+            >
+              {t("account.title")}
+            </button>
+          )}
         </div>
       )}
 

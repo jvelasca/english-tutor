@@ -7,7 +7,10 @@ evidencia. Aprobar es lo que crea o borra, y eso solo ocurre desde el lanzador
 Las solicitudes viven en la BD de la app y no en un fichero suelto por tres
 razones concretas: sobreviven a un reinicio, viajan en el backup y el lanzador
 —que ya abre esta BD en solo-lectura para sus contadores— puede contar las
-pendientes sin depender de que el backend conteste.
+pendientes sin depender de que el backend conteste
+(`launcher/status.py::read_pending_requests`, V3.80.1: hasta entonces esa frase
+era una capacidad declarada y no implementada, y una baja podía quedarse
+invisible en el lanzador cuando no había PIN de administración).
 """
 from __future__ import annotations
 

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import itertools
+
 from fastapi.testclient import TestClient
 
 from main import app
@@ -10,6 +14,28 @@ def _setup(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
     return users_repo.create_user("Ana")["id"]
+
+
+_ALTA_SEQ = itertools.count(1)
+
+
+def _alta(client, name: str, *, email: str = "", **extra):
+    """`POST /api/users` con un registro **completo** (V3.81).
+
+    Desde la Fase 3 el alta exige email y contraseña; estos tests comprueban sobre
+    todo la forma del **nombre**, así que el resto del cuerpo se rellena aquí una
+    vez en lugar de repetirlo. El email sale de un contador: dos altas con el mismo
+    nombre (que es justo lo que prueba la regla de duplicados) necesitan **dos
+    correos distintos** o chocarían por `EMAIL_TAKEN` y el test culparía a la
+    regla equivocada.
+    """
+    body = {
+        "name": name,
+        "email": email or f"alta-{next(_ALTA_SEQ)}@example.com",
+        "password": "caballo-bateria-grapa",
+        **extra,
+    }
+    return client.post("/api/users", json=body)
 
 
 def test_create_user_has_default_avatar_fields(monkeypatch, tmp_path):
@@ -81,9 +107,7 @@ def test_api_hides_test_profiles_and_deletes_them(monkeypatch, tmp_path):
     # is_test lo crea invisible y DELETE lo limpia (lo usa el teardown visual).
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        created = client.post(
-            "/api/users", json={"name": "Visual Tester", "is_test": True}
-        )
+        created = _alta(client, "Visual Tester", is_test=True)
         assert created.status_code == 200, created.text
         tester = created.json()
         assert tester["is_test"] is True
@@ -101,14 +125,17 @@ def test_api_hides_test_profiles_and_deletes_them(monkeypatch, tmp_path):
 
 
 def test_create_user_rejects_an_overlong_name(monkeypatch, tmp_path):
-    """`POST /api/users` no exige credencial: el nombre lleva tope (V3.73.x).
+    """El nombre lleva tope (V3.73.x).
 
     Antes solo `PATCH` acotaba `name`; crear un perfil con un nombre de tamaño
-    arbitrario era una vía trivial de crecimiento de la base de datos.
+    arbitrario era una vía trivial de crecimiento de la base de datos. Desde V3.81
+    el cuerpo del alta es un registro completo, así que el tope se prueba con el
+    resto de campos bien puestos: si no, el 422 lo daría un email ausente y el test
+    pasaría sin haber mirado el nombre.
     """
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.post("/api/users", json={"name": "x" * 10_000})
+        r = _alta(client, "x" * 10_000)
     assert r.status_code == 422
 
 
@@ -117,6 +144,51 @@ def test_create_user_accepts_a_name_at_the_limit(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     nombre = "n" * 80
     with TestClient(app) as client:
-        r = client.post("/api/users", json={"name": nombre})
+        r = _alta(client, nombre)
     assert r.status_code == 200, r.text
     assert r.json()["name"] == nombre
+
+
+def test_create_user_rejects_a_duplicate_name(monkeypatch, tmp_path):
+    """V3.80.2: dos usuarios activos con el mismo nombre son indistinguibles.
+
+    El selector de la app y el lanzador identifican a los usuarios por su nombre:
+    con dos «Ana» no hay forma de saber a quién se le abre sesión ni a quién se
+    le purga el historial. El `_setup` ya crea «Ana», así que esta alta choca.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = _alta(client, "Ana")
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "USER_NAME_TAKEN"
+
+
+def test_the_duplicate_rule_ignores_spaces_and_case(monkeypatch, tmp_path):
+    """«  ana  » es el mismo nombre que «Ana» para el ojo que lo lee."""
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = _alta(client, "  ANA  ")
+    assert r.status_code == 409, r.text
+
+
+def test_the_duplicate_rule_does_not_block_test_profiles(monkeypatch, tmp_path):
+    """Los perfiles de prueba quedan fuera: los crea y borra el teardown visual.
+
+    Si chocaran con esta regla, un residuo de un test fallido convertiría el
+    siguiente run en un alta rota — justo al revés de lo que la regla busca.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        primero = _alta(client, "Visual Tester", is_test=True)
+        segundo = _alta(client, "Visual Tester", is_test=True)
+    assert primero.status_code == 200, primero.text
+    assert segundo.status_code == 200, segundo.text
+
+
+def test_a_disabled_user_frees_their_name(monkeypatch, tmp_path):
+    """Un usuario desactivado ya no compite por su nombre en el selector."""
+    uid = _setup(monkeypatch, tmp_path)
+    users_repo.set_status(uid, users_repo.STATUS_DISABLED)
+    with TestClient(app) as client:
+        r = _alta(client, "Ana")
+    assert r.status_code == 200, r.text

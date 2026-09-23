@@ -142,7 +142,7 @@ def test_aprobar_un_alta_crea_exactamente_un_perfil(monkeypatch, tmp_path):
         ).json()
         creada = client.post(
             f"/api/admin/profile-requests/{pedida['id']}/approve",
-            json={"note": "adelante", "pin": "4321"},
+            json={"note": "adelante"},
             headers=_ADMIN_HEADERS,
         )
         repetida = client.post(
@@ -158,8 +158,10 @@ def test_aprobar_un_alta_crea_exactamente_un_perfil(monkeypatch, tmp_path):
     marta = users_repo.get_user(creado["resolved_user_id"])
     assert marta is not None
     assert marta["name"] == "Marta"
-    # El PIN que puso el webmaster al aprobar el alta se guarda hasheado.
-    assert marta["has_pin"] is True
+    # V3.81: aprobar ya **no** crea credencial. El PIN se retiró y la contraseña
+    # se asigna después desde la consola de gestión (con `must_change_password`),
+    # así que la cuenta nace «sin credencial» y el lanzador la lista como tarea.
+    assert marta["has_password"] is False
     assert len([u for u in users_repo.list_users() if u["name"] == "Marta"]) == 1
 
     assert repetida.status_code == 409, "aprobar dos veces creó dos perfiles"
@@ -246,10 +248,23 @@ def test_la_administracion_de_perfiles_no_se_ejerce_desde_la_red(monkeypatch, tm
 
 
 def test_crear_un_perfil_desde_la_red_esta_cerrado(monkeypatch, tmp_path):
-    """V3.77 cierra el alta anónima por LAN: por la red se **solicita**."""
+    """V3.77 cierra el alta anónima por LAN: por la red se **solicita**.
+
+    V3.81: el cuerpo tiene que ser un registro **completo** (nombre, email y
+    contraseña) para que la petición llegue siquiera a la frontera de equipo. Con
+    un cuerpo recortado el 422 de Pydantic salta antes y el test dejaría de
+    comprobar lo que dice comprobar (que desde la red no se crea nada).
+    """
     _setup(monkeypatch, tmp_path)
     with TestClient(app, client=_FOREIGN_CLIENT) as client:
-        directa = client.post("/api/users", json={"name": "Intruso"})
+        directa = client.post(
+            "/api/users",
+            json={
+                "name": "Intruso",
+                "email": "intruso@example.com",
+                "password": "caballo-bateria-grapa",
+            },
+        )
         pedida = client.post("/api/profile-requests", json={"display_name": "Ana"})
     assert directa.status_code == 403
     assert not any(u["name"] == "Intruso" for u in users_repo.list_users())
@@ -261,9 +276,20 @@ def test_el_alta_del_propio_equipo_sigue_funcionando(monkeypatch, tmp_path):
     """Lo que no puede pasar es cerrar de más: el primer arranque es local."""
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.post("/api/users", json={"name": "Primer Arranque"})
+        r = client.post(
+            "/api/users",
+            json={
+                "name": "Primer Arranque",
+                "email": "arranque@example.com",
+                "password": "caballo-bateria-grapa",
+            },
+        )
     assert r.status_code == 200
     assert r.json()["status"] == users_repo.STATUS_ACTIVE
+    # Y nace con credencial: ya no hay «un nombre y a correr» (Fase 3 del P0).
+    assert r.json()["has_password"] is True
+    assert r.json()["email"] == "arranque@example.com"
+    assert r.json()["email_verified"] is False
 
 
 # --- 4. Desactivar conserva; purgar se lleva ---------------------------------
@@ -417,17 +443,31 @@ def test_un_estado_de_filtro_inventado_no_se_traga(monkeypatch, tmp_path):
 def test_el_alta_directa_del_webmaster_no_pasa_por_la_cola(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        creada = client.post(
+        # Contraseña con mala forma: se rechaza **antes** de tocar la BD.
+        mala = client.post(
             "/api/admin/users",
-            json={"name": "Directo", "pin": "12"},  # PIN con mala forma
+            json={
+                "name": "Directo",
+                "email": "directo@example.com",
+                "password": "corta",
+            },
             headers=_ADMIN_HEADERS,
         )
-        assert creada.status_code == 422
+        assert mala.status_code == 400
+        assert mala.json()["detail"] == "PASSWORD_FORMAT"
+
+        # Sin contraseña en el cuerpo, el backend **genera una temporal** y obliga
+        # a cambiarla: el webmaster la entrega sin inventarse nada ni llegar a
+        # conocer la definitiva del alumno.
         buena = client.post(
             "/api/admin/users",
-            json={"name": "Directo", "pin": "1234"},
+            json={"name": "Directo", "email": "Directo@Example.COM"},
             headers=_ADMIN_HEADERS,
         )
     assert buena.status_code == 200
-    assert buena.json()["has_pin"] is True
+    cuerpo = buena.json()
+    assert cuerpo["user"]["has_password"] is True
+    assert cuerpo["user"]["email"] == "directo@example.com", "el email se normaliza"
+    assert cuerpo["temporary_password"], "sin contraseña se genera una temporal"
+    assert cuerpo["user"]["must_change_password"] is True
     assert _pendientes() == []

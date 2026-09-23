@@ -3,7 +3,7 @@
 > **Propósito:** permitir que un agente/contexto **nuevo** retome el proyecto desde cero
 > sin perder el hilo (premisa 8 y 12). Si el chat del gerente se satura o hay riesgo de
 > alucinación, este documento es el ancla para reanudar.
-> Actualizado por última vez: 2026-09-22 (UTC+2).
+> Actualizado por última vez: 2026-09-23 (UTC+2).
 >
 > **Nota (2026-09-22 · cierre de la sesión de Flashcards): V3.80.0 — release DE
 > PRODUCTO (minor) que rehace a fondo el estudio de Flashcards. CON migración de
@@ -76,6 +76,196 @@
 > y el guardia de `data/` —**sensible al entorno**— falló una vez **porque la app
 > estaba abierta escribiendo en `tutor.db`** (en la segunda pasada, 3008/3008).
 > Detalle en `release-notes-v3.80.0.md`.
+>
+> **Nota (2026-09-23 · gestión de usuarios): V3.81.0 — release DE PRODUCTO (minor)
+> que publica DOS LOTES BAJO UNA MISMA ETIQUETA: (1) la estabilización pre-freeze
+> que se iba a publicar como `v3.80.1` y (2) la Fase 3 del P0 de identidad, que es
+> la gestión de usuarios.** Publicar `v3.80.1` y `v3.81.0` con horas de diferencia
+> habría dejado dos etiquetas para el mismo árbol de trabajo —una sin valor para
+> quien audita— y un `CHANGELOG` que cuenta dos veces lo mismo: el mapa de los dos
+> lotes está en `release-notes-v3.81.0.md` y el detalle del primero, apartado por
+> apartado, en `release-notes-v3.80.1.md`. **(A) La cuenta y su credencial.** El
+> gerente decidió que el producto **sí tiene cuentas** y que la credencial es **por
+> cuenta, no por dispositivo**: cada persona se crea la suya, entra con su
+> contraseña y puede darse de baja, con la última palabra en el programa de
+> gestión. `users` gana `email`, `password_hash`, `email_verified_at`,
+> `email_verify_token_hash`, `email_verify_sent_at`, `must_change_password`,
+> `auth_epoch` y `unenrolled_at` (migración **aditiva e idempotente**: una BD de
+> V3.80.0 se abre intacta y nadie pierde nada) más la tabla `user_events` con el
+> historial. `services/credentials.py` sustituye a `services/pins.py` (**borrado**,
+> con su `test_pin.py`, y en el frontend se van `utils/pin.ts` y `pin.test.ts`):
+> **PBKDF2-HMAC-SHA256** con 200 000 iteraciones y sal por cuenta, comparación con
+> `hmac.compare_digest`, iteraciones **dentro del valor guardado** (subirlas más
+> adelante no invalida lo viejo), política de forma (8-128, sin espacios en los
+> extremos, no una de las obvias —esa lista vive **solo** en el servidor— y no un
+> carácter repetido) y el **freno por cuenta** (5 fallos no frenan; después el
+> retardo dobla con techo de 300 s y se limpia al acertar). Es la pieza que de
+> verdad sostiene la política: sin freno, 8 caracteres son fuerza bruta barata por
+> muy buen KDF que haya. El **PIN de perfil desaparece** como concepto (`PUT
+> /api/session/pin` se retira; `pin_hash` se conserva en la tabla **sin leerse**,
+> porque borrar una columna en SQLite es una reconstrucción de la tabla y una copia
+> antigua restaurada tiene que seguir abriendo). `POST /api/session` **exige
+> `password`** si la cuenta tiene credencial (401 `PASSWORD_REQUIRED` /
+> `PASSWORD_INVALID`, 429 `PASSWORD_THROTTLED` con `Retry-After`) y el token de
+> sesión pasa a llevar la **época de autenticación** (`auth_epoch`, comparada en
+> `dependencies.current_user`, que ya leía el perfil en cada petición): cambiar la
+> contraseña o forzar la baja **tumban las sesiones vivas al instante**, no cuando
+> caduque la cookie. Una contraseña **temporal** del webmaster entra con
+> `must_change_password` y el servidor la hace cumplir con 403
+> `PASSWORD_CHANGE_REQUIRED` hasta que se cambie. **(B) Alta, baja y email.** El
+> registro es **autoservicio** en el propio equipo (`POST /api/users`, acotado por
+> `is_admin_loopback_host` y por el cupo nuevo de `/api/users` en
+> `security._PATH_LIMITS`, porque hashea antes de decir que sí; por la red se sigue
+> **solicitando**, el reparto de V3.77) y los dos conflictos se distinguen a
+> propósito (`USER_NAME_TAKEN`, `EMAIL_TAKEN`). **El email es una señal, no un
+> muro:** `POST /api/account/verify` consume un token de un solo uso, **hasheado** y
+> con caducidad de una hora, y `POST /api/account/resend-verification` —bajo sesión,
+> porque emite tokens— responde con la verdad (`SMTP_NOT_CONFIGURED`,
+> `EMAIL_MISSING`, `ALREADY_VERIFIED`). La **baja autoservicio**
+> (`POST /api/account/unenroll`) **exige la contraseña** aunque ya haya sesión (sin
+> ella, pasar por delante de un equipo con la sesión abierta bastaría para dar de
+> baja a quien esté dentro), marca la cuenta como retirada, sube su época y retira
+> la cookie, y **no borra nada**: el borrado definitivo es la **purga** del
+> webmaster, con copia previa, solo sobre cuentas dadas de baja o desactivadas y con
+> confirmación por nombre. Mezclar «darme de baja» con «borrar mis datos» es cómo
+> las apps borran el historial de un alumno porque alguien pulsó el botón
+> equivocado. El **correo saliente** es la **segunda excepción de red** del producto
+> (`RUNTIME_TOUCHPOINTS`, `kind: "internet"`) y es **fail-closed**
+> (`services/mailer.py`: sin SMTP **no se abre ninguna conexión**, STARTTLS en los
+> puertos normales y TLS implícito en 465, timeout de 10 s porque el envío ocurre
+> dentro de una petición HTTP, texto plano y enlace al **fragmento** del frontend
+> `/#/cuenta/verificar?token=…`, que no se queda en los logs del servidor ni en un
+> `Referer`; un fallo de envío se registra y **no rompe** la acción), y su
+> contraseña vive en `backend/data/mail.secret`, **fuera de los backups** (se suma a
+> `certs`, `backups` y `session.secret`), mientras el **hash de la contraseña de la
+> cuenta sí viaja** porque es estado de la cuenta: declarado, no escondido. **(C) El
+> cuelgue de «Elige tu perfil».** Lo reportado en uso real no era del flujo de
+> cuentas sino de la sesión guardada: una cookie que apuntaba a una cuenta ya
+> purgada (404) o desactivada (403) hacía que `getSession()` **lanzara**, el
+> arranque en `Promise.all` se quedaba a medias y la puerta se pintaba sin lista y
+> sin salida. Se cierra en tres capas: `api/session.ts` trata 404 y 403 como «sin
+> sesión» y **limpia la cookie inservible**; `hooks/useChat.ts` pasa a
+> `Promise.allSettled` (una sonda caída ya no puede vaciar la pantalla); y
+> `ProfileGate` distingue **«no hay cuentas»**, **«no se pudo cargar»** (con
+> **reintentar**) y la lista normal, tres estados que antes se veían igual —
+> ofreciendo «Crear cuenta» **solo** en el propio equipo
+> (`utils/localDevice.ts`, espejo de `is_admin_loopback_host`), porque un formulario
+> que el servidor va a rechazar con 403 es peor que no ofrecerlo—. **(D) La consola
+> de Usuarios del lanzador.** El panel de perfiles pasa a tener la última palabra:
+> cola de alta y baja, alta y edición de cuentas, credenciales (asignar y
+> restablecer entregando una **temporal**), verificación de email **a mano** (modo
+> híbrido), activar/desactivar, baja forzada **con motivo**, historial (que
+> **sobrevive a la purga**: por eso la columna es `subject_id` y guarda también el
+> nombre), purga y SMTP (configurar y probar, con una frase que **concilia** lo
+> guardado con lo que ve el backend en marcha, que resuelve su entorno al arrancar).
+> La vista es **pura** (`launcher/ui.py`) y por eso se prueba sin pantalla. **(E) La
+> superficie sin sesión** pasa a **cuatro escrituras** (`users`, `account/verify`,
+> `session` y `profile-requests`), con `resend-verification` y `unenroll` exigiendo
+> sesión, y el candado en `test_public_surface.py`; `GET /api/users` sigue
+> enumerando **nombres** (la puerta es un selector y los necesita) pero **ya no
+> correos**: el de las demás cuentas se recorta en el borde HTTP, porque sin ese
+> recorte cualquier equipo de la red podría cosechar los correos de la casa sin
+> escribir una contraseña. Verificación: `ruff` limpio (backend y launcher),
+> `pytest` **3085/3085**, launcher **244/244**, `tsc` limpio, `vitest`
+> **1028/1028** (109 ficheros), build correcto (`3.81.0`), i18n `--strict`
+> **1733** cadenas con 0 huérfanas / 0 sin definir / 0 duplicadas, contraste 480
+> pares (+6 guardas) con 0 bloqueantes, `check_release_consistency` OK en los **6
+> orígenes** (`3.81.0`), `validation_gate.py auto` **10/10** y las dos sondas
+> visuales **6/6** en los tres breakpoints; los candados nuevos se **sabotearon**
+> para comprobar que muerden, y la **prueba end-to-end sobre una copia de la BD
+> real** (`backend/scripts/e2e_accounts_v381.py`, reproducible) da **62/62 pasos**
+> —freno, revocación por época, modo híbrido sin SMTP, baja autoservicio, purga
+> con copia previa, historial que sobrevive, cuenta heredada que entra sin
+> contraseña y la BD original con el mismo sha256—. **Honestidad:** (i) **las cuentas heredadas sin
+> credencial siguen entrando sin contraseña** (`password_hash == ''` abre como
+> siempre, para no dejar a nadie fuera de sus datos): **el P0 sigue abierto para
+> ellas**, la consola las lista como tarea pendiente y llevarlas a cero es trabajo
+> de uso; (ii) **no hay recuperación de contraseña por correo** —la restablece el
+> webmaster como temporal— ni segundo factor, ni verificación obligatoria;
+> (iii) `GET /api/users` sigue enumerando nombres en modo LAN (decisión declarada
+> desde V3.75); (iv) **el hash de la contraseña sí viaja en el backup** y quien lo
+> reciba puede atacarlo **sin el freno del servidor**; (v) **el freno vive en
+> memoria** y un reinicio lo vacía (mismo límite que el PIN de V3.76); (vi) **el
+> transporte de correo no se ha probado contra un SMTP real** (los candados cubren
+> el fail-closed, STARTTLS/TLS y la autenticación); (vii) **la consola sigue detrás
+> del doble candado** (PIN de administración + loopback): sin PIN se *cuenta* la
+> cola, pero no se resuelve, edita, fuerza una baja ni se purga; (viii) **el primer
+> candado del `mailer` no mordía** (el doble hacía fallar `smtplib` y el `except
+> Exception` del propio envío se lo comía, así que un test que lanza dentro del
+> `try` no puede probar «no se llama a esta función»): se reescribió para que
+> **registre la llamada antes** de fallar. Y **la API deja de ser solo aditiva**:
+> `PUT /api/session/pin` desaparece y `POST /api/session` cambia, así que los
+> instrumentos de campo que abrieran sesión con un `user_id` a secas deben conocer
+> el contrato nuevo — la base de certificación se re-ancla de `v3.75.8` a
+> **`v3.81.0`** y los 7 gates siguen `pending`. Detalle en
+> `release-notes-v3.81.0.md`.
+>
+> **Nota (2026-09-22 · estabilización pre-freeze): V3.80.1 — release DE PRODUCTO
+> (patch) que cierra los hallazgos de la auditoría externa de V3.80.0 —más un
+> hallazgo de uso real, la cola de perfiles invisible en el lanzador— y NO añade
+> funcionalidad de producto.** SIN migración, SIN endpoints nuevos, SIN bump de ninguna
+> versión de motor; **G1–G7 siguen `pending`**, y lo único que cambia fuera del
+> producto es que la **base de certificación se re-ancla de `v3.75.8` a
+> `v3.80.1`** (por tag, sin fijar SHA a mano, regla V3.73.5), porque
+> V3.78.0/V3.79.0/V3.80.0 añadieron producto y la campaña tenía **0 `record`**
+> —nada que invalidar—. **(A) P1 · La carrera generación ↔ edición de la cara B.**
+> `hydrate()` lanzaba una promesa que puede tardar hasta 120 s (modelo local) y
+> `saveOwnBack()` escribía después, así que una respuesta **tardía** pisaba la
+> traducción recién guardada y la pantalla contradecía la fuente de verdad del
+> alumno. Se cierra con **token por tarjeta** (`hydrationEpoch`) + **espejo
+> síncrono** (`ownBacksRef`, porque dentro del closure async el estado de React
+> puede ir desfasado): `hydrate()` captura el token antes del `await` y **descarta
+> su resultado** (cara y también el error de hidratación) si el token cambió o si
+> ya hay versión propia; guardar o borrar **sube el token** e invalida lo que
+> esté en vuelo; y guardar **retira el spinner** de esa tarjeta, que hasta ahora
+> tapaba la versión propia recién guardada. Candado con **promesa diferida**.
+> **(B) P2 · El badge «Tu versión» sobre una traducción borrada:** `saveOwnBack()`
+> lo marcaba también con `""`, así que borrar dejaba el badge sobre un texto que
+> ya no existía; ahora borrar **desmarca** y **restaura la cara del backend** (o
+> reintenta la caché). **(C) P2 · La `X` del diccionario limpiaba el campo pero no
+> el resultado:** un campo vacío con la tarjeta anterior debajo es un estado que
+> miente; ahora limpia **todo** lo que depende de la consulta y vuelven los
+> ejemplos, sin disparar ninguna petición. **(D) P2 · Los selectores tipo pestaña
+> son pestañas ARIA reales:** `tablist`/`tab`/`tabpanel` con `aria-selected` y
+> `aria-controls`, más el hook `useTabList` con **roving tabindex** y
+> `ArrowLeft`/`ArrowRight`/`Home`/`End`; antes eran `role="group"` +
+> `aria-pressed` pintados como pestañas. **(E) P2 · El `lang` de las tarjetas
+> manuales:** solo se declara cuando el idioma **se conoce** (léxico EN→ES) y se
+> omite en las manuales, en la sesión y en el navegador de Tarjetas. **(F) Sonda
+> visual permanente:** `dictionarySmoke.spec.ts` y `flashcardsSmoke.spec.ts`,
+> permanentes y en los **tres breakpoints** (390/768/1280) sin `skip` —el hueco
+> que V3.80.0 había declarado (el spec de V3.75.8 se borró)—. Sus mocks de `/api/**`
+> van **anclados al origen** (`/^https?:\/\/[^/]+\/api\//`) y no a globs por
+> endpoint: un `**​/api/settings*` casaría también con el módulo de la app
+> `/src/api/settings.ts` y, al servirle JSON, **la app no arrancaría** (la trampa
+> que `drillProvenance.spec.ts` ya documenta). **(G) La cola de perfiles que el
+> lanzador no podía ver** (hallazgo de **uso real**: una baja «no aparecía en el
+> lanzador»). El flujo del alumno estaba bien —la petición sí estaba en
+> `profile_requests` como `pending`—; el fallo era entero del lanzador: sin **PIN**
+> no se consultaba al backend y no había otra vía (aunque `profile_requests.py`
+> afirmaba desde V3.77 que el lanzador podía contar las pendientes sin el backend:
+> era una capacidad **declarada y no implementada**), y `_apply_profiles` **no
+> miraba `result.ok`**, así que un **401/403 o un servidor caído** se pintaban como
+> **«Sin solicitudes pendientes»** con la lista vacía, sin ningún test que lo
+> cubriera. Se cierra con `status.read_pending_requests` (contador en solo-lectura,
+> **siempre**, con PIN o sin él; `0` = vacía y `None` = no se pudo leer),
+> `ui.pending_view` (los estados no se confunden: sin PIN con pendientes **dice
+> cuántas hay**, con PIN y fallo **dice el motivo**) y el **reinicio automático al
+> guardar o retirar el PIN**, porque el backend en marcha no vuelve a leer el
+> entorno hasta arrancar. **Honestidad: el
+> test demuestra que la UI ya no miente, NO que el motor cumpla** (la generación
+> del reverso sigue dependiendo del modelo local); el **timeout de hidratación
+> sigue siendo el global de 120 s** (un timeout corto de cara B queda **aparcado**);
+> **no hay idioma por mazo** (queda aparcado); el **mismo pack sigue en dos
+> sitios**; y el **barrido visual completo sigue con flakiness local** (la tanda
+> completa en paralelo da **54 pasan / 2 fallan / 28 omiten**, y los dos que fallan
+> —el hub y el panel de conversaciones— pasan en aislamiento con estos cambios y
+> sin ellos, porque el Vite local proxea `/api` a un `:8000` que aquí sirve HTTPS),
+> mientras las dos specs nuevas dan **6/6 en los tres breakpoints**. Y, en (G), la
+> cola sigue exigiendo **PIN para leerse en detalle y resolverse**: sin PIN el
+> lanzador ahora **cuenta y anuncia** las pendientes leyendo la BD, pero ver la
+> fila y aprobar/rechazar siguen detrás del doble candado (PIN + loopback) —**contar
+> no es decidir**—. Detalle en `release-notes-v3.80.1.md`.
 >
 > **Nota (2026-09-22 · cierre de la sesión del perfil): V3.79.0 — release DE
 > PRODUCTO (patch) que cierra los DOS fallos que el alumno reportó usando el

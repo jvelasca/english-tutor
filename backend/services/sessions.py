@@ -127,22 +127,32 @@ def _sign(body: str) -> str:
     return _b64encode(mac)
 
 
-def issue(user_id: str, *, now: int | None = None) -> str:
-    """Emite un token firmado para `user_id`.
+def issue(user_id: str, *, epoch: int = 0, now: int | None = None) -> str:
+    """Emite un token firmado para `user_id` en la época de autenticación `epoch`.
+
+    `epoch` (V3.81) es lo que permite **cerrar sesiones de verdad**: viaja dentro
+    del token firmado y el servidor lo compara con el de la fila en cada
+    petición, así que cambiar la contraseña o forzar una baja invalida al
+    instante todas las sesiones abiertas de esa cuenta. Sin él, una baja forzada
+    no surtía efecto hasta que caducara la cookie (un año).
 
     `now` existe para los tests de caducidad: permite emitir un token «del
     pasado» sin tocar el reloj del sistema.
     """
     issued_at = int(time.time()) if now is None else int(now)
     payload = json.dumps(
-        {"iat": issued_at, "uid": user_id}, separators=(",", ":"), sort_keys=True
+        {"iat": issued_at, "uid": user_id, "ep": int(epoch)},
+        separators=(",", ":"),
+        sort_keys=True,
     ).encode("utf-8")
     body = _b64encode(payload)
     return f"{body}{_SEPARATOR}{_sign(body)}"
 
 
-def verify(token: str | None, *, now: int | None = None) -> str | None:
-    """Devuelve el `user_id` de un token válido, o `None` si no lo es.
+def verify_session(
+    token: str | None, *, now: int | None = None
+) -> tuple[str, int] | None:
+    """`(user_id, época)` de un token válido, o `None` si no lo es.
 
     `None` cubre **todos** los motivos (ausente, mal formado, firma que no cuadra,
     caducado, del futuro): quien llama no puede distinguirlos, y eso es
@@ -159,6 +169,10 @@ def verify(token: str | None, *, now: int | None = None) -> str | None:
         payload = json.loads(_b64decode(body))
         user_id = payload["uid"]
         issued_at = int(payload["iat"])
+        # Un token de una versión anterior no trae época: se lee como 0, que es
+        # la de las cuentas que aún no han cambiado nada. Así, actualizar la app
+        # no cierra la sesión de nadie sin motivo.
+        epoch = int(payload.get("ep", 0))
     except (ValueError, TypeError, KeyError, binascii.Error):
         return None
     if not isinstance(user_id, str) or not user_id:
@@ -168,4 +182,14 @@ def verify(token: str | None, *, now: int | None = None) -> str | None:
         return None  # token del futuro: reloj movido o manipulado
     if current - issued_at > SESSION_TTL_SECONDS:
         return None
-    return user_id
+    return user_id, epoch
+
+
+def verify(token: str | None, *, now: int | None = None) -> str | None:
+    """Devuelve el `user_id` de un token válido, o `None` si no lo es.
+
+    Se conserva porque es la firma que usan los sitios que no necesitan la época
+    (tests, diagnóstico); la comprobación de época vive en `dependencies`.
+    """
+    resolved = verify_session(token, now=now)
+    return resolved[0] if resolved is not None else None

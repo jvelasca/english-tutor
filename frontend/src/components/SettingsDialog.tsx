@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../hooks/useI18n";
 import type { Lang } from "../utils/i18n";
 import { LANGS } from "../utils/i18n";
-import { isValidPin, sanitizePinInput, type SetPinOutcome } from "../utils/pin";
 import {
   ACCENTS,
   DENSITIES,
@@ -19,7 +18,13 @@ import { AudioLibrary } from "./AudioLibrary";
 import { BackupPanel } from "./BackupPanel";
 import { VoicesPanel } from "./VoicesPanel";
 
-type Tab = "appearance" | "language" | "ai" | "audio" | "voices" | "pin" | "system";
+/**
+ * Pestañas de Ajustes. V3.81: la de «PIN» **desaparece**, y con ella la única
+ * pieza que quedaba del PIN en la interfaz. Lo que hacía —y lo que ahora hace la
+ * contraseña de la cuenta— vive en el diálogo de **Cuenta** (menú de usuario), que
+ * es su sitio: son cosas de identidad, no de la app.
+ */
+type Tab = "appearance" | "language" | "ai" | "audio" | "voices" | "system";
 
 const THEME_OPTIONS: { id: Theme; labelKey: string }[] = [
   { id: "light", labelKey: "settings.theme.light" },
@@ -43,10 +48,6 @@ interface SettingsDialogProps {
   onSelectModel: (model: string) => void;
   onFavoriteModel: (model: string) => void;
   userId: string | null;
-  /** V3.76: ¿el perfil de la sesión tiene PIN? (solo el booleano, nunca el hash). */
-  hasPin: boolean;
-  /** Pone/cambia/retira el PIN del perfil de la sesión. */
-  onSetPin: (currentPin: string | null, newPin: string) => Promise<SetPinOutcome>;
   onClose: () => void;
 }
 
@@ -62,8 +63,6 @@ export function SettingsDialog({
   onSelectModel,
   onFavoriteModel,
   userId,
-  hasPin,
-  onSetPin,
   onClose,
 }: SettingsDialogProps) {
   const { t } = useI18n();
@@ -83,7 +82,6 @@ export function SettingsDialog({
     { id: "ai", label: t("settings.ai") },
     { id: "audio", label: t("settings.audio") },
     { id: "voices", label: t("settings.voices") },
-    { id: "pin", label: t("settings.pin.title") },
     { id: "system", label: t("settings.system") },
   ];
 
@@ -281,9 +279,6 @@ export function SettingsDialog({
           )}
           {tab === "audio" && <AudioLibrary />}
           {tab === "voices" && <VoicesPanel userId={userId} />}
-          {tab === "pin" && (
-            <PinSettings hasPin={hasPin} onSetPin={onSetPin} />
-          )}
         </div>
 
         <footer className="dialog-footer">
@@ -301,126 +296,6 @@ export function SettingsDialog({
           </button>
         </footer>
       </div>
-    </div>
-  );
-}
-
-interface PinSettingsProps {
-  hasPin: boolean;
-  onSetPin: (currentPin: string | null, newPin: string) => Promise<SetPinOutcome>;
-}
-
-/**
- * PIN del perfil activo (V3.76, Fase 3 del P0 de identidad).
- *
- * Solo llama a la API: la regla de forma la comparte con el backend
- * (`utils/pin.ts` ↔ `services/pins.py`) y el hash, la verificación y el freno de
- * intentos viven **solo** en el servidor. Esta pantalla no puede debilitar nada
- * aunque se manipule: como mucho, manda un PIN que el backend rechazará.
- */
-function PinSettings({ hasPin, onSetPin }: PinSettingsProps) {
-  const { t } = useI18n();
-  const [currentPin, setCurrentPin] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [isError, setIsError] = useState(false);
-
-  const newPinInvalid = newPin !== "" && !isValidPin(newPin);
-  // Retirar el PIN (nuevo vacío) con uno ya puesto exige el actual; ponerlo por
-  // primera vez, no. Es la misma regla que aplica el backend.
-  const needsCurrent = hasPin;
-  const canSave =
-    !busy && !newPinInvalid && (!needsCurrent || currentPin.length > 0);
-
-  async function save() {
-    if (!canSave) return;
-    setBusy(true);
-    setMessage(null);
-    setIsError(false);
-    const outcome = await onSetPin(
-      needsCurrent ? currentPin : null,
-      newPin,
-    );
-    setBusy(false);
-    if (outcome === "ok") {
-      setMessage(newPin === "" ? t("settings.pin.removed") : t("settings.pin.saved"));
-      setCurrentPin("");
-      setNewPin("");
-      return;
-    }
-    setIsError(true);
-    if (outcome === "pin-invalid") setMessage(t("pin.invalid"));
-    else if (outcome === "pin-throttled") setMessage(t("pin.throttled"));
-    else setMessage(t("settings.pin.error"));
-  }
-
-  return (
-    <div className="field">
-      <span className="field-label">{t("settings.pin.title")}</span>
-      <p className="text-xs text-muted-foreground">
-        {t("settings.pin.explain")}
-      </p>
-      <p className="text-sm font-medium text-foreground">
-        {hasPin ? t("settings.pin.active") : t("settings.pin.inactive")}
-      </p>
-
-      <form
-        className="flex flex-col gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        {needsCurrent && (
-          <label className="flex flex-col gap-1">
-            <span className="field-label">{t("settings.pin.current")}</span>
-            <input
-              className="field-input"
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              value={currentPin}
-              onChange={(e) => {
-                setCurrentPin(sanitizePinInput(e.target.value));
-                setMessage(null);
-              }}
-              aria-label={t("settings.pin.current")}
-              disabled={busy}
-            />
-          </label>
-        )}
-
-        <label className="flex flex-col gap-1">
-          <span className="field-label">{t("settings.pin.new")}</span>
-          <input
-            className="field-input"
-            type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            value={newPin}
-            onChange={(e) => {
-              setNewPin(sanitizePinInput(e.target.value));
-              setMessage(null);
-            }}
-            aria-label={t("settings.pin.new")}
-            disabled={busy}
-          />
-        </label>
-
-        {newPinInvalid && <p className="text-xs text-destructive">{t("pin.format")}</p>}
-        {message && (
-          <p className={isError ? "dialog-error" : "text-sm text-foreground"}>
-            {message}
-          </p>
-        )}
-
-        <div>
-          <button type="submit" className="dialog-primary" disabled={!canSave}>
-            {t("settings.pin.save")}
-          </button>
-        </div>
-      </form>
     </div>
   );
 }

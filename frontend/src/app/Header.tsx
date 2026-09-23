@@ -19,8 +19,10 @@ interface HeaderProps {
   onSelectUser: (id: string) => void;
   onRequestUser: (name: string) => Promise<ProfileRequestOutcome>;
   onEditUser: (id: string, patch: UserPatch) => Promise<User | null>;
-  /** V3.77: el perfil de la sesión pide su baja (la resuelve el webmaster). */
+  /** V3.77: la cuenta de la sesión pide su baja (la resuelve el webmaster). */
   onRequestDeleteUser?: (note: string) => Promise<ProfileRequestOutcome>;
+  /** V3.81: abre el diálogo de cuenta (contraseña, email, verificación, baja, Salir). */
+  onOpenAccount?: () => void;
   handsFreeEnabled: boolean;
   handsFreeStatus: HandsFreeStatus;
   handsFreeMicError: MicUnavailableReason | null;
@@ -43,6 +45,7 @@ export function Header({
   onRequestUser,
   onEditUser,
   onRequestDeleteUser,
+  onOpenAccount,
   handsFreeEnabled,
   handsFreeStatus,
   handsFreeMicError,
@@ -129,6 +132,7 @@ export function Header({
           onRequest={onRequestUser}
           onEdit={onEditUser}
           {...(onRequestDeleteUser ? { onRequestDelete: onRequestDeleteUser } : {})}
+          {...(onOpenAccount ? { onOpenAccount } : {})}
         />
       </div>
     </header>

@@ -181,9 +181,17 @@ export function DictionaryLookup({
     void runLookup(query);
   }
 
+  // V3.80.1: la X limpia la búsqueda Y su resultado. Antes vaciaba el campo pero
+  // dejaba a la vista la tarjeta anterior, un estado que miente (parece que la
+  // búsqueda sigue viva). Al limpiar del todo vuelven a verse los ejemplos.
   function clearQuery() {
     setQuery("");
+    setEntry(null);
+    setPracticeWord(null);
     setInvalidError(false);
+    setNetworkError(false);
+    setAddStatus("idle");
+    setLastQuery("");
   }
 
   function searchExample(word: string) {

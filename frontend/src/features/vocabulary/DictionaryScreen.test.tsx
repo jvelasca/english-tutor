@@ -9,7 +9,7 @@
  * `localStorage` + `PUT /api/settings` al cambiar de pestaña.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { getSettings, saveSettings } from "../../api/settings";
 import { I18nProvider } from "../../hooks/useI18n";
 import { DICTIONARY_VIEW_STORAGE_KEY } from "../../utils/dictionaryView";
@@ -40,12 +40,9 @@ function renderScreen(userId: string | null = "u1") {
   );
 }
 
-/** Pestañas del grupo de vistas, en el orden en que se pintan. */
+/** Pestañas del tablist de vistas, en el orden en que se pintan. */
 function tabNames(): string[] {
-  const group = screen.getByRole("group", { name: "Dictionary views" });
-  return Array.from(group.querySelectorAll("button")).map(
-    (b) => b.textContent ?? "",
-  );
+  return screen.getAllByRole("tab").map((b) => b.textContent ?? "");
 }
 
 describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
@@ -67,7 +64,9 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
     expect(screen.getByText("lookup-view")).toBeTruthy();
     expect(screen.queryByText("personal-view")).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Look up" }).getAttribute("aria-pressed"),
+      screen
+        .getByRole("tab", { name: "Look up" })
+        .getAttribute("aria-selected"),
     ).toBe("true");
   });
 
@@ -79,7 +78,7 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
   it("la pestaña Flashcards monta la superficie de estudio y la persiste", async () => {
     renderScreen("u1");
 
-    fireEvent.click(screen.getByRole("button", { name: "Flashcards" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Flashcards" }));
 
     expect(screen.getByText("flashcards-view")).toBeTruthy();
     expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
@@ -99,9 +98,9 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
 
     expect(screen.getByText("flashcards-view")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Flashcards" }).getAttribute(
-        "aria-pressed",
-      ),
+      screen
+        .getByRole("tab", { name: "Flashcards" })
+        .getAttribute("aria-selected"),
     ).toBe("true");
   });
 
@@ -128,7 +127,7 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
   it("al cambiar de pestaña persiste en localStorage y en settings", async () => {
     renderScreen("u1");
 
-    fireEvent.click(screen.getByRole("button", { name: "Personal" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Personal" }));
 
     expect(screen.getByText("personal-view")).toBeTruthy();
     expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
@@ -144,11 +143,42 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
   it("sin perfil sigue persistiendo en localStorage (sin llamada a settings)", async () => {
     renderScreen(null);
 
-    fireEvent.click(screen.getByRole("button", { name: "Personal" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Personal" }));
 
     expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
       "personal",
     );
     expect(saveSettingsMock).not.toHaveBeenCalled();
+  });
+
+  // --- V3.80.1: los modos son pestañas ARIA reales ---------------------------
+
+  it("los modos son pestañas ARIA con su tabpanel asociado", () => {
+    renderScreen();
+    const tablist = screen.getByRole("tablist", { name: "Dictionary views" });
+    const tabs = within(tablist).getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    // Roving tabindex: solo la activa es tabulable.
+    expect(tabs.map((tab) => tab.getAttribute("tabindex"))).toEqual([
+      "0",
+      "-1",
+      "-1",
+    ]);
+
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.getAttribute("aria-labelledby")).toBe("dictionary-tab-lookup");
+    expect(tabs[0].getAttribute("aria-controls")).toBe(panel.id);
+  });
+
+  it("las flechas mueven la pestaña activa y el foco", () => {
+    renderScreen();
+    const lookup = screen.getByRole("tab", { name: "Look up" });
+    lookup.focus();
+    fireEvent.keyDown(lookup, { key: "ArrowRight" });
+
+    expect(screen.getByText("personal-view")).toBeTruthy();
+    const personal = screen.getByRole("tab", { name: "Personal" });
+    expect(personal.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(personal);
   });
 });

@@ -23,6 +23,25 @@
 > ningún `record` grabado** y por tanto nada que invalidar. El pre-vuelo se
 > repitió y también dio **10/10**. **Leer la sección «Re-congelación» en §A antes
 > de empezar.** Los 7 gates siguen `pending`.
+> **RE-CONGELACIÓN (2026-09-22, `v3.80.1`):** el árbol que se certifica pasa a ser
+> el de **`v3.80.1`** (cierre de la auditoría de V3.80.0: la carrera generación ↔
+> edición de la cara B, el badge al borrar, la `X` del diccionario, la semántica
+> ARIA de los dos selectores y el `lang` de las tarjetas manuales, más las dos
+> sondas visuales permanentes). V3.78.0, V3.79.0 y V3.80.0 **añadieron producto**
+> después de `v3.75.8`, así que el ancla documental se había quedado atrás. La
+> campaña sigue con **0 `record`** grabados: **no hay nada que invalidar**. Se
+> ancla **por tag, sin fijar SHA a mano** (regla de V3.73.5). Los 7 gates siguen
+> `pending`.
+> **RE-CONGELACIÓN (2026-09-23, `v3.81.0`):** el árbol que se certifica pasa a ser
+> el de **`v3.81.0`** —gestión de usuarios: cuentas con contraseña y email, alta y
+> baja autoservicio, retirada del PIN y consola de Usuarios del lanzador—, que
+> además publica el lote de estabilización que se iba a publicar como `v3.80.1`.
+> La campaña sigue con **0 `record`** grabados (**no hay nada que invalidar**) y el
+> ancla se mueve **por tag, sin fijar SHA a mano** (regla de V3.73.5). **Ojo: este
+> salto sí cambia el contrato de la API de forma NO aditiva** —`PUT
+> /api/session/pin` desaparece y `POST /api/session` exige contraseña si la cuenta
+> la tiene—, así que los instrumentos de campo deben conocerlo. Los 7 gates siguen
+> `pending`.
 
 **Regla de oro:** un gate no se cierra con una opinión. Se cierra con `record`, y
 **sin `--notes` el instrumento rechaza el registro**. Un `fail` o un `skip` son
@@ -115,6 +134,90 @@ Lo que sí cambia, y hay que leerlo antes de empezar la campaña:
   todos los perfiles existentes salvo que alguien active la mitigación.
 
 **Pre-vuelo de `v3.76.0` (2026-09-21):**
+
+| Comprobación | Resultado |
+|---|---|
+| `npm run build` | correcto; el bundle publica `3.76.0` |
+| `python scripts/validation_gate.py auto --require-dist` | **10/10** |
+| `.venv\Scripts\python.exe -m scripts.audit_dossier runtime-audit` | **Ausentes: 0** |
+| `.venv\Scripts\python.exe download_models.py --check` | todo lo que debe estar en disco, en disco |
+| `ollama list` | `llama3.1:8b` (`46e0c10c039e`) instalado |
+| Dossiers de G7 regenerados tras el diff del PIN | **cero diferencia** |
+| 7 gates | **`pending`** (la campaña sigue sin ejecutarse: exige hardware, corte de red real y una máquina limpia) |
+
+
+### Re-congelación del 2026-09-23 — el árbol que se certifica pasa a ser `v3.81.0`
+
+`v3.75.8` fue el árbol que se congeló, y **desde entonces se publicó producto**:
+V3.78.0 (diccionario en tres modos + Flashcards), V3.79.0 (el perfil), V3.80.0
+(Flashcards a fondo), el lote de estabilización de `v3.80.1` y **V3.81.0**, que es
+la **Fase 3 del P0 de identidad** —cuentas con contraseña y email—. Las notas
+anteriores ya movieron el ancla dos veces; esta la vuelve a mover al árbol actual.
+
+**No invalida nada, y la razón es la misma de siempre y es medible:** la campaña
+tiene **0 `record`** —los 7 gates en `pending`— así que no hay evidencia que
+desmentir.
+
+Lo que cambia, y hay que leerlo antes de empezar la campaña:
+
+- **El árbol certificado es el de `v3.81.0`**, identificado **por tag** y **sin
+  fijar un SHA a mano** (regla de V3.73.5): el `head_sha` de los 7 `record` es el
+  **`HEAD` real en el momento de grabar**. Las tablas de identidad anteriores
+  (`v3.75.8`, `v3.76.0`) son **historia del pre-vuelo**, no el árbol a validar.
+- **El pre-vuelo hay que repetirlo sobre `v3.81.0`** antes de la campaña (los
+  comandos de §A). No se ha ejecutado aquí: esta release solo mueve el ancla
+  documental y deja el pre-vuelo para la sesión de campo, que exige hardware.
+- **V3.78.0–V3.81.0 no tocan currículum, corpus, evaluaciones ni banco de
+  listening** (todos los bumpos de versión de motor están explícitamente fuera),
+  así que los **9 dossiers de G7 no se re-derivan**: los instrumentos del dossier
+  no leen mazos, tarjetas, traducción propia, cuentas ni correo.
+- **⚠ El contrato de la API ya NO es solo aditivo.** Hasta `v3.80.0` todo lo
+  añadido era aditivo; `v3.81.0` **retira** `PUT /api/session/pin` (el PIN de
+  perfil desaparece) y **cambia** `POST /api/session`, que ahora exige `password`
+  cuando la cuenta tiene credencial (`401 PASSWORD_REQUIRED` /
+  `PASSWORD_INVALID`, `429 PASSWORD_THROTTLED`). Añade `/api/account/verify`,
+  `/api/account/resend-verification`, `/api/account/unenroll` y
+  `PUT /api/session/password`. Cualquier instrumento de campo que abriera sesión
+  con un `user_id` a secas **debe** conocer el contrato nuevo antes de grabar: es
+  la diferencia entre esta re-congelación y las dos anteriores.
+- **Los 7 gates siguen `pending`.** Esta re-congelación **no** ejecuta ni cierra
+  ninguno.
+
+### Re-congelación del 2026-09-22 — el árbol que se certifica pasa a ser `v3.80.1`
+
+`v3.75.8` fue el árbol que se congeló en septiembre, pero **desde entonces se
+publicó producto**: V3.78.0 (diccionario en tres modos + Flashcards), V3.79.0
+(el perfil) y V3.80.0 (Flashcards a fondo) y V3.80.1 (esta estabilización). La
+nota de `v3.76.0` de arriba ya movió el ancla una vez; esta la vuelve a mover al
+**cierre de la auditoría de V3.80.0**, que es el árbol actual.
+
+**No invalida nada, y la razón es la misma de siempre y es medible:** la campaña
+tiene **0 `record`** —los 7 gates en `pending`— así que no hay evidencia que
+desmentir. `--same-tree` no puede marcar nada como «de otro árbol» porque no hay
+grabaciones.
+
+Lo que cambia, y hay que leerlo antes de empezar la campaña:
+
+- **El árbol certificado es el de `v3.80.1`**, identificado **por tag** y **sin
+  fijar un SHA a mano** (regla de V3.73.5): el `head_sha` de los 7 `record` es el
+  **`HEAD` real en el momento de grabar**. Las tablas de identidad de `v3.75.8`
+  (arriba) y `v3.76.0` son **historia del pre-vuelo**, no el árbol a validar.
+- **El pre-vuelo hay que repetirlo sobre `v3.80.1`** antes de la campaña (los
+  comandos de §A). No se ha ejecutado aquí: esta release solo mueve el ancla
+  documental y deja el pre-vuelo para la sesión de campo, que exige hardware.
+- **V3.78.0–V3.80.1 no tocan currículum, corpus, evaluaciones ni banco de
+  listening** (todos los bumpos de versión de motor están explícitamente fuera),
+  así que los **9 dossiers de G7 no se re-derivan** por estos cambios: los
+  instrumentos del dossier no leen mazos, tarjetas, traducción propia ni
+  accesibilidad de tabs. Si alguno se regenerara, debería salir sin diferencia.
+- **El contrato de la API respecto a `v3.76.0` es aditivo:** se añadieron los
+  endpoints de Flashcards (V3.78.0) y `PATCH /api/vocabulary/items` (V3.80.0).
+  Cualquier protocolo de campo que recorra la superficie autenticada debe
+  conocerlos; ninguno cambia el significado de los existentes.
+- **Los 7 gates siguen `pending`.** Esta re-congelación **no** ejecuta ni cierra
+  ninguno.
+
+**Pre-vuelo de `v3.76.0` (2026-09-21) — es historia y no se reescribe:**
 
 | Comprobación | Resultado |
 |---|---|
