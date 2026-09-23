@@ -16,7 +16,12 @@ import { ensureProfile } from "./gateHelper";
  * viewport, por bajo que sea— y que la cabecera y el pie siguen alcanzables. La
  * invariante del CSS, que es donde vive la decisión, se fija además en
  * `src/styles/dialogLayout.test.ts`.
+ *
+ * V3.81: el rótulo pasa de «Edit profile» a «Edit user» (la gestión de perfiles
+ * se convierte en gestión de usuarios). Se busca por el nombre **actual**, y si
+ * vuelve a cambiar, este spec es el que lo dice.
  */
+const EDIT_LABEL = "Edit user";
 
 /** Abre el diálogo de edición del perfil de la sesión. */
 async function openProfileDialog(page: Page) {
@@ -25,8 +30,8 @@ async function openProfileDialog(page: Page) {
   // El disparador del menú se localiza por su contrato accesible (`aria-haspopup`)
   // y no por su texto: su nombre accesible es el del perfil, que cambia.
   await page.locator('button[aria-haspopup="menu"]').click();
-  await page.getByRole("button", { name: "Edit profile" }).click();
-  await expect(page.getByRole("dialog", { name: "Edit profile" })).toBeVisible();
+  await page.getByRole("button", { name: EDIT_LABEL }).click();
+  await expect(page.getByRole("dialog", { name: EDIT_LABEL })).toBeVisible();
 }
 
 test("el diálogo de perfil no se sale por arriba en un viewport bajo", async ({
@@ -39,7 +44,7 @@ test("el diálogo de perfil no se sale por arriba en un viewport bajo", async ({
   await page.setViewportSize({ width: 520, height: 300 });
   await page.waitForTimeout(150);
 
-  const dialog = page.getByRole("dialog", { name: "Edit profile" });
+  const dialog = page.getByRole("dialog", { name: EDIT_LABEL });
   const box = await dialog.boundingBox();
   expect(box).not.toBeNull();
   // La cota que rompía el centrado con flexbox: el borde superior empieza DENTRO
@@ -62,7 +67,7 @@ test("el cuerpo del diálogo scrollea y la cabecera no se va con el scroll", asy
   await page.setViewportSize({ width: 520, height: 300 });
   await page.waitForTimeout(150);
 
-  const dialog = page.getByRole("dialog", { name: "Edit profile" });
+  const dialog = page.getByRole("dialog", { name: EDIT_LABEL });
   const close = page.getByRole("button", { name: "Close" });
   const headerBefore = await close.boundingBox();
 

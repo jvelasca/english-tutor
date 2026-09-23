@@ -77,6 +77,30 @@
 > estaba abierta escribiendo en `tutor.db`** (en la segunda pasada, 3008/3008).
 > Detalle en `release-notes-v3.80.0.md`.
 >
+> **Nota (2026-09-23 · el rótulo que dejó el CI rojo): V3.81.1 — release DE PRODUCTO
+> (patch) que NO toca ni una línea de la app.** El CI del commit del tag `v3.81.0`
+> salió **11 de 12 jobs verdes** y el rojo era **`Playwright E2E (visual)`**
+> (`6 failed · 28 skipped · 50 passed`): las **dos** pruebas de
+> `frontend/tests/visual/profileDialog.spec.ts` en los **tres** breakpoints. La
+> causa no era el producto: `V3.81.0` renombró «perfil» a «usuario» y con él
+> `user.editProfile` (`"Edit profile"` → `"Edit user"`) y `profile.editTitle`
+> (idem), pero el spec de `V3.79.0` seguía buscando el rótulo viejo, así que el
+> `click` agotaba los 30 s de timeout — el menú y el diálogo **funcionaban**. Se
+> cierra poniendo el rótulo actual en **una** constante del propio spec
+> (`EDIT_LABEL`) usada en las cuatro búsquedas, con el motivo escrito al lado. **El
+> hueco de método es lo que importa:** la verificación local de `V3.81.0` lanzó
+> **solo los dos specs nuevos** (`dictionarySmoke`/`flashcardsSmoke`, 6/6) y
+> **nunca el barrido visual completo**, que es donde vivía el spec afectado; la
+> lección queda escrita —**un renombrado de i18n obliga a lanzar el barrido
+> entero, no solo los specs nuevos**—. Verificado con `npx playwright test
+> tests/visual/profileDialog.spec.ts` → **6 passed** contra un backend real sobre
+> una **copia** de la BD, y el candado **muerde** (con el rótulo viejo, esos seis
+> casos fallan por timeout: lo demostró el CI). **Sin migración, sin endpoints,
+> sin cambios de contrato y sin tocar el currículum ni las versiones pedagógicas**;
+> **G1–G7 siguen `pending`** y el árbol de certificación **no se mueve** (el de
+> `v3.81.1` solo se diferencia en un fichero de pruebas), así que no hay nada que
+> re-anclar. Detalle en `release-notes-v3.81.1.md`.
+>
 > **Nota (2026-09-23 · gestión de usuarios): V3.81.0 — release DE PRODUCTO (minor)
 > que publica DOS LOTES BAJO UNA MISMA ETIQUETA: (1) la estabilización pre-freeze
 > que se iba a publicar como `v3.80.1` y (2) la Fase 3 del P0 de identidad, que es

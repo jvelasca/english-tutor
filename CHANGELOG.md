@@ -4,6 +4,51 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.81.1] — 2026-09-23
+
+**Release de PRODUCTO (patch) que **no toca ni una línea de la app**: arregla la
+**prueba visual que el CI de `v3.81.0` encontró roja**. El CI del commit del tag
+`v3.81.0` salió **11 de 12 jobs verdes** y el único rojo fue **`Playwright E2E
+(visual)`**: `6 failed · 28 skipped · 50 passed`, y los 6 eran **las dos pruebas de
+`frontend/tests/visual/profileDialog.spec.ts` en los tres breakpoints**.
+
+**La causa: un rótulo viejo en un spec, no un fallo del producto.**
+`V3.81.0` renombró el concepto entero de «perfil» a «usuario» y con él dos cadenas
+que el spec de `V3.79.0` daba por fijas: `user.editProfile` pasó de
+`"Edit profile"` a `"Edit user"` y `profile.editTitle` de `"Edit profile"` a
+`"Edit user"`. El spec seguía buscando `getByRole("button", { name: "Edit
+profile" })` y el diálogo `name: "Edit profile"`, así que el `click` agotaba los
+30 s de timeout: **el menú y el diálogo funcionaban**, lo que no cuadraba era el
+texto que la prueba esperaba.
+
+**El arreglo** es un rótulo en una constante del propio spec (`EDIT_LABEL`) usado
+en las cuatro búsquedas, con el motivo escrito al lado, para que el próximo
+renombrado se arregle en **un** sitio y el spec siga diciendo por qué.
+
+**Por qué no se vio antes (y esto es lo que hay que leer).** La verificación local
+de `V3.81.0` lanzó **solo los dos specs nuevos** —`dictionarySmoke` y
+`flashcardsSmoke`, **6/6** en los tres breakpoints— y **nunca la suite visual
+completa**, que es donde vivía el spec afectado. Las notas de `V3.81.0` dicen
+literalmente eso, y por eso son ciertas y a la vez insuficientes: **lo que se
+corrió se declaró; lo que no se corrió no.** El barrido visual completo es la
+autoridad del CI (§`PLAYWRIGHT E2E`), y en local ya estaba declarado con
+flakiness, así que la lección no es «el barrido local no vale» sino que **un
+renombrado de i18n obliga a lanzar el barrido entero, no solo los specs nuevos**.
+
+**Verificación.** `npx playwright test tests/visual/profileDialog.spec.ts`:
+**6 passed** (2 pruebas × 3 breakpoints) contra un backend real sobre una **copia**
+de la BD. Y la prueba de que el candado **muerde** la dio el propio CI: con el
+rótulo viejo, esos mismos 6 casos **fallan** por timeout. El resto de la release
+es idéntica a `v3.81.0`: `ruff` limpio, `pytest` **3085/3085**, `tsc` limpio,
+`vitest` **1028/1028**, i18n `--strict` **1733**, `check_release_consistency`
+(`3.81.1`) y `validation_gate.py auto` **10/10**.
+
+**Sin migración, sin endpoints, sin cambios de contrato y sin tocar el
+currículum**, las evaluaciones ni las versiones pedagógicas
+(`CURRICULUM_VERSION` sigue `1.3.1`). **G1–G7 siguen `pending`** y el árbol de
+certificación sigue siendo el de `v3.81.0` —el de `v3.81.1` solo se diferencia en
+un fichero de pruebas—.
+
 ## [3.81.0] — 2026-09-23
 
 **Release de PRODUCTO (minor) que publica DOS LOTES BAJO UNA SOLA ETIQUETA: (1) la estabilización
