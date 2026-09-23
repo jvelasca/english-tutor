@@ -264,6 +264,33 @@ mismo `sha256` y los mismos recuentos.
   (`.github/workflows/ci.yml` escucha `push: branches: [main]` y `pull_request`).
   Un tag no dispara nada: quien audite «el CI del tag» audita el CI del commit al
   que apunta el tag.
+
+```bash
+git rev-parse 'v3.81.2^{commit}'   # commit de release (el SHA exacto que se audita)
+gh run list --commit <sha>
+```
+
+| Certificación | Valor |
+|---|---|
+| Workflow | `CI` · evento `push` · rama `main` |
+| Run | **`35926727880`** — https://github.com/jvelasca/english-tutor/actions/runs/35926727880 |
+| Resultado | **`conclusion = success`, 12/12 jobs** |
+
+Los doce jobs verdes: `Release consistency`, `Backend (ruff + pytest)`,
+`Frontend (tsc + vitest + build)`, `Launcher (ruff + pytest)`, `Launcher (Windows,
+ruff + pytest)`, `Product origin (Windows, informativo)`, `Product origin (UI
+served over HTTPS)`, `Content validation`, `Validation gate (checks automáticos)`,
+`Beta V3.0 gate`, `Dependency audit (pip-audit + npm audit)` y `Playwright E2E
+(visual)` —este último es el que estaba rojo en `v3.81.0` y el que `v3.81.1`
+arregló—.
+
+- **Errata declarada (patrón de `v3.81.1`, §0.2):** el id de la run **no puede ir
+  dentro del propio commit que la dispara** (un commit no contiene el id del push
+  que lo publica). Se añade en un **commit documental POSTERIOR al tag `v3.81.2`**
+  que **no toca producto, pruebas ni versiones**, de modo que `main` va **un commit
+  por delante** de `v3.81.2` y el invariante «`git diff --stat v3.81.2..main --
+  backend frontend launcher scripts` sale **vacío**» se cumple **en ese commit**, no
+  en el del tag. El tag **no se mueve** (regla de `docs/audit/KIT-VALIDACION-GATES.md`).
 - **Lo que hay que mirar, en orden:**
   1. `git diff v3.81.1..v3.81.2 -- backend` → los cuatro sitios que escribían el
      correo, `redact_emails` + la migración de arranque, `redact_subject_notes` y
@@ -275,7 +302,8 @@ mismo `sha256` y los mismos recuentos.
   anterior (`agentes/auditoria-total-externa-v381.md`) declara como invariante que
   `git diff --stat v3.81.1..main -- backend frontend launcher scripts` sale
   **vacío**. Ese invariante **deja de ser cierto a partir del tag `v3.81.2`**, y se
-  declara aquí para que nadie lo lea como un fallo: el documento sigue siendo
-  válido **para el arco que audita** (`v3.80.0..v3.81.1`), y la auditoría del nuevo
-  arco necesita su propio punto de entrada anclado a `v3.81.2`.
+  declara aquí (y en una **errata en la cabecera de ese mismo documento**) para que
+  nadie lo lea como un fallo: el documento sigue siendo válido **para el arco que
+  audita** (`v3.80.0..v3.81.1`), y la auditoría del nuevo arco necesita su propio
+  punto de entrada anclado a `v3.81.2`.
 - **La revisión es de solo lectura:** un tag publicado no se recrea.
