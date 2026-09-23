@@ -16,6 +16,13 @@
 > delante (`G0`). No cambia lo que exigen los siete anteriores; sí cambia la
 > cifra: la puerta de V4.0 pasa de **7/7** a **8/8**. Con `without_password > 0`
 > el P0 de identidad no está cerrado y el gate no puede declararse en `pass`.
+> **Ojo al leer hacia abajo (marcador de historicidad).** Las notas **fechadas** que
+> siguen —de 2026-09-17 (`v3.73.2`) a 2026-09-23 (`v3.81.0`)— dicen «los **7** gates
+> siguen `pending`», y **es correcto para su fecha**: son la cadena cronológica de
+> re-congelaciones y no se reescriben. La **cifra vigente es 8**, `status --strict`
+> exige **8/8** y el octavo es `G0 · identidad-cuentas`. Un «7» en este documento
+> solo es hallazgo si aparece en una sección **sin fecha**.
+>
 > **Estado de partida (2026-09-17, `v3.73.2`):** `auto` **10/10** · 7 gates
 > `pending`. Nada de esta planilla está ejecutado todavía.
 > **Árbol congelado para la campaña (2026-09-20, `v3.75.8`):** pre-vuelo

@@ -257,13 +257,14 @@
 
 ### Instrumento nuevo (no es código de producto)
 
-- **`scripts/validation_gate.py`** — los 7 gates de validación física como estado
+- **`scripts/validation_gate.py`** — los **8** gates de validación física como estado
   registrado (`auto` / `record` / `status --strict`), con evidencia en
   `docs/audit/validation-evidence.json` y runbook en
   `docs/audit/VALIDATION-RELEASE-V373.md`. `status --strict` es la puerta real de
   V4.0: falla mientras algún gate no esté en `pass`; `--same-tree` la endurece
-  exigiendo que los siete `head_sha` sean el commit actual (V3.73.4). `record`
-  sella el commit validado y la run de CI: un `pass` sin commit se rechaza.
+  exigiendo que los **ocho** `head_sha` sean el commit actual (V3.73.4; la cifra
+  pasa de **siete a ocho** en `V3.81.2`, con el gate `G0 · identidad-cuentas`).
+  `record` sella el commit validado y la run de CI: un `pass` sin commit se rechaza.
   Candados: `backend/tests/test_validation_gate_v373.py` y
   `backend/tests/test_docs_drift_v373.py`.
 
@@ -1899,6 +1900,13 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   intactos. Incluye la comprobación de que el historial post-purga no tiene PII.
 
 ### Deuda que sigue abierta (y ahora es candado de V4.0)
+
+- **Marcador de historicidad del recuento de gates.** Las entradas **fechadas** de
+  este documento (y las de `docs/audit/KIT-VALIDACION-GATES.md`, y las notas de
+  release de la serie V3.73–V3.80) dicen «**7** gates» y **es correcto para su
+  fecha**: son el registro de entonces y no se reescriben. La cifra **vigente** es
+  **8** (`G0 · identidad-cuentas`, `V3.81.2`) y `status --strict` exige **8/8**. Un
+  «7» **solo** es hallazgo si aparece en una sección **sin fecha**. `[VALIDACIÓN]`
 
 - **La transición de las cuentas heredadas se cierra con un candado, no con
   código.** Se mantiene la compatibilidad (`password_hash == ''` sigue entrando)

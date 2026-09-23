@@ -276,5 +276,5 @@ estimadores usan.
   `PUT /api/session/pin` y **cambia** `POST /api/session` (exige contraseña si la
   cuenta la tiene), así que un instrumento de campo que abriera sesión con un
   `user_id` a secas debe conocerlo. Todo queda declarado en la sección
-  «Re-congelación» de `docs/audit/KIT-VALIDACION-GATES.md`. Los **7 gates siguen en
-  `pending`**.
+  «Re-congelación» de `docs/audit/KIT-VALIDACION-GATES.md`. Los **8 gates siguen en
+  `pending`** (el octavo, `G0 · identidad-cuentas`, se añade en `V3.81.2`).

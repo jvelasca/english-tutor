@@ -1,4 +1,4 @@
-# V3.73 — Release de validación (runbook de los 7 gates)
+# V3.73 — Release de validación (runbook de los 8 gates)
 
 > **Naturaleza:** V3.73 es una release de **validación**, no de producto. Cierra
 > el endurecimiento que la auditoría de V3.72 dejó como P2/P3 (fail-closed del
