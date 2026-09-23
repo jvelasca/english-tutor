@@ -71,9 +71,9 @@ que el spec de `V3.79.0` daba por fijas:
 ```bash
 git diff -U0 v3.80.0..v3.81.0 -- frontend/src/utils/i18n.ts
 # -  "user.editProfile": { en: "Edit profile", es: "Editar perfil" },
-# +  "user.editProfile": { en: "Edit user",    es: "Editar usuario" },
+# +  "user.editProfile": { en: "Edit user", es: "Editar usuario" },
 # -  "profile.editTitle": { en: "Edit profile", es: "Editar perfil" },
-# +  "profile.editTitle": { en: "Edit user",    es: "Editar usuario" },
+# +  "profile.editTitle": { en: "Edit user", es: "Editar usuario" },
 ```
 
 El spec buscaba el rótulo **viejo** en cuatro sitios: el botón del menú y el
@@ -155,7 +155,7 @@ alguien busca, el barrido entero se lanza, no solo los specs nuevos.
 | i18n `--strict` | **1733** cadenas, 0 huérfanas / 0 usadas sin definir / 0 duplicadas |
 | `check_release_consistency.py` | OK en los **6 orígenes** (`3.81.1`) |
 | `validation_gate.py auto` | **10/10** |
-| CI del commit del tag | **se resuelve por comando** (§1); el rojo que abrió esta release queda verde |
+| CI del commit del tag | run `35851931672` (workflow `CI`, evento `push`, `headSha = 2c413f9`): **`conclusion = success`, 12/12 jobs** — el rojo que abrió esta release queda verde |
 
 **La prueba visual se hizo contra un backend real sobre una COPIA de la BD**
 (`backend/data/tutor.db` → temporal), como en V3.81.0: el `globalSetup` del
@@ -184,3 +184,34 @@ uso.
    parte de los fallos de la tanda). La autoridad del barrido completo es el CI, y
    por eso la verificación de esta release se apoya en CI más los specs concretos,
    no en «la tanda local salió verde».
+
+---
+
+## Para auditar esta release
+
+- **Ancla:** el tag anotado **`v3.81.1`** (`2c413f9`). La run que **certifica** ese
+  commit es la del **push a `main`** (`35851931672`, `conclusion = success`, 12/12
+  jobs), porque **el CI no dispara en tags** (`.github/workflows/ci.yml` escucha
+  `push: branches: [main]` y `pull_request`). Un tag no dispara nada: quien audite
+  «el CI del tag» audita el CI del commit al que apunta el tag.
+- **Punto de entrada de la auditoría externa:** `agentes/auditoria-total-externa-v381.md`.
+  Cubre **el arco `v3.80.0..v3.81.1`** (tres commits: uno documental y dos de
+  release —`V3.81.0` y `V3.81.1`—), con **siete invariantes** que se comprueban por
+  comando, **una lista cerrada** del diff, **42 preguntas falsables en 7 áreas**, una
+  **matriz de cierre** y las **discrepancias declaradas a propósito**.
+- **Informe esperado:** `docs/audit/AR-AUDITORIA-TOTAL-V381.md` (formato de
+  `docs/audit/TEMPLATE.md`).
+- **La revisión es de solo lectura:** un tag publicado no se recrea.
+- **Erratas declaradas en el punto de entrada, para que no sorprendan:**
+  **§0.1** — el rango tiene tres commits y el primero es **posterior** al tag
+  `v3.80.0`; **§0.2** — cuatro cifras del §1 se habían calculado sobre
+  `v3.80.0..v3.81.0` y se corrigen en un **cuarto commit documental en `main`,
+  posterior al tag** (el tag no se mueve), de modo que `main` va **un commit por
+  delante** de `v3.81.1` y ese commit **no toca producto ni pruebas**.
+
+> **Qué es este Release, dicho sin adornos.** El Release de la página cubre **el
+> arco entero** (la gestión de usuarios de `V3.81.0` más este parche), pero **el
+> cambio que publica `v3.81.1` es una prueba**: el producto de `v3.81.0` no se toca.
+> El Release **no existía para `v3.81.0`**, y se publica anclado a `v3.81.1`
+> precisamente porque **el tag `v3.81.0` lleva el CI rojo** y un tag con un job rojo
+> no certifica nada. **El ancla de auditoría es el tag, no esta página.**

@@ -75,6 +75,56 @@ git show --stat 276fd8b
 
 ---
 
+## 0.2 Errata propia — cuatro cifras del §1 estaban calculadas sobre el rango viejo
+
+> **Qué es esta nota.** La corrección de un error **mío**, encontrado al preparar la
+> publicación del Release de `v3.81.1`, y declarado aquí **antes** de que lo encuentre
+> el auditor, porque este documento se publica **dentro** del tag y no se reescribe.
+
+Este punto de entrada se commiteó en `2c413f9` (tag `v3.81.1`). Sus cifras del §1.1 y
+el §1.3 se habían calculado sobre el rango `v3.80.0..v3.81.0` —**antes** de que
+existiera el hotfix—, así que **no describían el rango que el propio documento
+declara auditar** (`v3.80.0..v3.81.1`). Las cuatro cifras corregidas:
+
+| Cifra | Declarada (mal) | Real (`v3.80.0..v3.81.1`) |
+| --- | --- | --- |
+| Ficheros totales del arco | 95 | **98** |
+| Líneas totales | +12 520 / −2 094 | **+13 611 / −2 098** |
+| Ficheros de `frontend/` | 37 | **38** |
+| Ficheros `*.md` | 15 | **17** |
+
+Las cifras de `backend/` (**31**) y `launcher/` (**10**) y la de **50 ficheros
+no-test de producto** ya eran correctas: el hotfix solo añade un fichero de pruebas.
+El error es **de método y tiene causa**: los números se midieron al escribir el
+documento y **no se volvieron a medir cuando el rango ganó un commit**. Es
+exactamente la misma clase de fallo que la errata heredada del §0.1 —**el rango se
+movió y la prosa no**—, lo que la hace más incómoda y más útil de declarar.
+
+**Cómo se entrega la corrección, y por qué así:** con un **cuarto commit
+documental en `main`, POSTERIOR al tag `v3.81.1`** (`docs(audit): corrige el recuento
+del arco y resuelve el CI del tag`). No se mueve el tag: **un tag publicado no se
+recrea**. Consecuencias que el auditor debe tener en cuenta, y comprobar:
+
+```bash
+git log --oneline v3.81.1..main
+# un commit documental: corrige el recuento del arco
+git diff --stat v3.81.1..main -- backend frontend launcher scripts   # VACÍO
+```
+
+- **`main` va un commit por delante de `v3.81.1`**, y ese commit **no toca producto
+  ni pruebas**: solo `agentes/auditoria-total-externa-v381.md`. El invariante de que
+  el diff `v3.81.1..main` de `backend frontend launcher scripts` sale **vacío** sigue
+  cumpliéndose, y es el que el auditor debe ejecutar **antes** de dar por bueno este
+  texto.
+- **Las cifras del §1.1 y el §1.3, tal y como las lee, son las corregidas.** Si el
+  auditor quiere ver el error, está en el diff `v3.81.1..main` de este fichero.
+- **La lección, escrita:** un recuento citado en un documento **caduca cuando el
+  rango crece**. En este arco el rango creció *después* de escribirlo, y la disciplina
+  que faltó es la que el §G2 pide al auditor: **volver a medir al cerrar**, no al
+  escribir.
+
+---
+
 ## 0. Cómo arrancar (auditor con contexto nuevo)
 
 Orden de lectura recomendado, de marco a evidencia:
@@ -166,7 +216,7 @@ git log -1 --format='%H %s' 'v3.81.1^{commit}'
 ### 1.1 Invariantes — los que se pueden cumplir, y solo esos
 
 Este arco **cambia producto** (**50 ficheros** no-test de `backend/`, `frontend/` y
-`launcher/`; **95** en total contando documentación y pruebas: **+12 520 / −2 094**),
+`launcher/`; **98** en total contando documentación y pruebas: **+13 611 / −2 098**),
 así que **no se declaran** ni el invariante «el diff de producto sale vacío» ni el de
 «el contrato solo crece» —**serían falsos**, y el segundo **a propósito**—. Se
 declaran **siete invariantes acotados**, cada uno con el comando que lo comprueba.
@@ -296,16 +346,16 @@ que siga siendo cierto mañana depende de leer el fichero, no del test (§6-vi).
 | --- | --- | --- | --- |
 | 1 | `276fd8b` | **Documental, POSTERIOR a `v3.80.0`** (§0.1): el punto de entrada del arco anterior. No toca producto. | — |
 | 2 | `6724d8b` | `release(v3.81.0)`: cuentas locales con contraseña, la baja que no borra y la consola de usuarios | **`v3.81.0`** |
-| 3 | (release `v3.81.1`) | `release(v3.81.1)`: el rótulo que dejó el CI rojo (`Edit profile` → `Edit user` en un spec visual) | **`v3.81.1`** |
+| 3 | `2c413f9` | `release(v3.81.1)`: el rótulo que dejó el CI rojo (`Edit profile` → `Edit user` en un spec visual) | **`v3.81.1`** |
 
 ### 1.3 Lista cerrada — el diff del arco, por área
 
 ```bash
-git diff --shortstat v3.80.0..v3.81.1            #  95 files changed, 12520+/2094-
+git diff --shortstat v3.80.0..v3.81.1            #  98 files changed, 13611+/2098-
 git diff --shortstat v3.80.0..v3.81.1 -- backend #  31 files changed,  4628+/ 864-
-git diff --shortstat v3.80.0..v3.81.1 -- frontend#  37 files changed,  3619+/ 835-
+git diff --shortstat v3.80.0..v3.81.1 -- frontend#  38 files changed,  3628+/ 839-
 git diff --shortstat v3.80.0..v3.81.1 -- launcher#  10 files changed,  1928+/ 273-
-git diff --shortstat v3.80.0..v3.81.1 -- '*.md'  #  15 files changed,  2336+/ 117-
+git diff --shortstat v3.80.0..v3.81.1 -- '*.md'  #  17 files changed,  3418+/ 117-
 ```
 
 **`backend/` (31).** Nuevos: `services/credentials.py` (el relevo de `pins.py`:
@@ -322,7 +372,7 @@ autenticación, baja y contraseña temporal), `repositories/db.py` (migración a
 `domain/{users,profile_requests}.py`, `main.py` y los tests
 `test_{sessions,public_surface,user_profile,profile_requests_v377,runtime_audit_v371}.py`.
 
-**`frontend/` (37).** Nuevos: `components/AccountDialog.tsx` (+ **21** tests),
+**`frontend/` (38).** Nuevos: `components/AccountDialog.tsx` (+ **21** tests),
 `utils/credentials.ts` (+ **8** tests) y los dos specs visuales permanentes
 (`tests/visual/dictionarySmoke.spec.ts`, `flashcardsSmoke.spec.ts`). **Borrados:** la
 pestaña de PIN de Ajustes con sus cadenas, y `utils/pin.ts` con su
@@ -349,9 +399,16 @@ git diff --stat v3.81.1..main -- backend frontend launcher scripts   # vacío
 ```
 
 **A fecha de entrega (2026-09-23)**, y el auditor debe **re-resolverlo** porque los
-datos de CI **no forman parte del repositorio**: la run del commit del tag tenía
-**12 jobs** y **los 12 en `success`**. La consistencia de versión salió `OK` —una
-fuente de verdad y **cinco** sitios comprobados— y el invariante 3 salió vacío.
+datos de CI **no forman parte del repositorio**: la run del commit del tag
+(`35851931672`, workflow `CI`, evento `push`, `headSha = 2c413f9`) terminó con
+**`conclusion = success`: 12 jobs y los 12 en `success`**, incluido el
+`Playwright E2E (visual)` que estaba rojo en `v3.81.0`. La consistencia de versión
+salió `OK` —una fuente de verdad (`backend/config.py::VERSION`) y **cinco** sitios
+comprobados por el gate (`SOURCES` de `scripts/check_release_consistency.py`:
+`frontend/package.json`, `frontend/package-lock.json`, `README.md`, `CHANGELOG.md` y
+`PLAN.md`; las notas los llaman «**6 orígenes**» contando también la fuente de
+verdad— **es el mismo hecho contado de dos formas, no una discrepancia**) y el
+invariante 3 salió vacío.
 
 **El dato que hace honesto este punto de entrada: el CI de `v3.81.0` NO estaba
 verde.** La run de su commit (`gh run list --commit 6724d8be…`) salió **11 de 12** y
