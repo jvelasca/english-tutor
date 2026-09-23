@@ -21,7 +21,7 @@ Tres subcomandos:
 - ``status``    — tabla de los gates y su estado. Con ``--strict`` sale 1 si
                   algún gate no está en ``pass``; con ``--same-tree`` exige
                   además que la evidencia sea **de este mismo commit** (la
-                  puerta fuerte de V4.0: los 7 gates contra un árbol congelado).
+                  puerta fuerte de V4.0: los 8 gates contra un árbol congelado).
 
 El script **no ejecuta** ningún flujo de la app: certifica lo que una persona
 hizo. Un ``pass`` sin evidencia es exactamente lo que este instrumento existe para
@@ -68,7 +68,7 @@ class Gate:
     """Un gate de validación física: qué se prueba, dónde y qué se registra.
 
     ``human`` se declara **gate a gate** (sin valor por defecto) porque es la
-    propiedad que define el instrumento: **los 7 gates exigen una persona**,
+    propiedad que define el instrumento: **los 8 gates exigen una persona**,
     ya que ``auto`` no ejecuta ningún flujo de la app. Declararlo explícito
     evita que la cifra dependa de un descuido del código.
     """
@@ -80,9 +80,23 @@ class Gate:
     human: bool
 
 
-# --- Los 7 gates de la release de validación --------------------------------
+# --- Los 8 gates de la release de validación --------------------------------
 
 GATES: tuple[Gate, ...] = (
+    Gate(
+        id="identidad-cuentas",
+        title="G0 · Identidad y ciclo de vida de cuentas",
+        protocol=(
+            "backend/scripts/e2e_accounts_v381.py · "
+            "docs/audit/PLAN-P0-IDENTIDAD.md §16"
+        ),
+        evidence=(
+            "El E2E de cuentas verde sobre una copia de la BD **y** "
+            "`without_password == 0` en la BD de uso: la migración de las cuentas "
+            "heredadas está cerrada y el historial no conserva PII tras la purga."
+        ),
+        human=True,
+    ),
     Gate(
         id="offline-fisico",
         title="G1 · Los 12 flujos con la red cortada",
@@ -155,12 +169,15 @@ GATES: tuple[Gate, ...] = (
     ),
 )
 
-# Cifra vigente del instrumento: **7 de 7 gates son de acción humana** (ver
+# Cifra vigente del instrumento: **8 de 8 gates son de acción humana** (ver
 # `Gate.human`). La expresión «7 gates (5 de ellos acción humana)» que aparece en
 # notas históricas de V3.73.0 se refiere a los **cinco bloques físicos que V3.72
 # declaró** (corte de red, máquina limpia, Windows real, dispositivos y audio):
 # el instrumento los cubre y añade `journeys` y `pedagogia`, que también exigen
-# una persona. No hay dos cifras válidas: son siete.
+# una persona. V3.81.x añade **G0** (identidad y ciclo de vida de cuentas): con
+# `without_password > 0` el P0 de identidad no está cerrado, y ahora es una
+# condición de la puerta de V4.0, no una nota al pie. No hay dos cifras válidas:
+# son ocho.
 GATES_BY_ID = {gate.id: gate for gate in GATES}
 
 # Protocolos funcionales que se ejecutan **a pie de máquina** durante la
@@ -188,8 +205,8 @@ GIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 def git_head() -> str | None:
     """Commit que se está validando (``None`` si este árbol no tiene git).
 
-    La evidencia tiene que nombrar **su** árbol: sin este dato, «los 7 gates en
-    `pass`» puede significar siete gates probados en siete commits distintos.
+    La evidencia tiene que nombrar **su** árbol: sin este dato, «los 8 gates en
+    `pass`» puede significar ocho gates probados en ocho commits distintos.
     """
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -422,7 +439,7 @@ def check_runtime_audit() -> Check:
 
 
 def check_gates_declared() -> Check:
-    """Los 7 gates existen como definición y están escritos en el runbook."""
+    """Los 8 gates existen como definición y están escritos en el runbook."""
     problems: list[str] = []
     if not RUNBOOK.is_file():
         problems.append("falta el runbook de la release de validación")
@@ -431,14 +448,14 @@ def check_gates_declared() -> Check:
         for gate in GATES:
             if gate.id not in text:
                 problems.append(f"el runbook no declara el gate {gate.id}")
-    if len(GATES) != 7:
-        problems.append(f"se esperaban 7 gates y hay {len(GATES)}")
+    if len(GATES) != 8:
+        problems.append(f"se esperaban 8 gates y hay {len(GATES)}")
 
     return Check(
         "gates-declarados",
-        "Los 7 gates están definidos y documentados",
+        "Los 8 gates están definidos y documentados",
         not problems,
-        "; ".join(problems) or "7 gates declarados",
+        "; ".join(problems) or "8 gates declarados",
     )
 
 
@@ -482,7 +499,7 @@ def check_evidence_not_invented() -> Check:
             "evidencia-integra",
             "La evidencia registrada es válida",
             True,
-            "sin evidencia todavía (los 7 gates están en `pending`)",
+            "sin evidencia todavía (los 8 gates están en `pending`)",
         )
 
     data = json.loads(EVIDENCE.read_text(encoding="utf-8"))
@@ -569,9 +586,9 @@ def report_markdown(checks: list[Check], version: str) -> str:
         lines.append(f"| {i} | {check.title} | {icon} {_status_of(check)} | {check.detail} |")
     lines.append("")
     lines.append(
-        "Los 7 gates de validación física se registran con "
+        "Los 8 gates de validación física se registran con "
         "`validation_gate.py record` (que sella el commit validado) y se consultan "
-        "con `status --strict`; con los 7 en `pass`, `status --strict --same-tree` "
+        "con `status --strict`; con los 8 en `pass`, `status --strict --same-tree` "
         "exige además que la evidencia sea de este mismo commit."
     )
     lines.append("")
@@ -678,7 +695,7 @@ def record(gate_id: str, status: str, notes: str, ci_run: str = "") -> int:
 
 
 def status_report(strict: bool, same_tree: bool = False) -> int:
-    """Estado de los 7 gates. `--strict` = puerta de V4.0; `--same-tree` la endurece."""
+    """Estado de los 8 gates. `--strict` = puerta de V4.0; `--same-tree` la endurece."""
     evidence = load_evidence()
     version = source_version()
     head = git_head()
@@ -712,7 +729,7 @@ def status_report(strict: bool, same_tree: bool = False) -> int:
     ok = pending == 0 and (not same_tree or (head is not None and foreign == 0))
     if ok:
         suffix = " contra este mismo commit" if same_tree else ""
-        print(f"OK: los 7 gates están en `pass`{suffix} — V4.0 puede declararse.")
+        print(f"OK: los 8 gates están en `pass`{suffix} — V4.0 puede declararse.")
         return 0
 
     problems: list[str] = []
@@ -725,7 +742,7 @@ def status_report(strict: bool, same_tree: bool = False) -> int:
             problems.append(f"{foreign} gates con evidencia de otro commit")
     print(f"PENDIENTE: {'; '.join(problems)}.")
     if strict and pending:
-        print("FAIL: `--strict` exige los 7 gates en `pass`.")
+        print("FAIL: `--strict` exige los 8 gates en `pass`.")
         return 1
     if same_tree and (not head or foreign):
         print("FAIL: `--same-tree` exige evidencia del commit actual.")
@@ -773,7 +790,7 @@ def main(argv: list[str] | None = None) -> int:
         help="id numérico o URL de la run de CI que publicó el commit validado",
     )
 
-    st = sub.add_parser("status", help="estado de los 7 gates de validación")
+    st = sub.add_parser("status", help="estado de los 8 gates de validación")
     st.add_argument(
         "--strict",
         action="store_true",

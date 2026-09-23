@@ -1,5 +1,18 @@
 # Auditoría EXTERNA del producto — punto de entrada anclado a `v3.81.1`
 
+> **ERRATA (2026-09-23, `v3.81.2`) — el invariante 3 de §1.1 ya no se cumple, y es
+> correcto que no se cumpla.** Este documento sigue siendo válido **para el arco que
+> audita** (`v3.80.0..v3.81.1`), pero declara como invariante que
+> `git diff --stat v3.81.1..main -- backend frontend launcher scripts` sale
+> **vacío** (§1.1, invariante 3). Eso era cierto cuando se entregó —`main` iba un
+> commit por delante y era documental— y **deja de serlo con la publicación de
+> `v3.81.2`**, que **sí** toca producto: el cierre de G0 (el historial deja de
+> guardar el correo, el orden de `EVENT_PURGED` y el **octavo gate**
+> `identidad-cuentas`). No es una violación del punto de entrada, es que **el ancla
+> se ha movido**: para auditar el arco nuevo hace falta un punto de entrada propio
+> anclado a `v3.81.2` (ver `release-notes-v3.81.2.md`, §«Para auditar esta
+> release»). El detalle del cambio está en `release-notes-v3.81.2.md`.
+
 > **Qué es este archivo.** El prompt **autocontenido** para que un auditor externo
 > (que **solo ve el repositorio público** de GitHub) audite **la gestión de usuarios
 > que convirtió «perfiles» en «cuentas»**, tal y como quedó publicada en el tag

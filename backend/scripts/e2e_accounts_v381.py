@@ -13,7 +13,7 @@ además lo que **no** puede cambiar: la evidencia de los demás y la BD original
 **Por qué existe.** La auditoría de V3.80.0 señaló como defecto una cifra «medida
 en la BD real» que no se podía reproducir desde el repositorio. Esta prueba no
 vuelve a caer en eso: **cualquiera puede correrla** con su propia copia y obtener
-los mismos 62 pasos.
+el mismo recorrido.
 
 Uso (desde la raíz del repositorio, con el intérprete del backend):
 
@@ -31,7 +31,7 @@ directorio temporal **antes** de importar `main`, así que la copia, sus copias 
 seguridad y su `session.secret` viven y mueren en el temporal. La última
 comprobación del guion lo verifica de forma explícita (sha256 de la BD real).
 
-Devuelve 0 si los 62 pasos pasan y 1 si alguno falla.
+Devuelve 0 si todos los pasos pasan y 1 si alguno falla.
 """
 
 from __future__ import annotations
@@ -58,6 +58,11 @@ DEFAULT_DB = BACKEND_DIR / "data" / "tutor.db"
 ADMIN_PIN = "pin-de-prueba-e2e-381"
 PASSWORD = "caballo-bateria-grapa"
 PASSWORD2 = "bateria-caballo-grapa"
+# Cuenta heredada que se **siembra** en la copia (no se depende de la BD de
+# entrada): el escenario de migración de V3.81.x tiene que ser reproducible en
+# cualquier copia, no saltarse «porque no había ninguna».
+LEGACY_ID = "e2e-legacy-sin-credencial-381"
+LEGACY_NAME = "E2E Heredada"
 TABLES = ["users", "vocabulary", "learning_events", "conversations", "messages"]
 
 failures: list[str] = []
@@ -91,6 +96,26 @@ def identities(path: Path) -> set:
     con = _ro(path)
     try:
         return set(con.execute("SELECT id, name FROM users").fetchall())
+    finally:
+        con.close()
+
+
+def _insert_legacy_account(path: Path) -> None:
+    """Siembra una cuenta heredada **sin credencial** en la copia de trabajo.
+
+    Solo se escriben las columnas que existen en cualquier versión del esquema
+    (`id`, `name`, `created_at`): el `init_db()` del backend, al arrancar, añade
+    las demás con sus valores por defecto —`password_hash = ''` entre ellas—, que
+    es exactamente el estado de una cuenta anterior a V3.81. Escribirla aquí (y no
+    en el original) mantiene la garantía de que el fichero de partida no se toca.
+    """
+    con = sqlite3.connect(path)
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO users (id, name, created_at) VALUES (?, ?, ?)",
+                (LEGACY_ID, LEGACY_NAME, "2024-01-01T00:00:00+00:00"),
+            )
     finally:
         con.close()
 
@@ -184,6 +209,7 @@ def run(db_path: Path, port: int, keep: bool) -> int:
     data.mkdir(parents=True)
     copy_db = data / "tutor.db"
     shutil.copy2(db_path, copy_db)
+    _insert_legacy_account(copy_db)
 
     real_before = counts(db_path)
     real_sha = sha(db_path)
@@ -241,11 +267,14 @@ def run(db_path: Path, port: int, keep: bool) -> int:
         all(e == "" for e in emails),
         f"{len(users)} cuentas, correos vacíos: {emails.count('')}/{len(emails)}",
     )
-    legacy = next((u for u in users if not u.get("has_password")), None)
+    legacy = next((u for u in users if u.get("id") == LEGACY_ID), None)
     check(
-        "0.3 hay cuentas heredadas sin credencial (deuda declarada)",
-        legacy is not None,
-        f"{sum(1 for u in users if not u.get('has_password'))} de {len(users)}",
+        "0.3 la cuenta heredada sembrada en la copia sale sin credencial",
+        legacy is not None and legacy.get("has_password") is False,
+        (
+            f"{sum(1 for u in users if not u.get('has_password'))} de {len(users)}"
+            " sin credencial"
+        ),
     )
 
     # --- 1 · Alta autoservicio --------------------------------------------
@@ -677,6 +706,14 @@ def run(db_path: Path, port: int, keep: bool) -> int:
         bool(purge_payload.get("backup")),
         str(purge_payload.get("backup", "")),
     )
+    # La garantía de privacidad de V3.81.x: el historial sobrevive para poder
+    # explicar la purga, pero **sin** la PII que antes guardaba en sus notas.
+    history_text = json.dumps(events_after, ensure_ascii=False)
+    check(
+        "7.6c el historial que sobrevive NO conserva ningún correo (PII)",
+        "@" not in history_text,
+        history_text[:160],
+    )
 
     code, payload = admin.call(
         "POST",
@@ -705,22 +742,148 @@ def run(db_path: Path, port: int, keep: bool) -> int:
         f"{code} {detail_of(payload)}",
     )
 
-    # --- 8 · La deuda declarada: una cuenta heredada abre sin contraseña ---
-    if legacy:
+    # --- 8 · La migración de una cuenta heredada, entera (V3.81.x) --------
+    #
+    # El escenario que el P0 dejó abierto: una cuenta anterior a V3.81 (sin
+    # `password_hash`, entra nombrando) recorre el camino completo hasta
+    # `without_password = 0` para esa cuenta, sin perder sus datos por el camino.
+    if legacy is not None:
+        legacy_id = legacy["id"]
         legacy_client = Client(base)
+
         code, payload = legacy_client.call(
-            "POST", "/api/session", {"user_id": legacy["id"], "password": ""}
+            "POST", "/api/session", {"user_id": legacy_id}
         )
         check(
-            "8.1 una cuenta heredada entra sin contraseña (deuda declarada del P0)",
+            "8.1 la cuenta heredada entra sin contraseña (compatibilidad declarada)",
+            code == 200,
+            f"{code} {detail_of(payload)}",
+        )
+        code, payload = legacy_client.call(
+            "POST", "/api/session", {"user_id": legacy_id, "password": ""}
+        )
+        check(
+            "8.2 y lo hace también con la contraseña vacía",
             code == 200,
             f"{code} {detail_of(payload)}",
         )
         code, payload = legacy_client.call("GET", "/api/vocabulary/lexicon")
         check(
-            "8.2 y ve sus datos de siempre",
+            "8.3 antes de migrar, ve sus datos de siempre",
             code == 200 and isinstance(payload, dict),
             f"{code}",
+        )
+
+        _, listing_before = admin.call("GET", "/api/admin/users", pin=ADMIN_PIN)
+        sin_credencial_antes = (
+            int(listing_before.get("without_password", 0))
+            if isinstance(listing_before, dict)
+            else 0
+        )
+
+        code, payload = admin.call(
+            "POST",
+            f"/api/admin/users/{legacy_id}/credentials",
+            {"email": "heredada.migrada@example.test"},
+            pin=ADMIN_PIN,
+        )
+        body = payload if isinstance(payload, dict) else {}
+        temporary = str(body.get("temporary_password") or "")
+        check(
+            "8.4 la consola le asigna credenciales y devuelve una temporal legible",
+            code == 200 and bool(temporary),
+            f"{code} {detail_of(payload)}",
+        )
+        check(
+            "8.5 la credencial nace temporal (must_change_password)",
+            body.get("user", {}).get("must_change_password") is True,
+            f"{body.get('user', {}).get('must_change_password')}",
+        )
+
+        _, listing_after = admin.call("GET", "/api/admin/users", pin=ADMIN_PIN)
+        sin_credencial_despues = (
+            int(listing_after.get("without_password", 0))
+            if isinstance(listing_after, dict)
+            else 0
+        )
+        check(
+            "8.6 el contador de cuentas sin contraseña baja exactamente en uno",
+            sin_credencial_despues == sin_credencial_antes - 1,
+            f"{sin_credencial_antes} -> {sin_credencial_despues}",
+        )
+
+        code, payload = legacy_client.call(
+            "POST", "/api/session", {"user_id": legacy_id, "password": temporary}
+        )
+        check(
+            "8.7 entra con la temporal", code == 200, f"{code} {detail_of(payload)}"
+        )
+        legacy_cookie = legacy_client.session_cookie()
+        code, payload = legacy_client.call("GET", "/api/vocabulary/lexicon")
+        check(
+            "8.8 con la temporal puesta, el resto de la app está bloqueado",
+            code == 403 and payload.get("detail") == "PASSWORD_CHANGE_REQUIRED",
+            f"{code} {detail_of(payload)}",
+        )
+        code, payload = legacy_client.call("GET", "/api/session")
+        check(
+            "8.9 consultar la propia sesión sí está permitido (dice qué pedir)",
+            code == 200 and payload.get("must_change_password") is True,
+            f"{code}",
+        )
+
+        code, payload = legacy_client.call(
+            "PUT",
+            "/api/session/password",
+            {"current_password": temporary, "new_password": PASSWORD2},
+        )
+        check(
+            "8.10 el cambio obligatorio se completa",
+            code == 200 and payload.get("must_change_password") is False,
+            f"{code} {detail_of(payload)}",
+        )
+
+        code, payload = legacy_client.call("GET", "/api/session", cookie=legacy_cookie)
+        check(
+            "8.11 la cookie con la temporal deja de valer: 401 SESSION_STALE",
+            code == 401 and payload.get("detail") == "SESSION_STALE",
+            f"{code} {detail_of(payload)}",
+        )
+
+        migrado = Client(base)
+        code, _ = migrado.call(
+            "POST", "/api/session", {"user_id": legacy_id, "password": PASSWORD2}
+        )
+        check(
+            "8.12 con la contraseña definitiva vuelve a entrar",
+            code == 200,
+            f"{code}",
+        )
+        code, _ = migrado.call(
+            "POST", "/api/session", {"user_id": legacy_id, "password": temporary}
+        )
+        check("8.13 la temporal ya no abre", code == 401, f"{code}")
+        code, payload = migrado.call("GET", "/api/vocabulary/lexicon")
+        check(
+            "8.14 y sus datos siguen intactos tras la migración",
+            code == 200 and isinstance(payload, dict),
+            f"{code}",
+        )
+
+        code, payload = admin.call(
+            "GET", f"/api/admin/users/{legacy_id}/events", pin=ADMIN_PIN
+        )
+        events = payload.get("events", []) if isinstance(payload, dict) else []
+        actions = [e.get("action") for e in events]
+        check(
+            "8.15 el historial de la migración queda registrado",
+            code == 200 and "credentials" in actions,
+            f"{actions}",
+        )
+        check(
+            "8.16 y no guarda el correo en ninguna nota (PII fuera del historial)",
+            "@" not in json.dumps(events, ensure_ascii=False),
+            json.dumps(events, ensure_ascii=False)[:160],
         )
 
     # --- 9 · La evidencia de los demás sigue intacta ----------------------

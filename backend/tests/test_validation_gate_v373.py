@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "validation_gate.py"
 
 EXPECTED_GATES = {
+    "identidad-cuentas",
     "offline-fisico",
     "maquina-limpia",
     "launcher-windows",
@@ -61,7 +62,7 @@ def evidence_path(harness, tmp_path, monkeypatch):
 # --- El conjunto de gates es cerrado ----------------------------------------
 
 
-def test_los_siete_gates_estan_definidos(harness):
+def test_los_ocho_gates_estan_definidos(harness):
     assert {gate.id for gate in harness.GATES} == EXPECTED_GATES
 
 
@@ -177,7 +178,7 @@ def test_strict_falla_mientras_haya_gates_sin_pass(harness, evidence_path, capsy
     assert "PENDIENTE" in capsys.readouterr().out
 
 
-def test_strict_aprueba_con_los_siete_gates_en_pass(
+def test_strict_aprueba_con_los_ocho_gates_en_pass(
     harness, evidence_path, capsys
 ):
     for gate in harness.GATES:
@@ -213,7 +214,7 @@ def test_same_tree_aprueba_con_la_evidencia_del_commit_actual(harness, evidence_
 def test_same_tree_falla_si_la_evidencia_es_de_otro_commit(
     harness, evidence_path, monkeypatch
 ):
-    """Siete gates verdes en siete commits distintos no son los siete gates."""
+    """Ocho gates verdes en ocho commits distintos no son los ocho gates."""
     for gate in harness.GATES:
         harness.record(gate.id, "pass", "verificado en hardware real")
 
@@ -234,7 +235,7 @@ def test_same_tree_falla_si_el_arbol_no_tiene_git(
 
 
 def test_sin_same_tree_el_commit_no_decide(harness, evidence_path, monkeypatch):
-    """`--strict` sigue significando «7/7»; lo fuerte es añadir `--same-tree`."""
+    """`--strict` sigue significando «8/8»; lo fuerte es añadir `--same-tree`."""
     for gate in harness.GATES:
         harness.record(gate.id, "pass", "verificado en hardware real")
 

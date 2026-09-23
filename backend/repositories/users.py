@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from contextlib import closing
 
-from repositories.db import _conn, _now
+from repositories.db import _conn, _now, redact_emails
 
 # Columnas que forman el perfil que la API sirve. `email_verified_at` viaja
 # porque es informativo (cuándo se verificó), no porque sea un secreto.
@@ -523,6 +523,28 @@ def delete_test_user(uid: str) -> bool:
         return True
 
 
+def redact_subject_notes(conn, subject_id: str) -> None:
+    """Redacta los correos que hubieran quedado en las notas del historial.
+
+    `user_events` no entra en `_purge_user_rows` a propósito: es el registro que
+    responde «¿quién borró esta cuenta y por qué?». Pero su `note` es texto libre
+    y en V3.81 pudo guardar el email, así que purgar la cuenta y dejar el correo
+    atrás sería lo contrario de lo que la purga promete. Redactar aquí —antes de
+    borrar la fila de `users`— es la garantía de que no sobrevive PII, y
+    complementa la limpieza de arranque de `repositories/db.py`.
+    """
+    rows = conn.execute(
+        "SELECT id, note FROM user_events WHERE subject_id = ? AND note LIKE '%@%'",
+        (subject_id,),
+    ).fetchall()
+    for row in rows:
+        redacted = redact_emails(row["note"])
+        if redacted != row["note"]:
+            conn.execute(
+                "UPDATE user_events SET note = ? WHERE id = ?", (redacted, row["id"])
+            )
+
+
 def purge_user(uid: str) -> bool:
     """Borra una cuenta REAL y toda su evidencia (V3.77). Irreversible.
 
@@ -536,5 +558,8 @@ def purge_user(uid: str) -> bool:
         return False
     with closing(_conn(foreign_keys=False)) as conn, conn:
         _purge_user_rows(conn, uid)
+        # El historial sobrevive a la purga, pero sin la PII que pudiera esconder
+        # en sus notas: se limpia antes de que la fila de `users` desaparezca.
+        redact_subject_notes(conn, uid)
         conn.execute("DELETE FROM users WHERE id = ?", (uid,))
     return True

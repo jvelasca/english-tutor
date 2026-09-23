@@ -148,11 +148,14 @@ async def create_user(body: UserCreate, request: Request) -> dict:
         email=email,
         password_hash=credentials.hash_password(body.password),
     )
+    # El alta no deja el correo en el historial: `user_events` sobrevive a la
+    # purga, así que la nota guarda el **hecho** administrativo, no el dato
+    # personal. El email se lee hoy de la fila de `users`, que es lo que la
+    # purga sí borra.
     await user_service.record_event(
         subject_id=created["id"],
         subject_name=created["name"],
         action=user_service.EVENT_CREATED,
-        note=email,
         actor="alumno",
     )
 

@@ -1,4 +1,4 @@
-# Kit de validación — los 7 gates de la puerta de V4.0
+# Kit de validación — los 8 gates de la puerta de V4.0
 
 > **Naturaleza:** planilla de **campo**. No es un protocolo nuevo ni sustituye a
 > ninguno: **referencia** los protocolos existentes (RA, RB, `DEVICE_MATRIX`,
@@ -6,11 +6,16 @@
 > ejecutarlos: **pre-vuelo, orden por sesión y el comando `record` exacto de cada
 > gate**.
 > **Companion de:** `docs/audit/VALIDATION-RELEASE-V373.md` (el runbook, que
-> define los 7 gates y cómo se usa el instrumento).
+> define los 8 gates y cómo se usa el instrumento).
 > **Puerta de V4.0:** `python scripts/validation_gate.py status --strict` debe
-> salir **0** (los 7 gates en `pass`) y, con el árbol congelado,
+> salir **0** (los 8 gates en `pass`) y, con el árbol congelado,
 > `status --strict --same-tree` debe salir **0** también: la puerta fuerte exige
 > que la evidencia **sea de este mismo commit**.
+> **AMPLIACIÓN (2026-09-23, `v3.81.x`):** el cierre de G0 —identidad y ciclo de
+> vida de cuentas— añade el **octavo gate**, `identidad-cuentas`, y lo pone por
+> delante (`G0`). No cambia lo que exigen los siete anteriores; sí cambia la
+> cifra: la puerta de V4.0 pasa de **7/7** a **8/8**. Con `without_password > 0`
+> el P0 de identidad no está cerrado y el gate no puede declararse en `pass`.
 > **Estado de partida (2026-09-17, `v3.73.2`):** `auto` **10/10** · 7 gates
 > `pending`. Nada de esta planilla está ejecutado todavía.
 > **Árbol congelado para la campaña (2026-09-20, `v3.75.8`):** pre-vuelo
@@ -267,7 +272,8 @@ red, tiempo), no por número.
 
 ```mermaid
 flowchart LR
-    P["Pre-vuelo: build + auto 10/10"] --> S1["Sesion Windows: G3 + G5"]
+    P["Pre-vuelo: build + auto 10/10"] --> S0["Sesion consola: G0"]
+    S0 --> S1["Sesion Windows: G3 + G5"]
     S1 --> S2["Sesion sin red: G1"]
     S2 --> S3["Sesion recorridos: G6"]
     S3 --> S4["Sesion dispositivos: G4"]
@@ -278,6 +284,7 @@ flowchart LR
 
 | Sesión | Gates | Por qué van juntos |
 |---|---|---|
+| 0 · Consola de Usuarios | G0 | El E2E va en CI; aquí se confirma que la BD de uso llega a `without_password = 0` |
 | 1 · Windows real | G3 + G5 | La misma sesión con launcher, micrófono y altavoces reales cubre los tres |
 | 2 · Sin red | G1 | Exige cortar Wi-Fi **y** Ethernet: no se puede combinar con nada que necesite red |
 | 3 · Recorridos | G6 | Recorrido largo por la UI; necesita la app estable y un perfil con datos |
@@ -288,6 +295,31 @@ flowchart LR
 ---
 
 ## C · Hoja por gate
+
+### G0 · `identidad-cuentas` — identidad y ciclo de vida de cuentas
+
+- **Protocolo:** `backend/scripts/e2e_accounts_v381.py` ·
+  `docs/audit/PLAN-P0-IDENTIDAD.md` §16.
+- **Precondiciones:** consola de Usuarios accesible y una **copia** de la BD para
+  el E2E (el guion trabaja sobre copia: no toca el fichero de uso).
+- **Pasos:**
+  1. Ejecutar el E2E completo sobre la copia (alta, contraseña y freno, email,
+     baja autoservicio, baja forzada, reactivación, revocación por época, purga
+     con copia previa e historial sin PII, y migración de una cuenta heredada).
+  2. Comprobar que el historial que sobrevive a la purga **no contiene ningún
+     correo**.
+  3. Comprobar el contador `without_password` de la **BD de uso**: debe ser **0**.
+- **FALLO:** el E2E en rojo, un correo en el historial tras el purge, o
+  `without_password > 0` (quedan cuentas heredadas sin credencial: el P0 de
+  identidad sigue abierto).
+- **Evidencia a capturar:** resultado del E2E y el contador `without_password`
+  con la fecha.
+- **Registro:**
+
+```powershell
+backend\.venv\Scripts\python.exe scripts\validation_gate.py record identidad-cuentas pass --ci-run <run> `
+  --notes "E2E de cuentas verde sobre copia; without_password=0 en la BD de uso; historial post-purge sin PII"
+```
 
 ### G1 · `offline-fisico` — los 12 flujos con la red cortada
 
@@ -475,15 +507,15 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py record pedagogia pas
 # Estado legible (informa siempre)
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status
 
-# La puerta real de V4.0: sale 0 solo con los 7 gates en `pass`
+# La puerta real de V4.0: sale 0 solo con los 8 gates en `pass`
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict
 
 # La puerta fuerte: además, la evidencia tiene que ser de ESTE commit
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict --same-tree
 ```
 
-- **7/7 en `pass`** → V4.0 puede declararse (y `auto` debe seguir en 10/10). Si
-  además `--same-tree` sale **0**, los siete gates se probaron contra el **mismo
+- **8/8 en `pass`** → V4.0 puede declararse (y `auto` debe seguir en 10/10). Si
+  además `--same-tree` sale **0**, los ocho gates se probaron contra el **mismo
   commit**: es la forma de cierre que exige la certificación de V4.0.
 - **Algún `fail`** → se **deja registrado con su motivo** y se abre incidencia;
   no se reescribe a `pass`. El gate se puede volver a registrar cuando se
@@ -498,7 +530,7 @@ flowchart LR
     ST --> STR{"status --strict"}
     STR -->|"0"| ST2{"status --strict --same-tree"}
     STR -->|"1"| Pend["Quedan gates sin pass: repetir la sesion que falte"]
-    ST2 -->|"0"| V4["V4.0 declarable: 7 gates contra el mismo commit"]
+    ST2 -->|"0"| V4["V4.0 declarable: 8 gates contra el mismo commit"]
     ST2 -->|"1"| Rep["Evidencia de otro commit: repetir el gate en el arbol congelado"]
 ```
 

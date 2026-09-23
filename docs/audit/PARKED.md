@@ -1872,6 +1872,61 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   aquí (timeout corto de hidratación, idioma por mazo, el pack listado en dos
   sitios, la duplicación de plantillas/cloze/import, etc.).
 
+## V3.81.2 — Cierre de G0: identidad y ciclo de vida de cuentas · 2026-09-23
+
+> Parche de privacidad y de cierre de fase sobre V3.81.x (publicado como
+> `v3.81.2`). **SIN** cambio de contrato de API y **SIN** migración de columnas:
+> todo es **aditivo y no destructivo** en SQLite. Detalle en
+> `release-notes-v3.81.2.md`.
+
+### Cerrado en V3.81.2
+
+- **El historial ya no guarda el correo.** `user_events` sobrevive a la purga a
+  propósito —responde «¿quién borró esta cuenta y por qué?»—, pero deja de ser
+  una copia histórica de PII: las notas de alta, credenciales, edición y
+  verificación registran el **hecho administrativo**, no el email.
+- **Se redacta lo ya guardado.** Una migración de arranque en `init_db()`
+  sustituye cualquier correo de las notas por `(email)`, y al purgar una cuenta se
+  redactan también sus notas antes de borrar la fila de `users`: **después de la
+  purga no queda PII** en el historial que sobrevive.
+- **`EVENT_PURGED` se registra solo si la purga ocurrió.** Se invierte el orden
+  —borrar y **después** registrar—, así no puede quedar escrito «datos purgados»
+  sin haber purgado nada.
+- **El E2E de cuentas recorre la migración heredada entera.** El guion siembra una
+  cuenta sin credencial en la copia y la lleva hasta `without_password = 0`: alta
+  de credenciales temporales, login, bloqueo por cambio obligatorio, cambio,
+  cookie anterior tumbada (`SESSION_STALE`), login con la definitiva y datos
+  intactos. Incluye la comprobación de que el historial post-purga no tiene PII.
+
+### Deuda que sigue abierta (y ahora es candado de V4.0)
+
+- **La transición de las cuentas heredadas se cierra con un candado, no con
+  código.** Se mantiene la compatibilidad (`password_hash == ''` sigue entrando)
+  y se añade el gate **G0 · `identidad-cuentas`**: `status --strict` exige ahora
+  **8/8** gates y G0 **no** puede declararse en `pass` mientras
+  `without_password > 0`. Es el cierre real del P0 de identidad: llevar el
+  contador a cero es trabajo de uso (asignar credenciales a cada cuenta heredada
+  desde la consola), no de código. **Hoy la BD de uso de este equipo tiene 3
+  cuentas sin credencial** (`J.A` ×2 y `Paz`), así que **G0 queda `pending`** y
+  V4.0 no puede declararse hasta que ese contador llegue a cero. `[PRODUCTO]`
+- **En la BD de uso no había PII que limpiar** (`user_events` tiene 0 filas): el
+  hallazgo de esta release era un **riesgo de código**, no un dato ya expuesto, y
+  se declara así para no vender como «limpieza de datos» lo que fue «cierre de una
+  vía». La migración de arranque existe para las instalaciones que **sí** grabaron
+  correos. `[PRIVACIDAD]`
+- **El historial sigue guardando el nombre del sujeto** (`subject_name`), y es
+  deliberado: sin él, «¿a quién se purgó?» no tiene respuesta, y un nombre no es
+  por sí solo un identificador de contacto. Seudonimizarlo también sería una
+  decisión de producto, no una corrección. `[PRIVACIDAD]`
+- **La redacción por regex es un patrón, no un analizador:** un correo con formas
+  exóticas (comentarios RFC, corchetes, partido por saltos de línea) podría no
+  casar. Se acepta a propósito, porque la garantía fuerte es **dejar de escribir el
+  correo**, no redactar. `[PRIVACIDAD]`
+- **Fuera de alcance de este parche (declarado):** política de contraseña
+  (mínimo corto y la afirmación de «miles de años» en la documentación), freno de
+  intentos en memoria y limpieza global de la terminología perfil/usuario. Siguen
+  como deuda. `[SEGURIDAD]` `[PRODUCTO]`
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

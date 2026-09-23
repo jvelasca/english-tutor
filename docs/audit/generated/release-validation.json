@@ -1,11 +1,11 @@
 {
- "version": "3.81.1",
+ "version": "3.81.2",
  "checks": [
   {
    "id": "release-consistency",
    "title": "La versión es consistente en todos los orígenes",
    "status": "pass",
-   "detail": "OK: Release consistency (3.81.1) en todos los orígenes"
+   "detail": "OK: Release consistency (3.81.2) en todos los orígenes"
   },
   {
    "id": "i18n-strict",
@@ -45,9 +45,9 @@
   },
   {
    "id": "gates-declarados",
-   "title": "Los 7 gates están definidos y documentados",
+   "title": "Los 8 gates están definidos y documentados",
    "status": "pass",
-   "detail": "7 gates declarados"
+   "detail": "8 gates declarados"
   },
   {
    "id": "dist-artifact",
@@ -59,7 +59,7 @@
    "id": "evidencia-integra",
    "title": "La evidencia registrada es válida",
    "status": "pass",
-   "detail": "sin evidencia todavía (los 7 gates están en `pending`)"
+   "detail": "sin evidencia todavía (los 8 gates están en `pending`)"
   }
  ]
 }

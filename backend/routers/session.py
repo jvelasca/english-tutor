@@ -216,10 +216,13 @@ async def change_email(
     actualizado = await user_service.set_email(uid, email)
     if actualizado is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # El historial sobrevive a la purga, así que no se anota el correo nuevo
+    # (PII): se anota que **hubo** un cambio de correo. El valor vive en la fila
+    # de `users`, que la purga borra.
     await user_service.record_event(
         subject_id=uid,
         subject_name=user["name"],
         action=user_service.EVENT_EDITED,
-        note=f"email → {email}",
+        note="email actualizado",
     )
     return actualizado

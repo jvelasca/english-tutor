@@ -5,6 +5,34 @@
 > alucinación, este documento es el ancla para reanudar.
 > Actualizado por última vez: 2026-09-23 (UTC+2).
 >
+> **Nota (2026-09-23 · cierre de G0 — identidad y ciclo de vida de cuentas): V3.81.2 —
+> release DE PARCHE de PRIVACIDAD sobre V3.81.x que NO cambia el contrato de API ni
+> migra columnas (aditivo y no destructivo en SQLite).** Cierra los dos bloqueantes
+> que la auditoría de V3.81.x dejó abiertos antes de V4.0. **(A) PII después del
+> purge.** El historial `user_events` sobrevive a la purga a propósito —responde
+> «¿quién borró esta cuenta y por qué?»—, pero las notas de `EVENT_CREATED`,
+> `EVENT_CREDENTIALS`, `EVENT_EDITED` y `EVENT_EMAIL_VERIFIED` guardaban el correo en
+> claro, así que «borrar toda la evidencia de la cuenta» no era del todo cierto. Se
+> deja de escribir el email (la nota pasa a ser el **hecho administrativo**), una
+> **migración de arranque** en `init_db()` redacta a `(email)` los correos que ya
+> hubiera en la tabla —idempotente y acotada a las filas con `@`— y al purgar se
+> redactan las notas del sujeto **antes** de borrar la fila de `users`. **(B) Orden de
+> `EVENT_PURGED`.** Se invierte: primero se purga y **solo si tuvo éxito** se registra
+> el evento, así no puede quedar escrito «datos purgados» sin haber purgado nada; el
+> nombre se captura en memoria porque `user_events` sobrevive por su columna
+> `subject_id`. **(C) La transición de cuentas heredadas se cierra con un candado.** Se
+> mantiene la compatibilidad (`password_hash == ''` sigue entrando) y se añade el
+> **octavo gate** `G0 · identidad-cuentas`: `status --strict` pasa de **7/7 a 8/8** y
+> G0 no puede estar en `pass` mientras `without_password > 0`; llevar el contador a
+> cero es trabajo de uso, no de código. El E2E `backend/scripts/e2e_accounts_v381.py`
+> se reescribe para sembrar una cuenta heredada en la copia y recorrer la migración
+> entera (temporal → `403 PASSWORD_CHANGE_REQUIRED` → cambio → `401 SESSION_STALE` de
+> la cookie vieja → login con la definitiva → datos intactos) e incluye la comprobación
+> de que el historial post-purga no contiene ningún correo. **Fuera de alcance
+> (declarado):** política de contraseña, freno de intentos en memoria y limpieza de
+> terminología perfil/usuario. Detalle en `release-notes-v3.81.2.md` y
+> `docs/audit/PARKED.md` §V3.81.2.
+>
 > **Nota (2026-09-22 · cierre de la sesión de Flashcards): V3.80.0 — release DE
 > PRODUCTO (minor) que rehace a fondo el estudio de Flashcards. CON migración de
 > BD aditiva** (una columna: `vocabulary.translation TEXT NOT NULL DEFAULT ''`,
@@ -4737,9 +4765,10 @@ posiciones muertas). **El código sigue congelado:** los 7 gates siguen en `pend
 **no** cierra; léela antes de buscar «lo que falta». Aquí queda solo lo que gobierna la
 planificación inmediata:
 
-1. **Los 7 gates de validación física siguen `pending`.** **V4.0 no se declara** hasta
-   que `status --strict` (y `--strict --same-tree` con el árbol congelado) salga 0. Kit
-   y protocolo: `docs/audit/KIT-VALIDACION-GATES.md`.
+1. **Los 8 gates de validación física siguen `pending`** (8 desde V3.81.2, que añade
+   `G0 · identidad-cuentas`: `without_password == 0` y el E2E de cuentas verde).
+   **V4.0 no se declara** hasta que `status --strict` (y `--strict --same-tree` con el
+   árbol congelado) salga 0. Kit y protocolo: `docs/audit/KIT-VALIDACION-GATES.md`.
 2. **Acción humana, no trabajo del proyecto** (detalle en `PARKED.md`): corte de red
    real (`RA-05`, protocolo §5 de `docs/audit/RA-RUNTIME-OFFLINE.md`), máquina
    físicamente limpia (`RB-05`), **matriz de dispositivos** (G, 10/10 en ⬜ →

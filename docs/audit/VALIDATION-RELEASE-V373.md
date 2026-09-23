@@ -3,12 +3,12 @@
 > **Naturaleza:** V3.73 es una release de **validación**, no de producto. Cierra
 > el endurecimiento que la auditoría de V3.72 dejó como P2/P3 (fail-closed del
 > runtime de producto y descubrimiento de IP de LAN sin referencias externas) y
-> construye el instrumento que convierte los siete gates de validación física en
+> construye el instrumento que convierte los ocho gates de validación física en
 > **evidencia registrada**.
 > **Regla:** un gate no se cierra con una opinión. Se cierra con `record`, y un
 > `fail`/`skip` **exige notas**.
 > **Puerta de V4.0:** `python scripts/validation_gate.py status --strict` debe
-> salir 0 (los 7 gates en `pass`); con el árbol congelado, la puerta fuerte
+> salir 0 (los 8 gates en `pass`); con el árbol congelado, la puerta fuerte
 > `status --strict --same-tree` exige además que la evidencia sea **de este mismo
 > commit**.
 > **Planilla de campo:** `docs/audit/KIT-VALIDACION-GATES.md` ordena la ejecución
@@ -42,8 +42,8 @@ backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict
 backend\.venv\Scripts\python.exe scripts\validation_gate.py status --strict --same-tree
 ```
 
-Ids válidos: `offline-fisico`, `maquina-limpia`, `launcher-windows`,
-`dispositivos`, `audio-stt-tts`, `journeys`, `pedagogia`.
+Ids válidos: `identidad-cuentas`, `offline-fisico`, `maquina-limpia`,
+`launcher-windows`, `dispositivos`, `audio-stt-tts`, `journeys`, `pedagogia`.
 
 ## Qué sella la evidencia
 
@@ -56,17 +56,31 @@ guarda el id).
   rechaza el cierre. Un `pass` que no dice de qué árbol es no es evidencia.
 - `fail`, `skip` y `pending` **sí** se registran sin SHA: declaran un no-cierre.
 - `--strict` exige los 7 en `pass`. `--same-tree` exige además que los siete
-  `head_sha` sean el commit actual: es lo que impide que siete gates verdes en
-  siete commits distintos se presenten como «los siete gates».
+  `head_sha` sean el commit actual: es lo que impide que ocho gates verdes en
+  ocho commits distintos se presenten como «los ocho gates».
 
-**Los 7 gates son de acción humana.** La expresión «7 gates (5 de ellos acción
+**Los 8 gates son de acción humana.** La expresión «7 gates (5 de ellos acción
 humana)» de notas históricas de V3.73.0 se refería a los **cinco bloques físicos
 que V3.72 declaró** (corte de red, máquina limpia, Windows real, dispositivos y
 audio); el instrumento los cubre y añade `journeys` y `pedagogia`, que también
-exigen una persona. `Gate.human` se declara gate a gate y vale `True` en los
-siete: no hay dos cifras válidas.
+exigen una persona, y **G0** (`identidad-cuentas`), que exige el E2E de cuentas
+verde y `without_password == 0`. `Gate.human` se declara gate a gate y vale
+`True` en los ocho: no hay dos cifras válidas.
 
-## Los 7 gates
+## Los 8 gates
+
+### G0 · `identidad-cuentas` — identidad y ciclo de vida de cuentas
+
+- **Protocolo:** `backend/scripts/e2e_accounts_v381.py` ·
+  `docs/audit/PLAN-P0-IDENTIDAD.md` §16.
+- **Qué se hace:** el E2E de cuentas sobre una **copia** de la BD (alta, contraseña
+  y freno, email, baja autoservicio, baja forzada, reactivación, revocación por
+  época, purga con copia e historial sin PII) **y** la migración completa de una
+  cuenta heredada hasta `without_password == 0`.
+- **Qué se registra:** el resultado del E2E y el contador `without_password` de la
+  BD de uso (que debe ser **0**).
+- **Criterio:** con `without_password > 0` el P0 de identidad **no** está cerrado;
+  el gate queda `pending` hasta que el contador llegue a cero.
 
 ### G1 · `offline-fisico` — los 12 flujos con la red cortada
 
@@ -145,6 +159,7 @@ siete: no hay dos cifras válidas.
 
 | Gate | Estado |
 |---|---|
+| G0 `identidad-cuentas` | ⬜ pendiente (acción humana) |
 | G1 `offline-fisico` | ⬜ pendiente (acción humana) |
 | G2 `maquina-limpia` | ⬜ pendiente (acción humana) |
 | G3 `launcher-windows` | ⬜ pendiente (acción humana) |

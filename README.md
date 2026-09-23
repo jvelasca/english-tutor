@@ -16,7 +16,7 @@ opcional a la red es el correo de verificación, y solo si se configura un SMTP.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.81.1**.
+- Última versión estable: **v3.81.2**.
 
 ## Estructura
 

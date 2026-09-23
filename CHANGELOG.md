@@ -4,6 +4,67 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.81.2] — 2026-09-23
+
+**Cierre de G0 — identidad y ciclo de vida de cuentas.** Release de **PARCHE DE PRIVACIDAD** sobre
+`V3.81.x` que cierra los dos bloqueantes que la auditoría de la gestión de usuarios dejó abiertos antes
+de V4.0. **SIN cambio de contrato de API, SIN endpoints nuevos y SIN migración de columnas:** todo es
+**aditivo y no destructivo** en SQLite (una BD de `V3.81.1` se abre intacta). `GENERATOR_VERSION`,
+`DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`), `LISTENING_BANK_VERSION` y las
+evaluaciones **no se tocan**.
+
+**El hallazgo, que era de privacidad y no de autenticación.** El historial `user_events` **sobrevive a
+la purga a propósito** —es lo que responde «¿quién borró esta cuenta y por qué?»—, pero las notas de
+`EVENT_CREATED`, `EVENT_CREDENTIALS`, `EVENT_EDITED` y `EVENT_EMAIL_VERIFIED` guardaban el **correo en
+claro**, así que «borrar toda la evidencia de la cuenta» no era del todo cierto: quedaba PII en la
+tabla que la purga no toca. **(A) Se deja de escribir el email.** Las cuatro notas pasan a registrar el
+**hecho administrativo** —«credencial asignada · temporal», «email verificado», «email actualizado» y el
+alta sin nota—; el valor sigue leyéndose de la fila de `users`, que es justo lo que la purga sí borra.
+**(B) Se redacta lo ya guardado.** `redact_emails()` (un `regex` sobre el patrón de correo, público y
+reutilizable) más una **migración de arranque** en `init_db()` que redacta a `(email)` las notas con `@`
+que hubiera en la instalación: idempotente, acotada a las filas afectadas y sin tocar nada más.
+**(C) Defensa en profundidad en la purga.** `purge_user` redacta además las notas del sujeto **antes** de
+borrar la fila de `users`, así que la garantía «después de la purga no queda PII» no depende de que la
+migración haya corrido.
+
+**(D) El orden de `EVENT_PURGED` estaba invertido.** Se registraba el evento **antes** de borrar, y la
+copia previa y el borrado no son una transacción: si la purga fallaba, quedaba escrito «datos purgados»
+sin haber purgado nada —la peor clase de evidencia, la que afirma lo que no ocurrió—. Ahora se purga
+primero y **solo si `purge_user` devuelve `True`** se registra el evento, con el nombre capturado en
+memoria (el historial sobrevive por su columna `subject_id`, no por la fila borrada).
+
+**(E) La transición de las cuentas heredadas se cierra con un candado, no con código.** La
+compatibilidad se mantiene tal cual: una cuenta con `password_hash == ''` (anterior a `V3.81.0`) sigue
+entrando nombrando, porque dejar fuera a alguien de sus datos no es una opción. Lo que cambia es que
+**eso deja de ser una nota al pie y pasa a ser una condición de la puerta de V4.0**: el instrumento de
+validación gana el **octavo gate**, `G0 · identidad-cuentas`, y `status --strict` pasa de exigir **7/7**
+a exigir **8/8**. G0 no puede declararse en `pass` mientras la BD de uso tenga `without_password > 0`
+—llevar ese contador a cero es trabajo de uso (asignar credenciales desde la consola de Usuarios), no
+de código—, así que **V4.0 no se puede declarar con la migración heredada a medias**. El **E2E de
+cuentas** (`backend/scripts/e2e_accounts_v381.py`) se reescribe para recorrerla entera: siembra una
+cuenta heredada determinista en la **copia** de la BD y la lleva de «entra sin contraseña» a «contraseña
+definitiva», pasando por credenciales temporales, `403 PASSWORD_CHANGE_REQUIRED`, el cambio obligatorio,
+la cookie anterior tumbada (`401 SESSION_STALE`), el login con la temporal ya cerrado y los datos
+intactos; la sección de purga comprueba además que el historial que sobrevive **no contiene ningún
+correo**. **Verificación:** `ruff` limpio · `pytest` **3089/3089** · E2E sobre copia de la BD
+**77 pasos / 0 fallos** · `validation_gate.py auto` **10/10** con **8 gates declarados** ·
+`check_release_consistency` OK en los **6 orígenes** (`3.81.2`) · tests nuevos en
+`backend/tests/test_accounts_v381.py` (**4**: las notas sin email, `EVENT_PURGED` solo si la purga
+ocurrió, la redacción al purgar y la migración idempotente) más los candados de recuento de gates
+actualizados a ocho.
+
+**Honestidad.** (i) **G0 queda `pending` y esta release no lo cierra:** la BD de uso de este equipo
+tiene hoy **3 cuentas heredadas sin credencial** (`J.A` ×2 y `Paz`), así que el gate **no** puede
+declararse en `pass` —y ese es exactamente su cometido: que nadie declare cerrado el P0 de identidad
+mientras exista el camino «entrar sin contraseña»—. (ii) **En la BD de uso no había PII que limpiar:**
+`user_events` tiene **0 filas**, así que el hallazgo era un **riesgo de código**, no un dato ya
+expuesto; la migración de arranque existe para las instalaciones que **sí** grabaron correos. (iii)
+**Fuera de alcance, declarado:** la política de contraseña (el mínimo corto y la afirmación de
+«miles de años» en la documentación), el freno de intentos **en memoria** (un reinicio lo vacía) y la
+limpieza de la terminología «perfil/usuario» siguen como deuda en `docs/audit/PARKED.md` §`V3.81.2`.
+(iv) **No se reescriben las notas históricas** de `v3.81.0`/`v3.81.1`: su `PARKED.md` y sus notas
+siguen diciendo lo que decían, y esta release es la que explica el resto.
+
 ## [3.81.1] — 2026-09-23
 
 **Release de PRODUCTO (patch) que **no toca ni una línea de la app**: arregla la

@@ -18,6 +18,7 @@ si falla, no qué línea ejecuta. Las reglas que fija, en orden de importancia:
 """
 from __future__ import annotations
 
+import sqlite3
 from contextlib import closing
 
 from fastapi.testclient import TestClient
@@ -637,3 +638,151 @@ def test_toda_la_consola_exige_el_candado(monkeypatch, tmp_path):
         for metodo, ruta, body in rutas:
             r = getattr(client, metodo)(ruta, **({"json": body} if body else {}))
             assert r.status_code == 401, f"{ruta} respondió sin PIN: {r.status_code}"
+
+
+# --- 6. PII: el historial sobrevive a la purga, pero sin el correo -----------
+
+
+def _notas(uid: str) -> list[str]:
+    """Notas del historial leídas del SQLite, sin pasar por el borde HTTP.
+
+    Es a propósito: la garantía de privacidad es sobre **la tabla**, no sobre lo
+    que la API decida devolver.
+    """
+    con = sqlite3.connect(db.DB_PATH)
+    con.row_factory = sqlite3.Row
+    try:
+        rows = con.execute(
+            "SELECT note FROM user_events WHERE subject_id = ? ORDER BY created_at, id",
+            (uid,),
+        ).fetchall()
+        return [row["note"] for row in rows]
+    finally:
+        con.close()
+
+
+def test_las_notas_del_historial_no_guardan_el_email(monkeypatch, tmp_path):
+    """Alta, credenciales, edición y verificación anotan el **hecho**, no el correo.
+
+    `user_events` sobrevive a la purga; si guardara el email, «borrar toda la
+    evidencia de la cuenta» sería falso por la puerta de atrás.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        uid = _registro(client, "Marta", "marta@example.com").json()["id"]
+        assert "" in _notas(uid), "el alta no anota nada (mucho menos el correo)"
+
+        asignada = client.post(
+            f"/api/admin/users/{uid}/credentials",
+            json={"email": "nueva@example.com"},
+            headers=_ADMIN_HEADERS,
+        )
+        temporal = asignada.json()["temporary_password"]
+        client.post(f"/api/admin/users/{uid}/verify-email", headers=_ADMIN_HEADERS)
+
+        # Con la temporal puesta hay que cambiarla antes de tocar el email.
+        _abrir(client, uid, temporal)
+        client.put(
+            "/api/session/password",
+            json={"current_password": temporal, "new_password": _BUENA},
+        )
+        client.put(
+            "/api/session/email",
+            json={"email": "otra@example.com", "password": _BUENA},
+        )
+
+    notas = _notas(uid)
+    assert "@" not in "\n".join(notas), f"hay un correo en el historial: {notas}"
+    assert "credencial asignada · temporal" in notas
+    assert "email verificado" in notas
+    assert "email actualizado" in notas
+
+
+def test_el_evento_de_purga_solo_se_escribe_si_la_purga_ocurrio(
+    monkeypatch, tmp_path
+):
+    """La evidencia no puede afirmar una purga que no se hizo."""
+    _setup(monkeypatch, tmp_path)
+    uid = users_repo.create_user("Marta")["id"]
+    users_repo.set_unenrolled(uid, enrolled=False)
+    with TestClient(app) as client:
+        malo = client.post(
+            f"/api/admin/users/{uid}/purge",
+            json={"confirm_name": "Otra Persona"},
+            headers=_ADMIN_HEADERS,
+        )
+        assert malo.status_code == 409
+        assert users_repo.get_user(uid) is not None
+        assert not any(
+            e["action"] == users_repo.EVENT_PURGED for e in users_repo.list_events(uid)
+        ), "se registró «datos purgados» sin haber purgado nada"
+
+        bien = client.post(
+            f"/api/admin/users/{uid}/purge",
+            json={"confirm_name": "Marta"},
+            headers=_ADMIN_HEADERS,
+        )
+    assert bien.status_code == 200
+    assert users_repo.get_user(uid) is None
+    assert any(
+        e["action"] == users_repo.EVENT_PURGED for e in users_repo.list_events(uid)
+    ), "la purga que sí ocurrió dejó de registrarse"
+
+
+def test_la_purga_redacta_los_correos_que_hubiera_en_el_historial(
+    monkeypatch, tmp_path
+):
+    """Defensa en profundidad: una nota heredada con email no sobrevive al purge."""
+    _setup(monkeypatch, tmp_path)
+    uid = users_repo.create_user("Marta")["id"]
+    users_repo.record_event(
+        subject_id=uid,
+        subject_name="Marta",
+        action=users_repo.EVENT_CREATED,
+        note="marta@example.com",  # como lo escribía V3.81.0
+    )
+    users_repo.set_unenrolled(uid, enrolled=False)
+    with TestClient(app) as client:
+        r = client.post(
+            f"/api/admin/users/{uid}/purge",
+            json={"confirm_name": "Marta"},
+            headers=_ADMIN_HEADERS,
+        )
+    assert r.status_code == 200
+    notas = _notas(uid)
+    assert "(email)" in notas, "el correo heredado no se redactó"
+    assert "@" not in "\n".join(notas), f"sobrevive PII tras el purge: {notas}"
+
+
+def test_la_migracion_de_arranque_redacta_correos_y_es_idempotente(
+    monkeypatch, tmp_path
+):
+    """La limpieza de `init_db()` alcanza lo ya guardado y no reescribe de más."""
+    _setup(monkeypatch, tmp_path)
+    uid = users_repo.create_user("Marta")["id"]
+
+    con = sqlite3.connect(db.DB_PATH)
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO user_events "
+                "(subject_id, subject_name, actor, action, note, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    uid,
+                    "Marta",
+                    "sistema",
+                    users_repo.EVENT_CREATED,
+                    "marta@example.com",
+                    "2024-01-01T00:00:00+00:00",
+                ),
+            )
+    finally:
+        con.close()
+
+    db.init_db()
+    assert _notas(uid) == ["(email)"]
+
+    # Segunda pasada: idempotente (no vuelve a tocar lo ya redactado).
+    db.init_db()
+    assert _notas(uid) == ["(email)"]

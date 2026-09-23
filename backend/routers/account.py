@@ -66,11 +66,13 @@ async def verify_email(body: EmailVerify) -> dict:
     actualizado = await user_service.mark_email_verified(user["id"])
     if actualizado is None:
         raise HTTPException(status_code=400, detail="VERIFY_TOKEN_INVALID")
+    # La nota no repite el correo: `user_events` sobrevive a la purga y el
+    # email es justo el dato que la purga tiene que dejar de conservar.
     await user_service.record_event(
         subject_id=user["id"],
         subject_name=user["name"],
         action=user_service.EVENT_EMAIL_VERIFIED,
-        note=actualizado.get("email", ""),
+        note="email verificado",
     )
     return actualizado
 

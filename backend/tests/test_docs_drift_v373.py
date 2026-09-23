@@ -4,7 +4,7 @@ V3.73 endurece dos cosas y construye un instrumento:
 
 1. el runtime de producto es **fail-closed** (no arranca sin la UI compilada),
 2. el descubrimiento de la IP de LAN **no usa direcciones públicas**,
-3. los 7 gates de validación física son **estado registrado**, no prosa.
+3. los 8 gates de validación física son **estado registrado**, no prosa.
 
 La fuente de verdad es el código (`launcher/core.py`,
 `launcher/process_manager.py`, `backend/services/frontend_dist.py`,
@@ -26,6 +26,7 @@ SCRIPTS = ROOT / "scripts"
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 
 GATES = (
+    "identidad-cuentas",
     "offline-fisico",
     "maquina-limpia",
     "launcher-windows",
@@ -173,9 +174,13 @@ def test_existe_el_arnes_con_los_tres_subcomandos():
     assert "--strict" in text and "--require-dist" in text
 
 
-def test_el_arnes_declara_los_siete_gates():
+def test_el_arnes_declara_los_ocho_gates():
     text = _read(SCRIPTS / "validation_gate.py")
 
+    # Cifra única y explícita: V3.81.x añadió G0 (`identidad-cuentas`) y el
+    # instrumento pasa de 7 a 8 gates. Si alguien vuelve a mover la cifra, la
+    # documentación viva y la puerta de V4.0 tienen que moverse con ella.
+    assert len(GATES) == 8, "el instrumento declara ocho gates, no otra cifra"
     for gate in GATES:
         assert f'id="{gate}"' in text, f"el arnés no declara el gate {gate}"
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import uuid
 from contextlib import closing
@@ -12,6 +13,13 @@ from config import DATA_DIR
 DB_PATH = DATA_DIR / "tutor.db"
 
 DEFAULT_USER_NAME = "Usuario"
+
+# Un correo, tal y como lo escribe `services.credentials.normalize_email` (una
+# `@`, algo antes, un dominio con punto). Se usa para **redactar** el email que
+# pudiera haber quedado dentro de una nota del historial: `user_events`
+# sobrevive a la purga de la cuenta, así que la única forma de que «borrar toda
+# la evidencia» sea cierto es no dejar PII escondida en el texto libre.
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 # Marca de versión del contenido de diccionario cacheado antes de V3.31
 # (V3.30 / V3.30.1). Se mantiene deliberadamente DISTINTA de la
@@ -24,6 +32,39 @@ DICTIONARY_LEGACY_VERSION = "1.0.0"
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def redact_emails(text: str) -> str:
+    """Sustituye cualquier correo de `text` por `(email)`, dejando el resto igual.
+
+    Es la pieza que hace cierta la promesa de la purga: el historial de
+    administración tiene que sobrevivir para responder «¿quién borró esto y por
+    qué?», pero **no** puede convertirse en una copia histórica de PII. Se aplica
+    en dos sitios —al migrar en el arranque, sobre las notas ya guardadas, y al
+    purgar, sobre las de la cuenta que se borra— y en ambos es idempotente:
+    `(email)` no casa con el patrón de correo.
+    """
+    return _EMAIL_RE.sub("(email)", text or "")
+
+
+def _scrub_user_event_emails(conn: sqlite3.Connection) -> None:
+    """Limpia los correos que hubieran quedado en notas de `user_events`.
+
+    Es la migración de arranque de la deuda de privacidad de V3.81: las notas de
+    las versiones anteriores (`EVENT_CREATED`, `EVENT_CREDENTIALS`, `EVENT_EDITED`,
+    `EVENT_EMAIL_VERIFIED`) guardaban el email en claro y `user_events` no entra en
+    la purga, así que una cuenta borrada podía dejar su correo atrás. Idempotente
+    por construcción y acotada a las filas que contienen `@`.
+    """
+    rows = conn.execute(
+        "SELECT id, note FROM user_events WHERE note LIKE '%@%'"
+    ).fetchall()
+    for row in rows:
+        redacted = redact_emails(row["note"])
+        if redacted != row["note"]:
+            conn.execute(
+                "UPDATE user_events SET note = ? WHERE id = ?", (redacted, row["id"])
+            )
 
 
 def _conn(foreign_keys: bool = True) -> sqlite3.Connection:
@@ -950,6 +991,11 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_user_events_subject "
             "ON user_events(subject_id, created_at)"
         )
+        # Migración de arranque (V3.81.x): el historial pudo guardar correos en
+        # las notas de versiones anteriores y `user_events` sobrevive a la purga.
+        # Se redactan aquí, una sola vez por fila afectada; a partir de ahora las
+        # notas nacen sin email (`repositories/users.py`).
+        _scrub_user_event_emails(conn)
 
         # V3.25 (F-K7/P2-01, fase 6): renombrado canónico de los contadores de
         # producción/input en `vocabulary`. El histórico pasó por

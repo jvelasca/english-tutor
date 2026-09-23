@@ -219,7 +219,6 @@ async def create_profile(
         subject_id=created["id"],
         subject_name=created["name"],
         action=user_service.EVENT_CREATED,
-        note=email,
     )
     return created
 
@@ -252,7 +251,7 @@ async def set_credentials(
         subject_id=user_id,
         subject_name=updated["name"],
         action=user_service.EVENT_CREDENTIALS,
-        note=f"{clean}{' · temporal' if must_change else ''}",
+        note="credencial asignada" + (" · temporal" if must_change else ""),
     )
     return updated
 
@@ -276,7 +275,7 @@ async def verify_email_by_hand(user_id: str) -> dict | None:
         subject_id=user_id,
         subject_name=updated["name"],
         action=user_service.EVENT_EMAIL_VERIFIED,
-        note=updated.get("email", ""),
+        note="email verificado",
     )
     return updated
 
@@ -354,7 +353,7 @@ async def edit_user(user_id: str, fields: dict) -> dict | None:
         if with_email is None:
             return None
         updated = with_email
-        changed.append(f"email={clean}")
+        changed.append("email actualizado")
         # Cambiar el email **reinicia** la verificación: el sello pertenecía al
         # correo anterior, no a la persona.
         await user_service.set_email_verification(user_id, "")
@@ -428,18 +427,19 @@ async def purge_profile(user_id: str, confirm_name: str) -> dict | None:
     ):
         return None
     snapshot = await run_in_threadpool(backup_service.create_backup)
-    # El registro se escribe **antes** de borrar: `user_events` no entra en la
-    # purga (su columna es `subject_id`), así que sobrevive y es lo que responde
-    # después a «¿quién borró esta cuenta y cuándo?». Se guarda el nombre porque
-    # a partir de aquí la fila de `users` ya no existe para consultarlo.
+    # Primero se borra y **solo después** se registra. Al revés, un fallo de la
+    # purga dejaría escrito «datos purgados» sin haber purgado nada, que es la
+    # peor clase de evidencia: la que afirma lo que no ocurrió. El nombre se
+    # captura en memoria porque a partir de aquí la fila de `users` ya no existe;
+    # `user_events` sobrevive porque su columna es `subject_id`.
+    if not await run_in_threadpool(users_repo.purge_user, user_id):
+        return None
     await user_service.record_event(
         subject_id=user_id,
         subject_name=user["name"],
         action=user_service.EVENT_PURGED,
         note=f"copia {snapshot.get('name', '')}",
     )
-    if not await run_in_threadpool(users_repo.purge_user, user_id):
-        return None
     return {
         "purged": True,
         "user_id": user_id,
