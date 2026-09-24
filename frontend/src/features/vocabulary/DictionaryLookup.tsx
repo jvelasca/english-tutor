@@ -1,8 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { motion } from "motion/react";
 import {
   ArrowLeftRight,
   BookOpen,
+  Check,
   Languages,
+  Layers,
+  ListPlus,
   Loader2,
   Mic,
   Plus,
@@ -11,7 +15,11 @@ import {
   X,
 } from "lucide-react";
 import { normalizeDictionaryEntry } from "../../api/normalize";
-import { addVocabularyItem, lookupDictionaryWord } from "../../api/vocabulary";
+import {
+  addVocabularyItem,
+  listVocabCollections,
+  lookupDictionaryWord,
+} from "../../api/vocabulary";
 import type {
   DictionaryDirection,
   DictionaryEntry,
@@ -19,6 +27,7 @@ import type {
   DictionaryUnitUsage,
   LexicalCompetence,
   LexicalStatus,
+  VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
@@ -55,8 +64,14 @@ interface DictionaryLookupProps {
    * esto habría **dos `h1`** en `/diccionario` y el título repetido dos veces.
    */
   showHeader?: boolean;
+  /**
+   * V3.83.0: puente a la única superficie de estudio. Tras añadir una palabra
+   * —o si la consultada ya está en el léxico—, el panel ofrece «Estudiar en
+   * Flashcards». Quien monta la vista dice cómo se llega allí; si no se ofrece,
+   * el botón no se pinta (no se promete un destino que no existe).
+   */
+  onOpenFlashcards?: () => void;
 }
-
 
 /** Diccionario de consulta (V3.30, D2/D3): busca CUALQUIER palabra (esté o no
  * en el léxico del alumno) y muestra definición/traducción cacheadas del modelo
@@ -71,10 +86,18 @@ interface DictionaryLookupProps {
  * marco y botón de borrado, con el **color de la dirección** (azul EN→ES,
  * fucsia ES→EN)— y el conmutador de sentido vive DENTRO del buscador, para no
  * confundirse con las pestañas de la pantalla. Sin consulta todavía, la vista
- * ofrece ejemplos para arrancar. */
+ * ofrece ejemplos para arrancar.
+ *
+ * V3.83.0: «Añadir a Flashcards» deja de ser un botón de un solo uso. Abre un
+ * panel que declara qué significa añadir —la palabra pasa a APRENDIZAJE, con su
+ * carta FSRS, y por eso aparece también en PERSONAL y en el mazo automático «Mi
+ * diccionario»— y permite archivarla además en una lista propia. El alta sigue
+ * siendo `addVocabularyItem` (léxico + FSRS + estado `learning`), así que el
+ * diccionario, PERSONAL y Flashcards pasan a ser un solo proceso de estudio. */
 export function DictionaryLookup({
   userId,
   showHeader = true,
+  onOpenFlashcards,
 }: DictionaryLookupProps) {
   const { t } = useI18n();
   const [direction, setDirection] = useState<DictionaryDirection>("en-es");
@@ -93,6 +116,14 @@ export function DictionaryLookup({
   const [practiceWord, setPracticeWord] = useState<string | null>(null);
   const [addStatus, setAddStatus] = useState<"idle" | "ok" | "error">("idle");
   const [adding, setAdding] = useState(false);
+  // V3.83.0: el panel de alta. `lists` es `null` mientras no se ha pedido (se
+  // carga de forma perezosa al abrir el panel, para no pagar una consulta en
+  // cada búsqueda). `selectedList` es el id de la lista donde archivar la
+  // palabra ADEMÁS de dejarla en aprendizaje; vacío = solo aprendizaje.
+  const [addOpen, setAddOpen] = useState(false);
+  const [lists, setLists] = useState<VocabCollection[] | null>(null);
+  const [listError, setListError] = useState(false);
+  const [selectedList, setSelectedList] = useState("");
 
   async function runLookup(raw: string, dir: DictionaryDirection = direction) {
     if (!userId) return;
@@ -114,6 +145,8 @@ export function DictionaryLookup({
     setLastDirection(dir);
     setPracticeWord(null);
     setAddStatus("idle");
+    setAddOpen(false);
+    setSelectedList("");
     try {
       const data = await lookupDictionaryWord(userId, word, dir);
       setEntry(normalizeDictionaryEntry(data));
@@ -125,15 +158,52 @@ export function DictionaryLookup({
     }
   }
 
-  async function handleAddToPersonal() {
+  /** Abre el panel y, la primera vez, carga las listas propias del alumno.
+   *  Solo se ofrecen las de tipo `user_list`: un pack temático no es un destino
+   *  de archivo, es contenido curado. */
+  async function openAddPanel() {
+    setAddOpen(true);
+    setAddStatus("idle");
+    if (!userId || lists !== null || listError) return;
+    try {
+      const data = await listVocabCollections(userId);
+      const collections = Array.isArray(data?.collections) ? data.collections : [];
+      setLists(collections.filter((c) => c.kind === "user_list"));
+    } catch {
+      setListError(true);
+      setLists([]);
+    }
+  }
+
+  function closeAddPanel() {
+    setAddOpen(false);
+    setAddStatus("idle");
+    setSelectedList("");
+  }
+
+  function toggleAddPanel() {
+    if (addOpen) {
+      closeAddPanel();
+      return;
+    }
+    void openAddPanel();
+  }
+
+  async function handleAddToFlashcards() {
     if (!userId || !practiceTerm || adding) return;
     setAdding(true);
     setAddStatus("idle");
     try {
       const translation =
         entry?.direction === "en-es" ? entry.translation ?? "" : entry?.word ?? "";
-      await addVocabularyItem(userId, practiceTerm, { translation });
+      await addVocabularyItem(userId, practiceTerm, {
+        translation,
+        collectionId: selectedList ? Number(selectedList) : undefined,
+      });
       setAddStatus("ok");
+      setSelectedList("");
+      // El alta ya deja la palabra en el léxico (estado `learning`): se refresca
+      // en silencio para que la marca de uso lo refleje sin desmontar la tarjeta.
       void refreshEntry(lastQuery, lastDirection);
     } catch {
       setAddStatus("error");
@@ -164,6 +234,9 @@ export function DictionaryLookup({
     setPracticeWord(null);
     setInvalidError(false);
     setNetworkError(false);
+    setAddOpen(false);
+    setAddStatus("idle");
+    setSelectedList("");
   }
 
   const practiceTerm = entry
@@ -171,6 +244,10 @@ export function DictionaryLookup({
       ? entry.translation
       : entry.word
     : null;
+  // V3.83.0: `tracked` significa que la palabra YA está en el léxico del alumno
+  // (y por tanto en PERSONAL y en el mazo automático). En ese caso no se ofrece
+  // un alta que no cambiaría nada: se ofrece estudiar.
+  const tracked = Boolean(entry?.usage.tracked);
 
   // V3.75.8: color de la dirección ACTIVA (la del conmutador). El resultado usa
   // el de SU dirección (`entry.direction`), que es la que produjo la tarjeta.
@@ -191,6 +268,8 @@ export function DictionaryLookup({
     setInvalidError(false);
     setNetworkError(false);
     setAddStatus("idle");
+    setAddOpen(false);
+    setSelectedList("");
     setLastQuery("");
   }
 
@@ -410,9 +489,26 @@ export function DictionaryLookup({
             entry={entry}
             userId={userId}
             onPractice={practiceTerm ? () => setPracticeWord(practiceTerm) : undefined}
-            onAdd={practiceTerm ? () => void handleAddToPersonal() : undefined}
-            adding={adding}
-            addStatus={addStatus}
+            tracked={tracked}
+            addOpen={addOpen}
+            onToggleAdd={practiceTerm && !tracked ? toggleAddPanel : undefined}
+            onOpenFlashcards={onOpenFlashcards}
+            addPanel={
+              addOpen && practiceTerm ? (
+                <AddToFlashcardsPanel
+                  term={practiceTerm}
+                  lists={lists}
+                  listError={listError}
+                  selectedList={selectedList}
+                  onSelectList={setSelectedList}
+                  adding={adding}
+                  status={addStatus}
+                  onConfirm={() => void handleAddToFlashcards()}
+                  onClose={closeAddPanel}
+                  onOpenFlashcards={onOpenFlashcards}
+                />
+              ) : null
+            }
           />
 
           {/* V3.32: escalera de drill oral de la palabra consultada. Practicar
@@ -440,6 +536,136 @@ export function DictionaryLookup({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * V3.83.0: panel de alta del diccionario a Flashcards.
+ *
+ * No es un botón de un solo uso: declara **qué** significa añadir (la palabra
+ * entra en el proceso de estudio con estado `learning` y su carta FSRS, así que
+ * aparecerá en PERSONAL y en el mazo automático «Mi diccionario») y permite
+ * además archivarla en una lista propia. La confirmación deja un estado de
+ * éxito con la salida natural: estudiar en Flashcards.
+ */
+function AddToFlashcardsPanel({
+  term,
+  lists,
+  listError,
+  selectedList,
+  onSelectList,
+  adding,
+  status,
+  onConfirm,
+  onClose,
+  onOpenFlashcards,
+}: {
+  term: string;
+  lists: VocabCollection[] | null;
+  listError: boolean;
+  selectedList: string;
+  onSelectList: (id: string) => void;
+  adding: boolean;
+  status: "idle" | "ok" | "error";
+  onConfirm: () => void;
+  onClose: () => void;
+  onOpenFlashcards?: () => void;
+}) {
+  const { t } = useI18n();
+
+  if (status === "ok") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-start gap-2 rounded-xl border border-success/40 bg-success/10 p-3"
+        role="status"
+      >
+        <p className="flex items-center gap-2 text-sm font-medium text-success">
+          <Check className="size-4 shrink-0" aria-hidden="true" />
+          {t("dictionary.lookup.addOk").replace("{word}", term)}
+        </p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("dictionary.lookup.addLearning")}
+        </p>
+        {onOpenFlashcards ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onOpenFlashcards}
+            className="gap-1.5"
+          >
+            <Layers className="size-3.5" aria-hidden="true" />
+            {t("dictionary.lookup.studyCta")}
+          </Button>
+        ) : null}
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-3"
+    >
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {t("dictionary.lookup.addHint")}
+      </p>
+
+      {listError ? (
+        <p className="text-[11px] text-muted-foreground">
+          {t("dictionary.lookup.addListError")}
+        </p>
+      ) : lists && lists.length > 0 ? (
+        <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <ListPlus className="size-3.5" aria-hidden="true" />
+            {t("dictionary.lookup.addListLabel")}
+          </span>
+          <select
+            value={selectedList}
+            onChange={(e) => onSelectList(e.target.value)}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+          >
+            <option value="">{t("dictionary.lookup.addListNone")}</option>
+            {lists.map((list) => (
+              <option key={list.id} value={list.id}>
+                {list.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={adding}
+          onClick={onConfirm}
+          className="gap-1.5"
+        >
+          <Plus className="size-3.5" aria-hidden="true" />
+          {adding ? t("common.saving") : t("dictionary.lookup.addConfirm")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={adding}
+          onClick={onClose}
+        >
+          {t("common.cancel")}
+        </Button>
+      </div>
+
+      {status === "error" ? (
+        <p className="text-xs text-destructive" role="alert">
+          {t("dictionary.lookup.addError")}
+        </p>
+      ) : null}
+    </motion.div>
   );
 }
 
@@ -611,16 +837,23 @@ function ResultCard({
   entry,
   userId,
   onPractice,
-  onAdd,
-  adding = false,
-  addStatus = "idle",
+  tracked = false,
+  addOpen = false,
+  onToggleAdd,
+  onOpenFlashcards,
+  addPanel,
 }: {
   entry: DictionaryEntry;
   userId: string | null;
   onPractice?: () => void;
-  onAdd?: () => void;
-  adding?: boolean;
-  addStatus?: "idle" | "ok" | "error";
+  /** La palabra ya está en el léxico: no se ofrece alta, se ofrece estudiar. */
+  tracked?: boolean;
+  /** V3.83.0: el panel de alta está abierto (cambia el rótulo del botón). */
+  addOpen?: boolean;
+  onToggleAdd?: () => void;
+  onOpenFlashcards?: () => void;
+  /** Panel de alta, ya construido por el contenedor (null si está cerrado). */
+  addPanel?: ReactNode;
 }) {
   const { t } = useI18n();
   const kindLabel = lexicalKindLabel(entry.kind, t);
@@ -685,19 +918,36 @@ function ResultCard({
               /* V3.75.5: la palabra se puede oír en A o B (dos acentos). */
               <ItemReplayButton prompt={audioText} userId={userId} />
             )}
-            {onAdd && (
+            {/* V3.83.0: alta a Flashcards. Si la palabra ya está en el léxico,
+                el alta no cambiaría nada: se ofrece estudiar. El panel explica
+                el vínculo con PERSONAL y el mazo automático. */}
+            {onToggleAdd ? (
+              <Button
+                type="button"
+                variant={addOpen ? "ghost" : "secondary"}
+                size="sm"
+                onClick={onToggleAdd}
+                aria-expanded={addOpen}
+                className="gap-1.5"
+              >
+                <Plus className="size-3.5" aria-hidden="true" />
+                {addOpen
+                  ? t("common.cancel")
+                  : t("dictionary.lookup.addCta")}
+              </Button>
+            ) : null}
+            {tracked && onOpenFlashcards ? (
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={onAdd}
-                disabled={adding}
+                onClick={onOpenFlashcards}
                 className="gap-1.5"
               >
-                <Plus className="size-3.5" aria-hidden="true" />
-                {t("dictionary.lookup.addCta")}
+                <Layers className="size-3.5" aria-hidden="true" />
+                {t("dictionary.lookup.studyCta")}
               </Button>
-            )}
+            ) : null}
             {/* V3.32: «Practicar esta palabra» — abre la escalera de drill oral
                 (Recall → Sentence). Solo esta acción explícita escribe
                 evidencia; el lookup no (D3). V3.39: sin equivalente inglés
@@ -717,16 +967,15 @@ function ResultCard({
           </div>
         </div>
 
-        {addStatus === "ok" ? (
-          <p className="text-xs text-success" role="status">
-            {t("dictionary.lookup.addOk")}
+        {/* V3.83.0: el alta declara su vínculo («ya está en tu diccionario y en
+            tu mazo») y el estado de éxito la navegación a estudiar. */}
+        {tracked && !addOpen ? (
+          <p className="text-xs text-muted-foreground">
+            {t("dictionary.lookup.alreadyTracked")}
           </p>
         ) : null}
-        {addStatus === "error" ? (
-          <p className="text-xs text-destructive" role="status">
-            {t("dictionary.lookup.addError")}
-          </p>
-        ) : null}
+
+        {addPanel}
 
         {entry.definition_source === "llm" ? (
           <div className="flex flex-col gap-4">

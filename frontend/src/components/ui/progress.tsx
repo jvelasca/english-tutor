@@ -14,6 +14,9 @@ function Progress({
         "bg-primary/20 relative h-2 w-full overflow-hidden rounded-full",
         className,
       )}
+      // El `value` se reenvía a la raíz para que exponga `aria-valuenow`
+      // (Radix lo omite si no lo recibe): la barra no solo se ve, se anuncia.
+      value={value}
       {...props}
     >
       <ProgressPrimitive.Indicator

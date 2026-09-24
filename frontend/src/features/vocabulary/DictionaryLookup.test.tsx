@@ -869,3 +869,102 @@ describe("DictionaryLookup · contratos incompletos (V3.77.2)", () => {
     expect(await screen.findByText("A hot drink.")).toBeTruthy();
   });
 });
+
+describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  // Una lista propia (destino de archivo) y un pack curado (NO es destino).
+  const USER_LIST = {
+    id: 7,
+    kind: "user_list",
+    slug: "mi-lista",
+    title: "Mi lista",
+    title_es: "Mi lista",
+    cefr_hint: "",
+    item_count: 0,
+    enrolled: true,
+    is_global: false,
+  };
+  const PACK = { ...USER_LIST, id: 3, kind: "pack", title: "Pack A1" };
+
+  it("añade la palabra como aprendizaje (traducción + lista) y ofrece estudiar", async () => {
+    const onOpenFlashcards = vi.fn();
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: NEBULA },
+      {
+        url: "/api/vocabulary/collections",
+        data: { collections: [PACK, USER_LIST] },
+      },
+      {
+        url: "/api/vocabulary/items",
+        data: {
+          added: ["nebula"],
+          item: { word: "nebula", translation: "", definition: "" },
+        },
+      },
+    ]);
+    renderPanel(
+      <DictionaryLookup userId="u1" onOpenFlashcards={onOpenFlashcards} />,
+    );
+
+    fillAndSubmit("nebula");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to Flashcards" }),
+    );
+
+    // El panel declara el vínculo ANTES de confirmar: la palabra entra en el
+    // proceso de estudio (PERSONAL + mazo automático), no es un cajón aparte.
+    expect(screen.getByText(/The word joins your study flow/)).toBeTruthy();
+    // Solo se ofrecen las listas propias: un pack curado no es un destino.
+    const select = await screen.findByRole("combobox");
+    expect(screen.getByRole("option", { name: "Mi lista" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "Pack A1" })).toBeNull();
+
+    fireEvent.change(select, { target: { value: "7" } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add and start learning" }),
+    );
+
+    // El alta pasa por el mismo endpoint que crea léxico + carta FSRS, y lleva
+    // la traducción y la lista de archivo.
+    const addCall = fn.mock.calls.find((call) =>
+      String(call[0]).includes("/api/vocabulary/items"),
+    );
+    expect(JSON.parse(String(addCall?.[1]?.body))).toEqual({
+      word: "nebula",
+      translation: "",
+      collection_id: 7,
+    });
+
+    // Éxito honesto: «ya está en aprendizaje» + salida natural a estudiar.
+    expect(
+      await screen.findByText("nebula is now learning."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
+    expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
+  });
+
+  it("una palabra ya rastreada no se re-da de alta: declara el vínculo y ofrece estudiar", async () => {
+    // COFFEE ya está en el léxico (`usage.tracked`): ofrecer «Añadir» sería
+    // prometer un cambio que no ocurriría (ni duplicar la palabra).
+    const onOpenFlashcards = vi.fn();
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(
+      <DictionaryLookup userId="u1" onOpenFlashcards={onOpenFlashcards} />,
+    );
+
+    fillAndSubmit("coffee");
+    expect(
+      await screen.findByText(/Already in your dictionary/),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Add to Flashcards" }),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
+    expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
+  });
+});

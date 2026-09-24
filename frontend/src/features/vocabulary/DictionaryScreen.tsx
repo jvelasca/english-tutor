@@ -131,7 +131,14 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
                vista de consulta no repite cabecera (antes había dos `h1` en la
                misma página) ni vuelve a aplicar el ancho y el relleno de
                página, que ya pone este contenedor. */
-            <DictionaryLookup userId={userId} showHeader={false} />
+            <DictionaryLookup
+              userId={userId}
+              showHeader={false}
+              /* V3.83.0: tras añadir (o si la palabra ya está en el léxico), el
+                 panel ofrece estudiar. El destino es el modo Flashcards de esta
+                 misma pantalla: el foco no persiste, es un salto de un clic. */
+              onOpenFlashcards={() => setView("flashcards")}
+            />
           ) : view === "personal" ? (
             /* V3.77.2: la pantalla es la única dueña del layout (un solo `h1`
                y un solo contenedor de ancho). V3.78.0: PERSONAL ya no estudia;

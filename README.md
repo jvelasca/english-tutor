@@ -19,7 +19,7 @@ correo configurado, los enlaces se entregan **a mano** desde el lanzador.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.82.0**.
+- Última versión estable: **v3.83.0**.
 
 ## Estructura
 

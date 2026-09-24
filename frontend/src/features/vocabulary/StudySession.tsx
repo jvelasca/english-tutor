@@ -30,8 +30,18 @@
  * El resumen y el arranque los controla el contenedor con la `key`: una sesión
  * nueva remonta el componente, así que no hay que «resetear» estado por efecto.
  */
-import { useRef, useState } from "react";
-import { Layers, Pencil, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import {
+  Frown,
+  Layers,
+  Pencil,
+  RefreshCw,
+  RotateCcw,
+  Smile,
+  Sparkles,
+  Zap,
+} from "lucide-react";
 import type { FlashcardStudyItem } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import {
@@ -42,13 +52,41 @@ import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 
+/**
+ * Los cuatro grados FSRS con su identidad visual (V3.83.0): icono, color
+ * semántico y atajo de teclado. El color no es decorativo —cada grado tiene el
+ * suyo en toda la app (rojo/ámbar/primario/verde)— y el atajo (1–4) convierte
+ * calificar en un gesto de juego, sin quitar el botón: sigue siendo pulsable y
+ * accesible.
+ */
 const GRADES = [
-  { grade: 1, key: "fsrs.grade.again", tone: "text-destructive" },
-  { grade: 2, key: "fsrs.grade.hard", tone: "text-warning" },
-  { grade: 3, key: "fsrs.grade.good", tone: "text-primary" },
-  { grade: 4, key: "fsrs.grade.easy", tone: "text-success" },
+  {
+    grade: 1,
+    key: "fsrs.grade.again",
+    Icon: RotateCcw,
+    tone: "border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
+  },
+  {
+    grade: 2,
+    key: "fsrs.grade.hard",
+    Icon: Frown,
+    tone: "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20 hover:text-warning",
+  },
+  {
+    grade: 3,
+    key: "fsrs.grade.good",
+    Icon: Smile,
+    tone: "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
+  },
+  {
+    grade: 4,
+    key: "fsrs.grade.easy",
+    Icon: Zap,
+    tone: "border-success/40 bg-success/10 text-success hover:bg-success/20 hover:text-success",
+  },
 ] as const;
 
 interface StudySessionProps {
@@ -89,6 +127,12 @@ export function StudySession({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [done, setDone] = useState(0);
+  // V3.83.0: aciertos de la sesión (grados ≥ 3). Es lo único que se puede decir
+  // con honestidad al terminar: un % de esta sesión, no una nota de dominio.
+  const [good, setGood] = useState(0);
+  // Con «reducir movimiento» activo, el volteo 3D y la celebración se apagan:
+  // la información sigue igual, el movimiento es lo que desaparece.
+  const reduceMotion = useReducedMotion();
 
   // V3.80.0: caras B resueltas durante esta sesión (generadas o escritas a
   // mano). Se indexan por tarjeta para que volver atrás no vuelva a pedirlas.
@@ -233,6 +277,7 @@ export function StudySession({
     try {
       await onGrade(current, g);
       setDone((n) => n + 1);
+      if (g >= 3) setGood((n) => n + 1);
       setFlipped(false);
       // Al cambiar de tarjeta se cierra cualquier edición abierta: el campo es
       // de la tarjeta anterior y dejarlo abierto guardaría en la equivocada.
@@ -250,6 +295,34 @@ export function StudySession({
       setBusy(false);
     }
   }
+
+  // V3.83.0: atajos 1–4 para calificar cuando la tarjeta ya está revelada. Se
+  // ignora mientras se escribe el reverso propio (el campo captura el número) y
+  // mientras hay una calificación en vuelo, para no disparar dos grados de la
+  // misma tarjeta.
+  useEffect(() => {
+    if (!flipped || busy || editing) return;
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const value = Number(event.key);
+      if (!Number.isInteger(value) || value < 1 || value > 4) return;
+      event.preventDefault();
+      void grade(value);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // `grade` se recrea en cada render: el efecto se re-suscribe, que es
+    // barato y evita cerrar sobre un `current`/`busy` desfasado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flipped, busy, editing, current, key]);
 
   async function saveOwnBack() {
     if (!current || saving || !key) return;
@@ -307,16 +380,39 @@ export function StudySession({
   }
 
   if (!current) {
+    // V3.83.0: el cierre de sesión es el momento de celebrar. Se dice lo que de
+    // verdad se puede afirmar —cuántas tarjetas y el acierto de ESTA sesión—,
+    // sin convertirlo en una nota de dominio (D5/E3).
+    const accuracy = done > 0 ? Math.round((good / done) * 100) : 0;
     return (
-      <Card className="gap-3 p-5">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Layers className="size-4 text-primary" aria-hidden="true" />
-          {deckName}
-        </h2>
-        <p className="text-sm font-medium">
-          {t("flashcards.study.finished").replace("{n}", String(done))}
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
+      <Card className="gap-4 p-6 text-center">
+        <motion.div
+          initial={reduceMotion ? false : { scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 18 }}
+          className="mx-auto grid size-16 place-items-center rounded-full bg-success/15 text-success"
+          aria-hidden="true"
+        >
+          <Sparkles className="size-8" />
+        </motion.div>
+        <div className="flex flex-col items-center gap-1">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Layers className="size-4 text-primary" aria-hidden="true" />
+            {deckName}
+          </h2>
+          <p className="text-sm font-medium">
+            {t("flashcards.study.finished").replace("{n}", String(done))}
+          </p>
+          {done > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {t("flashcards.study.sessionAccuracy").replace(
+                "{pct}",
+                String(accuracy),
+              )}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={onExit}>
             {t("flashcards.study.back")}
           </Button>
@@ -332,6 +428,8 @@ export function StudySession({
   }
 
   const hasFace = Boolean(back || definition);
+  const progressPct =
+    items.length > 0 ? Math.round(((index + 1) / items.length) * 100) : 0;
 
   return (
     <Card className="gap-4 p-5">
@@ -354,22 +452,49 @@ export function StudySession({
         </div>
       </div>
 
+      {/* V3.83.0: barra de progreso de la sesión, para que el avance sea un
+          gesto visible y no solo un número. */}
+      <Progress
+        value={progressPct}
+        className="h-1.5"
+        aria-label={t("flashcards.study.progressBar")
+          .replace("{i}", String(index + 1))
+          .replace("{n}", String(items.length))}
+      />
+
+      {/* Volteo 3D: las dos caras viven en la misma escena y solo una mira al
+          frente. El botón sigue siendo el control («Flip card») y las caras son
+          spans no interactivos, así que la accesibilidad y los tests no cambian.
+          Con «reducir movimiento» la rotación se apaga y el cambio de cara es
+          instantáneo. */}
       <button
         type="button"
         onClick={() => (flipped ? setFlipped(false) : reveal())}
-        className={cn(
-          "flex min-h-36 w-full flex-col items-center justify-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-6 text-center transition-colors hover:border-primary/40",
-        )}
+        className="relative block w-full [perspective:1200px]"
         aria-label={t("flashcards.study.flip")}
       >
-        <span
-          className="text-2xl font-bold tracking-tight"
-          lang={isLexicon ? "en" : undefined}
+        <motion.span
+          className="relative block min-h-40 w-full [transform-style:preserve-3d]"
+          animate={reduceMotion ? undefined : { rotateY: flipped ? 180 : 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
-          {current.front}
-        </span>
-        {flipped ? (
-          <div className="flex flex-col gap-1">
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-6 text-center [backface-visibility:hidden]">
+            <span
+              className="text-2xl font-bold tracking-tight"
+              lang={isLexicon ? "en" : undefined}
+            >
+              {current.front}
+            </span>
+            {!flipped ? (
+              <span className="text-xs text-muted-foreground">
+                {t("flashcards.study.tapReveal")}
+              </span>
+            ) : null}
+          </span>
+          <span
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-6 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]"
+            aria-hidden={!flipped}
+          >
             {generating ? (
               <span className="flex items-center gap-2 text-sm text-muted-foreground">
                 <RefreshCw className="size-3.5 animate-spin" aria-hidden="true" />
@@ -399,12 +524,8 @@ export function StudySession({
                   : t("flashcards.study.noFace")}
               </span>
             ) : null}
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            {t("flashcards.study.tapReveal")}
           </span>
-        )}
+        </motion.span>
       </button>
 
       {canEdit && flipped ? (
@@ -493,19 +614,32 @@ export function StudySession({
 
       {flipped ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {GRADES.map((g) => (
-            <Button
-              key={g.grade}
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => void grade(g.grade)}
-              className={cn("font-semibold", g.tone)}
-            >
-              {t(g.key)}
-            </Button>
-          ))}
+          {GRADES.map((g) => {
+            const Icon = g.Icon;
+            return (
+              <Button
+                key={g.grade}
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => void grade(g.grade)}
+                aria-keyshortcuts={String(g.grade)}
+                className={cn(
+                  "flex-col gap-0.5 py-2.5 font-semibold sm:flex-row sm:gap-1.5",
+                  g.tone,
+                )}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                <kbd className="rounded border border-border/60 bg-background/60 px-1 text-[10px] font-bold text-muted-foreground">
+                  {g.grade}
+                </kbd>
+                {/* El texto de la nota va en su propio nodo: el nombre
+                    accesible y los tests siguen leyendo «Good», no «3Good». */}
+                <span>{t(g.key)}</span>
+              </Button>
+            );
+          })}
         </div>
       ) : (
         <Button

@@ -938,6 +938,15 @@ const STRINGS: Record<string, Entry> = {
     en: "{i} / {n}",
     es: "{i} / {n}",
   },
+  // V3.83.0: barra de progreso (su etiqueta accesible) y acierto de la sesión.
+  "flashcards.study.progressBar": {
+    en: "Card {i} of {n}",
+    es: "Tarjeta {i} de {n}",
+  },
+  "flashcards.study.sessionAccuracy": {
+    en: "{pct}% of this session rated Good or Easy.",
+    es: "{pct}% de esta sesión valorada como Bien o Fácil.",
+  },
   "flashcards.study.newCard": { en: "New", es: "Nueva" },
   "flashcards.study.reviewCard": { en: "Review", es: "Repaso" },
   "flashcards.study.pendingToday": {
@@ -1212,17 +1221,53 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not save. Try again.",
     es: "No se pudo guardar. Inténtalo de nuevo.",
   },
+  // V3.83.0: el diccionario deja de «añadir a Personal» y pasa a incorporar la
+  // palabra al PROCESO DE ESTUDIO. El alta crea léxico + carta FSRS (estado
+  // `learning`), así que la palabra aparece también en PERSONAL y en el mazo
+  // automático «Mi diccionario»: es el mismo vocabulario, no una copia.
   "dictionary.lookup.addCta": {
-    en: "Add to Personal",
-    es: "Añadir a Personal",
+    en: "Add to Flashcards",
+    es: "Añadir a Flashcards",
+  },
+  "dictionary.lookup.addConfirm": {
+    en: "Add and start learning",
+    es: "Añadir y empezar a aprender",
   },
   "dictionary.lookup.addOk": {
-    en: "Added to your personal dictionary.",
-    es: "Añadida a tu diccionario personal.",
+    en: "{word} is now learning.",
+    es: "{word} ya está en aprendizaje.",
+  },
+  "dictionary.lookup.addLearning": {
+    en: "It shows up in Personal and in your “My dictionary” deck, and it follows the full study flow (spaced repetition).",
+    es: "Aparece en Personal y en tu mazo «Mi diccionario», y sigue el proceso de estudio completo (repetición espaciada).",
+  },
+  "dictionary.lookup.addHint": {
+    en: "The word joins your study flow: it stays in learning, shows up in Personal and in the auto deck, and repeats with spaced review.",
+    es: "La palabra entra en tu proceso de estudio: queda en aprendizaje, aparece en Personal y en el mazo automático, y se repasa con repetición espaciada.",
+  },
+  "dictionary.lookup.addListLabel": {
+    en: "Also file it in a list (optional)",
+    es: "Archivar también en una lista (opcional)",
+  },
+  "dictionary.lookup.addListNone": {
+    en: "No list — just my dictionary",
+    es: "Ninguna — solo mi diccionario",
+  },
+  "dictionary.lookup.addListError": {
+    en: "Your lists could not be loaded. You can still add it to your dictionary.",
+    es: "No se pudieron cargar tus listas. Puedes añadirla igualmente a tu diccionario.",
   },
   "dictionary.lookup.addError": {
     en: "Could not add the word.",
     es: "No se pudo añadir la palabra.",
+  },
+  "dictionary.lookup.alreadyTracked": {
+    en: "Already in your dictionary — it is part of your study flow.",
+    es: "Ya está en tu diccionario — forma parte de tu proceso de estudio.",
+  },
+  "dictionary.lookup.studyCta": {
+    en: "Study in Flashcards",
+    es: "Estudiar en Flashcards",
   },
   // V3.38.1: pantalla dedicada del diccionario (ruta `/diccionario`). V3.78.0 la
   // reorganiza en TRES modos, en el orden en que se usan: consultar una palabra,

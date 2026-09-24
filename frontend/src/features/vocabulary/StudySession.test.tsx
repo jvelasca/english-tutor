@@ -466,4 +466,87 @@ describe("StudySession", () => {
     expect(screen.getByText("airport").getAttribute("lang")).toBe("en");
     expect(screen.getByText("aeropuerto").getAttribute("lang")).toBe("es");
   });
+
+  // --- V3.83.0: la sesión como juego (progreso, atajos, celebración) ---------
+
+  it("muestra una barra de progreso que avanza con la sesión", async () => {
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card(), card({ card_id: "ticket", front: "ticket" })]}
+        deckName="Deck"
+        onGrade={vi.fn().mockResolvedValue(undefined)}
+        onExit={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+      "50",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    fireEvent.click(screen.getByText("Good"));
+
+    // La segunda tarjeta llega con la barra al 100 %.
+    await screen.findByText("ticket");
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+      "100",
+    );
+  });
+
+  it("califica con los atajos 1–4 sin tocar el ratón", async () => {
+    const onGrade = vi.fn().mockResolvedValue(undefined);
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={onGrade}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    // Solo cuentan cuando la tarjeta ya está revelada.
+    fireEvent.keyDown(window, { key: "3" });
+
+    expect(await screen.findByText("Session done — 1 cards reviewed.")).toBeTruthy();
+    expect(onGrade).toHaveBeenCalledTimes(1);
+    expect(onGrade.mock.calls[0][1]).toBe(3);
+  });
+
+  it("declara el acierto de la sesión y reserva el atajo en el botón de nota", async () => {
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card(), card({ card_id: "ticket", front: "ticket" })]}
+        deckName="Deck"
+        onGrade={vi.fn().mockResolvedValue(undefined)}
+        onExit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    // El atajo va declarado en el propio botón (accesibilidad), pero el nombre
+    // accesible sigue siendo «Good», no «3Good».
+    expect(
+      screen
+        .getByText("Good")
+        .closest("button")
+        ?.getAttribute("aria-keyshortcuts"),
+    ).toBe("3");
+
+    fireEvent.click(screen.getByText("Good"));
+    await screen.findByText("ticket");
+    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
+    fireEvent.click(screen.getByText("Good"));
+
+    expect(
+      await screen.findByText("Session done — 2 cards reviewed."),
+    ).toBeTruthy();
+    // Acierto de ESTA sesión, no una nota de dominio (D5/E3).
+    expect(
+      screen.getByText("100% of this session rated Good or Easy."),
+    ).toBeTruthy();
+  });
 });
