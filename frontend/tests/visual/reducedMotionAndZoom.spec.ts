@@ -18,14 +18,27 @@ import { ensureProfile } from "./gateHelper";
 const APPEARANCE_KEY = "english-tutor.appearance";
 
 test.describe("prefers-reduced-motion (GUI-05)", () => {
-  test.use({ reducedMotion: "reduce" });
-
+  // OJO (V3.83.0): `test.use({ reducedMotion: 'reduce' })` NO es una opción
+  // válida de `test.use` en Playwright 1.62 —no existe como propiedad de
+  // `TestOptions` y se ignora en SILENCIO—, así que este gate pasaba sin emular
+  // nada. Se emula de verdad con `page.emulateMedia` y se comprueba que la
+  // emulación está activa, para que no pueda volver a pasar por vacío.
   test("el hub de APRENDER no deja contenido a medio aparecer", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/#/aprender");
     await ensureProfile(page);
 
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await expect(nav.first()).toBeVisible({ timeout: 15_000 });
+
+    // Guarda de mordida: sin la emulación activa el test sería vacuo.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        ),
+      )
+      .toBe(true);
 
     const grid = page.getByTestId("learn-hub-grid");
     await expect(grid).toBeVisible({ timeout: 15_000 });
