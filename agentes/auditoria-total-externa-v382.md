@@ -253,15 +253,33 @@ gh api repos/jvelasca/english-tutor/commits/$(git rev-parse 'v3.83.0^{commit}')/
 # 14
 ```
 
-**La causa más probable, que hay que dictaminar y no dar por segura:** el CI **no
-dispara en tags** (`ci.yml` escucha `push: branches: [main]` y `pull_request` —lo dice
-por escrito el punto de entrada de `v3.83.0`—), y si el commit de la release se hizo
-alcanzable **por el push de su tag** antes de que la rama lo llevara, **nunca fue el
-tip de un push a `main`** y por tanto **nunca tuvo run propia**. La run de `e05b3dd`
-**sí ejercita su árbol**, pero **combinado con v3.83.0**, nunca en aislamiento.
-**Lo falsaría:** una run borrada (no hay rastro) o un push a `main` cuyo tip fuera
-`3f686a0` (no lo hay en la ventana que lo rodea). **Severidad si se confirma: P1** —
-la Release se publicó marcando un commit **sin certificar**.
+**La causa, REPRODUCIDA en este mismo repositorio (no es una hipótesis):** el CI
+**solo certifica el TIP de cada push**. Un commit intermedio de un push que lleve más
+de uno **se queda sin run propia**, aunque su árbol sí viaje dentro de la run del tip.
+
+La reproducción es literal y está a la vista en la historia: el commit documental de
+este encargo se subió **junto con otro** (`54a32fd` + `4a7e70f`, un solo `git push`) y
+el resultado fue exactamente la firma de `3f686a0`:
+
+```bash
+gh api repos/jvelasca/english-tutor/commits/$(git rev-parse 54a32fd)/check-runs --jq '.total_count'   # 0
+gh api repos/jvelasca/english-tutor/commits/$(git rev-parse 4a7e70f)/check-runs --jq '.total_count'   # 12
+```
+
+`54a32fd` es **intermedio**; `4a7e70f` es el **tip**. Y `3f686a0` tiene la misma
+posición: su padre (`88e998a`) y su hijo (`e05b3dd`) tienen run; **él, no**. La run de
+`e05b3dd` **sí ejercita su árbol**, pero **combinado con `v3.83.0`**, nunca en
+aislamiento.
+
+**Lo que esta reproducción NO determina, y hay que dictaminar:** *cómo* quedó `3f686a0`
+en posición intermedia. El encargo anterior (`v3.83.0`) apunta al **push del tag** —el
+CI no dispara en tags—, pero los sellos de tiempo admiten una segunda lectura: `3f686a0`
+(a las `11:43:52Z`) y `e05b3dd` (cuya run nace a las `11:48:20Z`) están a **menos de
+cinco minutos**, lo que es compatible con **un único push de los dos commits de release**
+—y esa es la lectura que la reproducción de arriba favorece—. **Decide tú cuál es**, y
+nota que **las dos producen el mismo efecto**: el commit del tag nunca fue el tip.
+**Lo falsaría:** una run borrada (no hay rastro). **Severidad si se confirma: P1** —la
+Release se publicó marcando un commit **sin certificar**.
 
 ### 1.2 Lista cerrada — el único commit de producto del rango
 
@@ -592,10 +610,13 @@ El informe (`AV`) debe declarar explícitamente, aunque nadie lo pregunte:
 ## 6. Discrepancias declaradas a propósito (para que las dictamine)
 
 - **D1. El commit de la release no tiene run.** Verificado por comando
-  (`check-runs: 0`, `statuses: []`) y con la comparativa de su hijo (`14`). La
-  explicación **más probable** —no confirmada— es que el commit se hizo alcanzable por
-  el **push del tag** (que el CI **ignora**) antes de viajar en la rama. **Se declara
-  aquí para que no sorprenda**; la severidad la pone el auditor.
+  (`check-runs: 0`, `statuses: []`) y con la comparativa de su hijo (`14`). La causa
+  está **reproducida**: el CI **solo certifica el tip de cada push** (§1.1-9), y se
+  demuestra con el push documental de este mismo encargo (`54a32fd` intermedio → `0`;
+  `4a7e70f` tip → `12`). Queda por dictaminar **cómo** quedó `3f686a0` en posición
+  intermedia —el **push del tag** o **un push conjunto con `e05b3dd`**—, pero **las dos
+  vías dan el mismo efecto**. **Se declara aquí para que no sorprenda**; la severidad
+  la pone el auditor.
 - **D2. `KIT-VALIDACION-GATES.md` se contradice con sigo mismo sobre `G0`.** La
   **hoja del gate** (§C, paso 3) recoge la semántica nueva («ninguna cuenta pendiente
   sin invitación entregada»), pero la **tabla de sesiones** (línea 294, **sin fecha**)
