@@ -2017,6 +2017,57 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   credencial no entran, `GET /api/users` no es público y el registro autoservicio no
   existe).
 
+## V3.83.0 — Diccionario → Flashcards y sesión de estudio tipo juego · 2026-09-24
+
+> Release **SOLO FRONTEND** que hace visible el vínculo Diccionario → Flashcards →
+> PERSONAL y rediseña la sesión de estudio. **SIN migración, SIN endpoints nuevos y
+> SIN cambio de contrato**: reutiliza `POST /api/vocabulary/items`,
+> `GET /api/vocabulary/collections`, los mazos y la cola FSRS. Lo que sigue son
+> **deudas declaradas**, no olvidos. Detalle en `release-notes-v3.83.0.md`.
+
+### Cerrado en V3.83.0 (deja de ser deuda)
+
+- **El vínculo «todo uno» existía pero no se veía.** El botón «Añadir a Personal»
+  pasa a **«Añadir a Flashcards»** y abre un panel que declara qué significa el
+  alta: la palabra queda en **aprendizaje**, aparece en **Personal** y en el mazo
+  automático **«Mi diccionario»**, y se repasa con FSRS. El alta sigue siendo el
+  **mismo** `addVocabularyItem` de siempre: no hay copia ni segundo vocabulario.
+- **No se ofrecía estudiar desde el diccionario.** El panel cierra con **«Estudiar
+  en Flashcards»**, que salta al modo de estudio de la propia pantalla.
+- **Una palabra ya rastreada se podía «añadir» otra vez.** Si `usage.tracked` es
+  cierto, no se ofrece un alta que no cambiaría nada: se declara «Ya está en tu
+  diccionario» y se ofrece estudiar.
+- **No se podía archivar en una lista desde el diccionario.** Selector opcional con
+  las listas **propias** (`user_list`), cargado de forma perezosa; el alta entra con
+  `collection_id`.
+- **La barra de progreso no se anunciaba.** `components/ui/progress.tsx` no
+  reenviaba `value` a la raíz de Radix, así que no pintaba `aria-valuenow`: se veía,
+  no se oía. Se reenvía.
+- **La sesión se veía como un formulario.** Volteo **3D** real (dos caras),
+  **barra de progreso**, notas con **icono + color semántico + atajo 1–4** y cierre
+  con **celebración** que declara el **acierto de la sesión** (grados ≥ 3).
+
+### Lo que sigue abierto o aparcado (deuda declarada)
+
+- **No hay gamificación de datos**: ni XP, ni niveles, ni rachas. El «juego» es
+  visual y de movimiento, **a propósito**. `[PRODUCTO]`
+- **El acierto del resumen es de la sesión**, no una nota de dominio (D5/E3): dice
+  cuántas de las tarjetas repasadas fueron Bien o Fácil, nada más. `[PRODUCTO]`
+- **Crear una lista desde el diccionario no se ofrece**: el panel solo elige entre
+  las que ya existen; para crear una hay que ir a Añadir/packs. Es una limitación
+  declarada, no un olvido. `[PRODUCTO]`
+- **El volteo 3D y la celebración se apagan con `prefers-reduced-motion`**: la
+  información no cambia, pero quien reduzca movimiento no ve la animación. `[UX]`
+- **El alta sigue dependiendo del modelo/backend para el reverso** (léxico al día
+  siguiente): nada nuevo, pero tampoco se mejora aquí. `[PRODUCTO]`
+- **`frontend/dist` no se reconstruyó en esta release**: el artefacto compilado es
+  anterior a v3.82.0/v3.83.0 hasta que se ejecute `npm run build` y se vuelva a
+  validar el origen de producto. `[VALIDACIÓN]`
+- **Los 8 gates humanos siguen `pending`** (incluido **G0**, que depende de ejecutar
+  la migración heredada: acción del gerente, no del agente). `[VALIDACIÓN]`
+- **Todo lo declarado abierto en V3.82.0 y anteriores sigue abierto** salvo lo que
+  esta release cierra de forma explícita arriba.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
