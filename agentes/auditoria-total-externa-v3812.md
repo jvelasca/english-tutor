@@ -222,8 +222,15 @@ lanzador es la superficie donde el webmaster **ejecuta** la migración.
 git diff --stat v3.81.2..main -- backend frontend launcher scripts
 ```
 
-Debe salir **vacío**. Los commits posteriores al tag (`ea65561`, y el que entrega
-este documento) son **documentales**: `main` va por delante del tag **en
+Debe salir **vacío**, y con él este segundo candado, que no depende de contar commits:
+
+```bash
+git diff --name-only v3.81.2..main | grep -v '\.md$'   # VACÍO: desde el tag solo se ha tocado documentación
+```
+
+Los commits posteriores al tag son **documentales** (hoy: `ea65561`, el que entregó
+este documento y la nota de publicación de la Release). Esa cola **crece con cada
+entrega y no se congela por SHA a propósito**: `main` va por delante del tag **en
 documentación**, y ese es el precio declarado de no recrear un tag publicado.
 
 **(7) La evidencia de los gates está a CERO.** No hay ninguna aprobación previa que
@@ -273,7 +280,15 @@ producto, pruebas ni versiones**.
 | 1 | `91b2ff7` | `docs(audit)`: corrige el recuento del arco y resuelve el CI del tag | 2 (`*.md`), +100/−12 | — (documental, **posterior** al tag `v3.81.1`) |
 | 2 | `dd43514` | `release(v3.81.2)`: el historial deja de guardar el correo, la purga se registra después y la migración heredada pasa a candado | 26, +989/−87 | **`v3.81.2`** |
 
-Y **fuera del rango, posterior al tag**: `ea65561` (`docs(v3.81.2)`, 1 fichero, +31/−3).
+Y **fuera del rango, posterior al tag**: `ea65561` (`docs(v3.81.2)`, 1 fichero, +31/−3),
+más los commits documentales de las entregas siguientes —el que trae **este documento**
+y la nota de publicación de la Release—. Esa cola **no se congela por SHA a propósito**:
+se congela por *invariante*, que es lo que un auditor puede comprobar sin fiarse de
+esta lista ni de mi palabra:
+
+```bash
+git diff --name-only v3.81.2..main | grep -v '\.md$'   # debe salir VACÍO
+```
 
 ### 1.3 Lista cerrada — el diff del arco, por área
 
@@ -321,6 +336,8 @@ comentario: «8 gates») y los **dos candados de recuento** en
 ```bash
 git tag --list 'v3.81*'                 # v3.81.0, v3.81.1, v3.81.2
 gh run list --commit <sha-de-v3.81.2>   # la run que certifica el commit del tag
+gh release view v3.81.2                 # la Release publicada (cuerpo = notas)
+gh api repos/jvelasca/english-tutor/releases/latest --jq .tag_name   # v3.81.2
 ```
 
 | Certificación | Valor |
@@ -329,6 +346,28 @@ gh run list --commit <sha-de-v3.81.2>   # la run que certifica el commit del tag
 | Run del commit del tag | **`35926727880`** — `conclusion = success`, **12/12 jobs** |
 | Run del commit documental posterior | **`35927208170`** — `conclusion = success`, **12/12 jobs** |
 | `Playwright E2E (visual)` | ✅ verde en las dos (fue el rojo que abrió la saga de `v3.81.1`) |
+| Release publicada | **`v3.81.2`** — creada el **2026-09-24**, `draft = false` · `prerelease = false`; es la que GitHub marca como **Latest** |
+
+**Aviso de anclaje (evita auditar la versión equivocada).** Hasta el **2026-09-24**,
+`v3.81.2` existía **solo como tag**: no tenía *Release object*, así que
+`/releases/tag/v3.81.2` respondía **404** y la página
+[`/releases`](https://github.com/jvelasca/english-tutor/releases) anunciaba
+**`v3.81.1` como «Latest»**, con un título («Gestion de USUARIOS…») que describe el
+arco anterior. Un auditor que entrase por ahí habría auditado **una versión por
+detrás creyendo que era la última**. Se publicó la Release de `v3.81.2` (cuerpo =
+`release-notes-v3.81.2.md`, **idéntico al fichero salvo la normalización `LF → CRLF`**,
+que es la única diferencia y no es corrupción). Comprobado por comando:
+
+```bash
+# el cuerpo remoto y el fichero local coinciden tras normalizar saltos de línea
+gh api repos/jvelasca/english-tutor/releases/tags/v3.81.2 --jq .body > /tmp/remoto.md
+python -c "import io;a=io.open('/tmp/remoto.md',encoding='utf-8').read().replace(chr(13)+chr(10),chr(10)).strip();b=io.open('release-notes-v3.81.2.md',encoding='utf-8').read().strip();print(a==b)"
+```
+
+> **Trampa para el auditor de hoy en día:** si algún documento, memoria o
+> automatismo cita `v3.81.1` como «la última release», es **deriva documental
+> heredada** del día en que se publicó (y es correcta para su fecha). La cifra
+> vigente es `v3.81.2`.
 
 **El CI no dispara en tags** (`ci.yml` escucha `push: branches: [main]` y
 `pull_request`): quien audite «el CI del tag» audita el CI del commit al que apunta.
