@@ -134,10 +134,11 @@ Ficheros principales: `frontend/src/features/vocabulary/DictionaryLookup.tsx`,
 
 ## 5. Honestidad
 
-1. **Solo frontend.** No se toca ni el backend ni la BD. El alta usa el endpoint que
-   ya existía, así que una palabra añadida desde el diccionario **ya era** palabra
-   en aprendizaje antes de esta release: lo que cambia es que **ahora se ve y se
-   dice**.
+1. **Solo frontend, sin lógica de backend** (el único cambio fuera de la UI es el
+   bump de `VERSION` en `backend/config.py`) **y sin tocar la BD.** El alta usa el
+   endpoint que ya existía, así que una palabra añadida desde el diccionario **ya
+   era** palabra en aprendizaje antes de esta release: lo que cambia es que **ahora
+   se ve y se dice**.
 2. **Sin gamificación de datos.** No hay XP, niveles ni rachas: el «juego» es visual
    y de movimiento, como se pidió.
 3. **El acierto es de la sesión** (grados ≥ 3 sobre lo repasado), no una promesa de

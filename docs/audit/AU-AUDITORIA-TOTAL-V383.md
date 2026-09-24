@@ -435,7 +435,9 @@ notas se reproducen por comando**.
    ingestión (`bool(owner) and owner == user_id`) **o** declararlo como deuda con su
    severidad. Es **heredado**, no lo introduce esta release y **no es alcanzable desde
    la UI**, así que no bloquea el cierre; pero la promesa «un pack curado no es un
-   destino» no debería ser solo de cliente. **No lo he corregido.**
+   destino» no debería ser solo de cliente. **No lo he corregido** —queda **aparcado
+   como deuda aceptada en §12**, con `v3.83.1` como la versión que lo sitúa fuera de
+   un patch de instrumento.
 4. ~~**E6 (recomendado):** cerrar el dictamen de los PRs de Dependabot, que sigue
    `no verificado` y arrastra dos documentos.~~ **Hecho en §11** (addendum
    2026-09-24): no era el arnés; son **dos** bumps no instalables.
@@ -529,3 +531,37 @@ commit; la cifra vigente **incluye `AV`** y la cadena queda
 **Lo que este addendum NO cambia:** H1, H2 (ya corregida), H4, H5, la cola post-tag ni el
 veredicto de §8. Solo mueve la fila `E6` de la matriz de `no verificado` a **`fail`
 dictaminado**.
+
+---
+
+## 12. Addendum (2026-09-24) — H1 se **aparca** como deuda aceptada (`P2`); no se endurece en `v3.83.1`
+
+**Qué se decidió.** El patch `v3.83.1` (§8, «quirúrgico de instrumento y honestidad») es
+**instrumento y honestidad**, no endurecimiento de producto. Por eso **H1 no se corrige**
+en él: [`backend/domain/retention.py`](../../backend/domain/retention.py) sigue con
+`return not owner or owner == user_id` (línea 185), tal y como lo encontró este informe.
+
+**Por qué se acepta como deuda y no se cierra ahora.**
+
+1. **Es heredado y no lo introduce la serie.** El predicado es de `V3.77.1`; `V3.83.0` lo
+   que hace es **apoyar una promesa de producto** («un pack curado no es un destino») en
+   él sin reforzarlo.
+2. **No es alcanzable desde la UI.** El selector de V3.83.0 filtra a `kind === "user_list"`
+   y está fijado por E2E (`dictionaryFlashcardsBridge.spec.ts`): el camino de producto no
+   ofrece un pack global como destino. El agujero exige **una petición que no es la UI**
+   (cliente manipulado).
+3. **Severidad `P2` y fuera del alcance del patch.** Endurecerlo rompería la premisa «solo
+   frontend» (`frontend/src` dejaría de estar intacto en el diff) y abriría una revisión
+   de `retention.py` con sus propios tests, que no es lo que `v3.83.1` publica.
+
+**La deuda queda registrada, que es lo que impide que se pierda.** La recomendación de §5-H1
+(`return bool(owner) and owner == user_id` para la ingestión, o parametrizar el predicado
+con modo `read`/`enroll` vs `ingest`, más un caso en el candado de superficie pública)
+**sigue abierta y vigente**: este addendum **no la rebaja**, solo la **sitúa** fuera de un
+patch de instrumento. El compromiso es que **no se cerrará como «resuelta por omisión»**:
+mientras siga en el código, sigue viva.
+
+**Lo que este addendum NO cambia:** el veredicto de §8 (la release `v3.83.0` se puede
+cerrar como producto), ni la matriz de §4, ni H2 (ya corregida), ni el bloqueante de la
+SERIE (D1, el eslabón `v3.81.2..v3.82.0` sin informe). Solo fija **dónde** vive H1 a partir
+de `v3.83.1`.

@@ -4,6 +4,47 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.83.1] — 2026-09-24
+
+**Release de INSTRUMENTO Y HONESTIDAD (patch): publica la versión que el informe `AU`
+pidió y que no existía, sin producto nuevo y sin tocar la aplicación.** Hasta este
+lanzamiento la última etiqueta del repositorio era `v3.83.0`, así que el arreglo del gate
+`reduced-motion` (H2) y las pruebas visuales nuevas vivían en `main` **sin etiqueta**, y la
+deuda de honestidad de `release-notes-v3.83.0.md §5.1` seguía abierta. **SIN migración de
+BD, SIN endpoints nuevos, SIN cambio de contrato de API, SIN bump** de `GENERATOR_VERSION`
+/ `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION`
+ni de las evaluaciones, **SIN tocar `frontend/src`, `launcher/` ni `backend/` más allá del
+bump de `VERSION`**, y **SIN añadir ni retirar gate** (siguen los **ocho**, todos en
+`pending`).
+
+**(A) H2 — el gate `reduced-motion` que emulaba en vacío** (ya corregido en `54a32fd`, en
+`frontend/tests/visual/reducedMotionAndZoom.spec.ts`, y es lo que más justifica el parche).
+GUI-05 usaba `test.use({ reducedMotion: "reduce" })`, que **no es una opción válida** de
+`test.use` en Playwright 1.62 y se ignoraba **en silencio**: el gate pasaba sin emular
+nada. La corrección emula de verdad con `page.emulateMedia({ reducedMotion: "reduce" })` y
+añade una **guarda de mordida** (`matchMedia` debe estar activo) para que no pueda volver a
+pasar por vacío. Invalidaba la evidencia de un gate declarado desde `V3.73.1` y la release
+`V3.83.0` se apoyaba en él.
+
+**(B) E5/i — la letra de las notas de `v3.83.0`.** `release-notes-v3.83.0.md §5.1` decía
+«No se toca ni el backend ni la BD» y el commit de release **sí** tocaba `backend/config.py`
+(el bump de `VERSION`). Se corrige a «sin lógica de backend (solo el bump de `VERSION`) y
+sin tocar la BD»: una línea, y desaparece una contradicción literal.
+
+**(C) H1 — deuda aceptada, no resuelta.** El informe `AU` dictaminó que
+`_collection_writable` (`backend/domain/retention.py:185`) devuelve `True` para un pack
+global (`not owner`), así que la promesa «un pack curado no es un destino» es **solo de
+cliente**. Es **heredado** (`V3.77.1`), **no alcanzable desde la UI** y de severidad `P2`;
+`v3.83.1` **no lo endurece** —hacerlo rompería la premisa «solo frontend»— y lo **aparca
+como deuda explícita** en `docs/audit/AU-AUDITORIA-TOTAL-V383.md §12`, para que no se cierre
+por omisión.
+
+**Verificación:** `check_release_consistency.py` OK en los **6 orígenes** (`3.83.1`);
+`check_i18n_coverage.py --strict` sin cambios (no hay cadenas nuevas); `validation_gate.py
+auto` **10/10** con el informe regenerado; y las pruebas visuales de
+`reducedMotionAndZoom`, `dictionaryFlashcardsBridge`, `studySessionKeyboard` y
+`studySessionVisual` en verde. Ver `release-notes-v3.83.1.md`.
+
 ## [3.83.0] — 2026-09-24
 
 **Diccionario → Flashcards y sesión de estudio tipo juego: buscar una palabra y añadirla la convierte en palabra en aprendizaje, y estudiar deja de parecer un formulario.** Release de **PRODUCTO (minor)**, **SOLO FRONTEND**: reutiliza los endpoints que ya existían (`POST /api/vocabulary/items`, `GET /api/vocabulary/collections`, los mazos y la cola FSRS), **SIN migración de BD, SIN endpoints nuevos y SIN cambio de contrato de API**; **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones. **No se añade ni se retira gate** —siguen los **ocho**, todos en `pending`—.
