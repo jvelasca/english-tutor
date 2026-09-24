@@ -39,9 +39,16 @@ logger = logging.getLogger(__name__)
 SMTP_TIMEOUT_SECONDS = 10
 
 # Nombres de los envíos que sabe hacer el producto. Son códigos para que el
-# lanzador («Probar envío») y el alta pidan cosas distintas sin duplicar lógica.
+# lanzador («Probar envío») y las rutas de cuenta pidan cosas distintas sin
+# duplicar lógica.
 KIND_VERIFICATION = "verification"
 KIND_TEST = "test"
+# V3.82: la **invitación**. Es el correo que autoriza a alguien y le pide poner su
+# contraseña; sin él, el alta se queda en la cola del webmaster.
+KIND_ACTIVATION = "activation"
+# V3.82: el «olvidé mi contraseña». Es un enlace de restablecimiento, distinto del
+# de activación (caducidad y efecto no son los mismos).
+KIND_RESET = "reset"
 
 
 def secret_path() -> Path:
@@ -81,6 +88,20 @@ def verification_link(base_url: str, token: str) -> str:
     return f"{base_url.rstrip('/')}/#/cuenta/verificar?token={token}"
 
 
+def activation_link(base_url: str, token: str) -> str:
+    """Enlace de **invitación** (V3.82): donde el autorizado elige su contraseña.
+
+    Mismo criterio que el de verificación —ruta del frontend, token en el
+    fragmento— porque es el mismo tipo de enlace de un solo uso.
+    """
+    return f"{base_url.rstrip('/')}/#/cuenta/activar?token={token}"
+
+
+def password_reset_link(base_url: str, token: str) -> str:
+    """Enlace del «olvidé mi contraseña» (V3.82)."""
+    return f"{base_url.rstrip('/')}/#/cuenta/restablecer?token={token}"
+
+
 def _message(
     *, kind: str, to: str, link: str, lang: str, sender: str
 ) -> EmailMessage:
@@ -102,6 +123,60 @@ def _message(
             )
             if lang == "es"
             else "If you are reading this, English Tutor can send email."
+        )
+        return message
+    if kind == KIND_ACTIVATION:
+        # V3.82: la invitación. Explica que la cuenta está autorizada y que lo
+        # único que falta es que **la propia persona** elija su contraseña. No
+        # lleva contraseña provisional: el webmaster nunca la ve.
+        message["Subject"] = (
+            "English Tutor: tu cuenta está autorizada"
+            if lang == "es"
+            else "English Tutor: your account is approved"
+        )
+        message.set_content(
+            (
+                "Tu solicitud de cuenta en English Tutor ha sido autorizada.\n\n"
+                "Abre este enlace para poner tu contraseña:\n\n"
+                f"{link}\n\n"
+                "Caduca en siete días. Si no has pedido ninguna cuenta, "
+                "ignora este mensaje."
+            )
+            if lang == "es"
+            else (
+                "Your English Tutor account request has been approved.\n\n"
+                "Open this link to set your password:\n\n"
+                f"{link}\n\n"
+                "It expires in seven days. If you did not request an account, "
+                "ignore this message."
+            )
+        )
+        return message
+    if kind == KIND_RESET:
+        # V3.82: el restablecimiento. Corto y sin pistas de si la cuenta existe:
+        # el texto solo llega si existe.
+        message["Subject"] = (
+            "English Tutor: restablecer tu contraseña"
+            if lang == "es"
+            else "English Tutor: reset your password"
+        )
+        message.set_content(
+            (
+                "Alguien pidió restablecer la contraseña de tu cuenta de "
+                "English Tutor.\n\n"
+                "Abre este enlace para elegir una nueva:\n\n"
+                f"{link}\n\n"
+                "Caduca en una hora. Si no lo has pedido tú, ignora este mensaje: "
+                "tu contraseña no cambia."
+            )
+            if lang == "es"
+            else (
+                "Someone asked to reset your English Tutor password.\n\n"
+                "Open this link to choose a new one:\n\n"
+                f"{link}\n\n"
+                "It expires in one hour. If this was not you, ignore this "
+                "message: your password does not change."
+            )
         )
         return message
     message["Subject"] = (

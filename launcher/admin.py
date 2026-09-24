@@ -130,15 +130,37 @@ def pending_requests(pin: str) -> AdminResult:
 def approve_request(pin: str, request_id: int, *, note: str = "") -> AdminResult:
     """Aprueba: un alta crea la cuenta; una baja la desactiva.
 
-    V3.81: ya no se manda `pin` de perfil. Aprobar un alta crea la cuenta **sin
-    credencial** y la consola ofrece a continuación asignarle email y contraseña
-    temporal: son dos decisiones distintas.
+    V3.82: aprobar un alta ya no deja una cuenta «a medias» esperando que el
+    webmaster le ponga credenciales a mano. La solicitud trae el nombre, el email
+    y el avatar, así que la cuenta nace **completa** y lo que falta —la
+    contraseña— lo elige la propia persona desde una **invitación por correo** que
+    se emite en el mismo paso.
+
+    Por eso la respuesta (`AdminApprovalOut`) trae dos cosas que la consola
+    necesita: `email_sent` (si el correo salió de verdad) y `activation_link`, que
+    es la pieza del **modo híbrido**: sin SMTP configurado el enlace viaja de
+    vuelta aquí para que el webmaster lo entregue por el medio que sea. El token
+    en claro solo existe en esta respuesta; en la base de datos queda su hash.
     """
     return _call(
         "POST",
         f"/api/admin/profile-requests/{request_id}/approve",
         pin=pin,
         payload={"note": note},
+    )
+
+
+def resend_activation(pin: str, user_id: str) -> AdminResult:
+    """Reemite la invitación de activación de una cuenta que ya existe (V3.82).
+
+    Sirve para lo que un correo siempre necesita: que se perdiera, que caducara o
+    que nunca saliera por no haber SMTP. Emite un token **nuevo** (el anterior
+    deja de valer), así que no hay dos invitaciones vivas a la vez.
+    """
+    return _call(
+        "POST",
+        f"/api/admin/users/{user_id}/resend-activation",
+        pin=pin,
     )
 
 

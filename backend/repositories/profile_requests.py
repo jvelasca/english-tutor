@@ -29,7 +29,8 @@ STATUSES = (STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED)
 
 _COLUMNS = (
     "id, kind, display_name, user_id, note, requested_at, status, "
-    "decided_at, decided_note, resolved_user_id"
+    "decided_at, decided_note, resolved_user_id, "
+    "email, avatar_color, avatar_emoji, avatar_image"
 )
 
 
@@ -43,16 +44,37 @@ def create_request(
     display_name: str = "",
     user_id: str = "",
     note: str = "",
+    email: str = "",
+    avatar_color: str = "",
+    avatar_emoji: str = "",
+    avatar_image: str = "",
 ) -> dict:
-    """Registra una solicitud pendiente. No crea ni borra ningún perfil."""
+    """Registra una solicitud pendiente. No crea ni borra ningún perfil.
+
+    V3.82: además del nombre, guarda lo que la cuenta necesitará al aprobarse (el
+    email de la invitación y el avatar elegido). Sigue siendo **inerte**: nada de
+    esto toca `users`.
+    """
     now = _now()
     with closing(_conn()) as conn, conn:
         cursor = conn.execute(
             "INSERT INTO profile_requests "
             "(kind, display_name, user_id, note, requested_at, status, "
-            "decided_at, decided_note, resolved_user_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, '', '', '')",
-            (kind, display_name, user_id, note, now, STATUS_PENDING),
+            "decided_at, decided_note, resolved_user_id, "
+            "email, avatar_color, avatar_emoji, avatar_image) "
+            "VALUES (?, ?, ?, ?, ?, ?, '', '', '', ?, ?, ?, ?)",
+            (
+                kind,
+                display_name,
+                user_id,
+                note,
+                now,
+                STATUS_PENDING,
+                email,
+                avatar_color,
+                avatar_emoji,
+                avatar_image,
+            ),
         )
         request_id = int(cursor.lastrowid or 0)
     created = get_request(request_id)
@@ -109,6 +131,25 @@ def has_pending_create_for_name(name: str) -> bool:
             "SELECT 1 FROM profile_requests WHERE status = ? AND kind = ? "
             "AND LOWER(display_name) = LOWER(?) LIMIT 1",
             (STATUS_PENDING, KIND_CREATE, name),
+        ).fetchone()
+    return row is not None
+
+
+def has_pending_create_for_email(email: str) -> bool:
+    """¿Hay ya una petición de alta pendiente para ese email? (V3.82)
+
+    Igual que la del nombre, pero por correo: desde que el email identifica la
+    cuenta, dos solicitudes con el mismo correo son la misma persona pidiendo lo
+    mismo dos veces. Se normaliza en minúsculas, como se guarda.
+    """
+    text = (email or "").strip().lower()
+    if not text:
+        return False
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT 1 FROM profile_requests WHERE status = ? AND kind = ? "
+            "AND email <> '' AND email = ? COLLATE NOCASE LIMIT 1",
+            (STATUS_PENDING, KIND_CREATE, text),
         ).fetchone()
     return row is not None
 

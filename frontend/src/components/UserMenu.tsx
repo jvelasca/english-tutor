@@ -1,48 +1,46 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "../types/api";
 import type { UserPatch } from "../api/users";
-import type {
-  ProfileRequestFailure,
-  ProfileRequestOutcome,
-} from "../api/profileRequests";
 import { ProfileDialog } from "./ProfileDialog";
 import { UserAvatar } from "./UserAvatar";
 import { useI18n } from "../hooks/useI18n";
 
 interface UserMenuProps {
-  users: User[];
-  currentUserId: string | null;
-  onSelect: (id: string) => void;
   /**
-   * V3.77: **pide** una cuenta (ya no la crea). El menú cuenta el desenlace en el
-   * propio desplegable porque no hay otra pantalla donde contarlo.
+   * La cuenta de la sesión, o `null` mientras no hay ninguna (el armazón se
+   * pinta detrás de la puerta de entrada).
    */
-  onRequest: (name: string) => Promise<ProfileRequestOutcome>;
+  user: User | null;
   onEdit: (id: string, patch: UserPatch) => Promise<User | null>;
   /** Pedir la baja de la cuenta de la sesión (el webmaster la resuelve). */
-  onRequestDelete?: (note: string) => Promise<ProfileRequestOutcome>;
+  onRequestDelete?: (note: string) => Promise<import("../api/profileRequests").ProfileRequestOutcome>;
   /** V3.81: abre el diálogo de cuenta (contraseña, email, baja y Salir). */
   onOpenAccount?: () => void;
 }
+
+/**
+ * Menú de la cuenta (V3.75; recortado en V3.82).
+ *
+ * Hasta V3.81 esto era un **selector de usuarios**: desplegaba la lista de
+ * cuentas, dejaba cambiar de una a otra y pedir una nueva. V3.82 retira esa idea
+ * entera —cambiar de cuenta es cerrar sesión y entrar con otra credencial—, así
+ * que aquí queda una sola cuenta (la de la sesión) y sus acciones: ver la ficha,
+ * editarla y salir.
+ *
+ * No hay «pedir una cuenta» en el menú a propósito: pedirla es la pantalla de
+ * entrada, y ofrecerlo aquí —dentro de una sesión ya abierta— era pedir una
+ * cuenta a nombre de nadie.
+ */
 export function UserMenu({
-  users,
-  currentUserId,
-  onSelect,
-  onRequest,
+  user,
   onEdit,
   onRequestDelete,
   onOpenAccount,
 }: UserMenuProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [requested, setRequested] = useState(false);
-  const [failure, setFailure] = useState<ProfileRequestFailure | null>(null);
   const [editing, setEditing] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-
-  const current = users.find((u) => u.id === currentUserId) ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -57,29 +55,11 @@ export function UserMenu({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setOpen(false);
-        setAdding(false);
-      }
+      if (e.key === "Escape") setOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  async function submit() {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setFailure(null);
-    const outcome = await onRequest(trimmed);
-    if (outcome.ok) {
-      // Pedido, no creado: se dice a quién le toca ahora, en vez de dejar el
-      // desplegable como si el perfil ya existiera.
-      setRequested(true);
-      setName("");
-      return;
-    }
-    setFailure(outcome.reason);
-  }
 
   return (
     <div className="user-menu" ref={rootRef}>
@@ -90,9 +70,10 @@ export function UserMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         title={t("user.profileTitle")}
+        disabled={!user}
       >
-        {current ? (
-          <UserAvatar user={current} size={44} />
+        {user ? (
+          <UserAvatar user={user} size={44} />
         ) : (
           <span
             className="user-avatar user-avatar--placeholder"
@@ -102,92 +83,13 @@ export function UserMenu({
             ?
           </span>
         )}
-        <span className="user-menu-name">{current?.name ?? t("user.profile")}</span>
+        <span className="user-menu-name">{user?.name ?? t("user.profile")}</span>
         <ChevronIcon />
       </button>
 
-      {open && (
+      {open && user && (
         <div className="user-menu-pop" role="menu">
-          <div className="user-menu-title">{t("user.profiles")}</div>
-          <div className="user-menu-list">
-            {users.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                role="menuitem"
-                className={`user-menu-item${u.id === currentUserId ? " active" : ""}`}
-                onClick={() => {
-                  onSelect(u.id);
-                  setOpen(false);
-                }}
-              >
-                <UserAvatar user={u} size={26} />
-                <span>{u.name}</span>
-              </button>
-            ))}
-          </div>
-
-          {adding ? (
-            <div className="user-menu-add">
-              <input
-                className="field-input"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setFailure(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void submit();
-                  if (e.key === "Escape") setAdding(false);
-                }}
-                placeholder={t("user.name")}
-                autoFocus
-                disabled={requested}
-                aria-label={t("user.name")}
-              />
-              <button
-                type="button"
-                className="dialog-primary"
-                onClick={() => void submit()}
-                disabled={!name.trim() || requested}
-              >
-                {t("user.requestProfile")}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="user-menu-action"
-              onClick={() => {
-                setAdding(true);
-                setRequested(false);
-                setFailure(null);
-              }}
-            >
-              + {t("user.requestProfile")}
-            </button>
-          )}
-
-          {failure && (
-            <p className="user-menu-note user-menu-note--error">
-              {t(requestErrorKey(failure))}
-            </p>
-          )}
-          {requested && (
-            <p className="user-menu-note">{t("user.requestSent")}</p>
-          )}
-
-          <button
-            type="button"
-            className="user-menu-action"
-            disabled={!current}
-            onClick={() => {
-              setEditing(true);
-              setOpen(false);
-            }}
-          >
-            {t("user.editProfile")}
-          </button>
+          <div className="user-menu-title">{t("user.profile")}</div>
 
           {/* V3.81: la cuenta. Sustituye a la pestaña «PIN» de Ajustes, que
               desaparece: contraseña, email, verificación, baja y Salir son cosas
@@ -196,7 +98,6 @@ export function UserMenu({
             <button
               type="button"
               className="user-menu-action"
-              disabled={!current}
               onClick={() => {
                 onOpenAccount();
                 setOpen(false);
@@ -205,35 +106,30 @@ export function UserMenu({
               {t("account.title")}
             </button>
           )}
+
+          <button
+            type="button"
+            className="user-menu-action"
+            onClick={() => {
+              setEditing(true);
+              setOpen(false);
+            }}
+          >
+            {t("user.editProfile")}
+          </button>
         </div>
       )}
 
-      {editing && current && (
+      {editing && user && (
         <ProfileDialog
-          user={current}
+          user={user}
           onClose={() => setEditing(false)}
-          onSave={(patch) => onEdit(current.id, patch)}
+          onSave={(patch) => onEdit(user.id, patch)}
           {...(onRequestDelete ? { onRequestDelete } : {})}
         />
       )}
     </div>
   );
-}
-
-/** Qué decir ante cada desenlace fallido de la petición (mismo criterio que la puerta). */
-function requestErrorKey(failure: ProfileRequestFailure): string {
-  switch (failure) {
-    case "duplicate":
-      return "user.requestDuplicate";
-    case "full":
-      return "user.requestFull";
-    case "throttled":
-      return "errors.rateLimited";
-    case "invalid":
-      return "user.requestInvalid";
-    default:
-      return "user.requestError";
-  }
 }
 
 function ChevronIcon() {

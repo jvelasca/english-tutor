@@ -56,6 +56,17 @@ ACTION_ICONS = {
     "refresh": "🔄",
 }
 
+# Pestañas del área central (V3.81.3). El orden de esta tupla es el orden real de
+# las pestañas y el que usa la barra de estado para decir dónde se está.
+TAB_ORDER = ("Estado", "Usuarios", "Diagnóstico", "Registros")
+
+TAB_ICONS = {
+    "Estado": "📊",
+    "Usuarios": "👥",
+    "Diagnóstico": "🧪",
+    "Registros": "📄",
+}
+
 STATUS_DOT = {
     "ok": "🟢",
     "ready": "🟢",
@@ -196,13 +207,15 @@ def user_row_label(user: dict, duplicates: set[str]) -> str:
 def credential_label(user: dict) -> str:
     """¿La cuenta tiene contraseña? Se informa como sello, **nunca** como valor.
 
-    Es la columna que convierte el agujero de seguridad en una tarea visible: una
-    cuenta sin contraseña entra nombrando, y mientras el contador no llegue a cero
-    el webmaster tiene trabajo pendiente aquí.
+    V3.81 la llamaba «Sin contraseña» y era una alarma: desde la puerta se entraba
+    nombrando, así que una cuenta sin credencial era una puerta abierta. V3.82 la
+    cierra por construcción (sin contraseña no se entra: `ACCOUNT_NOT_ACTIVATED`),
+    así que el mismo dato pasa a ser una **tarea**: a esa persona le falta abrir su
+    invitación. El texto dice eso y no una alarma que ya no existe.
     """
     if user.get("has_password"):
         return "🔑 Con contraseña"
-    return "⚠️ Sin contraseña"
+    return "⏳ Sin activar"
 
 
 def email_label(user: dict) -> str:
@@ -240,24 +253,64 @@ def user_row(user: dict, duplicates: set[str]) -> tuple[str, str, str, str, str]
 def accounts_tasks(without_password: int, unverified_email: int) -> str:
     """Lista de tareas del webmaster, en una frase.
 
-    Los dos números que importan de verdad: cuentas **sin contraseña** (heredadas,
-    siguen entrando nombrando) y cuentas con email **sin verificar** (en modo
-    híbrido, las sella él). Un contador que se ve es un contador que baja; si esto
-    dijera «todo en orden» con cuentas sin credencial, la consola estaría mintiendo
-    justo en el punto que esta release viene a cerrar.
+    V3.82: el primer número **cambió de significado**. Hasta V3.81 eran cuentas
+    heredadas sin contraseña que **sí entraban** (nombrándose desde la puerta), y
+    por eso era la deuda que cerraba G0. Desde V3.82 una cuenta sin contraseña es
+    una cuenta con la **invitación emitida y sin canjear**: no entra nadie por
+    ahí —el servidor responde `ACCOUNT_NOT_ACTIVATED`—, y el contador pasa de
+    vulnerabilidad a tarea operativa («a esta persona le falta abrir su enlace»).
+
+    El segundo sigue siendo el mismo: emails sin verificar, que en modo híbrido
+    sella el webmaster a mano. Un contador que se ve es un contador que baja.
     """
     if without_password <= 0 and unverified_email <= 0:
-        return "✅ Todas las cuentas tienen contraseña y email verificado."
+        return "✅ Ninguna cuenta queda pendiente: todas tienen contraseña."
     partes = []
     if without_password == 1:
-        partes.append("1 cuenta sin contraseña")
+        partes.append("1 cuenta pendiente de activación")
     elif without_password > 1:
-        partes.append(f"{without_password} cuentas sin contraseña")
+        partes.append(f"{without_password} cuentas pendientes de activación")
     if unverified_email == 1:
         partes.append("1 email sin verificar")
     elif unverified_email > 1:
         partes.append(f"{unverified_email} emails sin verificar")
     return "⚠️ Pendiente: " + " · ".join(partes) + "."
+
+
+def invitation_message(data: dict) -> str:
+    """Qué decir al aprobar un alta o al reemitir una invitación (V3.82).
+
+    Se distinguen los dos modos porque mandan a hacer cosas distintas: si el
+    correo salió, no hay nada más que hacer; si no salió, el enlace está ahí y hay
+    que entregarlo. Decir «invitación enviada» cuando no hay SMTP sería la peor
+    clase de mentira: la que hace esperar un correo que no existe.
+    """
+    if data.get("email_sent"):
+        return "✅ Cuenta autorizada e invitación enviada por correo."
+    if data.get("activation_link"):
+        return (
+            "✅ Cuenta autorizada. No hay correo configurado: copia el enlace y "
+            "házselo llegar."
+        )
+    return "✅ Cuenta autorizada."
+
+
+def invitation_copy_text(data: dict) -> str:
+    """El texto para copiar y entregar el enlace a mano (modo híbrido).
+
+    Se arma con lo que la respuesta trae —nombre y email de la cuenta— más el
+    enlace. Si algo falta, el texto que queda sigue siendo útil: el enlace solo ya
+    sirve, y un texto a medias es mejor que un diálogo vacío.
+    """
+    user = data.get("user") or {}
+    link = str(data.get("activation_link") or "")
+    quien = str(user.get("email") or user.get("name") or "")
+    if quien:
+        return (
+            f"Invitación para {quien}:\n{link}\n\n"
+            "Ábrela y elige tu contraseña; caduca en unos días y solo sirve una vez."
+        )
+    return link
 
 
 def event_row(event: dict) -> tuple[str, str, str, str]:
@@ -287,24 +340,29 @@ def pending_summary(count: int) -> str:
 
 def request_row(
     request: dict, names: dict[str, str] | None = None
-) -> tuple[str, str, str]:
-    """Fila de una solicitud: (tipo, a quién se refiere, cuándo llegó).
+) -> tuple[str, str, str, str]:
+    """Fila de una solicitud: (tipo, a quién se refiere, email, cuándo llegó).
 
     En una baja, la solicitud guarda el `user_id`, no el nombre: se traduce con
     `names` (el mapa de la lista de cuentas ya cargada) para que el webmaster no
     tenga que decidir sobre un identificador. Si la cuenta ya no está, se dice
     «(cuenta que ya no existe)» en vez de enseñar el id crudo.
+
+    V3.82: se añade el email, que es con el que se manda la invitación al aprobar.
+    Una baja no tiene email propio (la cuenta ya existe), así que va vacío.
     """
     kind = REQUEST_KIND_LABELS.get(str(request.get("kind")), str(request.get("kind")))
     if request.get("kind") == "delete":
         uid = str(request.get("user_id") or "")
         target = (names or {}).get(uid) or "(cuenta que ya no existe)"
+        email = ""
     else:
         target = str(request.get("display_name") or "")
         if request.get("note"):
             target = f"{target} — {request['note']}"
+        email = str(request.get("email") or "") or "—"
     when = str(request.get("requested_at") or "").replace("T", " ")[:16]
-    return (kind, target, when)
+    return (kind, target, email, when)
 
 
 def pending_view(
@@ -315,7 +373,7 @@ def pending_view(
     error: str = "",
     requests: list[dict] | None = None,
     names: dict[str, str] | None = None,
-) -> tuple[str, list[tuple[str, str, str]]]:
+) -> tuple[str, list[tuple[str, str, str, str]]]:
     """Qué decir de la cola de solicitudes: (frase del contador, filas).
 
     Existe por un fallo concreto y no por gusto de partir la GUI: `_apply_profiles`
@@ -375,6 +433,84 @@ def admin_state_label(pin_set: bool) -> str:
         "🔒 Administración deshabilitada: define un PIN para poder crear "
         "cuentas, asignar credenciales, forzar bajas y purgar datos"
     )
+
+
+def statusbar_right(
+    *,
+    version: str,
+    lan: bool,
+    pin_set: bool,
+    tab: str = "",
+    checked_at: str = "",
+) -> str:
+    """Texto de la derecha de la barra de estado: versión, red, PIN y frescura.
+
+    Todo lo que se puede saber de un vistazo sin abrir una pestaña. Se compone
+    aquí, como función pura, porque la barra de estado es lo primero que se mira
+    y una frase mal armada (una LAN anunciada cuando está cerrada) miente sobre
+    el estado real de la máquina. El orden va de lo estable a lo cambiante.
+    """
+    parts: list[str] = []
+    if version:
+        parts.append(version)
+    parts.append("📡 LAN" if lan else "🔒 Solo este equipo")
+    parts.append("🔐 PIN" if pin_set else "🔓 Sin PIN")
+    if tab:
+        parts.append(tab)
+    if checked_at:
+        parts.append(f"actualizado {checked_at}")
+    return "   ·   ".join(parts)
+
+
+def clamp_window_size(
+    width: int,
+    height: int,
+    *,
+    screen_w: int,
+    screen_h: int,
+    min_w: int,
+    min_h: int,
+) -> tuple[int, int]:
+    """Acota el tamaño de la ventana al mínimo usable y a la pantalla.
+
+    `state.json` guarda el tamaño del último cierre, que puede venir de un monitor
+    más alto que el actual (o de una pantalla que ya no está): restaurarlo tal cual
+    dejaba la barra de estado y el scroll **fuera del escritorio**, que es el
+    síntoma que había que corregir. Se reserva una franja para la barra de tareas.
+
+    Función pura (recibe el tamaño de pantalla) para poder probarla sin ventana.
+    """
+    if screen_w <= 1 or screen_h <= 1:
+        return max(min_w, int(width)), max(min_h, int(height))
+    width = max(min_w, min(int(width), screen_w))
+    height = max(min_h, min(int(height), max(min_h, screen_h - 90)))
+    return width, height
+
+
+def centered_position(
+    width: int, height: int, *, screen_w: int, screen_h: int
+) -> tuple[int, int]:
+    """Posición centrada en horizontal y algo hacia arriba en vertical."""
+    return max(0, (screen_w - width) // 2), max(0, (screen_h - height) // 3)
+
+
+def window_position_visible(
+    x: int,
+    y: int,
+    *,
+    screen_w: int,
+    screen_h: int,
+    margin_x: int = 120,
+    margin_y: int = 60,
+) -> bool:
+    """True si la esquina guardada cae en la pantalla con margen para arrastrar.
+
+    Una posición guardada en un monitor secundario que ya no existe mandaba la
+    ventana a un escritorio virtual inalcanzable: no se podía ni arrastrar.
+    """
+    if x < 0 or y < 0:
+        return False
+    return x + margin_x <= screen_w and y + margin_y <= screen_h
 
 
 def smtp_state_label(configured: bool, has_password: bool) -> str:

@@ -18,6 +18,9 @@ backend/
 ├── dependencies.py      # current_user: el perfil activo sale de la **sesión firmada** (V3.75)
 ├── routers/             # Capa HTTP: endpoints + validación. SIN lógica de negocio.
 │   ├── __init__.py
+│   ├── account.py       # GET/POST /api/account/*: verificar email, reenviar, baja y
+│   │                    #   V3.82: activar (invitación), forgot/reset-password
+│   ├── admin.py         # /api/admin/*: cola de solicitudes y gestión de cuentas (PIN + loopback)
 │   ├── academy.py       # GET/POST /api/academy/levels, enroll, mastery, next, attempts, lessons, objective/assessment, speaking/{level,journey,assessment}
 │   ├── assessment.py    # /api/academy/placement*, /api/academy/exam/{level_id}*, /api/academy/level-completions
 │   ├── chat.py          # POST /api/chat, POST /api/chat/stream (mode; perfil de la sesión)
@@ -31,10 +34,11 @@ backend/
 │   ├── profile.py       # GET /api/profile (F4)
 │   ├── progress.py      # GET /api/progress, GET /api/progress/history (F6; perfil de la sesión)
 │   ├── pronunciation.py # POST /api/pronunciation (audio + texto → score)
-│   ├── session.py       # POST/GET/DELETE /api/session (V3.75: firma la cookie et_session)
-│   │                    #   + PUT /api/session/password; GET/POST /api/account/* (V3.81)
+│   ├── session.py       # POST/GET/DELETE /api/session (V3.75: firma la cookie et_session;
+│   │                    #   V3.82: entrar es email + contraseña, sin user_id)
+│   │                    #   + PUT /api/session/password y /api/session/email
 │   ├── settings.py      # GET/PUT /api/settings (preferencias; solo las del propio perfil)
-│   ├── users.py         # GET/POST /api/users, PATCH /api/users/{id} (solo el propio perfil)
+│   ├── users.py         # GET /api/users (V3.82: exige sesión), PATCH /api/users/{id} (solo el propio perfil)
 │   ├── vocabulary.py    # POST /api/vocabulary/analyze, GET /api/vocabulary (F4)
 │   └── voz.py           # POST /api/transcribe, POST /api/tts (voz opcional validada; V3.75.5)
 ├── schemas/             # Contratos de datos (Pydantic).
@@ -50,7 +54,8 @@ backend/
 │   ├── pronunciation.py # PronunciationResponse, FluencyStats, PronunciationBreakdown (F7/F8)
 │   ├── progress.py      # PronunciationStats, ProgressSummary, Bucket, ProgressHistory (F6)
 │   ├── settings.py      # Settings* (preferencias por usuario)
-│   ├── users.py         # User, UserCreate, UserUpdate, SessionCreate
+│   ├── profiles.py      # ProfileRequest* (solicitud: nombre, email, avatar, nota) (V3.77/V3.82)
+│   ├── users.py         # User, UserCreate, UserUpdate, SessionCreate (V3.82: email + password)
 │   ├── vocabulary.py    # VocabularyAnalyze*, VocabularyItem (F4)
 │   └── voz.py           # TTSRequest (text/language/voice), TranscribeResponse
 ├── domain/              # Servicios de dominio (async, orquestan la lógica).
@@ -62,9 +67,10 @@ backend/
 │   ├── listening.py     # next_question + submit_answer + stats (con progresión por nivel, F8)
 │   ├── pronunciation.py
 │   ├── profile.py       # get_profile_summary + get_profile_context (compone el perfil) (F4/F5)
+│   ├── profile_requests.py # resolver la cola: crear/aprobar/rechazar/borrar solicitudes
 │   ├── progress.py      # get_progress_history: series + racha + dominio + hitos (F6)
 │   ├── settings.py      # leer/guardar preferencias por usuario
-│   ├── users.py
+│   ├── users.py         # ciclo de vida de la cuenta (estado, purga, historial)
 │   └── vocabulary.py    # extracción + persistencia (F4)
 ├── repositories/        # Acceso a datos puro (SQLite). Sin reglas de negocio.
 │   ├── __init__.py
@@ -75,17 +81,19 @@ backend/
 │   ├── learning.py      # learning_events (F4)
 │   ├── listening.py     # listening_attempts + correct_question_ids (F8)
 │   ├── profile.py       # learning_profile (F4)
+│   ├── profile_requests.py # tabla profile_requests + eventos de la cola
 │   ├── pronunciation.py
 │   ├── progress.py      # activity_events (mensajes con modo + pronunciaciones) (F6)
 │   ├── settings.py      # tabla settings (clave/valor por usuario)
-│   ├── users.py
+│   ├── users.py         # users + user_events: estado, credencial, email, época de auth y purga
 │   └── vocabulary.py    # vocabulary (F4)
 ├── services/            # Lógica pura y clientes de infra (llm, voz, análisis).
 │   ├── __init__.py
 │   ├── academy.py       # mastery determinista (EMA+racha), gating, progresión, evaluación (puro)
 │   ├── cefr.py          # constantes CEFR + corte único de banda (level_for_numeric) + recommendations (puros)
 │   ├── context.py       # build_system_prompt: modo + perfil → prompt del tutor (F5)
-│   ├── credentials.py   # PBKDF2, política de contraseña, freno de intentos y tokens de email (V3.81)
+│   ├── credentials.py   # PBKDF2, política de contraseña, freno de intentos y tokens de
+│   │                    #   email/activación/restablecimiento (V3.81/V3.82)
 │   ├── curriculum.py    # carga/validación del currículum JSON + ASSESSABLE/PERFORMANCE_SKILLS
 │   ├── evaluation.py    # evaluador objetivo del tutor + informe agregado (puros, F9)
 │   ├── fluency.py       # compute_fluency: WPM + nivel (puro, F8)
@@ -93,7 +101,8 @@ backend/
 │   ├── interaction.py   # evidencia objetiva de interacción (turnos/latencia) (puro, V1.16)
 │   ├── listening.py     # banco de preguntas + score_answer + progresión por nivel (puro, F8)
 │   ├── llm.py           # cliente Ollama (chat + streaming; system prompt inyectable)
-│   ├── mailer.py        # correo saliente fail-closed: verificación y prueba de SMTP (V3.81)
+│   ├── mailer.py        # correo saliente fail-closed: verificación, invitación,
+│   │                    #   restablecimiento y prueba de SMTP (V3.81/V3.82)
 │   ├── mastery.py       # classify_errors + compute_milestones (puros, F6)
 │   ├── network.py       # get_lan_ip + URLs de acceso LAN
 │   ├── policy.py        # correctness_guidance por nivel CEFR (puro, F5)
@@ -336,6 +345,7 @@ frontend/src/
 launcher/
 ├── launcher.py          # PUNTO DE ENTRADA: GUI mínima (tkinter), prepara y arranca/para la app
 ├── ui.py                # paleta, iconos, dots de estado y lectura de logs (puro, sin tkinter)
+├── widgets.py           # presentación con ventana: columna con scroll y enrutado de la rueda (V3.82)
 ├── core.py              # lógica pura: rutas, comandos de arranque, normalización de estado
 ├── process_manager.py   # prepara el entorno (cert TLS + build si falta) y gestiona uvicorn
 ├── status.py            # lectura de estado: HTTP (health) + SQLite (contadores/usuarios)
@@ -352,11 +362,11 @@ launcher/
 ├── state.json           # estado de la UI persistido (gitignored)
 ├── config.json          # preferencias: modo LAN + PIN admin (gitignored, V3.77)
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
-                         #         test_ui/test_state_store/test_config_store/
+                         #         test_ui/test_widgets/test_state_store/test_config_store/
                          #         test_process_manager/test_preflight_v373/
                          #         test_lan_ip_v373/test_lan_mode/
-                         #         test_admin_pin/test_admin_client) — 227
-                         #         funciones de test (244 casos con parametrización), en CI
+                         #         test_admin_pin/test_admin_client) — 252
+                         #         funciones de test (269 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 
@@ -374,6 +384,15 @@ launcher/
   (`smtp_reconcile_label`, V3.81): el backend resuelve el SMTP de su entorno al arrancar, así que
   los dos estados pueden discrepar y enseñar el local como si fuera el del servidor sería el mismo
   error que V3.80.1 arregló en la cola.
+- **`widgets.py`** (V3.82): presentación que **necesita una ventana de verdad** y por eso no cabe
+  en `ui.py` (que es puro y se prueba sin abrir ninguna). Son dos piezas: la columna con scroll
+  vertical real (`ScrollableFrame`: canvas + barra + cuerpo empaquetable a lo ancho) y el
+  **enrutado de la rueda** (`wheel_column`), que decide quién atiende cada evento con una regla
+  —manda el widget más específico: si el puntero está sobre la tabla y le queda recorrido, se
+  mueve la tabla y no la columna—. Existe porque el launcher anterior solo se desplazaba
+  arrastrando la barra: la rueda no movía nada, y las columnas eran una tira con lo de abajo
+  fuera de la ventana. La decisión de quién atiende se separó del `bind` justo para poder
+  probarla sin ratón (`tests/test_widgets.py`).
 - **`core.py`**: funciones puras y testables (resolver rutas, construir comandos, normalizar
   estado de salud y contadores).
 - **`process_manager.py`**: prepara el entorno (genera el certificado TLS autofirmado y
@@ -531,36 +550,45 @@ barato** (modelos instalados, IP/hostname de LAN, trabajos de generación en cur
 rechazos por rate limit de 60 s) que **no** permite leer ni escribir datos de ningún
 alumno; (2) quien puede alcanzarlas ya está dentro para todo lo demás —la frontera
 real es la **red** (loopback por defecto, LAN opt-in), no esta lista—; y (3) las
-rutas que sí son de datos siguen exigiendo sesión firmada, y desde V3.81 **enumerar
-nombres ya no basta para entrar**: sin la contraseña, la lista de cuentas no abre
-ninguna.
+rutas que sí son de datos siguen exigiendo sesión firmada. V3.82 cierra el último
+resto del modelo «selector»: `GET /api/users` deja de enumerar cuentas sin sesión,
+así que **ni los nombres** se regalan, y entrar es demostrar email + contraseña.
 
 **Responden sin sesión** (y deben seguir haciéndolo: el launcher y la puerta de
 cuenta las usan antes de que exista ninguna sesión): `/` · `/api` · `/api/health` ·
 `/api/health/live` · `/api/health/ready` · `/api/health/dependencies` ·
-`/api/models` · `/api/network` · `/api/system/status` · `GET /api/users` ·
-`POST /api/users` (V3.81: **registro**, ver más abajo) · `POST /api/session` (abrir
-sesión es justo lo que aún no existe) · `POST /api/account/verify` (V3.81: el enlace
-del correo puede abrirse en otro navegador).
+`/api/models` · `/api/network` · `/api/system/status` · `POST /api/profile-requests`
+(la **solicitud**, ver abajo) · `POST /api/session` (abrir sesión es justo lo que
+aún no existe) · las cuatro de cuenta que van con **token**: `POST
+/api/account/verify`, `POST /api/account/activate`, `POST
+/api/account/forgot-password` y `POST /api/account/reset-password`.
 
-**`GET /api/users` enumera nombres, no correos.** La puerta es un **selector** con
-avatares y tiene que pintar los nombres antes de que haya sesión, así que los
-nombres viajan; el **email** no, salvo el de la **propia** cuenta (el de la sesión,
-que ya lo conoce). Sin ese recorte, cualquier dispositivo de la red podría cosechar
-los correos de toda la casa sin escribir una contraseña. El recorte se hace en el
-borde HTTP (`routers/users.py::_without_foreign_email`) y no en el repositorio,
-porque la consola de gestión lee las **mismas** filas detrás del candado de
-administración y necesita el email entero.
+**`GET /api/users` ya no es público (V3.82).** Hasta V3.81 la puerta era un
+**selector** con avatares y necesitaba pintar los nombres antes de que hubiera
+sesión —con el recorte de no mandar los correos ajenos—. Con el login por email ese
+paso desaparece: nadie necesita enumerar quién existe para entrar, así que la ruta
+pasa a **exigir sesión** como cualquier dato. Lo que se gana no es solo privacidad:
+un listado público de cuentas es la lista de objetivos de cualquier intento de
+entrar, y ya no hay ninguna razón de producto para publicarla.
+
+**La lista enseña nombres, no correos ajenos.** Con la sesión abierta, `GET
+/api/users` devuelve los nombres y avatares de las cuentas activas, pero el
+**email** solo el de la **propia** cuenta (el de la sesión, que ya lo conoce), y el
+aviso de contraseña temporal también se tapa: los dos son de la cuenta, no del
+catálogo. El recorte se hace en el borde HTTP
+(`routers/users.py::_without_foreign_email`) y no en el repositorio, porque la
+consola de gestión lee las **mismas** filas detrás del candado de administración y
+necesita el email entero.
 
 **Exigen sesión firmada** (401 `SESSION_REQUIRED`): todo lo que lee o escribe datos
 del alumno (`/api/settings`, `/api/profile`, `/api/progress`, `/api/conversations`,
 `/api/vocabulary`, `/api/grammar/errors`, `/api/academy/*`, `/api/listening/*`,
-`/api/pronunciation`, `/api/chat`…) y, desde V3.81, lo que toca la **cuenta**:
-`PUT /api/session/password` (cambiar un secreto: sustituye a `PUT /api/session/pin`,
-retirado con el PIN), `POST /api/session/logout`,
-`POST /api/account/resend-verification` (emite tokens) y `POST /api/account/unenroll`
-(saca a alguien del producto). **Exigen PIN de administración**
-(`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*`,
+`/api/pronunciation`, `/api/chat`…), `GET /api/users` (V3.82) y, desde V3.81, lo que
+toca la **cuenta**: `PUT /api/session/password` (cambiar un secreto: sustituye a
+`PUT /api/session/pin`, retirado con el PIN), `PUT /api/session/email`,
+`POST /api/session/logout`, `POST /api/account/resend-verification` (emite tokens) y
+`POST /api/account/unenroll` (saca a alguien del producto). **Exigen PIN de
+administración** (`X-Admin-Pin`, fail-closed sin `ADMIN_PIN`): `/api/system/backup*`,
 `/api/system/restore` y todo `/api/admin/*`.
 
 **V3.77 — la escritura anónima inerte, y por qué se acepta.**
@@ -576,16 +604,27 @@ una petición que puede rechazar. La de baja (`POST /api/profile-requests/delete
 **sí** exige sesión, y no lleva `{id}` en la ruta: no existe la forma de pedir la
 baja del perfil de otro.
 
-**V3.81 — las escrituras sin sesión, enumeradas y con candado.** Son cuatro, y cada
-una tiene su razón: `POST /api/users` (**registro**: quien se da de alta todavía no
-tiene sesión, y lo que lo acota no es una cookie sino la **frontera de equipo**,
-`config.is_admin_loopback_host`), `POST /api/account/verify` (**confirmación del
-email**: el enlace puede abrirse en otro navegador y lo que autoriza es un token de
-un solo uso con caducidad, no la cookie), `POST /api/session` (abrir sesión es justo
-lo que aún no existe) y `POST /api/profile-requests` (la solicitud inerte de arriba).
-Las otras dos rutas de cuenta —`resend-verification` y `unenroll`— **sí** exigen
-sesión, y se comprueban en el **mismo** test para que la lista no crezca sin querer:
-`backend/tests/test_public_surface.py::test_las_escrituras_sin_sesion_estan_declaradas_y_son_solo_dos`.
+**V3.82 — las escrituras sin sesión, enumeradas y con candado.** Son **cuatro**, y
+cada una tiene su razón: `POST /api/profile-requests` (la **solicitud** inerte de
+arriba: quien la manda todavía no tiene cuenta), `POST /api/account/activate`
+(**poner la contraseña desde la invitación**: lo autoriza un token de un solo uso
+con caducidad, no una cookie —el enlace puede abrirse en el móvil, en otro
+navegador—), `POST /api/account/forgot-password` (pedir el restablecimiento:
+responde **200 siempre**, exista o no la cuenta, para no ser un oráculo de qué
+correos tienen cuenta) y `POST /api/account/reset-password` (canjear ese token).
+`POST /api/account/verify` va por el mismo camino —token, sin cookie— y se
+comprueba en el mismo test. La lista **no puede crecer sin querer**: el test exige
+además, una por una, que las rutas de cuenta que **sí** exigen sesión
+(`resend-verification`, `unenroll`) sigan devolviendo 401, y otro test recorre
+`activate` y `reset-password` con un token inventado para fijar que **ninguna de
+las dos** cambia la contraseña de nadie sin el token real
+(`backend/tests/test_public_surface.py`).
+
+Las **tres** rutas que pueden acabar escribiendo un secreto (`activate`,
+`reset-password` y, antes, el registro) tienen cupo propio y estrecho en
+`security._PATH_LIMITS`: la de olvido es la superficie más abusable del producto
+—sin freno, cada llamada manda un correo a un tercero— así que va a **5/min por
+IP**, y el token de un solo uso con caducidad es la segunda valla.
 
 **V3.77 — la administración de perfiles es local por construcción.**
 `/api/admin/*` (crear, desactivar, purgar y resolver solicitudes) exige **dos**
@@ -597,7 +636,9 @@ sin PIN declarado, la administración está deshabilitada, no abierta. Y `POST
 /api/users` deja de ser un alta abierta por **LAN**: crear un perfil es una decisión
 del webmaster; por la red se pasa a **solicitar**. (V3.81 conserva ese reparto —el
 **registro** autoservicio llega, pero solo desde el propio equipo, que es la misma
-frontera con otro nombre— y le añade la credencial: ver «Credencial por cuenta».)
+frontera con otro nombre— y V3.82 **retira del todo** ese registro: el alta es una
+solicitud que el webmaster autoriza, o un alta directa desde `/api/admin/users`
+cuando tiene a la persona delante. Ver «Alta profesional de cuentas».)
 
 `backend/tests/test_public_surface.py` comprueba la lista en las dos direcciones (que
 lo declarado sin sesión siga respondiendo, y que lo declarado con sesión **no** salga
@@ -606,16 +647,31 @@ si esta sección desaparece del documento. `PUT /api/session/password` se compru
 un **test aparte** y no en esa lista: se recorre con `GET` y esa ruta responde
 **405**, no 401, así que mezclarlas habría debilitado el candado.
 
-### Credencial por cuenta (V3.81 · Fase 3 del P0, decisión de producto)
+### Credencial por cuenta y entrada por email (V3.81 Fase 3 · V3.82 Fase D del P0)
 
-`POST /api/session` **exige `password`** cuando la cuenta tiene credencial
-(`users.password_hash != ''`): sin ella o si no cuadra, **`401 PASSWORD_REQUIRED` /
-`401 PASSWORD_INVALID`**, y con el freno de intentos activo
-**`429 PASSWORD_THROTTLED`** con `Retry-After`. Una cuenta **heredada** sin
-credencial abre como siempre. El **PIN de perfil desapareció** como concepto
-(`PUT /api/session/pin` retirado; la columna `pin_hash` se queda en la BD sin
-leerse, para no reescribir el pasado): era una mitigación opt-in y esto es identidad,
-que es justo lo que la Fase 3 pedía.
+`POST /api/session` recibe **`email` + `password`** (V3.82). Ya **no** acepta
+`user_id`: hasta V3.81 la entrada era elegir una cuenta de la lista y, si tenía
+credencial, demostrarla; eso dejaba el nombre como forma de apuntar a una persona y
+la lista pública como catálogo de a quién intentar. Los desenlaces:
+
+- **`401 INVALID_CREDENTIALS`** — «ese email no existe» y «esa contraseña no es»
+  responden **igual**, a propósito: distinguirlos convertiría la puerta en un
+  oráculo de qué correos tienen cuenta. El mensaje que ve el usuario y el tiempo que
+  tarda el servidor son los mismos en los dos casos.
+- **`403 ACCOUNT_NOT_ACTIVATED`** — la cuenta existe y está autorizada, pero
+  **todavía no tiene contraseña**: su invitación está esperando en el correo. Este es
+  el cambio que **cierra G0 por construcción**: hasta V3.81 una cuenta con
+  `password_hash == ''` (J.A y Paz) entraba **sin credencial**, y por eso cualquiera
+  podía entrar como ellas. Hoy sin contraseña no se entra, y `without_password` deja
+  de ser una vulnerabilidad para ser un contador operativo («pendientes de activar»).
+- **`403 PROFILE_DISABLED` / `403 ACCOUNT_UNENROLLED`** — la cuenta está fuera de
+  servicio (desactivada por el webmaster o dada de baja por su dueño).
+- **`429 PASSWORD_THROTTLED`** con `Retry-After` — el freno de intentos, **por
+  cuenta**, además del cupo por IP de `security._PATH_LIMITS`. El freno se limpia al
+  acertar. El **PIN de perfil desapareció** como concepto (`PUT /api/session/pin`
+  retirado; la columna `pin_hash` se queda en la BD sin leerse, para no reescribir el
+  pasado): era una mitigación opt-in y esto es identidad, que es justo lo que la
+  Fase 3 pedía.
 
 - **El hash y el freno**: `backend/services/credentials.py`, **PBKDF2-HMAC-SHA256**
   (200 000 iteraciones, sal por cuenta, iteraciones dentro del valor) y comparación
@@ -629,31 +685,109 @@ que es justo lo que la Fase 3 pedía.
   también en la UI sería duplicar una lista que se desincroniza—.
 - **Revocación efectiva**: el token de sesión lleva la **época de autenticación**
   (`users.auth_epoch`) y `dependencies.current_user` la compara en cada petición
-  —una lectura que ya hacía—, así que cambiar la contraseña o **forzar la baja**
-  tumban las sesiones vivas al instante y no al caducar la cookie (un año).
-- **Registro, verificación y baja**: `POST /api/users` (nombre + email + contraseña,
-  acotado por `is_admin_loopback_host` y por el cupo de `security._PATH_LIMITS`),
-  `POST /api/account/verify` (token de un solo uso, **hasheado** y con caducidad),
-  `POST /api/account/resend-verification` y `POST /api/account/unenroll` (**baja
-  autoservicio**: exige la contraseña, cierra la sesión y **no borra nada** — solo el
-  webmaster purga, desde la consola, con copia previa).
+  —una lectura que ya hacía—, así que cambiar la contraseña —por el diálogo de
+  cuenta, por activación o por restablecimiento— o **forzar la baja** tumban las
+  sesiones vivas al instante y no al caducar la cookie (un año).
+- **Verificación, baja y cambio de email**: `POST /api/account/verify` (token de un
+  solo uso, **hasheado** y con caducidad),
+  `POST /api/account/resend-verification`, `PUT /api/session/email` (exige la
+  contraseña: apuntar la verificación a otro correo es la forma de quedarse una
+  cuenta) y `POST /api/account/unenroll` (**baja autoservicio**: exige la
+  contraseña, cierra la sesión y **no borra nada** — solo el webmaster purga, desde
+  la consola, con copia previa).
 - **El email es PII nueva y es una señal, no un muro**: sin SMTP configurado no se
   envía nada y el webmaster sella la verificación a mano (modo híbrido, y la UI lo
   dice con esas palabras). El correo saliente es la **segunda excepción de red** del
   producto, declarada en `RUNTIME_TOUCHPOINTS` y **fail-closed**
   (`services/mailer.py`: sin configuración no abre ninguna conexión, y un fallo de
   envío se registra sin romper la petición).
-- **Lo que NO hay** (y está declarado en `docs/audit/PARKED.md`): recuperación de
-  contraseña por correo —la restablece el webmaster—, segundo factor, verificación
-  **obligatoria** para usar la app, y `GET /api/users` sigue enumerando **nombres** de
-  toda la red (nunca correos: ver arriba). El hash de la contraseña **sí** viaja en
-  el backup (es estado de la cuenta) mientras `session.secret` y `mail.secret` siguen
-  sin viajar.
-- Fijado por test en `backend/tests/test_accounts_v381.py`, `test_credentials.py`,
-  `test_mailer_v381.py`, `test_public_surface.py` y `test_sessions.py`; y en frontend
-  por `api/session.test.ts`, `utils/session.test.ts`, `utils/credentials.test.ts`,
-  `components/ProfileGate.test.tsx`, `components/AccountDialog.test.tsx` y
-  `hooks/useChat.test.tsx`.
+- **Lo que NO hay** (y está declarado en `docs/audit/PARKED.md`): segundo factor,
+  verificación **obligatoria** para usar la app, y entrega garantizada del correo
+  cuando no hay SMTP (el enlace se entrega a mano desde el lanzador). V3.82 **sí**
+  trae recuperación de contraseña por correo, así que esa deuda sale de la lista.
+  El hash de la contraseña **sí** viaja en el backup (es estado de la cuenta)
+  mientras `session.secret` y `mail.secret` siguen sin viajar.
+- Fijado por test en `backend/tests/test_accounts_v381.py`,
+  `test_accounts_v382.py`, `test_credentials.py`, `test_mailer_v381.py`,
+  `test_public_surface.py`, `test_sessions.py`, `test_identity_source.py`,
+  `test_users_self_only.py` y `test_profile_requests_v377.py`;
+  y en frontend por `api/session.test.ts`, `utils/credentials.test.ts`,
+  `components/ProfileGate.test.tsx`, `components/AccountDialog.test.tsx`,
+  `features/account/AccountPages.test.tsx` y `hooks/useChat.test.tsx`.
+
+### Alta profesional de cuentas (V3.82 · Fase A–F del P0)
+
+El alta deja de ser «alguien se crea una cuenta» y pasa a ser un **ciclo con
+autorización**:
+
+1. **Solicitud** — `POST /api/profile-requests` (sin sesión, inerte: ver arriba).
+   `ProfileRequestCreate` lleva `display_name` + **`email`** + `avatar_color` +
+   `avatar_emoji` + `avatar_image` + `note` (`schemas/profiles.py`). Las columnas
+   `email`, `avatar_color`, `avatar_emoji` y `avatar_image` de `profile_requests` son
+   **aditivas** (`init_db()`), como todas las de este arco. Se valida el email con
+   `credentials.is_valid_email`, y si ya lo usa una cuenta activa el desenlace es
+   `EMAIL_TAKEN` (**409**), que la puerta traduce a «entra con ella o recupera la
+   contraseña» en vez de dejar la solicitud en una cola que no puede resolverse.
+2. **Autorización** — el webmaster la resuelve desde el lanzador
+   (`POST /api/admin/profile-requests/{id}/approve`). Aprobar **crea la cuenta con
+   el email y el avatar solicitados** (nada que teclear), le emite un **token de
+   activación** (`users.activation_token_hash`, `activation_sent_at`; TTL 7 días,
+   `credentials.ACTIVATION_TTL_SECONDS`) y manda la **invitación** por correo
+   (`mailer.KIND_ACTIVATION` → `/#/cuenta/activar?token=…`). La respuesta devuelve
+   `email_sent` y el `activation_link` **en claro**: es la única vez que ese enlace
+   existe —en la BD queda solo su hash— y es lo que permite entregarlo a mano cuando
+   no hay SMTP (modo híbrido). `POST /api/admin/users/{id}/resend-activation`
+   reemite.
+3. **Activación** — `POST /api/account/activate {token, password}` (sin sesión, con
+   cupo): valida el token por hash, su TTL y su **un solo uso**; aplica la política;
+   guarda el hash; marca el email como **verificado** (pulsar el enlace prueba la
+   posesión); limpia el token; sube `auth_epoch`; registra el evento; y **deja la
+   sesión abierta**, para que quien acaba de elegir su contraseña no la escriba otra
+   vez.
+4. **Recuperación** — `POST /api/account/forgot-password {email}` responde **200
+   siempre** y, si la cuenta existe y está activa, emite
+   `users.password_reset_token_hash` + `password_reset_sent_at` (TTL 1 hora) y manda
+   el correo. `POST /api/account/reset-password {token, password}` lo canjea (un solo
+   uso), guarda el hash, limpia el token, sube `auth_epoch` —las demás sesiones
+   mueren— y registra el evento.
+
+En el frontend, las tres páginas viven **fuera del armazón** y por encima de la
+puerta (`features/account/`, renderizadas antes que nada en `App.tsx`), porque llegan
+de un enlace de correo, sin sesión y en cualquier navegador: `#/cuenta/activar`,
+`#/cuenta/restablecer` y `#/cuenta/verificar` (la tercera **faltaba**: el mailer la
+enlazaba desde V3.81 y caía en Inicio, así que el enlace de verificación estaba roto
+sin que nadie lo viera).
+
+**Sonda visual permanente de las páginas de cuenta y de la puerta.** Las cuatro
+pantallas del alta —`activar`, `restablecer`, `verificar` y las tres de la puerta
+(`entrar`, `solicitar acceso`, `recuperar`)— son la primera impresión del producto y
+no las usa a diario nadie que esté ya dentro, así que se vigilan con
+`tests/visual/accountPages.spec.ts` en los **tres breakpoints**, sin `skip` y **sin
+backend**: cada prueba responde desde el navegador los cuatro endpoints que estas
+páginas usan (`/api/account/*` y `/api/session`) y afirma lo que se ve antes de
+disparar (el aviso con `role="alert"` para un fallo, `role="status"` para un
+«confirmando…»), no solo que la pantalla pinte.
+
+Esa sonda encontró un defecto real que las pruebas unitarias no podían ver: la página
+de verificación se quedaba en «Confirmando…» **para siempre** bajo el doble montaje
+de `StrictMode` —el primero de los dos efectos descartaba la única respuesta que iba a
+llegar, y el segundo no volvía a preguntar porque el token es de un solo uso—. La
+guarda que parecía prudente era justo la causa, y solo se vio abriendo la página en un
+navegador de verdad. Se cierra aplicando el resultado **sin** bandera de «sigo vivo»
+(el token se guarda como «ya canjeado» para no gastarlo dos veces, que es lo único que
+había que proteger) y queda fijado en las dos capas: el spec visual y
+`AccountPages.test.tsx`, que ahora monta también con `StrictMode` —una suite que no
+reproduce cómo arranca la app no vigila el bug que sí ocurre—.
+
+**Migración heredada.** `backend/scripts/migrate_legacy_accounts.py` deja las cuentas
+sin credencial «pendientes de activación»: les asigna email y les emite invitación
+(simula por defecto, `--apply` escribe, con copia previa). Es idempotente y no
+inventa contraseñas —cada persona elige la suya—. J.A y Paz usan *plus-addressing*
+(`josealberto.vel+ja@…`, `josealberto.vel+paz@…`): dos cuentas con email **único**
+que llegan a la misma bandeja. Y el **cierre de G0** es este: al retirar el acceso
+sin contraseña, `without_password` deja de ser un agujero y pasa a ser un contador
+de trabajo pendiente.
+
 
 ### Voz: el cliente puede pedir una voz, y sólo una instalada (V3.75.5)
 

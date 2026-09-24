@@ -16,6 +16,9 @@ STATUS_UNENROLLED = users_repo.STATUS_UNENROLLED
 EVENT_CREDENTIALS = users_repo.EVENT_CREDENTIALS
 EVENT_EMAIL_VERIFIED = users_repo.EVENT_EMAIL_VERIFIED
 EVENT_PASSWORD_CHANGED = users_repo.EVENT_PASSWORD_CHANGED
+EVENT_INVITED = users_repo.EVENT_INVITED
+EVENT_ACTIVATED = users_repo.EVENT_ACTIVATED
+EVENT_PASSWORD_RESET = users_repo.EVENT_PASSWORD_RESET
 EVENT_UNENROLLED = users_repo.EVENT_UNENROLLED
 EVENT_ENROLLED = users_repo.EVENT_ENROLLED
 EVENT_DISABLED = users_repo.EVENT_DISABLED
@@ -65,6 +68,9 @@ async def create_user(
     email: str = "",
     password_hash: str = "",
     must_change_password: bool = False,
+    avatar_color: str = "",
+    avatar_emoji: str = "",
+    avatar_image: str = "",
 ) -> dict:
     return await run_in_threadpool(
         users_repo.create_user,
@@ -73,6 +79,9 @@ async def create_user(
         email=email,
         password_hash=password_hash,
         must_change_password=must_change_password,
+        avatar_color=avatar_color,
+        avatar_emoji=avatar_emoji,
+        avatar_image=avatar_image,
     )
 
 
@@ -169,6 +178,50 @@ async def get_email_verification(uid: str) -> tuple[str, str] | None:
 
 async def mark_email_verified(uid: str) -> dict | None:
     return await run_in_threadpool(users_repo.mark_email_verified, uid)
+
+
+# --- Activación (invitación, V3.82) ------------------------------------------
+
+
+async def set_activation(uid: str, token_hash: str) -> bool:
+    return await run_in_threadpool(users_repo.set_activation, uid, token_hash)
+
+
+async def get_activation(uid: str) -> tuple[str, str] | None:
+    return await run_in_threadpool(users_repo.get_activation, uid)
+
+
+async def find_by_activation_token(token_hash: str) -> dict | None:
+    return await run_in_threadpool(
+        users_repo.find_by_activation_token, token_hash
+    )
+
+
+async def mark_activated(uid: str, *, email_verified: bool = True) -> dict | None:
+    return await run_in_threadpool(
+        users_repo.mark_activated, uid, email_verified=email_verified
+    )
+
+
+# --- Restablecimiento de contraseña (V3.82) ----------------------------------
+
+
+async def set_password_reset(uid: str, token_hash: str) -> bool:
+    return await run_in_threadpool(users_repo.set_password_reset, uid, token_hash)
+
+
+async def get_password_reset(uid: str) -> tuple[str, str] | None:
+    return await run_in_threadpool(users_repo.get_password_reset, uid)
+
+
+async def find_by_password_reset_token(token_hash: str) -> dict | None:
+    return await run_in_threadpool(
+        users_repo.find_by_password_reset_token, token_hash
+    )
+
+
+async def clear_password_reset(uid: str) -> bool:
+    return await run_in_threadpool(users_repo.clear_password_reset, uid)
 
 
 async def set_unenrolled(uid: str, *, enrolled: bool) -> dict | None:

@@ -38,6 +38,7 @@ export type ProfileRequestOutcome =
  */
 export type ProfileRequestFailure =
   | "duplicate"
+  | "email-taken"
   | "full"
   | "invalid"
   | "throttled"
@@ -50,7 +51,12 @@ function _outcomeFromError(err: unknown): ProfileRequestOutcome {
       retryAfter === undefined
         ? { ok: false, reason }
         : { ok: false, reason, retryAfterSeconds: retryAfter };
-    if (err.status === 409) return failure("duplicate");
+    if (err.status === 409) {
+      // V3.82: un 409 puede ser «ya pediste esto» (duplicado) o «ese email ya
+      // tiene cuenta». La respuesta útil es distinta —esperar vs entrar o
+      // recuperar la contraseña—, así que no se juntan.
+      return failure(err.detail === "EMAIL_TAKEN" ? "email-taken" : "duplicate");
+    }
     if (err.status === 422) return failure("invalid");
     if (err.status === 429) {
       // Dos 429 distintos: el del cupo por IP (`RATE_LIMITED`, delimitador de
@@ -62,9 +68,24 @@ function _outcomeFromError(err: unknown): ProfileRequestOutcome {
   return { ok: false, reason: "offline" };
 }
 
-/** Pide un perfil nuevo. Sin sesión; **no** crea nada. */
+/** El avatar con el que se pide la cuenta (V3.82). Todo opcional. */
+export interface RequestedAvatar {
+  avatar_color?: string;
+  avatar_emoji?: string;
+  avatar_image?: string;
+}
+
+/**
+ * Pide un perfil nuevo. Sin sesión; **no** crea nada.
+ *
+ * V3.82: la solicitud lleva el email (con el que el webmaster autoriza por
+ * correo) y el avatar elegido, para que al aprobarla no haya que teclear ni
+ * elegir nada a mano.
+ */
 export async function requestProfile(
   displayName: string,
+  email: string,
+  avatar: RequestedAvatar = {},
   note = "",
 ): Promise<ProfileRequestOutcome> {
   // El nombre se recorta aquí y no se valida más: la forma la decide el backend
@@ -77,7 +98,11 @@ export async function requestProfile(
       ok: true,
       request: await postJson<ProfileRequest>("/api/profile-requests", {
         display_name: name,
+        email: email.trim(),
         note: note.trim(),
+        ...(avatar.avatar_color ? { avatar_color: avatar.avatar_color } : {}),
+        ...(avatar.avatar_emoji ? { avatar_emoji: avatar.avatar_emoji } : {}),
+        ...(avatar.avatar_image ? { avatar_image: avatar.avatar_image } : {}),
       }),
     };
   } catch (err) {

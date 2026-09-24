@@ -5,11 +5,10 @@ import {
   changeEmail as changeEmailApi,
   changePassword as changePasswordApi,
   closeSession,
-  createAccount as createAccountApi,
   getSession,
   openSession,
   resendVerification as resendVerificationApi,
-  SessionPasswordError,
+  SessionLoginError,
   unenrollAccount,
 } from "../api/session";
 import {
@@ -19,11 +18,12 @@ import {
   listConversations,
   saveConversation,
 } from "../api/conversations";
-import { listUsers, updateUser as updateUserApi, type UserPatch } from "../api/users";
+import { updateUser as updateUserApi, type UserPatch } from "../api/users";
 import {
   requestProfile,
   requestProfileDelete,
   type ProfileRequestOutcome,
+  type RequestedAvatar,
 } from "../api/profileRequests";
 import { getProgressHistory } from "../api/progress";
 import { getSettings, saveSettings } from "../api/settings";
@@ -32,7 +32,6 @@ import { deriveTitle } from "../utils/title";
 import { ApiError } from "../api/client";
 import { turnTelemetry } from "../utils/telemetry";
 import { nextDefaultUserName } from "../utils/users";
-import { planSession } from "../utils/session";
 import { fallbackChatModel } from "../utils/models";
 import {
   LAYOUT_DEFAULTS,
@@ -65,24 +64,24 @@ const TUTOR_MODES: TutorMode[] = [
 ];
 
 /**
- * Por qué la puerta está pidiendo la contraseña (V3.81; sustituye al PIN de
- * V3.76). `null` = pidiéndola por primera vez (o tras un arranque, que es el caso
- * normal de una cuenta con credencial).
+ * Cómo terminó un intento de entrada (V3.82).
+ *
+ * Sustituye al estado `passwordPromptUserId` de V3.81: ya no hay un «paso de
+ * contraseña» separado del selector, porque **entrar es** escribir email y
+ * contraseña. La puerta recibe el desenlace y decide qué texto pintar.
  */
-export type PasswordFeedback = "password-invalid" | "password-throttled" | null;
-
-/** Cómo terminó el alta de una cuenta desde la puerta. */
-export type CreateAccountOutcome =
+export type LoginOutcome =
   | { ok: true; user: User }
   | {
       ok: false;
       reason:
-        | "name-taken"
-        | "email-taken"
-        | "email-format"
-        | "password-format"
-        | "not-local"
+        | "invalid-credentials"
+        | "not-activated"
+        | "disabled"
+        | "unenrolled"
+        | "throttled"
         | "error";
+      retryAfterSeconds?: number;
     };
 
 /** Cómo terminó una acción del diálogo de cuenta. */
@@ -90,7 +89,13 @@ export type AccountActionOutcome =
   | { ok: true; user: User }
   | {
       ok: false;
-      reason: "password-invalid" | "password-required" | "invalid" | "error";
+      reason:
+        | "password-invalid"
+        | "password-required"
+        | "password-format"
+        | "email-format"
+        | "email-taken"
+        | "error";
     };
 
 export function useChat() {
@@ -109,20 +114,10 @@ export function useChat() {
   // true cuando la lista de perfiles ya se ha cargado del backend (permite al
   // App distinguir "cargando" de "no hay ningún perfil seleccionado").
   const [usersLoaded, setUsersLoaded] = useState(false);
-  // V3.80.2: ¿falló la sonda de usuarios? La puerta lo usa para ofrecer
-  // «Reintentar» en vez de decir «no hay perfiles»: confundir las dos cosas es
+  // V3.80.2: ¿falló la sonda de la sesión? La puerta lo usa para ofrecer
+  // «Reintentar» en vez de decir «no hay sesión»: confundir las dos cosas es
   // exactamente lo que dejaba al alumno sin salida.
   const [usersLoadFailed, setUsersLoadFailed] = useState(false);
-  // V3.81 (Fase 3 del P0): cuenta que está esperando su contraseña y por qué.
-  // Que la contraseña se pida es un estado de la **app**, no de un componente:
-  // así los tres caminos que abren sesión (arranque, selector y alta) piden lo
-  // mismo y la puerta solo tiene que pintarlo.
-  const [passwordPromptUserId, setPasswordPromptUserId] = useState<string | null>(
-    null,
-  );
-  const [passwordFeedback, setPasswordFeedback] =
-    useState<PasswordFeedback>(null);
-  const [passwordRetryAfter, setPasswordRetryAfter] = useState(0);
   // V3.81: la contraseña vigente es temporal (la puso el webmaster) y hay que
   // cambiarla antes de usar nada. Se aprende de la respuesta del servidor, nunca
   // se adivina; el servidor lo hace cumplir igual con `403
@@ -235,109 +230,74 @@ export function useChat() {
   }, [models, model, favoriteModel]);
 
   /**
-   * Abre sesión para una cuenta y, si el servidor pide contraseña, deja la app en
-   * el paso de contraseña en vez de fallar en silencio (V3.81; misma pieza que en
-   * V3.76 pedía el PIN).
+   * Abre sesión con **email + contraseña** (V3.82).
    *
-   * Es el **único** camino que abre sesión: el arranque, el selector de cuenta y
-   * el alta comparten esta función, así que la política de credencial no puede
-   * quedar despareja entre ellos. Devuelve si la cuenta quedó activa.
+   * Es el único camino que abre sesión. Lo que devuelve es un desenlace tipado
+   * para que la puerta pueda decir qué pasa: credenciales que no cuadran, cuenta
+   * sin activar (su invitación está en el correo), cuenta fuera de servicio o el
+   * freno de intentos. Ninguno de esos casos es una avería, y tratarlos como
+   * «algo falló» era exactamente lo que hacía indescifrable la puerta.
    */
-  const openProfile = useCallback(
-    async (userId: string, password?: string): Promise<boolean> => {
+  const login = useCallback(
+    async (email: string, password: string): Promise<LoginOutcome> => {
       try {
-        const user = await openSession(userId, password);
-        setPasswordPromptUserId(null);
-        setPasswordFeedback(null);
-        setPasswordRetryAfter(0);
+        const user = await openSession(email, password);
         setMustChangePassword(user.must_change_password === true);
         setCurrentUserId(user.id);
-        return true;
+        setUsers([user]);
+        return { ok: true, user };
       } catch (err) {
-        if (err instanceof SessionPasswordError) {
-          // «Falta la contraseña» no es un error que pintar: es el paso siguiente.
-          setPasswordPromptUserId(userId);
-          setPasswordFeedback(
-            err.reason === "password-required"
-              ? null
-              : err.reason === "password-throttled"
-                ? "password-throttled"
-                : "password-invalid",
-          );
-          setPasswordRetryAfter(err.retryAfterSeconds);
-          return false;
+        if (err instanceof SessionLoginError) {
+          return err.reason === "throttled"
+            ? {
+                ok: false,
+                reason: "throttled",
+                retryAfterSeconds: err.retryAfterSeconds,
+              }
+            : { ok: false, reason: err.reason };
         }
-        /* backend no disponible: no se cambia de cuenta ni se pide contraseña */
-        return false;
+        // Backend caído o sin red: no se cambia de estado ni se finge que la
+        // contraseña era mala.
+        return { ok: false, reason: "error" };
       }
     },
     [],
   );
 
-  const cancelPassword = useCallback(() => {
-    setPasswordPromptUserId(null);
-    setPasswordFeedback(null);
-    setPasswordRetryAfter(0);
-  }, []);
-
   /**
-   * Carga los usuarios y resuelve el perfil inicial.
+   * Carga la sesión del servidor al arrancar (V3.82).
    *
-   * V3.80.2: las dos sondas viajan juntas en el tiempo pero **no** comparten
-   * destino. Antes un `Promise.all` las ataba: un 404 de `GET /api/session`
-   * (sesión abierta para un usuario que el webmaster acaba de purgar desde el
-   * lanzador) rechazaba la promesa conjunta y `setUsers` no llegaba a
-   * ejecutarse, así que la app caía en «Elige tu perfil» con la lista **vacía**
-   * y sin forma de salir. Con `allSettled` la lista se puebla igual, y el fallo
-   * de la sonda se declara en `usersLoadFailed` para que la puerta pueda ofrecer
-   * reintentar en vez de mentir con un «no hay perfiles».
-   *
-   * Se expone como `reloadUsers` porque ese reintento es del alumno: sin él, un
-   * backend que tardó en arrancar dejaría la puerta otra vez sin salida.
+   * Antes esto pedía también la lista de cuentas y resolvía «con quién entro»
+   * (`planSession`). Con el login por email no hay lista que resolver: o hay
+   * sesión y se adopta, o no la hay y se pinta la puerta. Menos estados, y sobre
+   * todo: deja de existir el arranque automático que abría sesión «nombrando» a
+   * una cuenta heredada — que era justo el agujero que G0 vigilaba.
    */
-  const loadUsers = useCallback(async () => {
+  const loadSession = useCallback(async () => {
     setUsersLoaded(false);
     try {
-      // V3.75 (Fase 2 del P0): quién es el perfil activo lo dice **el
-      // servidor**, no el navegador. La sesión viaja en una cookie
-      // `et_session` HttpOnly que JavaScript no puede leer (ese es el punto:
-      // antes bastaba con reescribir `et_user_id` para suplantar un perfil),
-      // así que se **pregunta** con `GET /api/session`.
-      const [usersResult, sessionResult] = await Promise.allSettled([
-        listUsers(),
-        getSession(),
-      ]);
-      const existing = usersResult.status === "fulfilled" ? usersResult.value : [];
-      const session =
-        sessionResult.status === "fulfilled" ? sessionResult.value : null;
-      setUsers(existing);
-      setUsersLoadFailed(usersResult.status === "rejected");
-      // Resolución del perfil inicial (sesión del servidor → perfil único → null)
-      // y, con ella, si hay que **abrir** sesión o basta con adoptarla. La
-      // decisión es pura y tiene test propio (`utils/session.ts`): es el punto
-      // donde un fallo se ve como «todo normal» mientras cada petición da 401.
-      const plan = planSession(existing, session?.id ?? null);
-      if (plan.action === "adopt") {
-        setCurrentUserId(plan.userId);
-        setMustChangePassword(session?.must_change_password === true);
-      } else if (plan.action === "password") {
-        // V3.81: la cuenta tiene contraseña. No se lanza un `POST` condenado a
-        // 401 —su error lo tragaría el `catch` de abajo y el arranque se vería
-        // como «no ha pasado nada»—: se pide la contraseña y se espera.
-        setPasswordPromptUserId(plan.userId);
-      } else if (plan.action === "open") {
-        // Cuenta resuelta **sin** sesión abierta y **sin** credencial (el caso
-        // heredado): se abre aquí antes de pintar nada.
-        await openProfile(plan.userId);
+      const session = await getSession();
+      if (session) {
+        setCurrentUserId(session.id);
+        setUsers([session]);
+        setMustChangePassword(session.must_change_password === true);
+      } else {
+        setCurrentUserId(null);
+        setUsers([]);
       }
+      setUsersLoadFailed(false);
+    } catch {
+      // Un fallo de red no es «no hay sesión»: se declara para que la puerta
+      // ofrezca reintentar en vez de mentir.
+      setUsersLoadFailed(true);
     } finally {
       setUsersLoaded(true);
     }
-  }, [openProfile]);
+  }, []);
 
   useEffect(() => {
-    void loadUsers();
-  }, [loadUsers]);
+    void loadSession();
+  }, [loadSession]);
 
   // Carga las preferencias persistidas del usuario (modelo, modo, layout).
   useEffect(() => {
@@ -499,19 +459,6 @@ export function useChat() {
     [currentUserId],
   );
 
-  const selectUser = useCallback(
-    (userId: string) => {
-      // V3.75: elegir usuario es **abrir sesión** en el servidor. Antes esto
-      // escribía la cookie `et_user_id`, que el propio cliente podía reescribir
-      // para suplantar a otra cuenta; ahora la firma el servidor y el estado local
-      // se fija con la cuenta que **él** devuelve, no con lo que pide el cliente.
-      // V3.81: si la cuenta tiene contraseña, el servidor responde 401
-      // `PASSWORD_REQUIRED` y `openProfile` deja la app en el paso de contraseña.
-      void openProfile(userId);
-    },
-    [openProfile],
-  );
-
   const selectModel = useCallback(
     (next: string) => {
       setModel(next);
@@ -569,47 +516,8 @@ export function useChat() {
   );
 
   /**
-   * Alta de una cuenta nueva desde la propia puerta (V3.81).
-   *
-   * Sustituye al «pide un perfil» de V3.77 como camino principal: cualquiera que
-   * esté delante de este equipo puede crearse una cuenta con contraseña y email.
-   * Si el backend responde 403 es que la petición no viene del propio equipo (modo
-   * LAN): entonces lo que toca es **pedir**, y el componente ya ofrece esa vía.
-   *
-   * Al terminar bien, la cuenta queda con sesión abierta: quien acaba de
-   * registrarse no tiene que volver a escribir lo que ya escribió.
-   */
-  const createAccountForGate = useCallback(
-    async (
-      name: string,
-      email: string,
-      password: string,
-    ): Promise<CreateAccountOutcome> => {
-      try {
-        const user = await createAccountApi(name.trim(), email.trim(), password);
-        await openProfile(user.id, password);
-        return { ok: true, user };
-      } catch (err) {
-        if (err instanceof ApiError) {
-          const mapped: Record<string, CreateAccountOutcome & { ok: false }> = {
-            USER_NAME_TAKEN: { ok: false, reason: "name-taken" },
-            EMAIL_TAKEN: { ok: false, reason: "email-taken" },
-            EMAIL_FORMAT: { ok: false, reason: "email-format" },
-            PASSWORD_FORMAT: { ok: false, reason: "password-format" },
-          };
-          if (err.status === 403) return { ok: false, reason: "not-local" };
-          const hit = mapped[err.detail];
-          if (hit) return hit;
-        }
-        return { ok: false, reason: "error" };
-      }
-    },
-    [openProfile],
-  );
-
-  /**
    * Salir: cierra la sesión en el servidor (caduca la cookie) y vacía el estado
-   * local para que la puerta vuelva a pedir cuenta.
+   * local para que la puerta vuelva a pedir credencial.
    *
    * V3.81 lo usa por primera vez: `closeSession()` existía desde V3.75 sin que
    * nadie la llamara, así que en un producto con selector de cuentas compartido en
@@ -620,12 +528,10 @@ export function useChat() {
       /* sin backend la cookie también caduca sola: la UI sale igual */
     });
     setCurrentUserId(null);
-    setPasswordPromptUserId(null);
-    setPasswordFeedback(null);
-    setPasswordRetryAfter(0);
+    setUsers([]);
     setMustChangePassword(false);
-    await loadUsers();
-  }, [loadUsers]);
+    await loadSession();
+  }, [loadSession]);
 
   /**
    * Cambia la contraseña de la cuenta de la sesión. Al terminar, la app relee la
@@ -680,26 +586,38 @@ export function useChat() {
       try {
         const res = await unenrollAccount(password);
         setCurrentUserId(null);
+        setUsers([]);
         setMustChangePassword(false);
-        await loadUsers();
+        await loadSession();
         return { ok: true, user: res.user };
       } catch (err) {
         return { ok: false, reason: accountFailure(err) };
       }
     },
-    [loadUsers],
+    [loadSession],
   );
 
-  // V3.77: la app ya no crea perfiles. Lo que hace es **pedirlos**, y el
-  // desenlace se devuelve tal cual para que la puerta pueda contarlo (una
-  // solicitud no abre sesión: no hay perfil al que abrirla). El nombre por
-  // defecto sigue teniendo sentido aquí —«Alumno 2» es más útil en la cola del
-  // webmaster que una fila vacía—, pero se resuelve solo si no escribieron nada.
+  /**
+   * Pide un acceso: nombre/nick, email y avatar (V3.77; email y avatar en V3.82).
+   *
+   * Sigue sin crear nada —la solicitud va a la cola del webmaster— pero ahora
+   * lleva **todo lo que hace falta para autorizarla**: sin el email no habría
+   * forma de mandar la invitación, y sin la contraseña nadie entra nunca sin
+   * demostrar quién es. Por eso el formulario ya no es «un nombre y a esperar».
+   *
+   * El nombre sí se puede dejar en blanco y se resuelve con el siguiente libre
+   * («Alumno 2» en la cola del webmaster es más útil que una fila vacía).
+   */
   const requestProfileForGate = useCallback(
-    async (name: string): Promise<ProfileRequestOutcome> => {
+    async (
+      name: string,
+      email: string,
+      avatar: RequestedAvatar = {},
+      note = "",
+    ): Promise<ProfileRequestOutcome> => {
       const trimmed = name.trim();
       const finalName = trimmed || nextDefaultUserName(users.map((u) => u.name));
-      return requestProfile(finalName);
+      return requestProfile(finalName, email, avatar, note);
     },
     [users],
   );
@@ -864,19 +782,14 @@ export function useChat() {
     users,
     currentUserId,
     usersLoaded,
-    // V3.80.2: la puerta distingue «no hay usuarios» de «no se pudo cargar» y
+    // V3.80.2: la puerta distingue «no hay sesión» de «no se pudo comprobar» y
     // puede volver a intentarlo sin recargar la página.
     usersLoadFailed,
-    reloadUsers: loadUsers,
-    // V3.81 (Fase 3 del P0): estado del paso de contraseña y las acciones que lo
-    // cierran, más el ciclo de vida de la cuenta. La puerta de entrada y el menú
-    // de cuenta los pintan; el resto de la app no los toca.
-    passwordPromptUserId,
-    passwordFeedback,
-    passwordRetryAfter,
-    submitPassword: openProfile,
-    cancelPassword,
-    createAccountForGate,
+    reloadSession: loadSession,
+    // V3.82: entrar es un acto explícito (email + contraseña). `login` devuelve el
+    // desenlace del intento y la puerta lo pinta; el resto del ciclo de vida de la
+    // cuenta vive en las acciones de abajo.
+    login,
     mustChangePassword,
     changePasswordNow,
     changeEmailNow,
@@ -889,7 +802,6 @@ export function useChat() {
     newConversation,
     loadConversation,
     removeConversation,
-    selectUser,
     requestProfileForGate,
     requestProfileRemoval,
     editUser,
@@ -920,19 +832,33 @@ export type ChatApi = ReturnType<typeof useChat>;
  * la UI tiene para él habla del freno, y decir «espera un momento» es más útil
  * que «algo falló».
  */
-function accountFailure(err: unknown): "password-invalid" | "password-required" | "invalid" | "error" {
+/**
+ * Traduce un fallo de la API al desenlace que el diálogo de cuenta sabe pintar.
+ *
+ * Se decide aquí, una sola vez, en vez de en cada componente: cada desenlace
+ * **de producto** tiene su frase, y decir la frase equivocada manda a arreglar lo
+ * que no era.
+ *
+ * V3.82 separa lo que antes era un único `invalid`: `PASSWORD_FORMAT` (la
+ * contraseña nueva no cumple la política) y `EMAIL_TAKEN` (ese correo ya tiene
+ * cuenta) son ahora alcanzables —la cuenta tiene email único— y los dos caían en
+ * el texto de «el email no tiene forma», que era falso en los dos casos: en el
+ * primero hablaba del campo que no era, y en el segundo mandaba a corregir un
+ * email perfectamente válido.
+ *
+ * Un `PASSWORD_THROTTLED` cae en `password-invalid` a propósito: el mensaje que
+ * la UI tiene para él habla del freno, y decir «espera un momento» es más útil
+ * que «algo falló».
+ */
+function accountFailure(err: unknown): Exclude<AccountActionOutcome, { ok: true }>["reason"] {
   if (err instanceof ApiError) {
     if (err.detail === "PASSWORD_INVALID" || err.detail === "PASSWORD_THROTTLED") {
       return "password-invalid";
     }
     if (err.detail === "PASSWORD_REQUIRED") return "password-required";
-    if (
-      err.detail === "EMAIL_FORMAT" ||
-      err.detail === "EMAIL_TAKEN" ||
-      err.detail === "PASSWORD_FORMAT"
-    ) {
-      return "invalid";
-    }
+    if (err.detail === "PASSWORD_FORMAT") return "password-format";
+    if (err.detail === "EMAIL_FORMAT") return "email-format";
+    if (err.detail === "EMAIL_TAKEN") return "email-taken";
   }
   return "error";
 }

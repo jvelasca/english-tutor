@@ -21,25 +21,37 @@ from main import app
 from repositories import db
 from repositories import settings as settings_repo
 from repositories import users as users_repo
+from services import credentials
 
 pytestmark = pytest.mark.identidad_cruda
+
+# V3.82: se entra con email + contraseña, así que el escenario tiene que tenerlas.
+# El módulo sigue marcado `identidad_cruda` por lo que *prueba* —que `?user_id=`
+# no significa nada—, no por cómo abre la sesión.
+PASSWORD = "caballo-bateria-grapa"
 
 
 def _setup(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DATA_DIR", tmp_path)
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
-    ana = users_repo.create_user("Ana")["id"]
-    beto = users_repo.create_user("Beto")["id"]
+    ana = users_repo.create_user("Ana", email="ana@example.com")["id"]
+    beto = users_repo.create_user("Beto", email="beto@example.com")["id"]
+    for uid in (ana, beto):
+        assert users_repo.set_password_hash(uid, credentials.hash_password(PASSWORD))
     settings_repo.set_settings(ana, {"model": "modelo-de-Ana"})
     settings_repo.set_settings(beto, {"model": "modelo-de-Beto"})
     return ana, beto
 
 
+def _entrar(client, email: str):
+    return client.post("/api/session", json={"email": email, "password": PASSWORD})
+
+
 def test_con_sesion_de_ana_pedir_lo_de_beto_devuelve_lo_de_ana(monkeypatch, tmp_path):
     ana, beto = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        assert client.post("/api/session", json={"user_id": ana}).status_code == 200
+        assert _entrar(client, "ana@example.com").status_code == 200
         r = client.get("/api/settings", params={"user_id": beto})
         assert r.status_code == 200
         assert r.json()["settings"]["model"] == "modelo-de-Ana"
@@ -48,7 +60,7 @@ def test_con_sesion_de_ana_pedir_lo_de_beto_devuelve_lo_de_ana(monkeypatch, tmp_
 def test_y_al_reves_la_sesion_manda_igual(monkeypatch, tmp_path):
     ana, beto = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        assert client.post("/api/session", json={"user_id": beto}).status_code == 200
+        assert _entrar(client, "beto@example.com").status_code == 200
         r = client.get("/api/settings", params={"user_id": ana})
         assert r.json()["settings"]["model"] == "modelo-de-Beto"
 
@@ -71,5 +83,5 @@ def test_tampoco_sirve_para_el_perfil_de_aprendizaje(monkeypatch, tmp_path):
 def test_con_sesion_de_ana_el_perfil_de_aprendizaje_es_el_de_ana(monkeypatch, tmp_path):
     ana, beto = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        assert client.post("/api/session", json={"user_id": ana}).status_code == 200
+        assert _entrar(client, "ana@example.com").status_code == 200
         assert client.get("/api/profile", params={"user_id": beto}).status_code == 200

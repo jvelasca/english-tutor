@@ -29,10 +29,15 @@ function respondOnce(status: number, body: unknown): ReturnType<typeof vi.fn> {
 }
 
 describe("requestProfile", () => {
-  it("registra la solicitud sin sesión y devuelve la fila creada", async () => {
+  it("registra la solicitud sin sesión, con email y avatar (V3.82)", async () => {
     const fetchMock = respondOnce(201, { id: 4, kind: "create", status: "pending" });
 
-    const outcome = await requestProfile("Ana", " 3.º ESO ");
+    const outcome = await requestProfile(
+      "Ana",
+      " ana@example.com ",
+      { avatar_color: "#6366f1", avatar_emoji: "🦊" },
+      " 3.º ESO ",
+    );
 
     expect(outcome).toEqual({
       ok: true,
@@ -41,18 +46,34 @@ describe("requestProfile", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/profile-requests");
     expect(init.method).toBe("POST");
-    // El nombre va recortado y la nota también: los espacios de sobra son ruido
-    // en una cola que lee una persona.
+    // Nombre, email y nota van recortados: los espacios de sobra son ruido en
+    // una cola que lee una persona. El avatar va tal cual se eligió, y lo que no
+    // se eligió **no se manda** (el backend distingue «sin elegir» de «elegido»).
     expect(JSON.parse(init.body as string)).toEqual({
       display_name: "Ana",
+      email: "ana@example.com",
       note: "3.º ESO",
+      avatar_color: "#6366f1",
+      avatar_emoji: "🦊",
+    });
+  });
+
+  it("sin avatar elegido el cuerpo no lleva huecos vacíos", async () => {
+    const fetchMock = respondOnce(201, { id: 4 });
+
+    await requestProfile("Ana", "ana@example.com");
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({
+      display_name: "Ana",
+      email: "ana@example.com",
+      note: "",
     });
   });
 
   it("un nombre vacío no llega a la red", async () => {
     const fetchMock = respondOnce(201, {});
 
-    const outcome = await requestProfile("   ");
+    const outcome = await requestProfile("   ", "ana@example.com");
 
     expect(outcome).toEqual({ ok: false, reason: "invalid" });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -61,6 +82,10 @@ describe("requestProfile", () => {
   it("traduce cada estado del backend a su motivo", async () => {
     const casos: Array<[number, unknown, string]> = [
       [409, { detail: "Ya hay una solicitud pendiente" }, "duplicate"],
+      // V3.82: un 409 puede ser «ya pediste esto» (duplicado) o «ese email ya
+      // tiene cuenta». La respuesta útil es distinta —esperar vs entrar o
+      // recuperar la contraseña—, así que no se juntan.
+      [409, { detail: "EMAIL_TAKEN" }, "email-taken"],
       [422, { detail: "Nombre de perfil no válido" }, "invalid"],
       [429, { detail: "Hay demasiadas solicitudes pendientes" }, "full"],
       // El 429 del cupo por IP llega con `code: RATE_LIMITED`, que el cliente
@@ -71,7 +96,7 @@ describe("requestProfile", () => {
 
     for (const [status, body, esperado] of casos) {
       respondOnce(status, body);
-      const outcome = await requestProfile("Ana");
+      const outcome = await requestProfile("Ana", "ana@example.com");
       expect(outcome, `status ${status}`).toEqual({
         ok: false,
         reason: esperado,
@@ -85,7 +110,7 @@ describe("requestProfile", () => {
       vi.fn().mockRejectedValue(new ApiError(0, "network")),
     );
 
-    await expect(requestProfile("Ana")).resolves.toEqual({
+    await expect(requestProfile("Ana", "ana@example.com")).resolves.toEqual({
       ok: false,
       reason: "offline",
     });

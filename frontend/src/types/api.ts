@@ -76,6 +76,15 @@ export interface ProfileRequest {
   /** Perfil afectado, en una baja. */
   user_id: string;
   note: string;
+  /**
+   * V3.82: lo que la solicitud pidió para la cuenta futura. El email es con el
+   * que se manda la invitación al aprobar; el avatar se copia tal cual a la
+   * cuenta. Solo llegan en una solicitud de alta.
+   */
+  email?: string;
+  avatar_color?: string;
+  avatar_emoji?: string;
+  avatar_image?: string;
   requested_at: string;
   status: "pending" | "approved" | "rejected" | string;
   decided_at: string;

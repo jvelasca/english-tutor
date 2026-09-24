@@ -122,26 +122,42 @@ completo.
 - La app admite **varios usuarios locales**, cada uno con su propio espacio: conversaciones,
   progreso, correcciones, puntuaciones de pronunciación y ajustes, **totalmente independientes**
   entre sí.
-- **Desde V3.81 la identidad es una cuenta con credencial propia** (nombre + email + contraseña),
-  no un nombre elegido de una lista: cualquiera puede **crearse una cuenta** desde la app
-  (registro autoservicio, en loopback) y **darse de baja** por sí mismo. Entrar sin contraseña
-  solo lo permite una cuenta **heredada** sin credencial (`password_hash == ''`): es una deuda
-  declarada y el lanzador la enseña como tarea pendiente.
+- **La identidad es el email** y la entrada es **email + contraseña** (V3.82). Ya **no** hay
+  lista de cuentas que elegir: enumerarlas era, además, regalar la lista de a quién intentar
+  entrar. Nadie puede entrar **como** otra persona: sin la contraseña correcta no hay sesión, y
+  una cuenta sin contraseña **no entra** (`403 ACCOUNT_NOT_ACTIVATED`) — así se cierra, por
+  construcción, el agujero que dejaba entrar a las cuentas heredadas nombrándolas.
+- **El alta es un ciclo con autorización**, no un registro instantáneo (V3.82):
+  1. la persona **solicita** acceso con su nombre o apodo, su **email** y su **avatar**;
+  2. la solicitud llega al **webmaster**, que la autoriza desde el lanzador y con ello **crea la
+     cuenta** (con esos datos, sin teclear nada) y le manda un **correo de invitación**;
+  3. con el enlace del correo, la persona **elige su propia contraseña** y entra (el enlace
+     prueba además que el correo es suyo, así que el email queda **verificado**).
+  El webmaster también puede **crear una cuenta directamente** cuando tiene a la persona delante.
+- **Recuperación de contraseña por correo**, estándar: «olvidé mi contraseña» → enlace de un
+  solo uso con caducidad → contraseña nueva. La respuesta es **idéntica exista o no la cuenta**,
+  para no revelar qué correos tienen cuenta, y el token caduca y no se puede reutilizar.
+- **La contraseña la elige siempre la persona**: ni el webmaster la inventa ni la conoce. Se
+  guarda **hasheada** (PBKDF2-HMAC-SHA256 con sal por cuenta, iteraciones declaradas en el
+  propio valor) y tanto el cambio de contraseña como una baja forzada **tumban las sesiones
+  abiertas** al instante (época de autenticación), no al caducar la cookie.
 - **La baja autoservicio no borra nada**: la cuenta deja de operar y sus sesiones se cierran,
   pero la evidencia se conserva. Borrar de verdad (purgar) es una acción **administrativa**, con
   copia previa, confirmación por nombre y registro en el historial.
 - **Sin cuentas en la nube** (coherente con la premisa 2): las cuentas, los hashes y los datos
   viven en la BD local. El **email** es PII nueva y es una **señal**, no un muro: si no hay SMTP
-  configurado, el webmaster sella la verificación a mano desde el lanzador.
-- La contraseña se guarda **hasheada** (PBKDF2-HMAC-SHA256 con sal por usuario, iteraciones
-  declaradas en el propio valor) y tanto el cambio de contraseña como una baja forzada
-  **tumban las sesiones abiertas** al instante (época de autenticación), no al caducar la cookie.
+  configurado, la invitación y el restablecimiento **se entregan a mano** desde el lanzador
+  (modo híbrido) y la UI lo dice en vez de fingir un correo que no ha salido.
 - **Aislamiento total de datos entre usuarios**: nada de un usuario puede verse desde otro.
 - El seguimiento de progreso (historial, estadísticas, logros) es **por usuario**.
 - El **lanzador** («Gestión de la APP») tiene el control y la prioridad: resuelve la cola de
-  solicitudes, crea cuentas, asigna o restablece credenciales, verifica emails a mano,
-  desactiva, reactiva, **fuerza la baja con motivo**, edita datos, enseña el historial, purga y
-  configura el correo. Es el único sitio desde el que se borra a una persona.
+  solicitudes, crea cuentas, **reemite invitaciones de activación**, asigna o restablece
+  credenciales, verifica emails a mano, desactiva, reactiva, **fuerza la baja con motivo**, edita
+  datos, enseña el historial, purga y configura el correo. Es el único sitio desde el que se
+  borra a una persona.
+- **Sin perfil de cobros ni nada económico** (por ahora): el alta no pide datos de pago, no hay
+  planes ni facturación. La estructura (solicitud, autorización, estado de la cuenta) es la que
+  necesitaría un uso público, pero el producto sigue siendo **libre y local** (premisa 15).
 
 ## 14. Diseño y UX nivel "top del mercado"
 - La interfaz aspira al nivel de las mejores apps del mercado (p. ej. ChatGPT, Duolingo,
@@ -172,7 +188,8 @@ completo.
   seguimiento por objetivo), indicadores visuales por estado (acertado / fallado / a
   repasar), y navegación por pestañas con indicador de nivel CEFR.
 - El resultado debe sentirse "PRO" sin sacrificar las premisas de localidad, privacidad y
-  ausencia de cuentas **en la nube** —la cuenta es local y, desde V3.81, con contraseña propia—.
+  ausencia de cuentas **en la nube** —la cuenta es local y, desde V3.82, entra por email +
+  contraseña, con una autorización previa del webmaster—.
 
 ## 17. Documentación accesible y Ayuda para no ingenieros
 - La documentación de `docs/` es la fuente de verdad técnica. La **Ayuda** de la app

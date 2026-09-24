@@ -91,6 +91,31 @@ export function isActive(
 }
 
 /**
+ * Separa una ruta canónica de la consulta que pueda llevar pegada dentro del
+ * hash (V3.82): `"/cuenta/activar?token=abc"` → ruta `"/cuenta/activar"` y
+ * `URLSearchParams` con `token=abc`.
+ *
+ * Hace falta porque el enlace de la invitación viaja entero en el fragmento
+ * (`#/cuenta/activar?token=…`): el token **no** se queda en los logs del
+ * servidor ni en una cabecera `Referer`, y a cambio la ruta y su consulta llegan
+ * juntas al frontend. `pathToRoute` compara segmentos, así que sin separarlas
+ * primero vería un segmento `"activar?token=abc"` y la ruta caería en home —
+ * exactamente el fallo que V3.82 arregla en la verificación.
+ */
+export function splitQuery(path: Path): {
+  path: Path;
+  query: URLSearchParams;
+} {
+  const normalized = normalizeHash(path);
+  const index = normalized.indexOf("?");
+  if (index === -1) return { path: normalized, query: new URLSearchParams() };
+  return {
+    path: normalizeHash(normalized.slice(0, index)),
+    query: new URLSearchParams(normalized.slice(index + 1)),
+  };
+}
+
+/**
  * Une una ruta base con segmentos en crudo y normaliza el resultado. Los
  * segmentos se percent-codifican, por lo que pueden incluir espacios o
  * caracteres no ASCII (p. ej. joinPath("/formacion", "b1") -> "/formacion/b1"

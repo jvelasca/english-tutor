@@ -4,6 +4,11 @@ Lo que estos tests fijan no es «existe una cookie», sino que la identidad **no
 elige el cliente**: un token sin el secreto del equipo no vale, uno manipulado no
 vale, y uno caducado no vale. El otro borde —que con una sesión de A no se lean ni
 escriban datos de B— vive en `test_identity_source.py` y `test_users_self_only.py`.
+
+V3.82: `POST /api/session` deja de aceptar `user_id` y pasa a exigir **email +
+contraseña**. Los tests de la cookie y de la sesión usan ya esa puerta porque es
+la única que existe; las cuentas se preparan por repositorio para no probar el
+alta y la sesión a la vez.
 """
 from __future__ import annotations
 
@@ -19,29 +24,37 @@ from fastapi.testclient import TestClient
 from main import app
 from repositories import db
 from repositories import users as users_repo
-from services import sessions
+from services import credentials, sessions
+
+# Credencial del escenario. Cualquier valor sirve mientras cumpla la política: lo
+# que importa es que el login la **demuestre**, no que sea difícil.
+EMAIL = "ana@example.com"
+PASSWORD = "caballo-bateria-grapa"
 
 
-def _setup(monkeypatch, tmp_path):
+def _setup(
+    monkeypatch,
+    tmp_path,
+    *,
+    email: str = EMAIL,
+    password: str | None = PASSWORD,
+) -> str:
+    """Crea «Ana» ya activada y devuelve su id.
+
+    `password=None` deja la cuenta tal como la deja una invitación sin abrir: con
+    email y sin credencial. Es el estado que V3.82 convierte en «no se entra».
+    """
     monkeypatch.setattr(db, "DATA_DIR", tmp_path)
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
-    return users_repo.create_user("Ana")["id"]
+    uid = users_repo.create_user("Ana", email=email)["id"]
+    if password is not None:
+        assert users_repo.set_password_hash(uid, credentials.hash_password(password))
+    return uid
 
 
-def _con_password(uid: str, password: str) -> None:
-    """Deja la cuenta con credencial, que es el estado al que va el producto.
-
-    Se hace por repositorio (`set_password_hash`) y no por la API a propósito: es
-    la preparación del escenario, y meterla por la puerta probaría dos cosas a la
-    vez —el alta y la sesión— y un fallo en cualquiera de las dos culparía a la
-    equivocada.
-    """
-    from services import credentials
-
-    hashed = credentials.hash_password(password)
-
-    assert users_repo.set_password_hash(uid, hashed) is True
+def _entrar(client, email: str = EMAIL, password: str = PASSWORD):
+    return client.post("/api/session", json={"email": email, "password": password})
 
 
 def _cookie_header(response) -> str:
@@ -144,7 +157,7 @@ def test_un_secreto_vacio_se_regenera_en_vez_de_firmar_con_nada(monkeypatch, tmp
 def test_abrir_sesion_devuelve_el_perfil_y_una_cookie_httponly(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.post("/api/session", json={"user_id": uid})
+        r = _entrar(client)
         assert r.status_code == 200
         assert r.json()["id"] == uid
         cookie = _cookie_header(r)
@@ -159,40 +172,71 @@ def test_abrir_sesion_devuelve_el_perfil_y_una_cookie_httponly(monkeypatch, tmp_
 
 
 def test_la_cookie_lleva_secure_cuando_la_peticion_va_por_https(monkeypatch, tmp_path):
-    uid = _setup(monkeypatch, tmp_path)
+    _setup(monkeypatch, tmp_path)
     with TestClient(app, base_url="https://testserver") as client:
-        r = client.post("/api/session", json={"user_id": uid})
+        r = _entrar(client)
         assert r.status_code == 200
         assert "secure" in _cookie_header(r)
 
 
-def test_abrir_sesion_de_un_perfil_inexistente_da_404(monkeypatch, tmp_path):
+def test_un_email_sin_cuenta_y_una_contrasena_mala_no_se_distinguen(
+    monkeypatch, tmp_path
+):
+    """V3.82: el login no puede servir para averiguar qué correos tienen cuenta.
+
+    Si «no existe ese email» y «esa contraseña no es» respondieran distinto, quien
+    quisiera una lista de cuentas la tendría probando correos. Por eso comparten
+    cuerpo: `401 INVALID_CREDENTIALS` para los dos.
+    """
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        r = client.post("/api/session", json={"user_id": "no-existe"})
-        assert r.status_code == 404
+        sin_cuenta = client.post(
+            "/api/session",
+            json={"email": "no-existe@example.com", "password": PASSWORD},
+        )
+        mala = client.post(
+            "/api/session", json={"email": EMAIL, "password": "no-es-esta"}
+        )
+
+        assert sin_cuenta.status_code == 401
+        assert mala.status_code == 401
+        assert sin_cuenta.json() == mala.json()
+        assert sin_cuenta.json()["detail"] == "INVALID_CREDENTIALS"
+
+
+def test_una_cuenta_sin_contrasena_no_entra_y_dice_que_mire_su_correo(
+    monkeypatch, tmp_path
+):
+    """El cierre **por construcción** del agujero de G0 (V3.82).
+
+    Hasta V3.81 una cuenta con `password_hash == ''` entraba con solo nombrarse, y
+    eso es exactamente lo que permitía entrar como J.A o Paz. Ahora esa misma
+    cuenta responde `403 ACCOUNT_NOT_ACTIVATED`: no es una puerta abierta, es una
+    invitación sin abrir.
+    """
+    _setup(monkeypatch, tmp_path, password=None)
+    with TestClient(app) as client:
+        r = client.post("/api/session", json={"email": EMAIL, "password": "lo-que-sea"})
+
+        assert r.status_code == 403
+        assert r.json()["detail"] == "ACCOUNT_NOT_ACTIVATED"
+        assert sessions.SESSION_COOKIE not in _cookie_header(r)
 
 
 def test_la_cuenta_de_la_sesion_declara_has_password_y_nunca_el_hash(
     monkeypatch, tmp_path
 ):
-    """V3.81: la entrada necesita saber si pedir contraseña; el hash no sale de aquí.
+    """V3.81: la cuenta declara si tiene credencial; el hash no sale de aquí.
 
     Se comprueba en las dos caras del contrato —`POST /api/session` y
     `GET /api/session`— porque la lista de cuentas y la sesión son superficies
     distintas y ninguna de las dos debe filtrarlo.
     """
-    from services import credentials
-
-    uid = _setup(monkeypatch, tmp_path)
-    _con_password(uid, "caballo-bateria-grapa")
+    _setup(monkeypatch, tmp_path)
     credentials.reset_state()
 
     with TestClient(app) as client:
-        abierta = client.post(
-            "/api/session",
-            json={"user_id": uid, "password": "caballo-bateria-grapa"},
-        )
+        abierta = _entrar(client)
         assert abierta.status_code == 200
         assert abierta.json()["has_password"] is True
         assert "password_hash" not in abierta.text
@@ -222,7 +266,7 @@ def test_una_cookie_manipulada_no_abre_la_sesion(monkeypatch, tmp_path):
 def test_la_sesion_se_consulta_y_se_cierra(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        client.post("/api/session", json={"user_id": uid})
+        assert _entrar(client).status_code == 200
         assert client.get("/api/session").json()["id"] == uid
         assert client.delete("/api/session").status_code == 200
         # El borrado caduca la cookie y el jar del cliente lo respeta, igual que un
@@ -238,14 +282,20 @@ def test_una_sesion_valida_de_un_perfil_borrado_no_finge_perfil(monkeypatch, tmp
         assert client.get("/api/session").status_code == 404
 
 
-def test_cambiar_de_perfil_reemplaza_la_cookie(monkeypatch, tmp_path):
-    """Dos perfiles, dos sesiones: la última abierta manda (no se acumulan)."""
+def test_cambiar_de_cuenta_reemplaza_la_cookie(monkeypatch, tmp_path):
+    """Dos cuentas, dos sesiones: la última abierta manda (no se acumulan)."""
     ana = _setup(monkeypatch, tmp_path)
-    beto = users_repo.create_user("Beto")["id"]
+    beto = users_repo.create_user("Beto", email="beto@example.com")["id"]
+    assert users_repo.set_password_hash(
+        beto, credentials.hash_password(PASSWORD)
+    ) is True
     with TestClient(app) as client:
-        client.post("/api/session", json={"user_id": ana})
+        assert _entrar(client).status_code == 200
         primero = unquote(client.cookies.get(sessions.SESSION_COOKIE, ""))
-        client.post("/api/session", json={"user_id": beto})
+        assert _entrar(client, "beto@example.com").status_code == 200
         segundo = unquote(client.cookies.get(sessions.SESSION_COOKIE, ""))
         assert primero != segundo
         assert client.get("/api/session").json()["id"] == beto
+    # `ana` se lee solo para dejar claro que la primera sesión era suya; el
+    # aserto que importa es que el token cambió de dueño.
+    assert ana != beto

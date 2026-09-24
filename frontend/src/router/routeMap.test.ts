@@ -14,6 +14,10 @@ const ALL_ROUTES: Route[] = [
   "dictionary",
   "translator",
   "analysis",
+  // V3.82: páginas de cuenta a las que apunta un enlace del correo.
+  "accountActivate",
+  "accountReset",
+  "accountVerify",
 ];
 
 describe("routeToPath", () => {
@@ -29,11 +33,14 @@ describe("routeToPath", () => {
     expect(routeToPath("dictionary")).toBe("/diccionario");
     expect(routeToPath("translator")).toBe("/traductor");
     expect(routeToPath("analysis")).toBe("/analisis");
+    expect(routeToPath("accountActivate")).toBe("/cuenta/activar");
+    expect(routeToPath("accountReset")).toBe("/cuenta/restablecer");
+    expect(routeToPath("accountVerify")).toBe("/cuenta/verificar");
   });
 });
 
 describe("round-trip routeToPath + pathToRoute", () => {
-  it("devuelve la misma pantalla para los 11 valores de Route", () => {
+  it("devuelve la misma pantalla para todos los valores de Route", () => {
     for (const route of ALL_ROUTES) {
       expect(pathToRoute(routeToPath(route))).toBe(route);
     }
@@ -75,6 +82,26 @@ describe("pathToRoute: hoja antes que prefijo", () => {
     expect(pathToRoute("/analisis")).toBe("analysis");
     // No hay sub-rutas: cualquier hoja cae en home.
     expect(pathToRoute("/analisis/detalle")).toBe("home");
+  });
+
+  it("resuelve las páginas de cuenta de un enlace de correo (V3.82)", () => {
+    expect(pathToRoute("/cuenta/activar")).toBe("accountActivate");
+    expect(pathToRoute("/cuenta/restablecer")).toBe("accountReset");
+    expect(pathToRoute("/cuenta/verificar")).toBe("accountVerify");
+    // Sin sub-rutas válidas ni hoja suelta: cualquiera de las dos cae en home.
+    expect(pathToRoute("/cuenta")).toBe("home");
+    expect(pathToRoute("/cuenta/otra")).toBe("home");
+    expect(pathToRoute("/cuenta/activar/extra")).toBe("home");
+  });
+
+  it("la consulta del enlace no se come la ruta (V3.82)", () => {
+    // El token viaja dentro del fragmento (`#/cuenta/activar?token=…`). Sin
+    // separarlo, el segmento sería "activar?token=abc" y la ruta caería en home:
+    // eso es exactamente lo que hacía que el enlace de verificación no hiciera
+    // nada desde V3.81.
+    expect(pathToRoute("/cuenta/activar?token=abc123")).toBe("accountActivate");
+    expect(pathToRoute("#/cuenta/verificar?token=abc123")).toBe("accountVerify");
+    expect(pathToRoute("/cuenta/restablecer?token=abc-123_def")).toBe("accountReset");
   });
 
   it("resuelve las sub-rutas de destreza del chat libre (V3.73.1)", () => {

@@ -60,6 +60,93 @@ def test_icons_have_expected_keys():
     assert ui.ACTION_ICONS["restart"] == "🔁"
 
 
+# --- Pestañas y barra de estado (V3.81.3) -------------------------------------
+
+
+def test_todas_las_pestanas_tienen_icono_y_estan_en_el_orden():
+    """Sin icono, una pestaña saldría sin marca; y el orden es el de la ventana."""
+    assert ui.TAB_ORDER == ("Estado", "Usuarios", "Diagnóstico", "Registros")
+    assert set(ui.TAB_ICONS) == set(ui.TAB_ORDER)
+
+
+def test_statusbar_right_compone_version_red_pin_pestana_y_hora():
+    frase = ui.statusbar_right(
+        version="v3.81.3",
+        lan=True,
+        pin_set=True,
+        tab="Estado",
+        checked_at="08:45",
+    )
+
+    assert "v3.81.3" in frase
+    assert "LAN" in frase
+    assert "PIN" in frase
+    assert "Estado" in frase
+    assert "08:45" in frase
+    assert "Sin PIN" not in frase
+
+
+def test_statusbar_right_avisa_cuando_la_red_esta_cerrada_y_sin_pin():
+    """Lo que se ve de un vistazo: cerrado y sin PIN se dice, no se calla."""
+    frase = ui.statusbar_right(version="", lan=False, pin_set=False)
+
+    assert "Solo este equipo" in frase
+    assert "Sin PIN" in frase
+
+
+def test_statusbar_right_no_deja_separadores_sueltos_sin_datos():
+    """Sin versión ni hora la frase no empieza ni acaba en separador."""
+    frase = ui.statusbar_right(version="", lan=False, pin_set=True)
+
+    assert frase.startswith("🔒")
+    assert frase.endswith("PIN")
+    assert "Solo este equipo   ·   🔐" in frase
+
+
+# --- Geometría de la ventana (V3.81.3) ----------------------------------------
+
+
+def test_clamp_window_size_acota_la_altura_a_la_pantalla():
+    """El fallo real: `state.json` con 1243 px de alto en una pantalla de 1080."""
+    assert ui.clamp_window_size(
+        1142, 1243, screen_w=1920, screen_h=1080, min_w=900, min_h=620
+    ) == (1142, 990)
+
+
+def test_clamp_window_size_no_baja_del_minimo():
+    assert ui.clamp_window_size(
+        300, 200, screen_w=1920, screen_h=1080, min_w=900, min_h=620
+    ) == (900, 620)
+
+
+def test_clamp_window_size_no_se_pasa_de_ancho():
+    assert ui.clamp_window_size(
+        4000, 800, screen_w=1920, screen_h=1080, min_w=900, min_h=620
+    ) == (1920, 800)
+
+
+def test_clamp_window_size_sin_pantalla_utilizable_respeta_el_minimo():
+    ancho, alto = ui.clamp_window_size(
+        10, 10, screen_w=0, screen_h=0, min_w=900, min_h=620
+    )
+    assert (ancho, alto) == (900, 620)
+
+
+def test_window_position_visible_rechaza_lo_que_cae_fuera_de_pantalla():
+    """x=2553 en una pantalla de 1920: la ventana era inalcanzable."""
+    assert ui.window_position_visible(100, 100, screen_w=1920, screen_h=1080) is True
+    assert ui.window_position_visible(2553, 85, screen_w=1920, screen_h=1080) is False
+    assert ui.window_position_visible(-10, 50, screen_w=1920, screen_h=1080) is False
+    assert ui.window_position_visible(100, 1070, screen_w=1920, screen_h=1080) is False
+
+
+def test_centered_position_deja_la_ventana_dentro():
+    x, y = ui.centered_position(1142, 990, screen_w=1920, screen_h=1080)
+    assert x == 389
+    assert y == 30
+    assert ui.window_position_visible(x, y, screen_w=1920, screen_h=1080) is True
+
+
 def test_server_activity_idle():
     status = {
         "generation": {"running": 0, "jobs": []},
@@ -257,42 +344,53 @@ def test_user_row_label_no_inventa_marcas_sin_repetidos():
 
 
 
-def test_request_row_de_una_alta_muestra_el_nombre_y_la_nota():
-    kind, target, when = ui.request_row(
+def test_request_row_de_una_alta_muestra_el_nombre_la_nota_y_el_email():
+    kind, target, email, when = ui.request_row(
         {
             "kind": "create",
             "display_name": "Marta",
             "note": "3.º ESO",
+            "email": "marta@example.com",
             "requested_at": "2026-09-21T22:34:00Z",
         }
     )
 
     assert kind == "🆕 Alta"
     assert target == "Marta — 3.º ESO"
+    assert email == "marta@example.com"
     assert when == "2026-09-21 22:34"
+
+
+def test_request_row_de_una_alta_sin_email_lo_marca_como_guion():
+    """V3.82: sin email no se puede invitar; se dice con un guion, no con un hueco."""
+    _, _, email, _ = ui.request_row({"kind": "create", "display_name": "Marta"})
+
+    assert email == "—"
 
 
 def test_request_row_de_una_baja_traduce_el_id_a_nombre():
     """El webmaster decide sobre un nombre, no sobre un identificador."""
-    kind, target, _ = ui.request_row(
+    kind, target, email, _ = ui.request_row(
         {"kind": "delete", "user_id": "abc123", "requested_at": "2026-09-21T10:00:00Z"},
         {"abc123": "Marta"},
     )
 
     assert kind == "🗑️ Baja"
     assert target == "Marta"
+    # Una baja no tiene email de invitación: la cuenta ya existe.
+    assert email == ""
 
 
 def test_request_row_de_una_baja_de_una_cuenta_que_ya_no_esta():
     """Ni un id crudo en pantalla: se dice que la cuenta ya no existe."""
-    _, target, _ = ui.request_row({"kind": "delete", "user_id": "abc123"}, {})
+    _, target, _, _ = ui.request_row({"kind": "delete", "user_id": "abc123"}, {})
 
     assert target == "(cuenta que ya no existe)"
 
 
 def test_request_row_de_un_tipo_desconocido_no_se_traga_la_fila():
     """Un `kind` nuevo del backend tiene que verse, no desaparecer."""
-    kind, _, _ = ui.request_row({"kind": "traslado"})
+    kind, _, _, _ = ui.request_row({"kind": "traslado"})
 
     assert kind == "traslado"
 
@@ -317,10 +415,11 @@ def test_user_row_ensena_estado_email_y_credencial_sin_ensenar_secretos():
         "🔑 Con contraseña",
         "2026-09-21 22:34",
     )
-    # Y una cuenta sin credencial lo dice explícitamente: es la lista de tareas
-    # que esta release viene a cerrar, y tiene que verse de un vistazo.
+    # Y una cuenta sin credencial lo dice explícitamente. V3.82: ya no es una
+    # alarma (nadie entra sin contraseña) sino una tarea —«le falta abrir su
+    # invitación»—, y por eso el texto cambió de ⚠️ a ⏳.
     assert ui.user_row({"name": "Luis", "has_password": False}, set())[3] == (
-        "⚠️ Sin contraseña"
+        "⏳ Sin activar"
     )
 
 
@@ -355,13 +454,60 @@ def test_accounts_tasks_cuenta_las_dos_tareas_del_webmaster():
     pendiente = ui.accounts_tasks(2, 1)
 
     assert "✅" in todo_ok
-    assert "2 cuentas sin contraseña" in pendiente
+    assert "2 cuentas pendientes de activación" in pendiente
     assert "1 email sin verificar" in pendiente
 
 
 def test_accounts_tasks_concuerda_en_singular():
-    assert "1 cuenta sin contraseña" in ui.accounts_tasks(1, 0)
+    assert "1 cuenta pendiente de activación" in ui.accounts_tasks(1, 0)
     assert "1 email sin verificar" in ui.accounts_tasks(0, 1)
+
+
+def test_accounts_tasks_no_llama_alarma_a_lo_que_ya_no_es_un_agujero():
+    """V3.82: sin contraseña ya no se entra, así que el contador es una tarea.
+
+    La frase «cuentas sin contraseña» describía una vulnerabilidad (se entraba
+    nombrándose). Mantenerla después de cerrar la puerta asustaría sin motivo; y
+    lo contrario —decir «todo en orden»— ocultaría el trabajo real: a esas
+    personas les falta abrir su invitación.
+    """
+    pendiente = ui.accounts_tasks(1, 0)
+
+    assert "sin contraseña" not in pendiente
+    assert "1 cuenta pendiente de activación" in pendiente
+
+
+def test_invitation_message_distingue_si_el_correo_salio():
+    """Decir «enviada» sin SMTP haría esperar un correo que no existe."""
+    assert "invitación enviada" in ui.invitation_message(
+        {"email_sent": True, "activation_link": "http://x/#/cuenta/activar?token=t"}
+    )
+    sin_correo = ui.invitation_message(
+        {"email_sent": False, "activation_link": "http://x/#/cuenta/activar?token=t"}
+    )
+    assert "copia el enlace" in sin_correo
+    # Sin enlace ni envío tampoco se inventa nada: la aprobación sí ocurrió.
+    assert "autorizada" in ui.invitation_message({})
+
+
+def test_invitation_copy_text_lleva_el_enlace_y_a_quién_es():
+    texto = ui.invitation_copy_text(
+        {
+            "activation_link": "http://x/#/cuenta/activar?token=abc",
+            "user": {"name": "Marta", "email": "marta@example.com"},
+        }
+    )
+
+    assert "marta@example.com" in texto
+    assert "http://x/#/cuenta/activar?token=abc" in texto
+    assert "solo sirve una vez" in texto
+
+
+def test_invitation_copy_text_sin_cuenta_sigue_siendo_pegable():
+    """Si el backend no manda la cuenta, el enlace solo ya sirve para entregarlo."""
+    link = "http://x/#/cuenta/activar?token=abc"
+
+    assert ui.invitation_copy_text({"activation_link": link}) == link
 
 
 def test_event_row_traduce_las_acciones_del_historial():
@@ -515,7 +661,7 @@ def test_pending_view_con_pin_y_ok_lista_las_filas_y_traduce_la_baja():
     )
 
     assert frase == "1 solicitud pendiente"
-    assert filas == [("🗑️ Baja", "JA", "2026-09-22 12:47")]
+    assert filas == [("🗑️ Baja", "JA", "", "2026-09-22 12:47")]
 
 
 def test_pending_view_con_pin_y_ok_pero_vacia_si_dice_que_no_hay_nada():

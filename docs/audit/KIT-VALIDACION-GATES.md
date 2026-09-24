@@ -305,27 +305,33 @@ flowchart LR
 
 ### G0 · `identidad-cuentas` — identidad y ciclo de vida de cuentas
 
-- **Protocolo:** `backend/scripts/e2e_accounts_v381.py` ·
-  `docs/audit/PLAN-P0-IDENTIDAD.md` §16.
+- **Protocolo:** `backend/scripts/e2e_accounts_v382.py` ·
+  `docs/audit/PLAN-P0-IDENTIDAD.md` §17.
 - **Precondiciones:** consola de Usuarios accesible y una **copia** de la BD para
   el E2E (el guion trabaja sobre copia: no toca el fichero de uso).
 - **Pasos:**
-  1. Ejecutar el E2E completo sobre la copia (alta, contraseña y freno, email,
-     baja autoservicio, baja forzada, reactivación, revocación por época, purga
-     con copia previa e historial sin PII, y migración de una cuenta heredada).
+  1. Ejecutar el E2E completo sobre la copia (solicitud con email y avatar,
+     autorización e invitación, activación, entrada por email, recuperación con
+     correo y sin correo, migración de una cuenta heredada por invitación, baja
+     autoservicio, reactivación, purga con copia previa e historial sin PII).
   2. Comprobar que el historial que sobrevive a la purga **no contiene ningún
      correo**.
-  3. Comprobar el contador `without_password` de la **BD de uso**: debe ser **0**.
-- **FALLO:** el E2E en rojo, un correo en el historial tras el purge, o
-  `without_password > 0` (quedan cuentas heredadas sin credencial: el P0 de
-  identidad sigue abierto).
+  3. Comprobar el contador `without_password` de la **BD de uso**: es la lista de
+     tareas (cuentas **pendientes de activación**). Desde V3.82 entrar sin
+     contraseña está cerrado por construcción (`403 ACCOUNT_NOT_ACTIVATED`), así
+     que lo que hay que verificar es que **ninguna** de esas cuentas se queda sin
+     invitación entregada: quien esté ahí tiene que poder activar su cuenta, y de
+     cada una consta que su enlace salió o se entregó a mano.
+- **FALLO:** el E2E en rojo, un correo en el historial tras el purge, o una cuenta
+  pendiente de activación **sin invitación emitida y entregada** (esa persona se
+  quedaría fuera de sus datos sin que nadie lo sepa).
 - **Evidencia a capturar:** resultado del E2E y el contador `without_password`
   con la fecha.
 - **Registro:**
 
 ```powershell
 backend\.venv\Scripts\python.exe scripts\validation_gate.py record identidad-cuentas pass --ci-run <run> `
-  --notes "E2E de cuentas verde sobre copia; without_password=0 en la BD de uso; historial post-purge sin PII"
+  --notes "E2E de cuentas verde sobre copia; ninguna cuenta pendiente de activación sin invitación entregada; historial post-purge sin PII"
 ```
 
 ### G1 · `offline-fisico` — los 12 flujos con la red cortada

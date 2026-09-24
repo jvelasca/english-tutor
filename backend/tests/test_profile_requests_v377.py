@@ -14,7 +14,7 @@ Los candados que fija este archivo, en el orden en que importan:
    nombre exacto y deja copia.
 5. **Un perfil desactivado no abre sesión**, aunque la cookie vieja siga firmada.
 
-`ADMIN_PIN` se declara por **entorno** (`ENGLISH_TUTOR_ADMIN_PIN`), que es como lo
+ADMIN_PIN` se declara por **entorno** (`ENGLISH_TUTOR_ADMIN_PIN`), que es como lo
 declara el lanzador: estos tests ejercen la vía real, no una constante de adorno.
 """
 from __future__ import annotations
@@ -29,15 +29,22 @@ from repositories import db
 from repositories import profile_requests as requests_repo
 from repositories import users as users_repo
 from services import backup as backup_svc
+from services import credentials
 
 _ADMIN_PIN = "test-pin"
 _ADMIN_HEADERS = {"X-Admin-Pin": _ADMIN_PIN}
+_BUENA = "caballo-bateria-grapa"
 # Cliente que **no** es el equipo: lo que vería un móvil de la LAN.
 _FOREIGN_CLIENT = ("203.0.113.9", 45000)
 
 
 def _setup(monkeypatch, tmp_path):
-    """BD aislada + backup aislado + PIN de administración declarado."""
+    """BD aislada + backup aislado + PIN de administración declarado.
+
+    Ana —la cuenta del escenario— nace con email y contraseña porque V3.82 solo
+    deja entrar así; sin credencial no habría forma de abrir su sesión y los tests
+    que comprueban «la cookie vieja ya no vale» no podrían ni empezar.
+    """
     monkeypatch.setattr(db, "DATA_DIR", tmp_path)
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
@@ -48,7 +55,17 @@ def _setup(monkeypatch, tmp_path):
     monkeypatch.setattr(backup_svc, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(backup_svc, "AUDIO_LIBRARY_DIR", tmp_path / "audio_library")
     monkeypatch.setenv(config.ADMIN_PIN_ENV, _ADMIN_PIN)
-    return users_repo.create_user("Ana")["id"]
+    credentials.reset_state()
+    uid = users_repo.create_user("Ana", email="ana@example.com")["id"]
+    assert users_repo.set_password_hash(uid, credentials.hash_password(_BUENA))
+    return uid
+
+
+def _abrir(client):
+    """Abre la sesión de Ana. V3.82: email + contraseña, sin `user_id`."""
+    return client.post(
+        "/api/session", json={"email": "ana@example.com", "password": _BUENA}
+    )
 
 
 def _pendientes() -> list[dict]:
@@ -131,6 +148,25 @@ def test_la_peticion_de_baja_exige_sesion_y_no_borra_nada(monkeypatch, tmp_path)
     assert ana["status"] == users_repo.STATUS_ACTIVE
 
 
+def test_un_email_sin_forma_no_culpa_al_nombre(monkeypatch, tmp_path):
+    """V3.82: el 422 dice **qué** campo está mal.
+
+    El alta pide nombre **y** email. Cuando el email no tiene forma de correo, el
+    desenlace tiene que poder distinguirse del «nombre no válido»: con el mismo
+    cuerpo para los dos, quien recibe el error mira el campo que sí está bien. Y
+    decirlo no revela nada de las cuentas que existen: esta comprobación ocurre
+    **antes** de mirar si el correo está en uso.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/profile-requests",
+            json={"display_name": "Marta", "email": "no-es-un-email"},
+        )
+    assert r.status_code == 422
+    assert r.json()["detail"] == "EMAIL_FORMAT"
+
+
 # --- 2. Aprobar y rechazar ---------------------------------------------------
 
 
@@ -138,7 +174,8 @@ def test_aprobar_un_alta_crea_exactamente_un_perfil(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
         pedida = client.post(
-            "/api/profile-requests", json={"display_name": "Marta"}
+            "/api/profile-requests",
+            json={"display_name": "Marta", "email": "marta@example.com"},
         ).json()
         creada = client.post(
             f"/api/admin/profile-requests/{pedida['id']}/approve",
@@ -152,16 +189,23 @@ def test_aprobar_un_alta_crea_exactamente_un_perfil(monkeypatch, tmp_path):
         )
     assert creada.status_code == 200
     creado = creada.json()
-    assert creado["status"] == requests_repo.STATUS_APPROVED
-    assert creado["resolved_user_id"]
+    assert creado["request"]["status"] == requests_repo.STATUS_APPROVED
+    assert creado["request"]["resolved_user_id"]
 
-    marta = users_repo.get_user(creado["resolved_user_id"])
+    marta = users_repo.get_user(creado["request"]["resolved_user_id"])
     assert marta is not None
     assert marta["name"] == "Marta"
-    # V3.81: aprobar ya **no** crea credencial. El PIN se retiró y la contraseña
-    # se asigna después desde la consola de gestión (con `must_change_password`),
-    # así que la cuenta nace «sin credencial» y el lanzador la lista como tarea.
+    assert marta["email"] == "marta@example.com", "la cuenta nace con el email pedido"
+    # V3.82: aprobar crea la cuenta **sin contraseña** y emite una **invitación**.
+    # La contraseña la elige la persona desde el enlace del correo, así que ni el
+    # webmaster ni la BD llegan a ver una provisional. Lo que la consola lista como
+    # tarea ya no es «sin credencial» en el sentido de antes —no entra nadie—, sino
+    # «pendiente de activación».
     assert marta["has_password"] is False
+    assert creado["activation_link"], "sin enlace no habría forma de activarla"
+    assert users_repo.get_activation(marta["id"]) is not None, (
+        "la aprobación no dejó invitación viva"
+    )
     assert len([u for u in users_repo.list_users() if u["name"] == "Marta"]) == 1
 
     assert repetida.status_code == 409, "aprobar dos veces creó dos perfiles"
@@ -250,10 +294,10 @@ def test_la_administracion_de_perfiles_no_se_ejerce_desde_la_red(monkeypatch, tm
 def test_crear_un_perfil_desde_la_red_esta_cerrado(monkeypatch, tmp_path):
     """V3.77 cierra el alta anónima por LAN: por la red se **solicita**.
 
-    V3.81: el cuerpo tiene que ser un registro **completo** (nombre, email y
-    contraseña) para que la petición llegue siquiera a la frontera de equipo. Con
-    un cuerpo recortado el 422 de Pydantic salta antes y el test dejaría de
-    comprobar lo que dice comprobar (que desde la red no se crea nada).
+    V3.82 va un paso más allá y retira la ruta de alta entera (`POST /api/users`):
+    ya no hay un «alta local» que se pueda intentar desde fuera, así que la
+    respuesta desde la red y desde el propio equipo es la misma —el método no
+    existe—. Lo que sí queda abierto sin sesión es la petición, que no crea nada.
     """
     _setup(monkeypatch, tmp_path)
     with TestClient(app, client=_FOREIGN_CLIENT) as client:
@@ -262,34 +306,41 @@ def test_crear_un_perfil_desde_la_red_esta_cerrado(monkeypatch, tmp_path):
             json={
                 "name": "Intruso",
                 "email": "intruso@example.com",
-                "password": "caballo-bateria-grapa",
+                "password": _BUENA,
             },
         )
         pedida = client.post("/api/profile-requests", json={"display_name": "Ana"})
-    assert directa.status_code == 403
+    assert directa.status_code == 405, "la ruta de alta ya no existe"
     assert not any(u["name"] == "Intruso" for u in users_repo.list_users())
     # La puerta que sí queda abierta desde la red es la petición, y sin sesión.
     assert pedida.status_code == 201
 
 
-def test_el_alta_del_propio_equipo_sigue_funcionando(monkeypatch, tmp_path):
-    """Lo que no puede pasar es cerrar de más: el primer arranque es local."""
+def test_el_alta_del_equipo_ya_solo_pasa_por_la_consola(monkeypatch, tmp_path):
+    """Cerrar de más habría dejado el primer arranque sin salida; no ocurre.
+
+    V3.82 retira el alta abierta por API, pero el webmaster sigue creando cuentas
+    **desde el equipo** con PIN (`POST /api/admin/users`). Es la sustitución
+    exacta: la misma capacidad, sin puerta pública.
+    """
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
         r = client.post(
-            "/api/users",
+            "/api/admin/users",
             json={
                 "name": "Primer Arranque",
                 "email": "arranque@example.com",
-                "password": "caballo-bateria-grapa",
+                "password": _BUENA,
             },
+            headers=_ADMIN_HEADERS,
         )
     assert r.status_code == 200
-    assert r.json()["status"] == users_repo.STATUS_ACTIVE
+    creada = r.json()["user"]
+    assert creada["status"] == users_repo.STATUS_ACTIVE
     # Y nace con credencial: ya no hay «un nombre y a correr» (Fase 3 del P0).
-    assert r.json()["has_password"] is True
-    assert r.json()["email"] == "arranque@example.com"
-    assert r.json()["email_verified"] is False
+    assert creada["has_password"] is True
+    assert creada["email"] == "arranque@example.com"
+    assert creada["email_verified"] is False
 
 
 # --- 4. Desactivar conserva; purgar se lleva ---------------------------------
@@ -373,7 +424,7 @@ def test_un_perfil_desactivado_no_abre_sesion_ni_usa_la_que_tenia(
 ):
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
-        assert client.post("/api/session", json={"user_id": uid}).status_code == 200
+        assert _abrir(client).status_code == 200
         # Con la sesión ya abierta, el webmaster desactiva el perfil.
         with TestClient(app) as admin:
             apagado = admin.post(
@@ -389,13 +440,13 @@ def test_un_perfil_desactivado_no_abre_sesion_ni_usa_la_que_tenia(
         assert r.json()["detail"] == "PROFILE_DISABLED"
         assert client.get("/api/settings").status_code == 403
 
-        # Y no se puede volver a abrir sesión con ese perfil.
-        reabrir = client.post("/api/session", json={"user_id": uid})
+        # Y no se puede volver a abrir sesión con esa cuenta.
+        reabrir = _abrir(client)
         assert reabrir.status_code == 403
         assert reabrir.json()["detail"] == "PROFILE_DISABLED"
 
 
-def test_reactivar_devuelve_el_perfil_al_selector_y_a_la_sesion(monkeypatch, tmp_path):
+def test_reactivar_devuelve_la_cuenta_al_servicio_y_a_la_sesion(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
         client.post(
@@ -411,7 +462,7 @@ def test_reactivar_devuelve_el_perfil_al_selector_y_a_la_sesion(monkeypatch, tmp
     assert reactivado.status_code == 200
     assert uid in [u["id"] for u in users_repo.list_users()]
     with TestClient(app) as client:
-        assert client.post("/api/session", json={"user_id": uid}).status_code == 200
+        assert _abrir(client).status_code == 200
 
 
 # --- 6. La cola que ve el webmaster ------------------------------------------

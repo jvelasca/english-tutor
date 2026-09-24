@@ -2049,38 +2049,28 @@ const STRINGS: Record<string, Entry> = {
   // concepto distinto «perfil auditivo» no se toca: no es lo mismo y renombrarlo
   // habría sido el error que esta decisión evita.
   "user.profile": { en: "Account", es: "Cuenta" },
-  "user.profiles": { en: "Users", es: "Usuarios" },
   "user.profileTitle": { en: "Account and users", es: "Cuenta y usuarios" },
   "user.editProfile": { en: "Edit user", es: "Editar usuario" },
   "user.name": { en: "Name", es: "Nombre" },
-  // Puerta de entrada al arrancar en un navegador sin sesión abierta.
-  "user.chooseTitle": { en: "Choose your user", es: "Elige tu usuario" },
-  "user.choosePrompt": {
-    en: "Select a user to start, or create an account.",
-    es: "Selecciona un usuario para empezar, o crea una cuenta.",
-  },
-  "user.noProfilesYet": {
-    en: "There are no users yet. Create the first one below.",
-    es: "Todavía no hay usuarios. Crea el primero abajo.",
-  },
-  // V3.80.2: la lista no se pudo leer del backend (servidor caído, arrancando o
-  // a medias). Antes esto se pintaba igual que «no hay usuarios», y esa
-  // confusión dejaba la puerta sin ninguna salida.
+  // V3.80.2: la sesión no se pudo **comprobar** (servidor caído, arrancando o a
+  // medias). Antes esto se pintaba igual que «no hay cuentas todavía», y esa
+  // confusión dejaba la puerta sin ninguna salida. V3.82: lo que se comprueba es
+  // la sesión, no una lista de usuarios —esa lista ya no se pide—, así que el
+  // texto dice lo que de verdad falló.
   "user.loadFailed": {
-    en: "Could not read the user list. Is the server running?",
-    es: "No se pudo leer la lista de usuarios. ¿Está activo el servidor?",
+    en: "Could not check your session. Is the server running?",
+    es: "No se pudo comprobar tu sesión. ¿Está activo el servidor?",
   },
-  // V3.77: dar de alta a alguien que **no está en el equipo** lo autoriza el
-  // webmaster. V3.81: desde el propio equipo sí se puede crear la cuenta, así que
-  // el texto dice las dos cosas en vez de mandar a pedir siempre.
-  "user.requestProfile": { en: "Ask for a user", es: "Pedir un usuario" },
+  // V3.77: dar de alta a alguien lo autoriza el webmaster. V3.82: la app ya no
+  // crea cuentas a la primera —ni desde el propio equipo—; se **pide**, y el
+  // webmaster responde con una invitación por correo para poner la contraseña.
   "user.requestHint": {
-    en: "From this computer you can create the account yourself. From another device on the network, the webmaster has to approve it from the management console.",
-    es: "Desde este equipo puedes crear tú la cuenta. Desde otro dispositivo de la red, la tiene que autorizar el webmaster desde el programa de gestión.",
+    en: "Send your request with your name, email and avatar. The webmaster authorises it and you will receive an email to choose your password.",
+    es: "Manda tu solicitud con tu nombre, email y avatar. El webmaster la autoriza y recibirás un correo para elegir tu contraseña.",
   },
   "user.requestSent": {
-    en: "Request sent. The webmaster has to approve it from the management console before you can use it.",
-    es: "Solicitud enviada. El webmaster tiene que autorizarla desde el programa de gestión para que puedas usarla.",
+    en: "Request sent. The webmaster has to authorise it; you will receive an email with a link to choose your password.",
+    es: "Solicitud enviada. El webmaster tiene que autorizarla; recibirás un correo con un enlace para elegir tu contraseña.",
   },
   "user.requestDuplicate": {
     en: "There is already a pending request with that name.",
@@ -2098,16 +2088,11 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not send the request. Is the server running?",
     es: "No se pudo enviar la solicitud. ¿Está activo el servidor?",
   },
-  // Alta de una cuenta nueva (V3.81). El email es identificador y canal de
-  // verificación, **no** la forma de entrar: la entrada sigue siendo el selector.
-  "user.createAccount": { en: "Create account", es: "Crear cuenta" },
-  "user.backToUsers": { en: "Back to users", es: "Volver a los usuarios" },
+  // Alta de una cuenta (V3.82). El email ya **no** es solo un canal de
+  // verificación: es la identidad con la que se entra, así que la contraseña la
+  // elige la propia persona desde el correo de invitación.
+  "user.createAccount": { en: "Ask for access", es: "Solicitar acceso" },
   "user.email": { en: "Email", es: "Email" },
-  "user.emailHint": {
-    en: "Used to verify the account. It is not needed to use the app if there is no mail configured: the webmaster confirms it.",
-    es: "Sirve para verificar la cuenta. No hace falta para usar la app si no hay correo configurado: lo confirma el webmaster.",
-  },
-  "user.password": { en: "Password", es: "Contraseña" },
   "user.passwordRepeat": { en: "Repeat the password", es: "Repite la contraseña" },
   "user.passwordHint": {
     en: "At least 8 characters. Choose a definitive one: the webmaster can reset it, but nobody else can read it.",
@@ -2121,30 +2106,143 @@ const STRINGS: Record<string, Entry> = {
     en: "I forgot my password",
     es: "He olvidado la contraseña",
   },
-  "user.forgotPasswordHint": {
-    en: "The webmaster resets it from the management console and gives you a temporary one. There is no recovery email: the app is local and may not have mail configured.",
-    es: "El webmaster la restablece desde el programa de gestión y te da una temporal. No hay correo de recuperación: la app es local y puede no tener correo configurado.",
-  },
 
-  // Paso de contraseña de la puerta (V3.81; sustituye al paso de PIN de V3.76).
-  // Honestidad en el propio texto: ya no es «una llave de la puerta», es la
-  // credencial de la cuenta.
-  "password.title": { en: "Enter your password", es: "Introduce tu contraseña" },
+  // Puerta de entrada (V3.82). Sustituye al «elige un usuario» + paso de
+  // contraseña de V3.81: entrar es escribir **email y contraseña**, y ya no hay
+  // lista de cuentas que enumerar ni forma de nombrar a otra persona.
+  "password.title": { en: "Sign in", es: "Entrar" },
   "password.prompt": {
-    en: "This account has a password. It is yours alone: the webmaster cannot read it.",
-    es: "Esta cuenta tiene contraseña. Es solo tuya: el webmaster no puede leerla.",
+    en: "With your email and your password. Nobody can sign in as you.",
+    es: "Con tu email y tu contraseña. Nadie puede entrar como tú.",
   },
   "password.label": { en: "Password", es: "Contraseña" },
   "password.submit": { en: "Sign in", es: "Entrar" },
-  "password.back": { en: "Back to users", es: "Volver a los usuarios" },
   "password.invalid": {
-    en: "That password is not right.",
-    es: "Esa contraseña no es correcta.",
+    en: "That email or password is not right.",
+    es: "Ese email o esa contraseña no son correctos.",
   },
   "password.throttled": {
     en: "Too many attempts. Wait a moment and try again.",
     es: "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
   },
+  "password.notActivated": {
+    en: "This account is not activated yet. Open the link in the email the webmaster sent you to choose your password.",
+    es: "Esta cuenta todavía no está activada. Abre el enlace del correo que te mandó el webmaster para elegir tu contraseña.",
+  },
+  "password.disabled": {
+    en: "This account is out of service. Talk to the webmaster.",
+    es: "Esta cuenta está fuera de servicio. Habla con el webmaster.",
+  },
+  "password.unenrolled": {
+    en: "This account was closed at your request. Only the webmaster can reopen it.",
+    es: "Esta cuenta se cerró a petición tuya. Solo el webmaster puede reabrirla.",
+  },
+
+  // Solicitud de acceso (V3.82): nombre, email y avatar, y a esperar la
+  // invitación. Es la **única** vía de alta: la app ya no crea cuentas a la
+  // primera, así que este formulario es todo el alta.
+  "request.title": { en: "Ask for access", es: "Solicitar acceso" },
+  "request.prompt": {
+    en: "Fill this in and the webmaster will authorise it. You will receive an email to choose your password.",
+    es: "Rellena esto y el webmaster lo autorizará. Recibirás un correo para elegir tu contraseña.",
+  },
+  "request.name": { en: "Name or nickname", es: "Nombre o apodo" },
+  "request.avatar": { en: "Avatar", es: "Avatar" },
+  "request.uploadImage": { en: "Use a photo", es: "Usar una foto" },
+  "request.removeImage": { en: "Remove photo", es: "Quitar foto" },
+  "request.note": { en: "Note (optional)", es: "Nota (opcional)" },
+  "request.submit": { en: "Send request", es: "Enviar solicitud" },
+  "request.back": { en: "Back to sign in", es: "Volver a la entrada" },
+  "request.emailRequired": {
+    en: "We need your email to send you the invitation.",
+    es: "Hace falta tu email para mandarte la invitación.",
+  },
+  "request.emailTaken": {
+    en: "That email already has an account. Sign in with it or recover your password.",
+    es: "Ese email ya tiene una cuenta. Entra con ella o recupera la contraseña.",
+  },
+
+  // Recuperación de contraseña (V3.82).
+  "forgot.title": { en: "Recover your password", es: "Recuperar la contraseña" },
+  "forgot.prompt": {
+    en: "Write your email and we will send you a link to choose a new password.",
+    es: "Escribe tu email y te mandaremos un enlace para elegir una contraseña nueva.",
+  },
+  "forgot.submit": { en: "Send link", es: "Enviar enlace" },
+  "forgot.sent": {
+    en: "If that email has an account, a link is on its way. It expires in one hour and can only be used once.",
+    es: "Si ese email tiene una cuenta, el enlace ya va de camino. Caduca en una hora y solo sirve una vez.",
+  },
+  "forgot.noMail": {
+    en: "Nothing was sent because this computer has no mail configured. Ask the webmaster to give you the link.",
+    es: "No se ha enviado nada porque en este equipo no hay correo configurado. Pide el enlace al webmaster.",
+  },
+  "forgot.back": { en: "Back to sign in", es: "Volver a la entrada" },
+
+  // Activación: la persona pone su contraseña desde el enlace de la invitación.
+  // El campo y la repetición los pone `NewPasswordForm`, que comparte con el
+  // restablecimiento y usa `account.newPassword` + `user.passwordRepeat`: son los
+  // mismos dos campos, así que tienen el mismo nombre en las dos páginas.
+  "activate.title": { en: "Choose your password", es: "Elige tu contraseña" },
+  "activate.prompt": {
+    en: "Your account is authorised. Choose the password you will use from now on.",
+    es: "Tu cuenta está autorizada. Elige la contraseña que usarás a partir de ahora.",
+  },
+  "activate.submit": { en: "Activate my account", es: "Activar mi cuenta" },
+  "activate.missing": {
+    en: "The link has no invitation. Open the link from the email exactly as it arrived.",
+    es: "El enlace no trae ninguna invitación. Abre tal cual el enlace del correo.",
+  },
+  "activate.invalid": {
+    en: "That invitation is not valid. It may have been used already.",
+    es: "Esa invitación no es válida. Puede que ya se haya usado.",
+  },
+  "activate.expired": {
+    en: "That invitation has expired. Ask the webmaster to send you a new one.",
+    es: "Esa invitación ha caducado. Pide al webmaster que te mande otra.",
+  },
+  "activate.passwordMismatch": {
+    en: "The two passwords do not match.",
+    es: "Las dos contraseñas no coinciden.",
+  },
+
+  // Restablecimiento: contraseña nueva desde el enlace del correo.
+  "reset.title": { en: "Choose a new password", es: "Elige una contraseña nueva" },
+  "reset.prompt": {
+    en: "Write the password you will use from now on. The other open sessions will be closed.",
+    es: "Escribe la contraseña que usarás a partir de ahora. Las demás sesiones abiertas se cerrarán.",
+  },
+  "reset.submit": { en: "Save password", es: "Guardar contraseña" },
+  "reset.missing": {
+    en: "The link has no reset. Open the link from the email exactly as it arrived.",
+    es: "El enlace no trae ningún restablecimiento. Abre tal cual el enlace del correo.",
+  },
+  "reset.invalid": {
+    en: "That link is not valid. It may have been used already.",
+    es: "Ese enlace no es válido. Puede que ya se haya usado.",
+  },
+  "reset.expired": {
+    en: "That link has expired. Ask for a new one.",
+    es: "Ese enlace ha caducado. Pide otro.",
+  },
+
+  // Verificación del email desde el enlace del correo (V3.82: la ruta existía
+  // en el mailer pero no en el frontend, así que el enlace caía en Inicio).
+  "verify.title": { en: "Confirm your email", es: "Confirmar tu email" },
+  "verify.working": { en: "Confirming…", es: "Confirmando…" },
+  "verify.ok": {
+    en: "Your email is confirmed. Thank you.",
+    es: "Tu email queda confirmado. Gracias.",
+  },
+  "verify.invalid": {
+    en: "That confirmation is not valid or has expired. Ask for a new one from your account.",
+    es: "Esa confirmación no es válida o ha caducado. Pide otra desde tu cuenta.",
+  },
+  "verify.missing": {
+    en: "The link has no confirmation. Open the link from the email exactly as it arrived.",
+    es: "El enlace no trae ninguna confirmación. Abre tal cual el enlace del correo.",
+  },
+  "verify.goHome": { en: "Go to the app", es: "Ir a la aplicación" },
 
   // Cuenta (V3.81): cambiar contraseña y email, verificar, y darse de baja.
   // Todo esto vive en el menú de cuenta, no en Ajustes: son cosas de identidad,
@@ -2212,13 +2310,16 @@ const STRINGS: Record<string, Entry> = {
     en: "Your password is required.",
     es: "Hace falta tu contraseña.",
   },
-  "account.nameTaken": {
-    en: "There is already a user with that name.",
-    es: "Ya hay un usuario con ese nombre.",
-  },
   "account.error": {
     en: "Could not complete the change. Is the server running?",
     es: "No se pudo completar el cambio. ¿Está activo el servidor?",
+  },
+  // Pie de las páginas de cuenta (V3.82): se abren desde un correo, así que
+  // conviene recordar de dónde salen y qué hacer si el correo no está
+  // configurado en este equipo.
+  "account.localNote": {
+    en: "This link came in your email. If no mail is configured on this computer, the webmaster can hand it to you.",
+    es: "Este enlace llegó a tu correo. Si en este equipo no hay correo configurado, el webmaster puede dártelo a mano.",
   },
 
   // Diálogo de usuario (avatar, nombre, color). V3.81: los textos dicen

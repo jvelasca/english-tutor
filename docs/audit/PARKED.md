@@ -1935,6 +1935,88 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   intentos en memoria y limpieza global de la terminología perfil/usuario. Siguen
   como deuda. `[SEGURIDAD]` `[PRODUCTO]`
 
+## V3.82.0 — Alta profesional de cuentas: solicitud autorizada, invitación, entrada por email y recuperación · 2026-09-24
+
+> Release que **cierra el P0 de identidad para las cuentas activas** y publica
+> **un cambio incompatible de contrato** (`SessionCreate` pasa de `user_id` a
+> `email` + `password`), coordinado en el mismo lanzamiento entre backend,
+> frontend, lanzador y sus tests. Todas las columnas nuevas son **aditivas**. Lo
+> que sigue son **deudas declaradas**, no olvidos. Detalle en
+> `release-notes-v3.82.0.md`.
+
+### Cerrado en V3.82.0 (deja de ser deuda)
+
+- **El alta sin autorización.** `POST /api/users` (registro autoservicio en
+  loopback) se **retira**: una cuenta nace de una **solicitud** que el webmaster
+  autoriza, o de un alta directa desde `/api/admin/users` cuando tiene a la
+  persona delante. El formulario de solicitud captura **email y avatar**, así que
+  aprobar no exige teclear nada.
+- **Aprobar no mandaba nada.** Ahora crea la cuenta **con los datos solicitados**,
+  emite un **token de activación** (7 días) y manda la **invitación**; y devuelve
+  el enlace en claro una única vez para poder entregarlo **a mano** sin SMTP
+  (`POST /api/admin/users/{id}/resend-activation` lo reemite).
+- **No había recuperación de contraseña por correo.** Flujo estándar: `POST
+  /api/account/forgot-password` (responde **200 siempre**, sin revelar si el correo
+  tiene cuenta, con cupo de 5/min por IP) + `POST /api/account/reset-password`
+  (token de un solo uso, caducidad de 1 hora, sube la época de autenticación y
+  tumba las demás sesiones).
+- **El enlace de verificación estaba roto.** El mailer lo enlazaba a
+  `/#/cuenta/verificar?token=…` desde V3.81 y esa ruta **no existía** en el
+  frontend: pulsarlo caía en Inicio y no confirmaba nada. La ruta y su página
+  existen ahora, junto con `cuenta/activar` y `cuenta/restablecer`.
+- **Las cuentas heredadas entraban sin contraseña** (`password_hash == ''` abría
+  sesión). Ahora responden **403 `ACCOUNT_NOT_ACTIVATED`**. `without_password` deja
+  de ser un agujero y pasa a ser **contador operativo** de trabajo pendiente, así
+  que G0 ya no vigila un agujero abierto sino una cola de tareas.
+- **`GET /api/users` enumeraba cuentas sin sesión.** Pasa a exigir sesión: la
+  puerta ya no pide la lista (entra por email), así que el catálogo de a quién
+  intentar entrar deja de publicarse.
+
+### Lo que sigue abierto o aparcado (deuda declarada)
+
+- **No hay segundo factor** (TOTP, passkeys) ni **verificación obligatoria** para
+  usar la app: el email es una **señal**. `[PRODUCTO]`
+- **La entrega del correo depende de que el webmaster configure SMTP.** Sin él,
+  invitación y restablecimiento **no se pierden** (el enlace se entrega a mano
+  desde el lanzador o desde la pantalla) pero el flujo deja de ser autoservicio de
+  verdad, y la UI lo dice con esas palabras en vez de prometer un correo que no ha
+  salido. `[PRODUCTO]`
+- **Los tokens de activación y restablecimiento viven en columnas de `users`**
+  (`activation_token_hash`, `password_reset_token_hash`), **hasheados** y con
+  caducidad, pero sin historial: emitir uno nuevo **anula el anterior** sin dejar
+  rastro de cuántos se emitieron. `[SEGURIDAD]`
+- **El *plus-addressing* es una dependencia del proveedor de correo.** `J.A` y
+  `Paz` comparten bandeja con `josealberto.vel+ja@…` y `josealberto.vel+paz@…`
+  porque Gmail y Outlook soportan `+`. Un proveedor que no lo soporte obligaría a
+  usar correos distintos, y la migración heredada dejaría de poder hacerse así.
+  `[PRODUCTO]`
+- **El cupo de recuperación es por IP y por proceso** (5/min en
+  `security._PATH_LIMITS`): un reinicio lo vacía y una red con una sola salida
+  comparte cupo. Es el mismo límite declarado del freno de contraseña. `[SEGURIDAD]`
+- **No hay cuenta atrás ni aviso al usuario cuando se emite un restablecimiento**:
+  quien tenga acceso al correo puede pedirlo sin que el titular se entere hasta que
+  llegue (o no llegue). Un aviso «se pidió cambiar tu contraseña» es la mejora
+  natural y no está. `[PRODUCTO]`
+- **Sin perfil de cobros ni nada económico** (a petición expresa del gerente): la
+  estructura del alta es la que necesitaría un uso público —solicitud,
+  autorización, estado de la cuenta, recuperación— pero no hay planes, facturación
+  ni límites por tipo de cuenta. `[PRODUCTO]`
+- **El hash de la contraseña sigue viajando en el backup** (es estado de la
+  cuenta, dentro de la BD); `session.secret` y `mail.secret` **no**. Quien reciba un
+  backup puede atacar la contraseña **fuera de línea**, sin el freno del servidor.
+  `[SEGURIDAD]`
+- **La migración heredada de este equipo quedó preparada, no ejecutada sobre la BD
+  en uso**: `backend/scripts/migrate_legacy_accounts.py` es idempotente y simula por
+  defecto (`--apply` escribe, con copia previa), y `J.A` y `Paz` siguen
+  «pendientes de activación» hasta que se ejecute de verdad. G0 sigue `pending` por
+  eso, no por código. `[VALIDACIÓN]`
+- **La prueba manual end-to-end se hizo sobre una COPIA de la BD**, como en V3.81.2;
+  repetirla sobre la BD de uso queda pendiente de acción humana. `[VALIDACIÓN]`
+- **Todo lo declarado abierto en V3.81.x sigue abierto** salvo lo que esta release
+  cierra de forma explícita arriba (no hay recuperación por correo, las cuentas sin
+  credencial no entran, `GET /api/users` no es público y el registro autoservicio no
+  existe).
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

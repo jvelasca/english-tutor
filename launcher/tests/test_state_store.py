@@ -10,6 +10,9 @@ def test_load_state_missing_file_returns_defaults(tmp_path):
     assert state["window"]["height"] == state_store.DEFAULTS["window"]["height"]
     assert state["sash"] == state_store.DEFAULTS["sash"]
     assert state["sections"] == {}
+    # V3.81.3: la pestaña y la barra de herramientas también tienen default.
+    assert state["tab"] == "Estado"
+    assert state["toolbar"] is True
 
 
 def test_load_state_corrupt_json_returns_defaults(tmp_path):
@@ -48,6 +51,8 @@ def test_load_state_ignores_invalid_fields(tmp_path):
                 "window": {"width": -5, "height": "alto", "x": "no"},
                 "sash": -1,
                 "sections": {"Servicios": "no-bool"},
+                "tab": "   ",
+                "toolbar": "sí",
             }
         ),
         encoding="utf-8",
@@ -58,6 +63,19 @@ def test_load_state_ignores_invalid_fields(tmp_path):
     assert state["sash"] == state_store.DEFAULTS["sash"]
     # Los valores de secciones que no son booleanos se descartan.
     assert state["sections"] == {}
+    # Una pestaña en blanco no es una pestaña y un «sí» en texto no es un bool.
+    assert state["tab"] == state_store.DEFAULTS["tab"]
+    assert state["toolbar"] is True
+
+
+def test_load_state_lee_pestana_y_barra_de_herramientas(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text(
+        json.dumps({"tab": "Registros", "toolbar": False}), encoding="utf-8"
+    )
+    state = state_store.load_state(path)
+    assert state["tab"] == "Registros"
+    assert state["toolbar"] is False
 
 
 def test_save_then_load_roundtrip(tmp_path):
@@ -66,6 +84,8 @@ def test_save_then_load_roundtrip(tmp_path):
         "window": {"width": 1280, "height": 720, "x": 100, "y": 50},
         "sash": 640,
         "sections": {"Registros": False},
+        "tab": "Usuarios",
+        "toolbar": False,
     }
     state_store.save_state(state, path)
     loaded = state_store.load_state(path)

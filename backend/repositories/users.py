@@ -53,6 +53,9 @@ STATUSES = (STATUS_ACTIVE, STATUS_DISABLED, STATUS_UNENROLLED)
 EVENT_CREDENTIALS = "credentials"  # el webmaster asigna email + contraseña
 EVENT_EMAIL_VERIFIED = "email_verified"
 EVENT_PASSWORD_CHANGED = "password_changed"
+EVENT_INVITED = "invited"  # V3.82: se emitió la invitación de activación
+EVENT_ACTIVATED = "activated"  # V3.82: la persona puso su contraseña
+EVENT_PASSWORD_RESET = "password_reset"  # V3.82: «olvidé mi contraseña»
 EVENT_UNENROLLED = "unenrolled"  # el propio usuario pide la baja
 EVENT_ENROLLED = "reenrolled"
 EVENT_DISABLED = "disabled"
@@ -158,16 +161,23 @@ def create_user(
     email: str = "",
     password_hash: str = "",
     must_change_password: bool = False,
+    avatar_color: str = "",
+    avatar_emoji: str = "",
+    avatar_image: str = "",
 ) -> dict:
-    """Alta. Con `email`/`password_hash` nace una cuenta con credencial."""
+    """Alta. Con `email`/`password_hash` nace una cuenta con credencial.
+
+    V3.82: admite el avatar elegido en la solicitud, para que aprobarla no obligue
+    a elegir de nuevo lo que la persona ya eligió al pedir la cuenta.
+    """
     uid = uuid.uuid4().hex
     now = _now()
     with closing(_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO users "
             "(id, name, created_at, is_test, email, password_hash, "
-            "must_change_password) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "must_change_password, avatar_color, avatar_emoji, avatar_image) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 uid,
                 name,
@@ -176,14 +186,17 @@ def create_user(
                 email,
                 password_hash,
                 1 if must_change_password else 0,
+                avatar_color,
+                avatar_emoji,
+                avatar_image,
             ),
         )
     return {
         "id": uid,
         "name": name,
-        "avatar_color": "",
-        "avatar_emoji": "",
-        "avatar_image": "",
+        "avatar_color": avatar_color,
+        "avatar_emoji": avatar_emoji,
+        "avatar_image": avatar_image,
         "is_test": is_test,
         "has_password": bool(password_hash),
         "email": email,
@@ -357,6 +370,135 @@ def mark_email_verified(uid: str) -> dict | None:
             (_now(), uid),
         )
     return get_user(uid)
+
+
+# --- Activación de la cuenta (invitación, V3.82) ------------------------------
+#
+# El ciclo es: el webmaster aprueba → se emite un token de activación y sale el
+# correo → la persona abre el enlace y **elige su contraseña**. Son tres columnas
+# y dos operaciones, y el token se guarda hasheado igual que los demás: quien lea
+# la BD no puede activar una cuenta ajena con lo que hay en la fila.
+
+
+def set_activation(uid: str, token_hash: str) -> bool:
+    """Guarda el token de activación (hasheado) y cuándo se emitió."""
+    if get_user(uid) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET activation_token_hash = ?, activation_sent_at = ? "
+            "WHERE id = ?",
+            (token_hash, _now(), uid),
+        )
+    return True
+
+
+def get_activation(uid: str) -> tuple[str, str] | None:
+    """`(token_hash, sent_at)` de la invitación pendiente, o `None`."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT activation_token_hash, activation_sent_at FROM users "
+            "WHERE id = ?",
+            (uid,),
+        ).fetchone()
+    if row is None:
+        return None
+    return (row["activation_token_hash"] or "", row["activation_sent_at"] or "")
+
+
+def find_by_activation_token(token_hash: str) -> dict | None:
+    """Cuenta cuya invitación pendiente es ese token (hasheado), o `None`."""
+    if not token_hash:
+        return None
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_SELECT} FROM users WHERE activation_token_hash = ? LIMIT 1",
+            (token_hash,),
+        ).fetchone()
+    return _row_to_user(row) if row is not None else None
+
+
+def mark_activated(uid: str, *, email_verified: bool = True) -> dict | None:
+    """Pone la contraseña de activación, consume el token y da el email por bueno.
+
+    Marcar el email como verificado no es un atajo: para canjear el token hay que
+    haber recibido el correo y abierto el enlace, que es exactamente lo que la
+    verificación comprueba. Pedir además un segundo enlace sería pedir dos veces
+    lo mismo.
+
+    La contraseña **no** se escribe aquí: la escribe `set_password_hash`, que es
+    el único sitio que sube la época de autenticación (`auth_epoch`). Mezclar las
+    dos cosas aquí dejaría dos formas de cambiar una contraseña, y solo una
+    sería la que revoca las sesiones.
+    """
+    if get_user(uid) is None:
+        return None
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET activation_token_hash = '', activation_sent_at = NULL, "
+            "email_verified_at = ?, email_verify_token_hash = '' "
+            "WHERE id = ?",
+            (_now() if email_verified else None, uid),
+        )
+    return get_user(uid)
+
+
+# --- Restablecimiento de contraseña (V3.82) ----------------------------------
+
+
+def set_password_reset(uid: str, token_hash: str) -> bool:
+    """Guarda el token de restablecimiento (hasheado) y cuándo se emitió."""
+    if get_user(uid) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET password_reset_token_hash = ?, "
+            "password_reset_sent_at = ? WHERE id = ?",
+            (token_hash, _now(), uid),
+        )
+    return True
+
+
+def get_password_reset(uid: str) -> tuple[str, str] | None:
+    """`(token_hash, sent_at)` del restablecimiento pendiente, o `None`."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT password_reset_token_hash, password_reset_sent_at FROM users "
+            "WHERE id = ?",
+            (uid,),
+        ).fetchone()
+    if row is None:
+        return None
+    return (
+        row["password_reset_token_hash"] or "",
+        row["password_reset_sent_at"] or "",
+    )
+
+
+def find_by_password_reset_token(token_hash: str) -> dict | None:
+    """Cuenta cuyo restablecimiento pendiente es ese token (hasheado), o `None`."""
+    if not token_hash:
+        return None
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_SELECT} FROM users "
+            "WHERE password_reset_token_hash = ? LIMIT 1",
+            (token_hash,),
+        ).fetchone()
+    return _row_to_user(row) if row is not None else None
+
+
+def clear_password_reset(uid: str) -> bool:
+    """Consume el token de restablecimiento (de un solo uso)."""
+    if get_user(uid) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "UPDATE users SET password_reset_token_hash = '', "
+            "password_reset_sent_at = NULL WHERE id = ?",
+            (uid,),
+        )
+    return True
 
 
 def update_user(

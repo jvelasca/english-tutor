@@ -64,17 +64,21 @@ class UserUpdate(BaseModel):
 
 
 class SessionCreate(BaseModel):
-    """Cuerpo de `POST /api/session`: la cuenta que la petición **reclama**.
+    """Cuerpo de `POST /api/session`: con qué credencial se entra (V3.82).
 
-    V3.81: si la cuenta tiene contraseña, es obligatoria. Lo que cambia respecto a
-    V3.73.x es que ya no basta con **nombrar** a alguien: hay que demostrar que se
-    es quien dice ser. Las cuentas heredadas sin contraseña (`has_password` falso)
-    siguen abriendo con el cuerpo de siempre mientras el webmaster no les asigne
-    credenciales, que es la compatibilidad declarada de esta release.
+    Hasta V3.81 esto era `user_id` + contraseña opcional, y eso venía del modelo
+    «selector de perfiles»: se entraba **eligiendo** a alguien de una lista y la
+    contraseña solo confirmaba. V3.82 cierra ese modelo: la identidad la
+    demuestra un **email + contraseña**, exactamente como en cualquier producto
+    que se pueda abrir al público.
+
+    Consecuencia deliberada: `user_id` desaparece, así que ya no se puede
+    **nombrar** una cuenta para entrar en ella. Es lo que hace imposible
+    suplantar a otro usuario aunque la lista de cuentas esté a la vista.
     """
 
-    user_id: str = Field(min_length=1, max_length=64)
-    password: str | None = Field(default=None, max_length=MAX_PASSWORD_CHARS)
+    email: str = Field(min_length=3, max_length=MAX_EMAIL_CHARS)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)
 
 
 class PasswordChange(BaseModel):
@@ -111,3 +115,32 @@ class EmailVerify(BaseModel):
     """Token de verificación tal como llega del enlace del correo."""
 
     token: str = Field(min_length=8, max_length=256)
+
+
+class AccountActivate(BaseModel):
+    """Poner la contraseña desde el enlace de **invitación** (V3.82).
+
+    El token es el que autoriza; el cuerpo no lleva email ni nombre porque los dos
+    ya están en la cuenta que el token resuelve. La contraseña se valida con la
+    misma política que en cualquier otro sitio (`is_valid_password`).
+    """
+
+    token: str = Field(min_length=8, max_length=256)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """«Olvidé mi contraseña» (V3.82): solo el email.
+
+    La respuesta a esta petición es **siempre la misma** haya cuenta o no: sin
+    eso, el formulario sería un oráculo para averiguar qué correos tienen cuenta.
+    """
+
+    email: str = Field(min_length=3, max_length=MAX_EMAIL_CHARS)
+
+
+class PasswordReset(BaseModel):
+    """Elegir contraseña nueva desde el enlace de restablecimiento (V3.82)."""
+
+    token: str = Field(min_length=8, max_length=256)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_CHARS)

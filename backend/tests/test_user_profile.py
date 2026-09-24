@@ -4,38 +4,44 @@ import itertools
 
 from fastapi.testclient import TestClient
 
+import config
 from main import app
 from repositories import db
 from repositories import users as users_repo
+
+_ADMIN_PIN = "test-pin"
+_ADMIN_HEADERS = {"X-Admin-Pin": _ADMIN_PIN}
+_BUENA = "caballo-bateria-grapa"
 
 
 def _setup(monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DATA_DIR", tmp_path)
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
+    monkeypatch.setenv(config.ADMIN_PIN_ENV, _ADMIN_PIN)
     return users_repo.create_user("Ana")["id"]
 
 
 _ALTA_SEQ = itertools.count(1)
 
 
-def _alta(client, name: str, *, email: str = "", **extra):
-    """`POST /api/users` con un registro **completo** (V3.81).
+def _alta(client, name: str, *, email: str = "", password: str = _BUENA):
+    """Alta **del webmaster** (V3.82): `POST /api/admin/users` con el PIN.
 
-    Desde la Fase 3 el alta exige email y contraseña; estos tests comprueban sobre
-    todo la forma del **nombre**, así que el resto del cuerpo se rellena aquí una
-    vez en lugar de repetirlo. El email sale de un contador: dos altas con el mismo
-    nombre (que es justo lo que prueba la regla de duplicados) necesitan **dos
-    correos distintos** o chocarían por `EMAIL_TAKEN` y el test culparía a la
-    regla equivocada.
+    Hasta V3.81 esto era `POST /api/users`. V3.82 cierra esa puerta (una cuenta se
+    pide y el webmaster la autoriza, o la crea él directamente desde el equipo) y
+    estos tests, que comprueban sobre todo la forma del **nombre**, usan la vía que
+    queda. El email sale de un contador: dos altas con el mismo nombre (que es
+    justo lo que prueba la regla de duplicados) necesitan **dos correos
+    distintos** o chocarían por `EMAIL_TAKEN` y el test culparía a la regla
+    equivocada.
     """
     body = {
         "name": name,
         "email": email or f"alta-{next(_ALTA_SEQ)}@example.com",
-        "password": "caballo-bateria-grapa",
-        **extra,
+        "password": password,
     }
-    return client.post("/api/users", json=body)
+    return client.post("/api/admin/users", json=body, headers=_ADMIN_HEADERS)
 
 
 def test_create_user_has_default_avatar_fields(monkeypatch, tmp_path):
@@ -103,35 +109,52 @@ def test_api_patch_user_unknown(monkeypatch, tmp_path):
 
 
 def test_api_hides_test_profiles_and_deletes_them(monkeypatch, tmp_path):
-    # V3.52.1: el perfil de prueba no aparece en GET /api/users; el POST con
-    # is_test lo crea invisible y DELETE lo limpia (lo usa el teardown visual).
+    # V3.52.1: el perfil de prueba no aparece en GET /api/users; DELETE lo limpia.
+    # V3.82: ya no se crea por API (`POST /api/users` no existe), así que lo crea el
+    # repo —que es lo único que puede marcar `is_test`— y la **lectura** sí se
+    # prueba por HTTP, que es donde vive la garantía de invisibilidad. Como
+    # `GET /api/users` dejó de ser público, se pide con sesión.
     uid = _setup(monkeypatch, tmp_path)
+    tester = users_repo.create_user("Visual Tester", is_test=True)
+    assert tester["is_test"] is True
     with TestClient(app) as client:
-        created = _alta(client, "Visual Tester", is_test=True)
-        assert created.status_code == 200, created.text
-        tester = created.json()
-        assert tester["is_test"] is True
-        listed = client.get("/api/users").json()
+        listed = client.get("/api/users", params={"user_id": uid}).json()
         assert [u["name"] for u in listed] == ["Usuario", "Ana"]
-        with_test = client.get("/api/users", params={"include_test": True}).json()
+        with_test = client.get(
+            "/api/users", params={"include_test": True, "user_id": uid}
+        ).json()
         assert "Visual Tester" in [u["name"] for u in with_test]
         deleted = client.delete(f"/api/users/{tester['id']}")
         assert deleted.status_code == 200, deleted.text
-        remaining = client.get("/api/users", params={"include_test": True}).json()
+        remaining = client.get(
+            "/api/users", params={"include_test": True, "user_id": uid}
+        ).json()
         assert "Visual Tester" not in [u["name"] for u in remaining]
         # Un perfil real no se puede borrar por esta vía.
         assert client.delete(f"/api/users/{uid}").status_code == 404
         assert users_repo.get_user(uid) is not None
 
 
+def test_sin_sesion_no_se_enumera_quien_tiene_cuenta(monkeypatch, tmp_path):
+    """V3.82: la lista de cuentas vuelve detrás de la puerta.
+
+    Era pública porque la entrada era un **selector** que tenía que pintar los
+    nombres antes de que existiera sesión. Con el login por email esa necesidad
+    desaparece, así que enumerar deja de ser gratis para quien alcance la API.
+    """
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.get("/api/users")
+    assert r.status_code == 401
+
+
 def test_create_user_rejects_an_overlong_name(monkeypatch, tmp_path):
     """El nombre lleva tope (V3.73.x).
 
     Antes solo `PATCH` acotaba `name`; crear un perfil con un nombre de tamaño
-    arbitrario era una vía trivial de crecimiento de la base de datos. Desde V3.81
-    el cuerpo del alta es un registro completo, así que el tope se prueba con el
-    resto de campos bien puestos: si no, el 422 lo daría un email ausente y el test
-    pasaría sin haber mirado el nombre.
+    arbitrario era una vía trivial de crecimiento de la base de datos. El tope se
+    prueba con el resto de campos bien puestos: si no, el 422 lo daría un email
+    ausente y el test pasaría sin haber mirado el nombre.
     """
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
@@ -146,15 +169,15 @@ def test_create_user_accepts_a_name_at_the_limit(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = _alta(client, nombre)
     assert r.status_code == 200, r.text
-    assert r.json()["name"] == nombre
+    assert r.json()["user"]["name"] == nombre
 
 
 def test_create_user_rejects_a_duplicate_name(monkeypatch, tmp_path):
     """V3.80.2: dos usuarios activos con el mismo nombre son indistinguibles.
 
-    El selector de la app y el lanzador identifican a los usuarios por su nombre:
-    con dos «Ana» no hay forma de saber a quién se le abre sesión ni a quién se
-    le purga el historial. El `_setup` ya crea «Ana», así que esta alta choca.
+    El lanzador y la consola identifican a las cuentas por su nombre: con dos
+    «Ana» no hay forma de saber a quién se le purga el historial. El `_setup` ya
+    crea «Ana», así que esta alta choca.
     """
     _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:
@@ -175,18 +198,20 @@ def test_the_duplicate_rule_does_not_block_test_profiles(monkeypatch, tmp_path):
     """Los perfiles de prueba quedan fuera: los crea y borra el teardown visual.
 
     Si chocaran con esta regla, un residuo de un test fallido convertiría el
-    siguiente run en un alta rota — justo al revés de lo que la regla busca.
+    siguiente alta en un error — justo al revés de lo que la regla busca. V3.82:
+    el perfil de prueba ya no se puede crear por API, así que se prepara por
+    repositorio y lo que se prueba por HTTP es que **no bloquea** un alta real con
+    el mismo nombre.
     """
     _setup(monkeypatch, tmp_path)
+    users_repo.create_user("Visual Tester", is_test=True)
     with TestClient(app) as client:
-        primero = _alta(client, "Visual Tester", is_test=True)
-        segundo = _alta(client, "Visual Tester", is_test=True)
-    assert primero.status_code == 200, primero.text
-    assert segundo.status_code == 200, segundo.text
+        r = _alta(client, "Visual Tester")
+    assert r.status_code == 200, r.text
 
 
 def test_a_disabled_user_frees_their_name(monkeypatch, tmp_path):
-    """Un usuario desactivado ya no compite por su nombre en el selector."""
+    """Una cuenta desactivada ya no compite por su nombre."""
     uid = _setup(monkeypatch, tmp_path)
     users_repo.set_status(uid, users_repo.STATUS_DISABLED)
     with TestClient(app) as client:

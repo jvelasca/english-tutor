@@ -18,7 +18,7 @@ desactivar o purgar es un acto explícito del webmaster.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 import config
 from dependencies import require_admin_local
@@ -26,6 +26,8 @@ from domain import profile_requests as requests_service
 from domain import users as user_service
 from repositories import profile_requests as requests_repo
 from schemas.profiles import (
+    AdminActivationOut,
+    AdminApprovalOut,
     AdminCredentials,
     AdminForceUnenroll,
     AdminHistoryOut,
@@ -63,19 +65,25 @@ async def list_profile_requests(
 
 @router.post(
     "/api/admin/profile-requests/{request_id}/approve",
-    response_model=ProfileRequestOut,
+    response_model=AdminApprovalOut,
 )
 async def approve_profile_request(
     request_id: int,
     body: ProfileRequestDecision,
+    request: Request,
     _: None = Depends(require_admin_local),
 ) -> dict:
-    """Aprueba: un alta **crea** la cuenta; una baja **desactiva** (reversible).
+    """Aprueba: un alta **crea** la cuenta e **invita**; una baja **desactiva**.
 
     Purgar no ocurre aquí, ni siquiera cuando la petición era de borrado: es un
     acto aparte, con confirmación por nombre y copia previa. Aprobar una baja es
     «esta cuenta deja de usarse», que es lo que el alumno puede pedir; destruir su
     evidencia es lo que decide el webmaster.
+
+    V3.82: al aprobar un alta, la cuenta nace con el email y el avatar de la
+    solicitud y sale la **invitación** (el correo que le pide poner su
+    contraseña). `activation_link` vuelve siempre que haya invitación, para que el
+    webmaster pueda entregarla a mano cuando no haya SMTP configurado.
     """
     resolved = await requests_service.approve(request_id, note=body.note)
     if resolved is None:
@@ -83,7 +91,61 @@ async def approve_profile_request(
             status_code=409,
             detail="La solicitud no existe o ya estaba resuelta",
         )
-    return resolved["request"]
+    user = resolved.get("user") or {}
+    activation_url, sent = _invite(
+        str(request.base_url), resolved.get("activation_token") or "", user
+    )
+    return {
+        "request": resolved["request"],
+        "user": user or None,
+        "email_sent": sent,
+        "activation_link": activation_url,
+    }
+
+
+def _invite(base_url: str, token: str, user: dict) -> tuple[str, bool]:
+    """Construye el enlace de invitación y manda el correo si hay a quién.
+
+    Devuelve `(enlace, enviado)`. El enlace se devuelve aunque el correo salga:
+    el webmaster puede reenviarlo por su cuenta, y si el envío falla, el enlace
+    es la única forma de que la persona active su cuenta (modo híbrido).
+    """
+    if not token:
+        return "", False
+    link = mailer.activation_link(base_url.rstrip("/"), token)
+    to = str((user or {}).get("email") or "")
+    sent = bool(to) and mailer.send(kind=mailer.KIND_ACTIVATION, to=to, link=link)
+    return link, sent
+
+
+@router.post(
+    "/api/admin/users/{user_id}/resend-activation",
+    response_model=AdminActivationOut,
+)
+async def resend_user_activation(
+    user_id: str,
+    request: Request,
+    _: None = Depends(require_admin_local),
+) -> dict:
+    """Reemite la invitación de activación de una cuenta (V3.82).
+
+    Existe porque un correo se pierde, caduca o cae en una bandeja que nadie mira,
+    y la alternativa —asignarle una contraseña a mano— es justo lo que esta
+    release retira. Emite un token **nuevo** (el anterior deja de valer) y lo
+    manda con el mismo texto que la invitación original.
+    """
+    user = await user_service.get_user(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+    if not user.get("email"):
+        raise HTTPException(
+            status_code=409, detail="La cuenta no tiene email al que invitar"
+        )
+    token = await requests_service.issue_activation(user_id)
+    if not token:
+        raise HTTPException(status_code=409, detail="No se pudo emitir la invitación")
+    link, sent = _invite(str(request.base_url), token, user)
+    return {"user": user, "email_sent": sent, "activation_link": link}
 
 
 @router.post(

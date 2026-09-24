@@ -5,9 +5,9 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1733,
- "literal_uses": 1225,
- "referenced_keys": 1413,
+ "defined": 1762,
+ "literal_uses": 1244,
+ "referenced_keys": 1442,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",
@@ -85,7 +85,6 @@
   "translator.placeholder.",
   "unitReview.state.",
   "unitReview.window.",
-  "user-menu-item",
   "voc-demonstrate-note-",
   "vocRoutes.",
   "vocRoutes.levelStates.",

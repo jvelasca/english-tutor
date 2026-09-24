@@ -1,28 +1,26 @@
 // @vitest-environment jsdom
 /**
- * Arranque con contraseña y ciclo de vida de la cuenta (V3.81, Fase 3 del P0).
+ * Arranque de la sesión y ciclo de vida de la cuenta (V3.82).
  *
- * Lo que se fija aquí es la parte que **no** puede fallar en silencio: el
- * arranque automático. Antes de la Fase 2, un `POST /api/session` que no fuera
- * 200 moría en un `catch` vacío, así que la app se quedaba sin cuenta activa y
- * sin decir por qué. Con una cuenta que tiene contraseña eso pasaría **siempre**,
- * y el alumno vería una puerta que no responde.
+ * Lo que se fija aquí es la parte que **no** puede fallar en silencio:
  *
- * Por eso los casos de aquí son de comportamiento del hook, no de la vista: que
- * la cuenta con credencial no se abra a ciegas, que la contraseña correcta deje
- * la sesión abierta, que la incorrecta se explique, y que las acciones de cuenta
- * (alta, salir, baja) dejen el estado local como el servidor dice y no como el
- * cliente supone.
+ * - El arranque ya no «elige» con quién entrar. Antes resolvía una cuenta de una
+ *   lista y abría sesión nombrando a alguien; con el login por email eso
+ *   desaparece, y con él la posibilidad de arrancar como otra persona.
+ * - Entrar es un acto explícito, y sus desenlaces (credenciales malas, cuenta sin
+ *   activar, freno) vuelven **tipados** para que la puerta pueda contarlos.
+ * - Las acciones de cuenta (salir, baja) dejan el estado local como el servidor
+ *   dice y no como el cliente supone.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { User } from "../types/api";
-import { SessionPasswordError } from "../api/session";
+import { SessionLoginError } from "../api/session";
 import type { ProfileRequestOutcome } from "../api/profileRequests";
 import { useChat } from "./useChat";
 
 vi.mock("../api/session", async (importOriginal) => {
-  // Se conserva el módulo real: `SessionPasswordError` tiene que ser **la misma
+  // Se conserva el módulo real: `SessionLoginError` tiene que ser **la misma
   // clase** que usa `useChat`, o su `instanceof` no reconocería ningún error.
   const actual = await importOriginal<typeof import("../api/session")>();
   return {
@@ -30,7 +28,6 @@ vi.mock("../api/session", async (importOriginal) => {
     openSession: vi.fn(),
     getSession: vi.fn(),
     closeSession: vi.fn(),
-    createAccount: vi.fn(),
     changePassword: vi.fn(),
     changeEmail: vi.fn(),
     resendVerification: vi.fn(),
@@ -51,7 +48,6 @@ vi.mock("../api/conversations", () => ({
   saveConversation: vi.fn(),
 }));
 vi.mock("../api/users", () => ({
-  listUsers: vi.fn(),
   updateUser: vi.fn(),
 }));
 vi.mock("../api/profileRequests", () => ({
@@ -73,165 +69,173 @@ vi.mock("../api/learning", () => ({
 
 import { getSession, openSession } from "../api/session";
 import * as sessionApi from "../api/session";
-import { listUsers } from "../api/users";
 import { requestProfile, requestProfileDelete } from "../api/profileRequests";
 import { ApiError } from "../api/client";
 
 const openSessionMock = vi.mocked(openSession);
 const getSessionMock = vi.mocked(getSession);
-const listUsersMock = vi.mocked(listUsers);
 const requestProfileMock = vi.mocked(requestProfile);
 const requestProfileDeleteMock = vi.mocked(requestProfileDelete);
 const closeSessionMock = vi.mocked(sessionApi.closeSession);
-const createAccountMock = vi.mocked(sessionApi.createAccount);
 const changePasswordMock = vi.mocked(sessionApi.changePassword);
-const changeEmailMock = vi.mocked(sessionApi.changeEmail);
 const resendVerificationMock = vi.mocked(sessionApi.resendVerification);
 const unenrollAccountMock = vi.mocked(sessionApi.unenrollAccount);
 
-function user(id: string, name: string, hasPassword = false): User {
+function user(id: string, name: string): User {
   return {
     id,
     name,
     avatar_color: "",
     avatar_emoji: "",
     avatar_image: "",
-    has_password: hasPassword,
+    email: `${id}@example.com`,
+    has_password: true,
     created_at: "2026-01-01T00:00:00Z",
   };
 }
 
-const ANA_CON_CLAVE = user("a", "Ana", true);
+const ANA = user("a", "Ana");
 const BETO = user("b", "Beto");
 
 beforeEach(() => {
   openSessionMock.mockReset();
   getSessionMock.mockReset();
-  listUsersMock.mockReset();
   getSessionMock.mockResolvedValue(null);
   // Las acciones de cuenta arrancan con un desenlace razonable para que un test
   // que no las use no se lleve un `undefined` del mock recién reseteado.
   closeSessionMock.mockReset();
   closeSessionMock.mockResolvedValue({ closed: true });
-  createAccountMock.mockReset();
   changePasswordMock.mockReset();
-  changeEmailMock.mockReset();
   resendVerificationMock.mockReset();
-  resendVerificationMock.mockResolvedValue({ sent: false, reason: "SMTP_NOT_CONFIGURED" });
+  resendVerificationMock.mockResolvedValue({
+    sent: false,
+    reason: "SMTP_NOT_CONFIGURED",
+  });
   unenrollAccountMock.mockReset();
 });
 
 afterEach(cleanup);
 
-/** Espera a que el arranque termine (la lista de perfiles cargada). */
+/** Espera a que el arranque termine (la sesión comprobada). */
 async function boot() {
   const rendered = renderHook(() => useChat());
   await waitFor(() => expect(rendered.result.current.usersLoaded).toBe(true));
   return rendered;
 }
 
-describe("useChat · arranque con contraseña (V3.81)", () => {
-  it("una cuenta sin contraseña se abre sola: es el caso heredado", async () => {
-    listUsersMock.mockResolvedValue([BETO]);
-    openSessionMock.mockResolvedValue(BETO);
-
+describe("useChat · arranque de la sesión (V3.82)", () => {
+  it("sin sesión no se abre ninguna: la app pide credencial", async () => {
     const { result } = await boot();
 
-    await waitFor(() => expect(result.current.currentUserId).toBe("b"));
-    expect(openSessionMock).toHaveBeenCalledWith("b", undefined);
-  });
-
-  it("una cuenta con contraseña no se abre a ciegas: se pide", async () => {
-    listUsersMock.mockResolvedValue([ANA_CON_CLAVE]);
-
-    const { result } = await boot();
-
-    // Ni un POST condenado a 401 ni un arranque mudo: la puerta recibe la
-    // cuenta que espera su contraseña.
     expect(openSessionMock).not.toHaveBeenCalled();
-    expect(result.current.passwordPromptUserId).toBe("a");
     expect(result.current.currentUserId).toBeNull();
-    expect(result.current.passwordFeedback).toBeNull();
+    expect(result.current.users).toEqual([]);
+    expect(result.current.usersLoadFailed).toBe(false);
   });
 
-  it("la contraseña correcta deja la cuenta activa y cierra el paso", async () => {
-    listUsersMock.mockResolvedValue([ANA_CON_CLAVE]);
-    openSessionMock.mockResolvedValue(ANA_CON_CLAVE);
-
-    const { result } = await boot();
-    await act(async () => {
-      await result.current.submitPassword("a", "4821");
-    });
-
-    expect(openSessionMock).toHaveBeenCalledWith("a", "4821");
-    await waitFor(() => expect(result.current.currentUserId).toBe("a"));
-    expect(result.current.passwordPromptUserId).toBeNull();
-    expect(result.current.passwordFeedback).toBeNull();
-  });
-
-  it("una contraseña incorrecta se explica y no activa la cuenta", async () => {
-    listUsersMock.mockResolvedValue([ANA_CON_CLAVE]);
-    openSessionMock.mockRejectedValue(new SessionPasswordError("password-invalid"));
-
-    const { result } = await boot();
-    await act(async () => {
-      await result.current.submitPassword("a", "0000");
-    });
-
-    expect(result.current.passwordFeedback).toBe("password-invalid");
-    expect(result.current.currentUserId).toBeNull();
-    expect(result.current.passwordPromptUserId).toBe("a");
-  });
-
-  it("el freno del servidor llega con su espera", async () => {
-    listUsersMock.mockResolvedValue([ANA_CON_CLAVE]);
-    openSessionMock.mockRejectedValue(new SessionPasswordError("password-throttled", 42));
-
-    const { result } = await boot();
-    await act(async () => {
-      await result.current.submitPassword("a", "0000");
-    });
-
-    expect(result.current.passwordFeedback).toBe("password-throttled");
-    expect(result.current.passwordRetryAfter).toBe(42);
-  });
-
-  it("elegir en el selector una cuenta con contraseña también la pide", async () => {
-    // El caso de cambio de cuenta dentro de la app: el servidor responde 401
-    // `PASSWORD_REQUIRED` y la puerta tiene que aparecer aunque ya hubiera una
-    // cuenta activa (si no, el paso quedaría invisible detrás de la app).
-    listUsersMock.mockResolvedValue([BETO, ANA_CON_CLAVE]);
+  it("con sesión adoptada, la cuenta es la única que la app conoce", async () => {
+    // V3.82: `users` deja de ser «las cuentas que existen» y pasa a ser «la
+    // cuenta de esta sesión». Es lo que hace imposible que la app enumere a
+    // nadie, y de paso lo que garantiza que el menú solo pueda hablar de ti.
     getSessionMock.mockResolvedValue(BETO);
+
     const { result } = await boot();
+
     await waitFor(() => expect(result.current.currentUserId).toBe("b"));
-
-    openSessionMock.mockRejectedValueOnce(new SessionPasswordError("password-required"));
-    act(() => result.current.selectUser("a"));
-
-    await waitFor(() => expect(result.current.passwordPromptUserId).toBe("a"));
-    // La cuenta anterior sigue activa: cancelar devuelve a la app tal cual.
-    expect(result.current.currentUserId).toBe("b");
+    expect(result.current.users).toEqual([BETO]);
+    expect(result.current.usersLoadFailed).toBe(false);
   });
 
-  it("cancelar la contraseña devuelve a la puerta sin tocar la sesión", async () => {
-    listUsersMock.mockResolvedValue([ANA_CON_CLAVE]);
-    const { result } = await boot();
-    expect(result.current.passwordPromptUserId).toBe("a");
+  it("con `must_change_password` la app marca el cambio forzado", async () => {
+    // Se aprende de la respuesta del servidor, nunca se adivina.
+    getSessionMock.mockResolvedValue({ ...ANA, must_change_password: true });
 
-    act(() => result.current.cancelPassword());
-    expect(result.current.passwordPromptUserId).toBeNull();
-    expect(result.current.passwordFeedback).toBeNull();
-    expect(result.current.currentUserId).toBeNull();
-    expect(openSessionMock).not.toHaveBeenCalled();
+    const { result } = await boot();
+
+    await waitFor(() => expect(result.current.currentUserId).toBe("a"));
+    expect(result.current.mustChangePassword).toBe(true);
   });
 });
 
-describe("useChat · pedir una cuenta (V3.77)", () => {
+describe("useChat · entrar con email y contraseña (V3.82)", () => {
+  it("una credencial buena abre la cuenta de esa sesión", async () => {
+    openSessionMock.mockResolvedValue(ANA);
+
+    const { result } = await boot();
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("ana@example.com", "caballo-bateria");
+    });
+
+    expect(openSessionMock).toHaveBeenCalledWith("ana@example.com", "caballo-bateria");
+    expect(outcome?.ok).toBe(true);
+    await waitFor(() => expect(result.current.currentUserId).toBe("a"));
+    expect(result.current.users).toEqual([ANA]);
+  });
+
+  it("una credencial mala vuelve como desenlace, no como avería", async () => {
+    openSessionMock.mockRejectedValue(new SessionLoginError("invalid-credentials"));
+
+    const { result } = await boot();
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("ana@example.com", "0000");
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: "invalid-credentials" });
+    expect(result.current.currentUserId).toBeNull();
+    expect(result.current.users).toEqual([]);
+  });
+
+  it("una cuenta sin activar se distingue de una contraseña mala", async () => {
+    openSessionMock.mockRejectedValue(new SessionLoginError("not-activated"));
+
+    const { result } = await boot();
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("ana@example.com", "loquesea");
+    });
+
+    // La diferencia importa: el texto es «abre el enlace de tu correo», que sí se
+    // puede hacer, en vez de «algo falló».
+    expect(outcome).toEqual({ ok: false, reason: "not-activated" });
+  });
+
+  it("el freno llega con su espera para poder contarla", async () => {
+    openSessionMock.mockRejectedValue(new SessionLoginError("throttled", 42));
+
+    const { result } = await boot();
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("ana@example.com", "0000");
+    });
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: "throttled",
+      retryAfterSeconds: 42,
+    });
+  });
+
+  it("un backend caído no se disfraza de credencial mala", async () => {
+    // Distinguirlo es lo que evita que alguien cambie su contraseña —y encima la
+    // recuerde mal— por un servidor que no responde.
+    openSessionMock.mockRejectedValue(new Error("sin red"));
+
+    const { result } = await boot();
+    let outcome: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      outcome = await result.current.login("ana@example.com", "caballo-bateria");
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: "error" });
+  });
+});
+
+describe("useChat · pedir una cuenta (V3.77; email y avatar en V3.82)", () => {
   it("pedir una cuenta no la crea ni abre sesión: deja la solicitud", async () => {
-    // La app dejó de crear cuentas a la primera: por LAN solo se puede
-    // **pedir**, y una solicitud no es una cuenta. Si esto abriera sesión, la app
-    // se pintaría con un `currentUserId` que no existe y todo daría 401.
-    listUsersMock.mockResolvedValue([]);
+    // Una solicitud no es una cuenta. Si esto abriera sesión, la app se pintaría
+    // con un `currentUserId` que no existe y todo daría 401.
     requestProfileMock.mockResolvedValue({
       ok: true,
       request: {
@@ -240,6 +244,7 @@ describe("useChat · pedir una cuenta (V3.77)", () => {
         display_name: "Ana",
         user_id: "",
         note: "",
+        email: "ana@example.com",
         requested_at: "2026-09-21T22:00:00Z",
         status: "pending",
         decided_at: "",
@@ -251,44 +256,55 @@ describe("useChat · pedir una cuenta (V3.77)", () => {
     const { result } = await boot();
     let outcome: ProfileRequestOutcome | undefined;
     await act(async () => {
-      outcome = await result.current.requestProfileForGate("  Ana  ");
+      outcome = await result.current.requestProfileForGate(
+        "  Ana  ",
+        " ana@example.com ",
+        { avatar_emoji: "🦊" },
+      );
     });
 
-    expect(requestProfileMock).toHaveBeenCalledWith("Ana");
+    expect(requestProfileMock).toHaveBeenCalledWith(
+      "Ana",
+      " ana@example.com ",
+      { avatar_emoji: "🦊" },
+      "",
+    );
     expect(outcome).toEqual({ ok: true, request: expect.objectContaining({ id: 1 }) });
     expect(openSessionMock).not.toHaveBeenCalled();
     expect(result.current.currentUserId).toBeNull();
-    expect(result.current.users).toEqual([]);
   });
 
-  it("un nombre ya pedido se cuenta como tal, no como error del servidor", async () => {
-    listUsersMock.mockResolvedValue([]);
-    requestProfileMock.mockResolvedValue({ ok: false, reason: "duplicate" });
+  it("un email ya con cuenta se cuenta como tal, no como error del servidor", async () => {
+    requestProfileMock.mockResolvedValue({ ok: false, reason: "email-taken" });
 
     const { result } = await boot();
     let outcome: ProfileRequestOutcome | undefined;
     await act(async () => {
-      outcome = await result.current.requestProfileForGate("Ana");
+      outcome = await result.current.requestProfileForGate("Ana", "ana@example.com");
     });
 
-    expect(outcome).toEqual({ ok: false, reason: "duplicate" });
+    expect(outcome).toEqual({ ok: false, reason: "email-taken" });
   });
 
   it("sin nombre se propone el siguiente nombre por defecto", async () => {
-    // En la cola del webmaster «Usuario 2» es más útil que una fila vacía.
-    listUsersMock.mockResolvedValue([user("b", "Usuario")]);
+    // En la cola del webmaster «Usuario» es más útil que una fila vacía.
     requestProfileMock.mockResolvedValue({ ok: true, request: {} as never });
 
     const { result } = await boot();
     await act(async () => {
-      await result.current.requestProfileForGate("   ");
+      await result.current.requestProfileForGate("   ", "ana@example.com");
     });
 
-    expect(requestProfileMock).toHaveBeenCalledWith("Usuario 2");
+    expect(requestProfileMock).toHaveBeenCalledWith(
+      "Usuario",
+      "ana@example.com",
+      {},
+      "",
+    );
   });
 
   it("pedir la baja no borra nada: solo registra la solicitud", async () => {
-    listUsersMock.mockResolvedValue([BETO]);
+    getSessionMock.mockResolvedValue(BETO);
     requestProfileDeleteMock.mockResolvedValue({
       ok: true,
       request: { id: 9, kind: "delete", status: "pending" } as never,
@@ -302,48 +318,33 @@ describe("useChat · pedir una cuenta (V3.77)", () => {
 
     expect(requestProfileDeleteMock).toHaveBeenCalledWith("ya no lo uso");
     expect(outcome?.ok).toBe(true);
-    // La cuenta sigue en la lista: la baja la resuelve el webmaster, no la app.
+    // La cuenta sigue ahí: la baja la resuelve el webmaster, no la app.
     expect(result.current.users.map((u) => u.id)).toContain("b");
   });
 });
 
 describe("useChat · arranque cuando la sonda de sesión falla (V3.80.2)", () => {
-  it("un fallo de la sesión NO vacía la lista de usuarios", async () => {
-    // El fallo real que colgaba la app: la cookie de sesión apuntaba a una cuenta
-    // purgada, `GET /api/session` contestaba 404 y el `Promise.all` del arranque
-    // lo convertía en un rechazo conjunto, así que `setUsers` no se ejecutaba
-    // nunca. La puerta salía con la lista **vacía** y sin forma de salir.
-    listUsersMock.mockResolvedValue([user("a", "Ana"), BETO]);
-    getSessionMock.mockRejectedValue(new Error("GET /api/session 404"));
+  it("un fallo de la sesión se declara en vez de fingir «no hay sesión»", async () => {
+    // Un backend caído no es «no hay sesión»: si se confundieran, la puerta
+    // ofrecería entrar y el alumno teclearía su contraseña contra nadie.
+    getSessionMock.mockRejectedValue(new Error("GET /api/session 500"));
 
     const { result } = await boot();
 
-    expect(result.current.users.map((u) => u.name)).toEqual(["Ana", "Beto"]);
-    // El fallo de la sesión no se confunde con un fallo de la lista.
-    expect(result.current.usersLoadFailed).toBe(false);
-  });
-
-  it("si lo que falla es la lista, se dice en vez de fingir que no hay usuarios", async () => {
-    listUsersMock.mockRejectedValue(new Error("backend arrancando"));
-    getSessionMock.mockResolvedValue(null);
-
-    const { result } = await boot();
-
-    expect(result.current.users).toEqual([]);
     expect(result.current.usersLoadFailed).toBe(true);
+    expect(result.current.currentUserId).toBeNull();
   });
 
-  it("reintentar vuelve a pedir la lista y deja la puerta usable", async () => {
-    // `reloadUsers` es la salida que faltaba: un backend que tarda dos segundos
+  it("reintentar vuelve a comprobar la sesión y deja la puerta usable", async () => {
+    // `reloadSession` es la salida que faltaba: un backend que tarda dos segundos
     // de más no debe obligar a recargar el navegador a mano.
-    listUsersMock.mockRejectedValueOnce(new Error("todavía arrancando"));
-    getSessionMock.mockResolvedValue(null);
+    getSessionMock.mockRejectedValueOnce(new Error("todavía arrancando"));
     const { result } = await boot();
     expect(result.current.usersLoadFailed).toBe(true);
 
-    listUsersMock.mockResolvedValue([BETO]);
+    getSessionMock.mockResolvedValue(BETO);
     await act(async () => {
-      await result.current.reloadUsers();
+      await result.current.reloadSession();
     });
 
     expect(result.current.usersLoadFailed).toBe(false);
@@ -352,71 +353,10 @@ describe("useChat · arranque cuando la sonda de sesión falla (V3.80.2)", () =>
 });
 
 describe("useChat · ciclo de vida de la cuenta (V3.81)", () => {
-  it("el alta deja la cuenta activa sin volver a pedir la contraseña", async () => {
-    // Quien acaba de registrarse ya ha escrito lo que hay que escribir: pedirle
-    // la contraseña otra vez en el paso siguiente sería castigar el registro.
-    listUsersMock.mockResolvedValue([]);
-    createAccountMock.mockResolvedValue(ANA_CON_CLAVE);
-    openSessionMock.mockResolvedValue(ANA_CON_CLAVE);
-
-    const { result } = await boot();
-    let outcome: Awaited<ReturnType<typeof result.current.createAccountForGate>> | undefined;
-    await act(async () => {
-      outcome = await result.current.createAccountForGate(
-        "  Ana  ",
-        " ana@example.com ",
-        "caballo-bateria",
-      );
-    });
-
-    expect(createAccountMock).toHaveBeenCalledWith(
-      "Ana",
-      "ana@example.com",
-      "caballo-bateria",
-    );
-    expect(openSessionMock).toHaveBeenCalledWith("a", "caballo-bateria");
-    expect(outcome?.ok).toBe(true);
-    await waitFor(() => expect(result.current.currentUserId).toBe("a"));
-  });
-
-  it("un nombre o un email ya usados vuelven como desenlace, no como avería", async () => {
-    listUsersMock.mockResolvedValue([]);
-    createAccountMock.mockRejectedValue(
-      new ApiError(409, "EMAIL_TAKEN", { message: "EMAIL_TAKEN" }),
-    );
-
-    const { result } = await boot();
-    let outcome: Awaited<ReturnType<typeof result.current.createAccountForGate>> | undefined;
-    await act(async () => {
-      outcome = await result.current.createAccountForGate("Ana", "ana@example.com", "caballo-bateria");
-    });
-
-    expect(outcome).toEqual({ ok: false, reason: "email-taken" });
-  });
-
-  it("el alta desde la LAN se cuenta como «no es tu equipo», no como caída", async () => {
-    listUsersMock.mockResolvedValue([]);
-    createAccountMock.mockRejectedValue(
-      new ApiError(403, "no", { message: "no" }),
-    );
-
-    const { result } = await boot();
-    let outcome: Awaited<ReturnType<typeof result.current.createAccountForGate>> | undefined;
-    await act(async () => {
-      outcome = await result.current.createAccountForGate("Ana", "ana@example.com", "caballo-bateria");
-    });
-
-    expect(outcome).toEqual({ ok: false, reason: "not-local" });
-  });
-
   it("Salir cierra la sesión en el servidor y devuelve a la puerta", async () => {
     // `closeSession()` existía desde V3.75 sin que nadie la llamara: en un equipo
     // compartido no había forma de salir salvo borrar las cookies a mano.
-    listUsersMock.mockResolvedValue([BETO]);
-    // La primera sonda devuelve la sesión abierta; tras salir, el servidor ya no
-    // la reconoce (que es lo que hace de verdad al caducar la cookie).
     getSessionMock.mockResolvedValueOnce(BETO).mockResolvedValue(null);
-    closeSessionMock.mockResolvedValue({ closed: true });
 
     const { result } = await boot();
     await waitFor(() => expect(result.current.currentUserId).toBe("b"));
@@ -427,10 +367,10 @@ describe("useChat · ciclo de vida de la cuenta (V3.81)", () => {
 
     expect(closeSessionMock).toHaveBeenCalled();
     expect(result.current.currentUserId).toBeNull();
+    expect(result.current.users).toEqual([]);
   });
 
   it("un cambio de contraseña fallido se cuenta con su motivo, no como avería", async () => {
-    listUsersMock.mockResolvedValue([BETO]);
     getSessionMock.mockResolvedValue(BETO);
     changePasswordMock.mockRejectedValue(
       new ApiError(401, "PASSWORD_INVALID", { message: "PASSWORD_INVALID" }),
@@ -447,20 +387,7 @@ describe("useChat · ciclo de vida de la cuenta (V3.81)", () => {
     expect(outcome).toEqual({ ok: false, reason: "password-invalid" });
   });
 
-  it("la contraseña temporal del webmaster obliga a cambiarla", async () => {
-    // Se aprende de la respuesta del servidor, nunca se adivina: `useChat` marca
-    // el aviso con el `must_change_password` que viene en la cuenta.
-    const conTemporal = { ...ANA_CON_CLAVE, must_change_password: true };
-    listUsersMock.mockResolvedValue([conTemporal]);
-    getSessionMock.mockResolvedValue(conTemporal);
-
-    const { result } = await boot();
-    await waitFor(() => expect(result.current.currentUserId).toBe("a"));
-    expect(result.current.mustChangePassword).toBe(true);
-  });
-
   it("darse de baja cierra la sesión sin borrar nada", async () => {
-    listUsersMock.mockResolvedValue([BETO]);
     getSessionMock.mockResolvedValueOnce(BETO).mockResolvedValue(null);
     unenrollAccountMock.mockResolvedValue({
       unenrolled: true,
@@ -481,13 +408,11 @@ describe("useChat · ciclo de vida de la cuenta (V3.81)", () => {
   });
 
   it("reenviar la verificación sin SMTP no finge un envío", async () => {
-    listUsersMock.mockResolvedValue([]);
-    resendVerificationMock.mockResolvedValue({
-      sent: false,
-      reason: "SMTP_NOT_CONFIGURED",
-    });
+    getSessionMock.mockResolvedValue(BETO);
 
     const { result } = await boot();
+    await waitFor(() => expect(result.current.currentUserId).toBe("b"));
+
     let sent: boolean | undefined;
     await act(async () => {
       sent = await result.current.resendVerificationNow();

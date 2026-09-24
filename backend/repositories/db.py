@@ -952,6 +952,16 @@ def init_db() -> None:
             ("auth_epoch", "INTEGER NOT NULL DEFAULT 0"),
             # Baja autoservicio. No borra nada: marca la cuenta como retirada.
             ("unenrolled_at", "TEXT"),
+            # V3.82: INVITACIÓN. Hash del token con el que la persona pone su
+            # contraseña por primera vez tras ser autorizada. Hasheado por el
+            # mismo motivo que el de verificación; vacío = no hay invitación viva.
+            ("activation_token_hash", "TEXT NOT NULL DEFAULT ''"),
+            ("activation_sent_at", "TEXT"),
+            # V3.82: RECUPERACIÓN. Hash del token del «olvidé mi contraseña».
+            # Separado del de activación a propósito: son dos enlaces con
+            # caducidades y efectos distintos y no deben canjearse entre sí.
+            ("password_reset_token_hash", "TEXT NOT NULL DEFAULT ''"),
+            ("password_reset_sent_at", "TEXT"),
         ):
             if column not in user_cols:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {column} {ddl}")
@@ -2039,6 +2049,23 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_profile_requests_status "
             "ON profile_requests(status, requested_at)"
         )
+        # V3.82: una solicitud deja de ser «un nombre» y pasa a ser un **alta en
+        # potencia**: guarda el email con el que se invita y el avatar que la
+        # persona eligió. Migración aditiva: las solicitudes anteriores llegan
+        # con `''` y el webmaster puede completarlas desde la consola.
+        request_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(profile_requests)")
+        }
+        for column, ddl in (
+            ("email", "TEXT NOT NULL DEFAULT ''"),
+            ("avatar_color", "TEXT NOT NULL DEFAULT ''"),
+            ("avatar_emoji", "TEXT NOT NULL DEFAULT ''"),
+            ("avatar_image", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if column not in request_cols:
+                conn.execute(
+                    f"ALTER TABLE profile_requests ADD COLUMN {column} {ddl}"
+                )
 
         # Usuario por defecto para no perder conversaciones previas (huérfanas).
         default = conn.execute("SELECT id FROM users LIMIT 1").fetchone()

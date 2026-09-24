@@ -1,52 +1,31 @@
 // @vitest-environment jsdom
 /**
- * Puerta de entrada: elegir cuenta, entrar con contraseña o crear una (V3.81).
+ * Puerta de entrada (V3.82): entrar con email + contraseña, pedir acceso o
+ * recuperar la contraseña.
  *
- * Lo que se fija aquí no es «hay un campo de contraseña», sino que la puerta **no
- * promete lo que no puede cumplir**: no deja enviar una contraseña con mala forma
- * (el backend la rechazaría con 400), no se queda muda cuando no cuadra, no ofrece
- * crear una cuenta desde la LAN (fuera del equipo el backend responde 403) y no
- * atrapa a nadie en la pantalla.
+ * Lo que se fija aquí no es «hay un campo de email», sino que la puerta **no
+ * promete lo que no puede cumplir** y **no deja entrar sin demostrar nada**:
  *
- * Quién decide que hace falta contraseña es el servidor: estos tests reciben el
- * estado ya resuelto por props (que es como se lo pasa `useChat`), porque lo que se
- * prueba es el contrato de la vista.
+ * - No hay lista de cuentas que elegir. Esto es lo que hacía posible nombrar a
+ *   otra persona, y es la razón de que la puerta ya no sepa quién existe.
+ * - Los desenlaces que trae `useChat` (credenciales malas, cuenta sin activar,
+ *   freno) se pintan con textos distintos, porque mandan a hacer cosas distintas.
+ * - El formulario de solicitud exige un email con forma: sin él no hay forma de
+ *   mandar la invitación, así que dejarle enviar sería prometer un correo que no
+ *   puede salir.
+ *
+ * Quién decide si la credencial vale es el servidor: estos tests reciben el
+ * desenlace ya resuelto por props (que es como se lo pasa `useChat`), porque lo
+ * que se prueba es el contrato de la vista.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { I18nProvider } from "../hooks/useI18n";
-import type { ProfileRequest, User } from "../types/api";
+import type { ProfileRequest } from "../types/api";
+import type { LoginOutcome } from "../hooks/useChat";
 import { ProfileGate } from "./ProfileGate";
 
-function user(id: string, name: string, hasPassword = false): User {
-  return {
-    id,
-    name,
-    avatar_color: "",
-    avatar_emoji: "",
-    avatar_image: "",
-    has_password: hasPassword,
-    created_at: "2026-01-01T00:00:00Z",
-  };
-}
-
-const ANA = user("a", "Ana", true);
-const BETO = user("b", "Beto");
-
 afterEach(cleanup);
-
-function renderGate(props: Partial<Parameters<typeof ProfileGate>[0]> = {}) {
-  return render(
-    <I18nProvider lang="en" setLang={() => {}}>
-      <ProfileGate
-        users={[ANA, BETO]}
-        onSelect={() => {}}
-        onRequest={async () => ({ ok: true, request: PEDIDA })}
-        {...props}
-      />
-    </I18nProvider>,
-  );
-}
 
 /** La solicitud tal como la devuelve el backend, para el caso de éxito. */
 const PEDIDA: ProfileRequest = {
@@ -55,6 +34,7 @@ const PEDIDA: ProfileRequest = {
   display_name: "Ana",
   user_id: "",
   note: "",
+  email: "ana@example.com",
   requested_at: "2026-09-21T22:00:00Z",
   status: "pending",
   decided_at: "",
@@ -62,208 +42,185 @@ const PEDIDA: ProfileRequest = {
   resolved_user_id: "",
 };
 
-describe("ProfileGate · lista de cuentas", () => {
-  it("elegir una cuenta avisa con su id", () => {
-    const onSelect = vi.fn();
-    renderGate({ onSelect });
-    fireEvent.click(screen.getByRole("option", { name: /Beto/ }));
-    expect(onSelect).toHaveBeenCalledWith("b");
-  });
+function renderGate(props: Partial<Parameters<typeof ProfileGate>[0]> = {}) {
+  return render(
+    <I18nProvider lang="en" setLang={() => {}}>
+      <ProfileGate
+        onLogin={async () => ({ ok: true, user: { id: "a", name: "Ana", created_at: "" } })}
+        onRequest={async () => ({ ok: true, request: PEDIDA })}
+        onForgot={async () => ({ sent: true })}
+        {...props}
+      />
+    </I18nProvider>,
+  );
+}
 
-  it("sin paso de contraseña no aparece el campo", () => {
+const emailInput = () => screen.getByLabelText("Email") as HTMLInputElement;
+const passwordInput = () =>
+  screen.getByLabelText("Password") as HTMLInputElement;
+const signIn = () => screen.getByRole("button", { name: "Sign in" });
+
+async function fillLogin(email = "ana@example.com", password = "caballo-bateria") {
+  fireEvent.change(emailInput(), { target: { value: email } });
+  fireEvent.change(passwordInput(), { target: { value: password } });
+}
+
+describe("ProfileGate · entrar (V3.82)", () => {
+  it("ya no hay lista de cuentas: la puerta no enumera a nadie", () => {
+    // Es la decisión de fondo de V3.82. Un `GET /api/users` sin sesión convertía
+    // la pantalla de entrada en un censo de quién tiene cuenta.
     renderGate();
-    expect(screen.queryByLabelText("Password")).toBeNull();
-  });
-});
-
-describe("ProfileGate · paso de contraseña (V3.81)", () => {
-  const passwordInput = () => screen.getByLabelText("Password") as HTMLInputElement;
-  const submit = () => screen.getByRole("button", { name: "Sign in" });
-
-  it("pide la contraseña de la cuenta que la tiene", () => {
-    renderGate({ passwordUser: ANA });
-    expect(screen.getByText("Ana")).toBeTruthy();
-    expect(passwordInput().type).toBe("password");
-    // El formulario de «pedir cuenta» no se ofrece mientras se teclea: no son dos
-    // cosas que se puedan hacer a la vez.
-    expect(screen.queryByLabelText("Name")).toBeNull();
+    expect(screen.queryByRole("option")).toBeNull();
+    expect(screen.queryByText("Beto")).toBeNull();
   });
 
-  it("no deja enviar con el campo vacío", () => {
-    renderGate({ passwordUser: ANA, onSubmitPassword: async () => false });
-    expect((submit() as HTMLButtonElement).disabled).toBe(true);
+  it("no deja enviar hasta tener email y contraseña", () => {
+    renderGate();
+    expect((signIn() as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    expect((signIn() as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(passwordInput(), { target: { value: "c" } });
-    expect((submit() as HTMLButtonElement).disabled).toBe(false);
+    expect((signIn() as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("envía la contraseña de la cuenta correcta", async () => {
-    const onSubmitPassword = vi.fn().mockResolvedValue(true);
-    renderGate({ passwordUser: ANA, onSubmitPassword });
-    fireEvent.change(passwordInput(), { target: { value: "caballo-bateria" } });
-    fireEvent.click(submit());
-    expect(onSubmitPassword).toHaveBeenCalledWith("a", "caballo-bateria");
+  it("manda lo tecleado al abrir la sesión", async () => {
+    const onLogin = vi.fn().mockResolvedValue({
+      ok: true,
+      user: { id: "a", name: "Ana", created_at: "" },
+    });
+    renderGate({ onLogin });
+    await fillLogin();
+    fireEvent.click(signIn());
+    expect(onLogin).toHaveBeenCalledWith("ana@example.com", "caballo-bateria");
   });
 
-  it("una contraseña incorrecta no se queda en silencio", () => {
-    renderGate({ passwordUser: ANA, passwordFeedback: "password-invalid" });
-    expect(screen.getByText("That password is not right.")).toBeTruthy();
-  });
-
-  it("el freno se explica con su propio mensaje", () => {
-    renderGate({ passwordUser: ANA, passwordFeedback: "password-throttled" });
+  it("unas credenciales que no cuadran no se quedan en silencio", async () => {
+    renderGate({
+      onLogin: async () => ({ ok: false, reason: "invalid-credentials" }),
+    });
+    await fillLogin();
+    fireEvent.click(signIn());
     expect(
-      screen.getByText("Too many attempts. Wait a moment and try again."),
+      await screen.findByText("That email or password is not right."),
     ).toBeTruthy();
+    // Y la contraseña se vacía: dejarla puesta invita a reintentar lo mismo.
+    expect(passwordInput().value).toBe("");
   });
 
-  it("dice quién puede restablecerla, porque no hay correo garantizado", () => {
-    renderGate({ passwordUser: ANA });
-    // Dos textos hablan del webmaster en este paso (el aviso y la ayuda). Se fija
-    // el de la recuperación, que es el que dice qué hacer si no te acuerdas.
-    expect(screen.getByText(/resets it from the management console/)).toBeTruthy();
+  it("una cuenta sin activar manda al enlace del correo, no a «algo falló»", async () => {
+    // El texto importa: es una instrucción que sí se puede seguir.
+    renderGate({ onLogin: async () => ({ ok: false, reason: "not-activated" }) });
+    await fillLogin();
+    fireEvent.click(signIn());
+    expect(await screen.findByText(/not activated yet/)).toBeTruthy();
   });
 
-  it("se puede volver sin quedarse atrapado en el paso de contraseña", () => {
-    const onCancelPassword = vi.fn();
-    renderGate({ passwordUser: ANA, onCancelPassword });
-    fireEvent.click(screen.getByRole("button", { name: "Back to users" }));
-    expect(onCancelPassword).toHaveBeenCalled();
+  it("«fuera de servicio» y «dada de baja» dicen cosas distintas", async () => {
+    const { unmount } = renderGate({
+      onLogin: async () => ({ ok: false, reason: "disabled" }),
+    });
+    await fillLogin();
+    fireEvent.click(signIn());
+    expect(await screen.findByText(/out of service/)).toBeTruthy();
+    unmount();
+
+    renderGate({ onLogin: async () => ({ ok: false, reason: "unenrolled" }) });
+    await fillLogin();
+    fireEvent.click(signIn());
+    expect(await screen.findByText(/closed at your request/)).toBeTruthy();
+  });
+
+  it("el freno se explica con su propio mensaje", async () => {
+    renderGate({
+      onLogin: async () => ({ ok: false, reason: "throttled", retryAfterSeconds: 30 }),
+    });
+    await fillLogin();
+    fireEvent.click(signIn());
+    expect(await screen.findByText(/Too many attempts/)).toBeTruthy();
+  });
+
+  it("un backend caído se cuenta como avería, no como credencial mala", async () => {
+    const onLogin = vi.fn(
+      async (): Promise<LoginOutcome> => ({ ok: false, reason: "error" }),
+    );
+    renderGate({ onLogin });
+    await fillLogin();
+    fireEvent.click(signIn());
+    // Se fija lo que **no** dice: acusar a la contraseña de una caída manda a
+    // cambiarla, y eso es hacer perder el tiempo a quien no se ha equivocado.
+    expect(await screen.findByText(/Is the server running\?/)).toBeTruthy();
+    expect(screen.queryByText(/not right/)).toBeNull();
   });
 });
 
-describe("ProfileGate · crear una cuenta en el equipo (V3.81)", () => {
-  const openCreate = () =>
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+describe("ProfileGate · solicitar acceso (V3.82)", () => {
+  const openRequest = () =>
+    fireEvent.click(screen.getByRole("button", { name: "Ask for access" }));
+  const submitRequest = () =>
+    screen.getByRole("button", { name: "Send request" });
 
-  it("no ofrece crear cuenta desde la LAN: el backend la cerraría con 403", () => {
-    renderGate({ canCreateAccount: false, onCreateAccount: async () => ({ ok: true, user: BETO }) });
-    expect(screen.queryByRole("button", { name: "Create account" })).toBeNull();
-  });
-
-  it("en el equipo ofrece el alta y pide nombre, email y contraseña", () => {
-    renderGate({
-      canCreateAccount: true,
-      onCreateAccount: async () => ({ ok: true, user: BETO }),
-    });
-    openCreate();
-    expect(screen.getByLabelText("Name")).toBeTruthy();
+  it("pide nombre, email y avatar: lo que la cuenta necesita para existir", () => {
+    renderGate();
+    openRequest();
+    expect(screen.getByLabelText("Name or nickname")).toBeTruthy();
     expect(screen.getByLabelText("Email")).toBeTruthy();
-    expect(screen.getByLabelText("Password")).toBeTruthy();
-    expect(screen.getByLabelText("Repeat the password")).toBeTruthy();
+    expect(screen.getByLabelText("Note (optional)")).toBeTruthy();
   });
 
-  it("no manda el alta con dos contraseñas distintas", async () => {
-    const onCreateAccount = vi.fn();
-    renderGate({ canCreateAccount: true, onCreateAccount });
-    openCreate();
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "marta@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("Password"), {
-      target: { value: "caballo-bateria" },
-    });
-    fireEvent.change(screen.getByLabelText("Repeat the password"), {
-      target: { value: "caballo-bateriaX" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    expect(onCreateAccount).not.toHaveBeenCalled();
-    expect(await screen.findByText(/do not match/)).toBeTruthy();
+  it("no manda una solicitud sin nombre", async () => {
+    const onRequest = vi.fn();
+    renderGate({ onRequest });
+    openRequest();
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(submitRequest());
+    expect(onRequest).not.toHaveBeenCalled();
+    expect(await screen.findByText("That name is not valid.")).toBeTruthy();
   });
 
-  it("no manda el alta con un email que no lo es", async () => {
-    const onCreateAccount = vi.fn();
-    renderGate({ canCreateAccount: true, onCreateAccount });
-    openCreate();
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "marta" } });
-    fireEvent.change(screen.getByLabelText("Password"), {
-      target: { value: "caballo-bateria" },
+  it("no manda una solicitud sin un email con forma", async () => {
+    // Sin email no hay forma de mandar la invitación: enviarla sería prometer un
+    // correo que no puede salir.
+    const onRequest = vi.fn();
+    renderGate({ onRequest });
+    openRequest();
+    fireEvent.change(screen.getByLabelText("Name or nickname"), {
+      target: { value: "Ana" },
     });
-    fireEvent.change(screen.getByLabelText("Repeat the password"), {
-      target: { value: "caballo-bateria" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    expect(onCreateAccount).not.toHaveBeenCalled();
+    fireEvent.change(emailInput(), { target: { value: "ana" } });
+    fireEvent.click(submitRequest());
+    expect(onRequest).not.toHaveBeenCalled();
     expect(await screen.findByText(/does not look valid/)).toBeTruthy();
   });
 
-  it("no manda el alta con una contraseña corta", async () => {
-    const onCreateAccount = vi.fn();
-    renderGate({ canCreateAccount: true, onCreateAccount });
-    openCreate();
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "marta@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "corta" } });
-    fireEvent.change(screen.getByLabelText("Repeat the password"), {
-      target: { value: "corta" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    expect(onCreateAccount).not.toHaveBeenCalled();
-  });
-
-  it("cuenta el nombre o el email ya usados con mensajes distintos", async () => {
-    const onCreateAccount = vi.fn().mockResolvedValue({ ok: false, reason: "email-taken" });
-    renderGate({ canCreateAccount: true, onCreateAccount });
-    openCreate();
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Marta" } });
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "marta@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("Password"), {
-      target: { value: "caballo-bateria" },
-    });
-    fireEvent.change(screen.getByLabelText("Repeat the password"), {
-      target: { value: "caballo-bateria" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
-    expect(await screen.findByText("That email is already in use.")).toBeTruthy();
-  });
-});
-
-describe("ProfileGate · pedir una cuenta (V3.77)", () => {
-  const nameInput = () => screen.getByLabelText("Name") as HTMLInputElement;
-  const submit = () => screen.getByRole("button", { name: "Ask for a user" });
-
-  it("sigue existiendo la vía de pedir, que es la de la LAN", () => {
-    // Desde otro dispositivo no se crea nada: se deja una solicitud que el
-    // webmaster resuelve. Ese camino no desaparece con el registro local.
-    renderGate();
-    expect(submit()).toBeTruthy();
-  });
-
-  it("manda el nombre recortado y cuenta que la solicitud está enviada", async () => {
+  it("manda nombre, email y avatar y cuenta que está enviada", async () => {
     const onRequest = vi.fn().mockResolvedValue({ ok: true, request: PEDIDA });
     renderGate({ onRequest });
-
-    fireEvent.change(nameInput(), { target: { value: "  Ana  " } });
-    fireEvent.click(submit());
-
-    expect(onRequest).toHaveBeenCalledWith("Ana");
-    expect(await screen.findByText(/Request sent/)).toBeTruthy();
-    // Y no desaparece: no hay cuenta a la que entrar todavía, así que la puerta se
-    // queda explicando que falta la autorización del webmaster.
-    expect(nameInput().disabled).toBe(true);
-    expect((submit() as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("no deja pedir con el campo vacío", () => {
-    renderGate();
-    expect((submit() as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(nameInput(), { target: { value: "   " } });
-    expect((submit() as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("un nombre ya pedido se explica como espera, no como fallo", async () => {
-    renderGate({
-      onRequest: async () => ({ ok: false, reason: "duplicate" }),
+    openRequest();
+    fireEvent.change(screen.getByLabelText("Name or nickname"), {
+      target: { value: "  Ana  " },
     });
-    fireEvent.change(nameInput(), { target: { value: "Ana" } });
-    fireEvent.click(submit());
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(submitRequest());
+
+    // El nombre se manda tal cual se tecleó: **quien lo recorta es el cliente de
+    // la API** (`requestProfile`), que es el único sitio donde el nombre se
+    // normaliza. Recortarlo también aquí sería tener la regla dos veces.
+    expect(onRequest).toHaveBeenCalledWith("  Ana  ", "ana@example.com", {}, "");
+    expect(await screen.findByText(/Request sent/)).toBeTruthy();
+  });
+
+  it("un email que ya tiene cuenta se explica con la salida a mano", async () => {
+    renderGate({
+      onRequest: async () => ({ ok: false, reason: "email-taken" }),
+    });
+    openRequest();
+    fireEvent.change(screen.getByLabelText("Name or nickname"), {
+      target: { value: "Ana" },
+    });
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(submitRequest());
     expect(
-      await screen.findByText("There is already a pending request with that name."),
+      await screen.findByText(/already has an account/),
     ).toBeTruthy();
   });
 
@@ -271,66 +228,88 @@ describe("ProfileGate · pedir una cuenta (V3.77)", () => {
     const { unmount } = renderGate({
       onRequest: async () => ({ ok: false, reason: "full" }),
     });
-    fireEvent.change(nameInput(), { target: { value: "Ana" } });
-    fireEvent.click(submit());
+    openRequest();
+    fireEvent.change(screen.getByLabelText("Name or nickname"), {
+      target: { value: "Ana" },
+    });
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(submitRequest());
     expect(await screen.findByText(/too many pending requests/i)).toBeTruthy();
     unmount();
 
     renderGate({ onRequest: async () => ({ ok: false, reason: "offline" }) });
-    fireEvent.change(nameInput(), { target: { value: "Ana" } });
-    fireEvent.click(submit());
+    openRequest();
+    fireEvent.change(screen.getByLabelText("Name or nickname"), {
+      target: { value: "Ana" },
+    });
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(submitRequest());
     expect(await screen.findByText(/Could not send the request/)).toBeTruthy();
   });
 
-  it("tras un fallo se puede rectificar sin recargar", async () => {
-    const onRequest = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, reason: "invalid" })
-      .mockResolvedValueOnce({ ok: true, request: PEDIDA });
-    renderGate({ onRequest });
-
-    fireEvent.change(nameInput(), { target: { value: "Ana" } });
-    fireEvent.click(submit());
-    expect(await screen.findByText("That name is not valid.")).toBeTruthy();
-
-    fireEvent.change(nameInput(), { target: { value: "Ana María" } });
-    // Al escribir, el error viejo se retira: dejaría de hablar del nombre actual.
-    expect(screen.queryByText("That name is not valid.")).toBeNull();
-    fireEvent.click(submit());
-    expect(onRequest).toHaveBeenLastCalledWith("Ana María");
-    expect(await screen.findByText(/Request sent/)).toBeTruthy();
-  });
-
-  it("la puerta dice a quién hay que pedirle la autorización", () => {
+  it("se puede volver a la entrada sin quedarse atrapado", () => {
     renderGate();
-    expect(screen.getByText(/webmaster/)).toBeTruthy();
+    openRequest();
+    fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+    expect(signIn()).toBeTruthy();
   });
 });
 
-describe("ProfileGate · la lista que no se pudo leer (V3.80.2)", () => {
-  it("no confunde «no hay usuarios» con «no se pudo leer»", () => {
-    renderGate({ users: [], loadFailed: true });
+describe("ProfileGate · recuperar la contraseña (V3.82)", () => {
+  const openForgot = () =>
+    fireEvent.click(screen.getByRole("button", { name: "I forgot my password" }));
+
+  it("deja de ser informativo: ahora pide el email de verdad", () => {
+    // Hasta V3.81 el botón solo **explicaba** que la restablecía el webmaster.
+    renderGate();
+    openForgot();
+    expect(emailInput()).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send link" })).toBeTruthy();
+  });
+
+  it("manda el email y no promete que exista la cuenta", async () => {
+    const onForgot = vi.fn().mockResolvedValue({ sent: true });
+    renderGate({ onForgot });
+    openForgot();
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send link" }));
+
+    expect(onForgot).toHaveBeenCalledWith("ana@example.com");
+    // «Si ese email tiene una cuenta…»: el backend responde igual siempre para no
+    // revelar quién está registrado, y el texto no puede decir más que el backend.
+    expect(await screen.findByText(/If that email has an account/)).toBeTruthy();
+  });
+
+  it("sin SMTP dice que no se ha enviado nada en vez de fingirlo", async () => {
+    renderGate({ onForgot: async () => ({ sent: false }) });
+    openForgot();
+    fireEvent.change(emailInput(), { target: { value: "ana@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send link" }));
+    expect(await screen.findByText(/Nothing was sent/)).toBeTruthy();
+  });
+});
+
+describe("ProfileGate · la sesión que no se pudo comprobar (V3.80.2)", () => {
+  it("no confunde «no hay sesión» con «no se pudo comprobar»", () => {
+    renderGate({ loadFailed: true });
     expect(screen.getByRole("alert")).toBeTruthy();
-    // La mentira que dejaba al alumno sin salida era pintar «todavía no hay
-    // usuarios» cuando lo que había era un fallo de lectura.
-    expect(screen.queryByText(/no users yet/i)).toBeNull();
+    // La mentira que dejaba al alumno sin salida era ofrecer entrar cuando lo que
+    // había era un fallo de lectura.
+    expect(screen.queryByLabelText("Email")).toBeNull();
   });
 
   it("ofrece reintentar en el sitio y avisa al hacerlo", () => {
     const onRetry = vi.fn();
-    renderGate({ users: [], loadFailed: true, onRetry });
+    renderGate({ loadFailed: true, onRetry });
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it("con la lista cargada bien, el aviso no aparece", () => {
+  it("con la sesión comprobada bien, el aviso no aparece", () => {
     renderGate();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("option", { name: /Ana/ })).toBeTruthy();
-  });
-
-  it("ni se ofrece reintentar cuando no hace falta", () => {
-    renderGate();
-    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(emailInput()).toBeTruthy();
   });
 });
+
+

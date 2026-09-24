@@ -73,6 +73,18 @@ _COMMON_PASSWORDS = frozenset(
 EMAIL_TOKEN_TTL_SECONDS = 3600
 _EMAIL_TOKEN_BYTES = 32
 
+# Caducidad del token de **activación** (V3.82). Es el enlace que autoriza a
+# alguien a poner su contraseña por primera vez, y por eso no puede caducar en una
+# hora: quien lo recibe tiene que elegir contraseña y quizá hacerlo desde otro
+# equipo. Una semana es lo que dura una invitación razonable; pasado ese plazo,
+# pide una nueva al webmaster.
+ACTIVATION_TOKEN_TTL_SECONDS = 7 * 24 * 3600
+
+# Caducidad del token de **restablecimiento de contraseña** (V3.82). Más corto
+# que la activación y por un motivo distinto: aquí ya hay una cuenta viva, y un
+# enlace que permite tomar su control no debe sobrevivir al rato en que se pidió.
+PASSWORD_RESET_TTL_SECONDS = 3600
+
 # --- Freno de intentos por cuenta -------------------------------------------
 # Holgura antes de empezar a frenar. Quien se equivoca dos o tres veces no debe
 # notar nada; a partir de ahí el retardo crece en potencias de 2.
@@ -209,16 +221,46 @@ def new_email_token() -> str:
     return secrets.token_urlsafe(_EMAIL_TOKEN_BYTES)
 
 
-def hash_email_token(token: str) -> str:
-    """Hash del token para guardarlo.
+def new_activation_token() -> str:
+    """Token de **activación** en claro (el enlace de la invitación, V3.82).
 
-    SHA-256 sin sal es suficiente aquí y es una decisión, no un descuido: el token
-    lo genera el propio servidor con 256 bits de entropía (no es una contraseña
-    elegida por una persona, así que no hay diccionario que lo ataque), es de un
-    solo uso y caduca en una hora. Lo que sí evita el hash es que leer la fila de
-    la BD baste para confirmar un email ajeno.
+    Misma entropía que el de verificación (256 bits): lo que autoriza a poner la
+    contraseña de una cuenta no puede ser adivinable. Se guarda hasheado y es de
+    un solo uso, igual que los demás.
+    """
+    return secrets.token_urlsafe(_EMAIL_TOKEN_BYTES)
+
+
+def new_password_reset_token() -> str:
+    """Token de **restablecimiento** en claro (V3.82)."""
+    return secrets.token_urlsafe(_EMAIL_TOKEN_BYTES)
+
+
+def hash_token(token: str) -> str:
+    """Hash de cualquier token de un solo uso para guardarlo.
+
+    SHA-256 sin sal es suficiente aquí y es una decisión, no un descuido: los
+    tokens los genera el propio servidor con 256 bits de entropía (no son
+    contraseñas elegidas por una persona, así que no hay diccionario que los
+    ataque), son de un solo uso y caducan. Lo que sí evita el hash es que leer la
+    fila de la BD baste para tomar una cuenta ajena.
+
+    Es la generalización de `hash_email_token`, que existía desde V3.81: activar
+    y restablecer usan la misma primitiva, y una sola función evita que las tres
+    se separen con el tiempo.
     """
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def hash_email_token(token: str) -> str:
+    """Hash del token de verificación de email para guardarlo.
+
+    Alias de `hash_token`, que nació en V3.82 al añadir activación y
+    restablecimiento: era el mismo cálculo y mantener dos copias garantizaba que
+    un día divergieran. El nombre se conserva porque lo usan los llamantes de
+    V3.81 y la API pública del módulo no debe romperse por un refactor interno.
+    """
+    return hash_token(token)
 
 
 def is_valid_email(raw: object) -> bool:

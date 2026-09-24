@@ -31,70 +31,92 @@ router = APIRouter()
 
 
 def _is_https(request: Request) -> bool:
-    """¿La petición llegó por HTTPS? Decide el atributo `Secure` de la cookie.
-
-    `Secure` impide que la cookie viaje por HTTP en claro, pero si se pusiera
-    siempre el navegador la **descartaría** en el modo de desarrollo (Vite sirve
-    por HTTP), y la sesión no se abriría nunca. Por eso se decide por petición,
-    igual que hacía la cookie de perfil que la Fase 2 retiró.
-    """
-    forwarded = request.headers.get("x-forwarded-proto", "")
-    return request.url.scheme == "https" or forwarded.split(",")[0].strip() == "https"
+    """Compatibilidad: la política vive en `services.sessions.is_https`."""
+    return sessions.is_https(request)
 
 
 def _set_session_cookie(response: Response, request: Request, token: str) -> None:
-    response.set_cookie(
-        sessions.SESSION_COOKIE,
-        token,
-        max_age=sessions.SESSION_TTL_SECONDS,
-        path="/",
-        httponly=True,  # fuera del alcance de JS: lo que `et_user_id` no tenía
-        samesite="lax",  # el producto no necesita cookies en flujos de terceros
-        secure=_is_https(request),
-    )
+    sessions.set_cookie(response, token, secure=sessions.is_https(request))
 
 
 @router.post("/api/session", response_model=User)
 async def open_session(
     body: SessionCreate, request: Request, response: Response
 ) -> dict:
-    """Abre sesión para una cuenta existente (404 si no existe).
+    """Abre sesión con **email + contraseña** (V3.82).
 
-    V3.81: si la cuenta tiene contraseña, es obligatoria. Los desenlaces son
-    distinguibles a propósito, para que la UI sepa qué pintar:
+    Lo que cambió respecto a V3.81 y por qué: antes se entraba nombrando una
+    cuenta (`user_id`) y la contraseña era opcional si la cuenta no tenía. Eso
+    hacía posible suplantar a cualquiera con solo saber su nombre. Ahora la
+    identidad se demuestra con el email y una contraseña que **siempre** existe:
+    una cuenta sin contraseña no es una cuenta, es una invitación pendiente.
 
-    - `401 PASSWORD_REQUIRED` — la cuenta tiene contraseña y no se envió ninguna.
-    - `401 PASSWORD_INVALID`  — llegó una y no cuadra (nunca se dice si «casi»).
-    - `429 PASSWORD_THROTTLED` — el freno de `services/credentials.py` está
-      activo; incluye `Retry-After` para que la UI pueda contar los segundos.
+    Desenlaces, y qué puede aprender quien llama de cada uno:
+
+    - `401 INVALID_CREDENTIALS` — email inexistente o contraseña que no cuadra;
+      **el mismo** para los dos, para que el login no sirva para averiguar qué
+      correos tienen cuenta.
+    - `403 ACCOUNT_NOT_ACTIVATED` — la cuenta existe y está autorizada pero
+      todavía no tiene contraseña: se le dice a quien **ya ha demostrado conocer
+      el email**, para que sepa que su invitación está en el correo. Es un mensaje
+      de ayuda, no un oráculo: no revela nada que el email no revelara ya.
+    - `429 PASSWORD_THROTTLED` — freno de intentos, con `Retry-After`.
     - `403 PROFILE_DISABLED` / `403 ACCOUNT_UNENROLLED` — la cuenta está fuera de
       servicio; se comprueba **antes** de gastar KDF y de contar intentos.
     """
-    user = await user_service.get_user(body.user_id)
+    email = credentials.normalize_email(body.email)
+    user = await user_service.find_by_email(email) if email else None
     if user is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        # Mismo cuerpo que una contraseña incorrecta: enumerar cuentas no puede
+        # ser tan barato como probar correos.
+        raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
 
     if user_service.is_disabled(user):
         raise HTTPException(status_code=403, detail="PROFILE_DISABLED")
     if user_service.is_unenrolled(user):
         raise HTTPException(status_code=403, detail="ACCOUNT_UNENROLLED")
 
-    await _require_password_if_set(body.user_id, body.password)
+    stored = await user_service.get_password_hash(user["id"]) or ""
+    if not stored:
+        # Invitación pendiente: sin contraseña no hay entrada. Esto es el cierre
+        # **por construcción** del agujero que el gate de G0 vigilaba.
+        raise HTTPException(status_code=403, detail="ACCOUNT_NOT_ACTIVATED")
 
-    epoch = await user_service.get_auth_epoch(body.user_id) or 0
-    _set_session_cookie(response, request, sessions.issue(user["id"], epoch=epoch))
+    uid = user["id"]
+    espera = credentials.seconds_to_wait(uid)
+    if espera > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="PASSWORD_THROTTLED",
+            headers={"Retry-After": str(int(espera) + 1)},
+        )
+    if not credentials.verify_password(stored, body.password):
+        credentials.note_failure(uid)
+        raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
+    credentials.note_success(uid)
+
+    epoch = await user_service.get_auth_epoch(uid) or 0
+    sessions.set_cookie(
+        response,
+        sessions.issue(uid, epoch=epoch),
+        secure=sessions.is_https(request),
+    )
     return user
 
 
 async def _require_password_if_set(uid: str, password: str | None) -> None:
-    """Puerta de la contraseña. Sin credencial guardada no hace nada.
+    """Puerta de la contraseña para acciones sobre la cuenta **de la sesión**.
 
-    Es deliberado que una cuenta heredada (`password_hash` vacío) siga entrando
-    sin pedir nada: la alternativa —cerrar la puerta a todo el mundo al
-    actualizar— convertiría una mejora de seguridad en un bloqueo. El precio está
-    declarado: hasta que el webmaster asigne credenciales, esas cuentas siguen
-    abriéndose nombrando. La consola de gestión las lista precisamente para que
-    ese número llegue a cero.
+    V3.82: la entrada ya no la usa —`open_session` demuestra la credencial por
+    email—, pero sigue siendo la comprobación de las acciones destructivas
+    (cambiar la contraseña, darse de baja): que la sesión esté abierta no basta
+    para darse de baja, hay que volver a demostrar la contraseña. Sin eso, pasar
+    por delante de un equipo con la sesión abierta bastaría para dar de baja a
+    quien esté dentro.
+
+    Si la cuenta no tiene contraseña (una invitación a medias) no hay nada que
+    comprobar: las acciones que la usan ya exigen sesión, y sin contraseña no hay
+    sesión posible.
     """
     stored = await user_service.get_password_hash(uid)
     if not stored:

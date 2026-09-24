@@ -441,8 +441,12 @@ function accountErrorKey(
       return "account.passwordInvalid";
     case "password-required":
       return "account.passwordRequired";
-    case "invalid":
+    case "password-format":
+      return "account.passwordFormat";
+    case "email-format":
       return "account.emailFormat";
+    case "email-taken":
+      return "account.emailTaken";
     default:
       return "account.error";
   }

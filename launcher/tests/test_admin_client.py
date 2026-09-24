@@ -111,6 +111,24 @@ def test_aprobar_ya_no_manda_pin_de_perfil(monkeypatch):
     assert rec.body == {"note": "vale"}
 
 
+def test_reenviar_invitacion_es_un_post_sin_cuerpo(monkeypatch):
+    """V3.82: el token lo emite el servidor; el webmaster solo pide que se emita.
+
+    Mandar aquí un token o un email sería elegir la credencial desde fuera de
+    donde se firma, y el enlace de vuelta no se podría verificar.
+    """
+    rec = _install(monkeypatch, b'{"user": {"id": "u1"}, "activation_link": "http://x"}')
+
+    result = admin.resend_activation("secreto-largo", "u1")
+
+    assert result.ok
+    assert rec.request.method == "POST"
+    assert rec.request.full_url.endswith("/api/admin/users/u1/resend-activation")
+    assert rec.request.data is None
+    # El enlace vuelve en la respuesta para poder entregarlo sin SMTP.
+    assert result.data["activation_link"] == "http://x"
+
+
 def test_rechazar_lleva_el_motivo_y_nada_mas(monkeypatch):
     rec = _install(monkeypatch, b'{"id": 7, "status": "rejected"}')
 

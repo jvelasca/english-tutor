@@ -193,3 +193,38 @@ def verify(token: str | None, *, now: int | None = None) -> str | None:
     """
     resolved = verify_session(token, now=now)
     return resolved[0] if resolved is not None else None
+
+
+def is_https(request) -> bool:  # noqa: ANN001 - se evita importar fastapi aquí
+    """¿La petición llegó por HTTPS? Decide el atributo `Secure` de la cookie.
+
+    `Secure` impide que la cookie viaje por HTTP en claro, pero si se pusiera
+    siempre el navegador la **descartaría** en el modo de desarrollo (Vite sirve
+    por HTTP), y la sesión no se abriría nunca. Por eso se decide por petición,
+    igual que hacía la cookie de perfil que la Fase 2 del P0 retiró.
+
+    Vive aquí y no en cada router porque abrir sesión ocurre ya en tres sitios
+    (`/api/session`, `/api/account/activate`, `/api/account/reset-password`): tres
+    copias de la misma política de cookie es exactamente cómo una de ellas se
+    queda atrás en la siguiente release.
+    """
+    forwarded = request.headers.get("x-forwarded-proto", "")
+    return request.url.scheme == "https" or forwarded.split(",")[0].strip() == "https"
+
+
+def set_cookie(response, token: str, *, secure: bool) -> None:  # noqa: ANN001
+    """Emite la cookie de sesión con la política del producto, en un solo sitio.
+
+    `HttpOnly` (fuera del alcance de JavaScript) y `SameSite=Lax` (el producto no
+    necesita flujos de terceros) no son negociables; `Secure` lo decide quien
+    llama con `is_https`.
+    """
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_TTL_SECONDS,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=secure,
+    )

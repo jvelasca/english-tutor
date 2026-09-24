@@ -1,43 +1,16 @@
 import fs from "node:fs";
 
-import { request } from "@playwright/test";
-
-import { TESTER_FILE, VISUAL_TESTER_FALLBACK_ID } from "./globalSetup";
-
-const BASE_URL = "https://localhost:5173";
+import { TESTER_FILE } from "./globalSetup";
 
 /**
- * Borra el perfil de prueba (y sus datos) al terminar la suite visual, para no
- * dejar residuos en la base de datos local (V3.52.1). Aunque el perfil está
- * marcado `is_test` y es invisible en la app, se elimina igualmente: el teardown
- * cierra el ciclo. Si el backend no está disponible o se usó el id ficticio no
- * hay nada que limpiar. Siempre borra el fichero de handshake.
+ * Cierra el arnés visual borrando el fichero de handshake.
+ *
+ * Hasta V3.82 aquí se borraba además el perfil `is_test` por API
+ * (`DELETE /api/users/{id}`), porque `globalSetup` lo había creado. Ya no hay
+ * perfil que borrar —la identidad de los specs es mockeada y la alta pública está
+ * cerrada (ver `globalSetup.ts`)—, así que el teardown se queda con lo único que
+ * sigue haciendo falta: no dejar el handshake en el árbol de trabajo.
  */
 export default async function globalTeardown(): Promise<void> {
-  let id: string | undefined;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(TESTER_FILE, "utf8")) as {
-      id?: string;
-    };
-    id = parsed.id;
-  } catch {
-    /* Sin fichero (setup no llegó a escribir): nada que limpiar. */
-  }
-  try {
-    if (id && id !== VISUAL_TESTER_FALLBACK_ID) {
-      const ctx = await request.newContext({
-        baseURL: BASE_URL,
-        ignoreHTTPSErrors: true,
-      });
-      try {
-        await ctx.delete(`/api/users/${encodeURIComponent(id)}`);
-      } finally {
-        await ctx.dispose();
-      }
-    }
-  } catch {
-    /* Backend caído: nada que limpiar por API. */
-  } finally {
-    fs.rmSync(TESTER_FILE, { force: true });
-  }
+  fs.rmSync(TESTER_FILE, { force: true });
 }

@@ -43,6 +43,19 @@ export const TRANSLATOR_PATH: Path = "/traductor";
 export const ANALYSIS_PATH: Path = "/analisis";
 
 /**
+ * Rutas de **cuenta** (V3.82): destino de los enlaces que llegan por correo.
+ *
+ * No son destinos de la navegación ni viven dentro de la app: se abren desde un
+ * enlace externo, sin sesión, en cualquier navegador, y por eso se renderizan
+ * fuera del armazón y por encima de la puerta de entrada. El token viaja en la
+ * consulta del fragmento (`#/cuenta/activar?token=…`), así que no se queda en los
+ * logs del servidor.
+ */
+export const ACCOUNT_ACTIVATE_PATH: Path = "/cuenta/activar";
+export const ACCOUNT_RESET_PATH: Path = "/cuenta/restablecer";
+export const ACCOUNT_VERIFY_PATH: Path = "/cuenta/verificar";
+
+/**
  * Ruta canónica de un nivel dentro de Formación para deep links, por ejemplo
  * formationLevelPath("b1") -> "/formacion/b1". El `levelId` se percent-codifica.
  */

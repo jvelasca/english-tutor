@@ -2,9 +2,12 @@
 
 App para conversar con un modelo de IA **local** (Ollama), pensada para convertirse en un
 profesor de inglés totalmente local. Sin coste, sin cuentas **en la nube** y con todo el
-procesamiento en tu equipo. Desde V3.81 cada persona tiene **cuenta local con contraseña**
-(nombre + email + contraseña), se la crea ella misma y puede darse de baja; la única salida
-opcional a la red es el correo de verificación, y solo si se configura un SMTP.
+procesamiento en tu equipo. Desde V3.82, cada persona tiene una **cuenta local con contraseña**:
+**solicita** acceso con su nombre, email y avatar, el **webmaster la autoriza** desde el lanzador
+y le manda una **invitación** por correo para que **elija su propia contraseña**; se entra
+**solo con email + contraseña** (nadie puede entrar como otra persona), hay **recuperación de
+contraseña** por correo y la cuenta se puede **dar de baja** sin que se borre nada. Si no hay
+correo configurado, los enlaces se entregan **a mano** desde el lanzador.
 
 ## Documentación (leer primero)
 
@@ -16,7 +19,7 @@ opcional a la red es el correo de verificación, y solo si se configura un SMTP.
 ## Repositorio
 
 - **GitHub (público):** https://github.com/jvelasca/english-tutor — seguimiento con issues, PR y releases.
-- Última versión estable: **v3.81.2**.
+- Última versión estable: **v3.82.0**.
 
 ## Estructura
 
@@ -33,11 +36,14 @@ opcional a la red es el correo de verificación, y solo si se configura un SMTP.
 - **Memoria e historial**: conversaciones guardadas en SQLite (sidebar).
 - **Modo profesor (M4)**: 4 modos de tutor (conversación, gramática, ejercicios, pronunciación)
   y **corrección de pronunciación** (graba y recibe una puntuación).
-- **Cuentas locales (M7 · V3.81)**: cada persona tiene **cuenta con contraseña** (nombre, email y
-  contraseña), se la crea ella misma desde la puerta de entrada y puede **darse de baja** sin que se
-  borre nada; el lanzador («Gestión de la APP») resuelve la cola de solicitudes, asigna o restablece
-  credenciales, verifica emails, activa/desactiva, fuerza bajas con motivo, enseña el historial y
-  purga. Conversaciones e historial quedan **aislados** por cuenta.
+- **Cuentas locales (M7 · V3.81, alta profesional en V3.82)**: cada persona tiene **cuenta con
+  contraseña** (nombre, email y contraseña). El alta es un ciclo con autorización: se **solicita**
+  con nombre, email y avatar → el webmaster la autoriza en el lanzador y le llega una **invitación**
+  por correo para **elegir su contraseña** → se entra con **email + contraseña**. Hay
+  **recuperación de contraseña** por correo y **baja autoservicio** sin que se borre nada; el
+  lanzador («Gestión de la APP») resuelve la cola de solicitudes, crea cuentas, **reemite
+  invitaciones**, asigna o restablece credenciales, verifica emails, activa/desactiva, fuerza bajas
+  con motivo, enseña el historial y purga. Conversaciones e historial quedan **aislados** por cuenta.
 - **Diseño y UX (M8)**: tema claro/oscuro, responsive (móvil/escritorio), accesibilidad
   y sistema de tokens de diseño.
 - **Voz continua / manos libres (M10)**: modo conversación por voz sin pulsar botones
@@ -324,13 +330,17 @@ npm run dev         # Vite en https://localhost:5173 con proxy /api
 | `GET` | `/api/health/dependencies` | Estado por dependencia (BD, Ollama, STT, TTS) |
 | `GET` | `/api/network` | Acceso en red: `ip`, `hostname`, `url` (HTTPS), `local_url` y `local_url_available` (mDNS real) |
 | `GET` | `/api/models` | Modelos disponibles en Ollama |
-| `POST/GET/DELETE` | `/api/session` | Abrir / consultar / cerrar la **sesión** del perfil activo (cookie `et_session` firmada) |
+| `POST/GET/DELETE` | `/api/session` | Abrir (email + contraseña) / consultar / cerrar la **sesión** (cookie `et_session` firmada) |
 | `POST` | `/api/chat` | Diálogo con el modelo (acepta `mode`) |
 | `POST` | `/api/chat/stream` | Diálogo con streaming (SSE) |
 | `POST` | `/api/transcribe` | Audio → texto (Whisper) |
 | `POST` | `/api/tts` | Texto → audio WAV (Piper) |
 | `POST` | `/api/pronunciation` | Audio + texto esperado → puntuación + fluidez |
-| `GET/POST` | `/api/users` | Listar / crear perfiles de usuario |
+| `GET` | `/api/users` | Listar cuentas (**requiere sesión** desde V3.82) |
+| `POST` | `/api/profile-requests` | **Solicitar** acceso (sin sesión; nombre, email y avatar) |
+| `POST` | `/api/account/activate` · `/api/account/forgot-password` · `/api/account/reset-password` | Elegir contraseña desde la invitación · pedir el enlace · canjearlo |
+| `POST` | `/api/account/verify` | Confirmar el email desde el enlace |
+| `POST` | `/api/account/unenroll` | **Baja autoservicio** (exige la contraseña; no borra nada) |
 | `GET/POST` | `/api/conversations` | Listar / crear conversaciones del perfil de la sesión |
 | `GET/PUT/DELETE` | `/api/conversations/{id}` | Leer / guardar / borrar una conversación |
 | `POST/GET` | `/api/learning/events` | Registrar / listar eventos de aprendizaje |
@@ -345,12 +355,15 @@ npm run dev         # Vite en https://localhost:5173 con proxy /api
 > **El perfil activo no viaja en la URL.** Desde V3.75 la identidad la fija el
 > servidor al abrir sesión (`POST /api/session`, cookie `et_session` `HttpOnly` y
 > firmada) y los endpoints que antes llevaban `?user_id=<id>` la leen de ahí: sin
-> sesión válida responden **401 `SESSION_REQUIRED`**. Desde **V3.81** abrir sesión
-> con una cuenta que tiene credencial **exige su contraseña**, y hay registro
-> autoservicio (`POST /api/users`), baja autoservicio (`POST /api/account/unenroll`)
-> y salir (`POST /api/session/logout`). Lo que **no** hay es cuentas en la nube: todo
-> vive en la BD local, y la **frontera de red** —loopback por defecto, LAN opt-in—
-> sigue decidiendo quién alcanza la API (`docs/audit/PLAN-P0-IDENTIDAD.md`).
+> sesión válida responden **401 `SESSION_REQUIRED`**. Desde **V3.82** abrir sesión es
+> **email + contraseña** —ya no se elige un nombre de una lista, así que la app no
+> enumera quién tiene cuenta—, la cuenta sin contraseña **no entra**
+> (`403 ACCOUNT_NOT_ACTIVATED`: mira tu correo), hay **invitación**,
+> **recuperación de contraseña** y baja autoservicio
+> (`POST /api/account/unenroll`), y salir es `POST /api/session/logout`. Lo que **no**
+> hay es cuentas en la nube: todo vive en la BD local, y la **frontera de red**
+> —loopback por defecto, LAN opt-in— sigue decidiendo quién alcanza la API
+> (`docs/audit/PLAN-P0-IDENTIDAD.md` §17).
 
 > **Modos de tutor** (`mode` en `/api/chat`): `conversation`, `grammar`, `exercises`, `pronunciation`.
 

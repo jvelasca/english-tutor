@@ -1,8 +1,11 @@
 import type { Route } from "../app/routes";
 import type { Path } from "./hash";
-import { joinPath, normalizeHash, parseSegments } from "./hash";
+import { joinPath, parseSegments, splitQuery } from "./hash";
 import { isChatSkillSlug } from "./chat";
 import {
+  ACCOUNT_ACTIVATE_PATH,
+  ACCOUNT_RESET_PATH,
+  ACCOUNT_VERIFY_PATH,
   ANALYSIS_PATH,
   CHAT_PATH,
   DICTIONARY_PATH,
@@ -36,6 +39,10 @@ const ROUTE_TO_PATH: Record<Route, Path> = {
   translator: TRANSLATOR_PATH,
   // V3.75.3: destino auxiliar de análisis, sin píldora de navegación.
   analysis: ANALYSIS_PATH,
+  // V3.82: páginas de cuenta que llegan por correo.
+  accountActivate: ACCOUNT_ACTIVATE_PATH,
+  accountReset: ACCOUNT_RESET_PATH,
+  accountVerify: ACCOUNT_VERIFY_PATH,
 };
 
 /**
@@ -59,12 +66,23 @@ export function routeToPath(route: Route): Path {
  * sub-nivel). Toda ruta desconocida cae en home.
  */
 export function pathToRoute(path: Path): Route {
-  const segments = parseSegments(normalizeHash(path));
+  // V3.82: los enlaces de correo traen la consulta dentro del hash
+  // (`#/cuenta/activar?token=…`). Se separa antes de trocear, o el token
+  // acabaría pegado al segmento y la ruta caería en home.
+  const segments = parseSegments(splitQuery(path).path);
   if (segments.length === 0) return "home";
   const [root, leaf] = segments;
   switch (root) {
     case "formacion":
       return "course";
+    case "cuenta":
+      // V3.82: páginas de cuenta abiertas desde un enlace de correo. Sin
+      // sub-rutas válidas, cualquier otra hoja degrada a home como el resto.
+      if (segments.length !== 2) return "home";
+      if (leaf === "activar") return "accountActivate";
+      if (leaf === "restablecer") return "accountReset";
+      if (leaf === "verificar") return "accountVerify";
+      return "home";
     case "progreso":
       return segments.length === 2 && leaf === "trayectoria"
         ? "journey"

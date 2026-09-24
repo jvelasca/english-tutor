@@ -31,6 +31,7 @@ import config
 from domain import users as user_service
 from repositories import profile_requests as requests_repo
 from repositories import users as users_repo
+from schemas.users import MAX_AVATAR_IMAGE_CHARS
 from services import backup as backup_service
 
 # Desenlaces de una petición. Son códigos y no excepciones porque el router los
@@ -40,6 +41,14 @@ OUTCOME_OK = "ok"
 OUTCOME_INVALID = "invalid"
 OUTCOME_FULL = "full"
 OUTCOME_DUPLICATE = "duplicate"
+# V3.82: el email pedido ya lo usa una cuenta. Es un desenlace distinto de
+# `duplicate` (que es «ya pediste esto»): aquí la respuesta útil es «esa cuenta ya
+# existe, entra o recupera la contraseña», no «espera sentado».
+OUTCOME_EMAIL_TAKEN = "email-taken"
+# V3.82: el email no tiene forma de correo. Se separa de «nombre no válido»
+# porque el router tiene que poder decir **qué** campo está mal: un 422 que
+# culpara al nombre dejaba a quien llama mirando el sitio equivocado.
+OUTCOME_EMAIL_INVALID = "email-invalid"
 
 
 @dataclass(frozen=True)
@@ -69,29 +78,70 @@ def normalize_note(raw: str | None) -> str:
     return " ".join((raw or "").split())[: config.PROFILE_REQUEST_NOTE_MAX]
 
 
-async def request_create(display_name: str, note: str = "") -> RequestOutcome:
+def normalize_avatar(raw: str | None, *, limit: int) -> str:
+    """Avatar acotado tal cual: se recortan los extremos y se corta al tope.
+
+    No se valida la forma del emoji ni de la imagen de datos: son datos de
+    presentación, y quien los pinta (la consola y la app) los trata como texto.
+    Lo único que importa aquí es que no puedan crecer sin límite en la BD.
+    """
+    return (raw or "").strip()[:limit]
+
+
+async def request_create(
+    display_name: str,
+    note: str = "",
+    *,
+    email: str = "",
+    avatar_color: str = "",
+    avatar_emoji: str = "",
+    avatar_image: str = "",
+) -> RequestOutcome:
     """Registra una petición de alta. **No** crea el perfil.
 
-    Las tres vallas van antes de escribir nada, y en este orden: el nombre tiene
-    que servir, la cola no puede estar llena y no se admite dos veces la misma
-    petición. La última no es por el alumno —pedir dos veces no es un error suyo—
-    sino por el webmaster: una cola con «Ana» cinco veces no es una cola.
+    Las vallas van antes de escribir nada, y en este orden: el nombre tiene que
+    servir, el correo (si viene) tiene que tener forma y no estar en uso, la cola
+    no puede estar llena y no se admite dos veces la misma petición. La última no
+    es por el alumno —pedir dos veces no es un error suyo— sino por el webmaster:
+    una cola con «Ana» cinco veces no es una cola.
+
+    V3.82: la solicitud guarda también el email de la invitación y el avatar
+    elegido, así que aprobarla ya no necesita teclear nada a mano.
     """
     name = normalize_name(display_name)
     if not name:
         return RequestOutcome(OUTCOME_INVALID)
+
+    from services import credentials  # import local: evita el ciclo con el router
+
+    clean_email = ""
+    if email:
+        clean_email = credentials.normalize_email(email)
+        if not clean_email:
+            return RequestOutcome(OUTCOME_EMAIL_INVALID)
+        if await user_service.email_in_use(clean_email):
+            return RequestOutcome(OUTCOME_EMAIL_TAKEN)
+
     if await count_pending() >= config.PROFILE_REQUEST_MAX_PENDING:
         return RequestOutcome(OUTCOME_FULL)
-    repeated = await run_in_threadpool(
+    if await run_in_threadpool(
         requests_repo.has_pending_create_for_name, name
-    )
-    if repeated:
+    ):
         return RequestOutcome(OUTCOME_DUPLICATE)
+    if clean_email and await run_in_threadpool(
+        requests_repo.has_pending_create_for_email, clean_email
+    ):
+        return RequestOutcome(OUTCOME_DUPLICATE)
+
     created = await run_in_threadpool(
         requests_repo.create_request,
         requests_repo.KIND_CREATE,
         display_name=name,
         note=normalize_note(note),
+        email=clean_email,
+        avatar_color=normalize_avatar(avatar_color, limit=32),
+        avatar_emoji=normalize_avatar(avatar_emoji, limit=16),
+        avatar_image=normalize_avatar(avatar_image, limit=MAX_AVATAR_IMAGE_CHARS),
     )
     return RequestOutcome(OUTCOME_OK, created)
 
@@ -131,19 +181,32 @@ async def approve(request_id: int, *, note: str = "") -> dict | None:
     petición como resuelta. Al revés, un fallo al crear la cuenta dejaría la
     petición «aprobada» sin cuenta y el webmaster no tendría forma de reintentar.
 
-    V3.81: aprobar un alta crea la cuenta **sin credencial** y la consola ofrece a
-    continuación asignarle email y contraseña temporal. Son dos decisiones
-    distintas —«esta persona puede tener cuenta» y «con qué entra»— y juntarlas
-    obligaba a teclear el PIN antes de saber si la cuenta se iba a crear siquiera.
+    V3.82: aprobar un alta ya no deja la cuenta «sin credencial» a la espera de un
+    segundo paso manual. Crea la cuenta con el email y el avatar que la solicitud
+    pidió y emite un **token de activación**: el webmaster autoriza y la propia
+    persona elige su contraseña desde el enlace. El token viaja en la respuesta
+    (en claro) para que el router pueda montar el enlace y mandarlo; ni el
+    webmaster ni la BD ven nunca una contraseña provisional.
+
+    Una aprobación que no venga de una solicitud con email (una fila antigua)
+    sigue funcionando: crea la cuenta y no emite invitación, y la consola ofrece
+    asignar credenciales a mano como antes.
     """
     request = await run_in_threadpool(requests_repo.get_request, request_id)
     if request is None or request["status"] != requests_repo.STATUS_PENDING:
         return None
 
     if request["kind"] == requests_repo.KIND_CREATE:
-        created = await create_profile(request["display_name"])
+        created = await create_profile(
+            request["display_name"],
+            email=str(request.get("email") or ""),
+            avatar_color=str(request.get("avatar_color") or ""),
+            avatar_emoji=str(request.get("avatar_emoji") or ""),
+            avatar_image=str(request.get("avatar_image") or ""),
+        )
         if created is None:
             return None
+        token = await issue_activation(created["id"])
         resolved = await run_in_threadpool(
             requests_repo.resolve,
             request_id,
@@ -151,7 +214,7 @@ async def approve(request_id: int, *, note: str = "") -> dict | None:
             decided_note=normalize_note(note),
             resolved_user_id=created["id"],
         )
-        return {"request": resolved, "user": created}
+        return {"request": resolved, "user": created, "activation_token": token}
 
     # Baja: se **desactiva** (reversible). Purgar es un acto aparte y deliberado.
     target = request["user_id"]
@@ -174,7 +237,31 @@ async def approve(request_id: int, *, note: str = "") -> dict | None:
         decided_note=normalize_note(note),
         resolved_user_id=target,
     )
-    return {"request": resolved, "user": disabled}
+    return {"request": resolved, "user": disabled, "activation_token": ""}
+
+
+async def issue_activation(user_id: str) -> str:
+    """Emite (o reemite) la invitación de activación de una cuenta.
+
+    Público porque la consola tiene una acción de **reenviar** invitación: el
+    primer correo puede perderse, caducar o llegar a una bandeja que nadie mira, y
+    sin esta vía la única salida sería asignarle una contraseña a mano —justo lo
+    que esta release retira.
+    """
+    from services import credentials
+
+    token = credentials.new_activation_token()
+    if not await user_service.set_activation(
+        user_id, credentials.hash_token(token)
+    ):
+        return ""
+    user = await user_service.get_user(user_id)
+    await user_service.record_event(
+        subject_id=user_id,
+        subject_name=(user or {}).get("name", ""),
+        action=user_service.EVENT_INVITED,
+    )
+    return token
 
 
 async def reject(request_id: int, note: str = "") -> dict | None:
@@ -192,13 +279,20 @@ async def create_profile(
     email: str = "",
     password_hash: str = "",
     must_change: bool = True,
+    avatar_color: str = "",
+    avatar_emoji: str = "",
+    avatar_image: str = "",
 ) -> dict | None:
-    """Alta del webmaster. `None` si el nombre no sirve o el email ya está cogido.
+    """Alta del webmaster (o de una invitación aprobada). `None` si el nombre no
+    sirve o el email ya está cogido.
 
     V3.81: la cuenta puede nacer **con** credenciales (nombre + email + contraseña
-    ya hasheada) o **sin** ellas. Sin credencial es el caso de una petición
-    aprobada: entra en la lista de tareas de la consola («asígnale contraseña»)
-    mientras la compatibilidad le siga permitiendo entrar nombrando.
+    ya hasheada) o **sin** ellas.
+
+    V3.82: una aprobación crea la cuenta **sin contraseña** (la elige la persona
+    desde el enlace de invitación) pero **con** el email y el avatar que pidió.
+    Sigue habiendo una lista de tareas —«pendiente de activación»— pero ahora la
+    salida natural es la invitación, no que el webmaster invente una contraseña.
 
     La comprobación de email duplicado no es cosmética: el índice único de la BD
     lo rechazaría al escribir, y sin esta comprobación el error llegaría como un
@@ -214,6 +308,9 @@ async def create_profile(
         email=email,
         password_hash=password_hash,
         must_change_password=must_change if password_hash else False,
+        avatar_color=avatar_color,
+        avatar_emoji=avatar_emoji,
+        avatar_image=avatar_image,
     )
     await user_service.record_event(
         subject_id=created["id"],

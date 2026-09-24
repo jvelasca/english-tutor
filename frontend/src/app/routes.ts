@@ -16,7 +16,14 @@ export type Route =
   // V3.75.3: destino AUXILIAR Análisis (ruta `/analisis`), la evolución del
   // alumno en su conjunto. Se abre desde la cabecera, junto al usuario, y no es
   // un destino raíz de la navegación (no lleva píldora en `ROUTES`).
-  | "analysis";
+  | "analysis"
+  // V3.82: páginas de cuenta a las que apunta un enlace de correo
+  // (`/cuenta/activar`, `/cuenta/restablecer`, `/cuenta/verificar`). Se
+  // renderizan fuera del armazón y por encima de la puerta: llegan de un correo,
+  // sin sesión y en cualquier navegador.
+  | "accountActivate"
+  | "accountReset"
+  | "accountVerify";
 
 export interface RouteOption {
   id: Route;

@@ -6,8 +6,12 @@ import {
   normalizeHash,
   parseSegments,
   pathToHash,
+  splitQuery,
 } from "./hash";
 import {
+  ACCOUNT_ACTIVATE_PATH,
+  ACCOUNT_RESET_PATH,
+  ACCOUNT_VERIFY_PATH,
   FORMATION_PATH,
   HELP_PATH,
   HOME_PATH,
@@ -227,6 +231,37 @@ describe("joinPath", () => {
   });
 });
 
+describe("splitQuery (V3.82)", () => {
+  it("separa la ruta de la consulta que trae el enlace del correo", () => {
+    const { path, query } = splitQuery("/cuenta/activar?token=abc123");
+    expect(path).toBe("/cuenta/activar");
+    expect(query.get("token")).toBe("abc123");
+  });
+
+  it("admite el '#' del hash y varios parámetros", () => {
+    const { path, query } = splitQuery("#/cuenta/verificar?token=abc&lang=es");
+    expect(path).toBe("/cuenta/verificar");
+    expect(query.get("token")).toBe("abc");
+    expect(query.get("lang")).toBe("es");
+  });
+
+  it("sin consulta devuelve la ruta tal cual y una consulta vacía", () => {
+    const { path, query } = splitQuery("/aprender/listening");
+    expect(path).toBe("/aprender/listening");
+    expect(query.get("token")).toBeNull();
+  });
+
+  it("conserva los caracteres de un token URL-safe", () => {
+    // `secrets.token_urlsafe` usa base64url: letras, dígitos, '-' y '_'. Si el
+    // separador se comiera alguno, el token llegaría recortado y la invitación
+    // diría «no válida» sin motivo.
+    const token = "aB3-_xY9";
+    expect(splitQuery(`/cuenta/activar?token=${token}`).query.get("token")).toBe(
+      token,
+    );
+  });
+});
+
 describe("paths (constantes y builders)", () => {
   it("define las rutas raíz de los mundos", () => {
     expect(HOME_PATH).toBe("/");
@@ -234,6 +269,12 @@ describe("paths (constantes y builders)", () => {
     expect(LEARN_PATH).toBe("/aprender");
     expect(PROGRESS_PATH).toBe("/progreso");
     expect(HELP_PATH).toBe("/ayuda");
+  });
+
+  it("define las rutas de cuenta a las que apunta el correo (V3.82)", () => {
+    expect(ACCOUNT_ACTIVATE_PATH).toBe("/cuenta/activar");
+    expect(ACCOUNT_RESET_PATH).toBe("/cuenta/restablecer");
+    expect(ACCOUNT_VERIFY_PATH).toBe("/cuenta/verificar");
   });
 
   it("formationLevelPath construye el deep link de nivel", () => {

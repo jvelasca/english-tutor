@@ -803,3 +803,100 @@ emparejamiento por **dispositivo** sigue **descartado**.
 frontend, launcher), `ruff`/`tsc`, gates y consistencia de versiones, **mordida**
 de los candados nuevos y prueba manual end-to-end sobre una **copia** de la BD
 real.
+
+## 17 · Fase 4 implementada — el alta profesional y la puerta cerrada (2026-09-24, `v3.82.0`)
+
+> **Estado: Fase 4 CERRADA. El P0 queda cerrado para las cuentas activas**, porque
+> las tres deudas que §16 dejó abiertas —entrar sin contraseña, enumerar cuentas y
+> no poder recuperar la contraseña— se cierran **por construcción**, no por
+> vigilancia. Notas completas en `release-notes-v3.82.0.md`.
+
+**Qué preguntó el gerente (2026-09-24).** «¿Es 100% profesional el procedimiento de
+alta? Que alguien solicite ser usuario con nombre/nick, correo e imagen; que la
+solicitud llegue al webmaster, que manda un correo autorizando y pidiendo que se
+ponga una contraseña; que con esa contraseña se entre y **no se pueda suplantar a
+otro**; con recuperación estándar por email; que las contraseñas se guarden
+encriptadas; y que sirva para un uso público futuro, aunque hoy sea personal y sin
+nada económico.»
+
+**La respuesta era «no».** El diagnóstico, medido sobre el árbol, era:
+
+- El formulario de solicitud **no capturaba email ni avatar** (`ProfileRequestCreate`
+  era `display_name` + `note`): sin correo no se puede autorizar por correo, así que
+  el webmaster completaba a mano lo que la solicitud no traía.
+- **Aprobar no mandaba nada**: `approve()` creaba la cuenta con `email=''` y
+  `password_hash=''`, y el alta y la credencial eran dos pasos manuales del lanzador.
+- **No había recuperación**: solo la contraseña temporal que asignaba el webmaster.
+- El **enlace de verificación estaba roto**: `mailer.verification_link()` apuntaba a
+  `/#/cuenta/verificar?token=…`, ruta que **no existía** en el frontend → caía en
+  Inicio y no confirmaba nada. Un enlace roto en un correo es peor que no mandarlo.
+- **Se entraba eligiendo un nombre** de la lista (`GET /api/users` público) y una
+  cuenta con `password_hash == ''` **entraba sin contraseña**: por eso cualquiera
+  podía entrar como J.A o Paz. Era, literalmente, el hueco que G0 vigilaba.
+
+**Las cinco decisiones de producto (acordadas antes de tocar código).**
+
+1. **Onboarding con autorización**: todos pasan por solicitud → aprobación del
+   webmaster → correo de autorización → **el usuario pone su contraseña**. El alta
+   instantánea desaparece; la alta directa del webmaster se queda para cuando tiene
+   a la persona delante.
+2. **La entrada es email + contraseña**: se retira el **selector** de nombres, que
+   dejaba de enumerar quién existe.
+3. **`1234` no se usa** (ni se importa de ninguna parte): no cumple la política
+   (mínimo 8) ni es defendible en un producto público. **Cada persona elige la suya**
+   y nadie más la conoce, tampoco el webmaster.
+4. **J.A y Paz se migran por invitación**, no con una contraseña repartida, y con
+   *plus-addressing* (`josealberto.vel+ja@…`, `josealberto.vel+paz@…`) para que dos
+   cuentas con email **único** lleguen a la misma bandeja.
+5. **El correo es opcional pero no se finge**: sin SMTP configurado, el enlace de
+   invitación (o de restablecimiento) se entrega **a mano** desde el lanzador, y la
+   UI lo dice.
+
+**Lo que cambia en el contrato y en el código.**
+
+| Pieza | Antes (`v3.81.0`) | Ahora (`v3.82.0`) |
+|---|---|---|
+| Solicitud | `display_name` + `note` | + **email**, + avatar (color/emoji/imagen); `EMAIL_TAKEN` = 409 con salida útil |
+| Aprobar | crea la cuenta con email vacío y **no manda nada** | crea la cuenta **con el email y el avatar pedidos**, emite **token de activación** (7 días) y manda la **invitación**; devuelve `email_sent` y el `activation_link` para entregarlo a mano |
+| Alta instantánea | `POST /api/users` en loopback | **retirada**; el alta es la solicitud autorizada o `/api/admin/users` |
+| Primer acceso | contraseña **temporal** del webmaster | `POST /api/account/activate` : la persona elige la suya desde el enlace, y el email queda **verificado** al pulsarlo |
+| Abrir sesión | `{user_id}` + contraseña opcional | **`{email, password}`**; 401 genérico si no cuadra (sin enumeración) |
+| Cuenta sin contraseña | **entra** sin credencial | **403 `ACCOUNT_NOT_ACTIVATED`**: mira tu correo |
+| Recuperación | manual (contraseña temporal) | `forgot-password` (200 siempre) + `reset-password` (token de un solo uso, 1 h, sube la época) |
+| Enumerar cuentas | `GET /api/users` **sin sesión** | exige sesión; la puerta ya no lo usa |
+| Puerta de entrada | selector de cuentas + contraseña | **email + contraseña**, con «Solicitar acceso» y «Olvidé mi contraseña» |
+| Rutas de cuenta | solo `cuenta/verificar` **roto** | `cuenta/activar`, `cuenta/restablecer` y `cuenta/verificar` **implementadas**, fuera del armazón y por encima de la puerta |
+| Superficie sin sesión | 4 declaradas | **4 declaradas** (ya sin `users`): `profile-requests`, `activate`, `forgot-password`, `reset-password` (+ `verify`, con token) |
+
+**Las tres deudas de §16, cerradas — y cómo.**
+
+1. **«Las cuentas heredadas sin credencial siguen entrando sin contraseña»** →
+   **cerrada por construcción**. `password_hash == ''` ya **no** abre sesión; responde
+   403 `ACCOUNT_NOT_ACTIVATED`. `without_password` deja de ser un agujero y pasa a ser
+   un **contador operativo** («pendientes de activar»): el lanzador cuenta el trabajo
+   que queda, que es exactamente lo que G0 quería vigilar. `migrate_legacy_accounts.py`
+   lleva esas cuentas a «invitación emitida» sin inventar contraseñas.
+2. **«`GET /api/users` sigue enumerando nombres sin sesión»** → **cerrada**: la ruta
+   exige sesión. Se retira el modelo «selector» entero, así que la lista de objetivos
+   deja de publicarse.
+3. **«No hay recuperación de contraseña por correo»** → **cerrada**: flujo estándar
+   con token de un solo uso, respuesta que no revela si el correo tiene cuenta, cupo
+   por IP y sin ninguna ruta que cambie un secreto sin token.
+
+**Lo que sigue abierto (declarado, no maquillado).**
+
+1. **Sin segundo factor** ni verificación **obligatoria** para usar la app.
+2. **La entrega del correo depende de SMTP**: sin él, invitación y restablecimiento
+   funcionan pero el enlace se entrega a mano. Es el modo híbrido, declarado.
+3. **Plus-addressing**: `+` requiere que el proveedor lo soporte (Gmail y Outlook
+   sí). Si no, hay que usar correos distintos.
+4. **El freno de recuperación vive en memoria del proceso** y quien tenga un backup
+   puede atacarlo fuera de línea (mismo límite que §15.1).
+5. **El hash de la contraseña sí viaja en el backup**; `session.secret` y
+   `mail.secret` no.
+6. **Sin perfil de cobros ni facturación** (a petición expresa): la estructura es la
+   que necesitaría un uso público, pero no hay planes ni pagos.
+
+**Cambio incompatible, asumido y coordinado.** `SessionCreate` pasa de `user_id` a
+`email` + `password`. Backend, frontend, lanzador y sus tests entran en el **mismo**
+lanzamiento: no hay ventana en la que una app vieja hable con un backend nuevo.

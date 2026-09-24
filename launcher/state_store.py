@@ -17,6 +17,8 @@ DEFAULTS: dict = {
     "window": {"width": 1160, "height": 800, "x": None, "y": None},
     "sash": 580,
     "sections": {},
+    "tab": "Estado",
+    "toolbar": True,
 }
 
 
@@ -27,6 +29,8 @@ def load_state(path: Path | None = None) -> dict:
         "window": dict(DEFAULTS["window"]),
         "sash": DEFAULTS["sash"],
         "sections": dict(DEFAULTS["sections"]),
+        "tab": DEFAULTS["tab"],
+        "toolbar": DEFAULTS["toolbar"],
     }
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -55,6 +59,14 @@ def load_state(path: Path | None = None) -> dict:
         for key, val in sections.items():
             if isinstance(key, str) and isinstance(val, bool):
                 state["sections"][key] = val
+
+    # V3.81.3: qué pestaña estaba abierta y si la barra de herramientas se veía.
+    tab = data.get("tab")
+    if isinstance(tab, str) and tab.strip():
+        state["tab"] = tab
+    toolbar = data.get("toolbar")
+    if isinstance(toolbar, bool):
+        state["toolbar"] = toolbar
 
     return state
 

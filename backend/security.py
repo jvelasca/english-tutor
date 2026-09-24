@@ -73,11 +73,13 @@ _PATH_LIMITS: dict[str, int] = {
     # es la primera valla, para que una máquina que barre contraseñas a toda
     # velocidad ni siquiera llegue al KDF.
     "/api/session": 120,
-    # V3.81: el alta de cuenta (`POST /api/users`) es el otro punto sin sesión con
-    # coste real: hashea una contraseña a 200.000 iteraciones antes de decir que
-    # sí. Comparte prefijo con el listado del selector (`GET /api/users`), que es
-    # una lectura barata y poco frecuente, así que el cupo se pone holgado: acota
-    # un barrido sin rozar una app que se abre varias veces al día.
+    # V3.81: `/api/users` pasó a ser el punto sin sesión con coste real —el alta
+    # hasheaba una contraseña a 200.000 iteraciones— y el cupo se puso holgado para
+    # acotar un barrido sin rozar a quien abre la app varias veces al día.
+    # V3.82: el alta ya **no** vive aquí (se pide y el webmaster la autoriza), así
+    # que este cupo solo cubre la **lectura** de la lista de cuentas, que exige
+    # sesión. Se conserva porque el prefijo existe y un tope explícito es más
+    # legible que dejarlo caer en el general.
     "/api/users": 60,
     # V3.77: pedir un perfil es la única escritura de la app que **no** exige
     # sesión (quien la pide no tiene perfil todavía). Es una petición humana de
@@ -91,6 +93,22 @@ _PATH_LIMITS: dict[str, int] = {
     # cupo heredado, el primer clic de una baja podía recibir 429 por peticiones
     # ajenas a esta ruta (ver `_rate_limit_ok`). El prefijo más largo la separa.
     "/api/profile-requests/delete": 30,
+    # V3.82: la **recuperación** es una ruta sin sesión que puede mandar correo, y
+    # eso la convierte en la superficie más abusable de toda la API: con SMTP
+    # configurado, cada llamada a `forgot-password` emite un token y envía un
+    # mensaje a un tercero. El cupo estrecho (y el hecho de que la respuesta sea
+    # idéntica exista o no la cuenta) es lo que impide usarla como lanzadera de
+    # correo y como oráculo de qué correos tienen cuenta. El token de un solo uso
+    # con caducidad es la segunda valla, y no hay ninguna ruta que pueda cambiar
+    # una contraseña sin él.
+    "/api/account/forgot-password": 5,
+    # El canje de tokens (activación, restablecimiento y verificación de email) es
+    # coste de KDF cuando el token es bueno y una búsqueda barata cuando no: un
+    # cupo moderado frena el barrido de tokens sin estorbar a quien pulsa su
+    # enlace una vez.
+    "/api/account/activate": 30,
+    "/api/account/reset-password": 30,
+    "/api/account/verify": 30,
 }
 
 # Ventanas por CLASE de ruta, no por host a secas (V3.79.0).

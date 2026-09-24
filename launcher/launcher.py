@@ -35,6 +35,7 @@ from admin import (
     pending_requests,
     purge_user,
     reject_request,
+    resend_activation,
     set_credentials,
     set_user_status,
     smtp_config,
@@ -92,14 +93,21 @@ from status import (
 from ui import (
     ACTION_ICONS,
     COLORS,
+    LOG_DIR,
     SECTION_ICONS,
     SERVICE_ICONS,
+    TAB_ICONS,
+    TAB_ORDER,
     accounts_tasks,
     admin_state_label,
     backend_failure_hint,
+    centered_position,
+    clamp_window_size,
     duplicate_user_ids,
     event_row,
     interface_state,
+    invitation_copy_text,
+    invitation_message,
     pending_view,
     purge_block_reason,
     read_log_tail,
@@ -108,9 +116,12 @@ from ui import (
     smtp_state_label,
     status_color,
     status_dot,
+    statusbar_right,
     user_row,
     user_row_label,
+    window_position_visible,
 )
+from widgets import ScrollableFrame, attach_scrollbars, enable_mousewheel_scrolling
 
 REFRESH_MS = 2000
 POLL_MS = 100
@@ -132,6 +143,11 @@ SPINNER_MS = 120
 WINDOW_W = 1160
 WINDOW_H = 800
 COLUMN_W = 540
+# Mínimo viable de la ventana: por debajo, las pestañas y las tablas dejan de
+# ser legibles. La geometría restaurada se acota también contra la pantalla
+# (`_clamp_size`), porque `state.json` puede venir de un monitor más alto.
+MIN_W = 900
+MIN_H = 620
 
 _SERVICE_ORDER = ["Backend", "Interfaz", "Ollama", "STT", "TTS", "Base de datos"]
 
@@ -212,15 +228,33 @@ class LauncherApp:
         self._pending_rows: list[dict] = []
         self._user_rows: list[dict] = []
         self._admin_busy = False
+        # V3.81.3: qué pestaña está abierta (manda en la barra de estado y se
+        # persiste), cuándo fue la última comprobación y si la barra de
+        # herramientas se ve. Se leen del estado guardado antes de construir nada.
+        self._current_tab_name = str(self._state.get("tab") or TAB_ORDER[0])
+        self._checked_at = ""
+        self._tab_var = tk.StringVar(value=self._current_tab_name)
+        self._toolbar_visible = tk.BooleanVar(
+            value=bool(self._state.get("toolbar", True))
+        )
+        self._tabs: dict[str, tk.Misc] = {}
         root.title("English Tutor — Gestión de la APP")
-        # La ventana es redimensionable; el tamaño y la posición del divisor se
-        # restauran del estado persistido (state.json) y se guardan al cerrar.
+        # La ventana es redimensionable; el tamaño y la posición se restauran del
+        # estado persistido (state.json) y se guardan al cerrar.
         root.resizable(True, True)
+        root.minsize(MIN_W, MIN_H)
         self._apply_window_icon()
         self._build_style()
         self._build_ui()
         self._restore_window()
         root.protocol("WM_DELETE_WINDOW", self._on_close)
+        # V3.81.3: la rueda del ratón se enruta una sola vez por ventana. Sin
+        # esto los canvas con scroll solo respondían arrastrando la barra.
+        enable_mousewheel_scrolling(root)
+        # Atajos de teclado de los menús (los aceleradores se anuncian ahí).
+        root.bind("<F5>", lambda _e: self.refresh())
+        root.bind("<Control-o>", lambda _e: self.open_app())
+        root.bind("<Control-q>", lambda _e: self._on_close())
         # Programar desde el hilo principal (antes de mainloop es seguro).
         root.after(0, self.refresh)
         root.after(POLL_MS, self._poll_queue)
@@ -404,131 +438,403 @@ class LauncherApp:
 
     # --- UI ---
     def _build_ui(self) -> None:
-        root = self.root
+        """Cáscara de la app: menús, barra de herramientas, pestañas y estado.
 
-        # Cabecera (banner).
-        header = ttk.Frame(root, style="Card.TFrame")
-        header.pack(fill="x")
-        brand = ttk.Frame(header, style="Card.TFrame")
-        brand.pack(side="left", padx=16, pady=12)
-        ttk.Label(brand, text="EN", style="Badge.TLabel").pack(side="left")
-        txt = ttk.Frame(brand, style="Card.TFrame")
-        txt.pack(side="left", padx=(10, 0))
-        ttk.Label(txt, text="English Tutor", style="Title.TLabel").pack(anchor="w")
-        self._version = tk.StringVar(value="")
-        ttk.Label(
-            txt, textvariable=self._version, style="Sub.TLabel"
-        ).pack(anchor="w")
-        ttk.Label(
-            txt, text=author_line(), style="DimCard.TLabel"
-        ).pack(anchor="w", pady=(2, 0))
-
+        El orden de empaquetado no es libre: la barra de estado se ancla abajo
+        **antes** de que el cuaderno central (que expande) ocupe el resto; si se
+        empaquetara después, quedaría fuera de la ventana y no se vería —que es
+        justo el síntoma que esta reorganización corrige—.
+        """
+        self._msg = tk.StringVar(value="")
         self._status = tk.StringVar(value="Comprobando…")
         self._status_dot = tk.StringVar(value=status_dot("unknown"))
-        pill = ttk.Frame(header, style="Card.TFrame")
-        pill.pack(side="right", padx=16, pady=12)
-        self._status_dot_label = ttk.Label(
-            pill, textvariable=self._status_dot, style="Card.TLabel"
-        )
-        self._status_dot_label.pack(side="left")
-        self._status_label = ttk.Label(
-            pill,
-            textvariable=self._status,
-            style="Status.TLabel",
-        )
-        self._status_label.pack(side="left", padx=(6, 0))
+        self._version = tk.StringVar(value="")
 
-        # Acciones.
-        actions = ttk.Frame(root, style="TFrame")
-        actions.pack(fill="x", padx=16, pady=(12, 6))
+        self._build_menubar()
+        self._build_toolbar()
+        self._build_statusbar()
+        self._build_tabs()
+        if not self._toolbar_visible.get():
+            self._toolbar_frame.pack_forget()
+
+    # --- Barra de menús ---
+    def _build_menubar(self) -> None:
+        """Barra de menús nativa, sin duplicar lógica: llama a lo que ya existe.
+
+        Cada entrada es un método que ya estaba detrás de un botón. No hay una
+        segunda implementación de «purgar» ni de «activar red local» que se pueda
+        desincronizar de la de la pantalla.
+        """
+        menubar = tk.Menu(self.root)
+
+        archivo = tk.Menu(menubar, tearoff=0)
+        archivo.add_command(label="Iniciar app", command=self.start)
+        archivo.add_command(label="Detener app", command=self.stop)
+        archivo.add_command(label="Reiniciar servidor", command=self.restart)
+        archivo.add_separator()
+        archivo.add_command(
+            label="Abrir app", command=self.open_app, accelerator="Ctrl+O"
+        )
+        archivo.add_command(label="Actualizar", command=self.refresh, accelerator="F5")
+        archivo.add_separator()
+        archivo.add_command(label="Salir", command=self._on_close, accelerator="Ctrl+Q")
+        menubar.add_cascade(label="Archivo", menu=archivo)
+
+        ver = tk.Menu(menubar, tearoff=0)
+        for name in TAB_ORDER:
+            ver.add_radiobutton(
+                label=f"{TAB_ICONS.get(name, '')}  {name}".strip(),
+                value=name,
+                variable=self._tab_var,
+                command=lambda n=name: self.show_tab(n),
+            )
+        ver.add_separator()
+        ver.add_command(
+            label="Expandir todas las secciones",
+            command=lambda: self._set_all_sections(True),
+        )
+        ver.add_command(
+            label="Colapsar todas las secciones",
+            command=lambda: self._set_all_sections(False),
+        )
+        ver.add_separator()
+        ver.add_checkbutton(
+            label="Mostrar barra de herramientas",
+            variable=self._toolbar_visible,
+            command=self._toggle_toolbar,
+        )
+        ver.add_command(label="Restablecer ventana", command=self._reset_window)
+        menubar.add_cascade(label="Ver", menu=ver)
+
+        herramientas = tk.Menu(menubar, tearoff=0)
+        herramientas.add_command(
+            label="Ir al PIN de administración…", command=self.focus_admin_pin
+        )
+        herramientas.add_command(
+            label="Generar PIN aleatorio", command=self.generate_admin_pin_value
+        )
+        herramientas.add_command(
+            label="Retirar PIN de administración…", command=self.clear_admin_pin
+        )
+        herramientas.add_separator()
+        herramientas.add_command(
+            label="Configurar correo saliente…", command=self.configure_smtp_dialog
+        )
+        herramientas.add_separator()
+        # La variable se sincroniza en `_refresh_access`: el modo real lo manda
+        # `core`, no lo que el menú creía haber marcado.
+        self._lan_var = tk.BooleanVar(value=lan_mode())
+        herramientas.add_checkbutton(
+            label="Permitir el acceso desde la red local (LAN)",
+            variable=self._lan_var,
+            command=self._toggle_lan_from_menu,
+        )
+        herramientas.add_separator()
+        herramientas.add_command(
+            label="Abrir la carpeta de registros", command=self.open_logs_folder
+        )
+        menubar.add_cascade(label="Herramientas", menu=herramientas)
+
+        usuarios = tk.Menu(menubar, tearoff=0)
+        usuarios.add_command(
+            label="Ir a Usuarios", command=lambda: self.show_tab("Usuarios")
+        )
+        usuarios.add_separator()
+        usuarios.add_command(label="Crear cuenta…", command=self.create_user_dialog)
+        usuarios.add_command(label="Credenciales…", command=self.credentials_dialog)
+        usuarios.add_command(
+            label="Verificar email", command=self.verify_email_selected
+        )
+        usuarios.add_command(
+            label="Reenviar invitación", command=self.resend_activation_selected
+        )
+        usuarios.add_command(label="Editar…", command=self.edit_user_dialog)
+        usuarios.add_separator()
+        usuarios.add_command(label="Reactivar", command=self.reactivate_selected_user)
+        usuarios.add_command(label="Desactivar", command=self.deactivate_selected_user)
+        usuarios.add_command(
+            label="Forzar baja…", command=self.force_unenroll_selected_user
+        )
+        usuarios.add_command(label="Historial…", command=self.user_history_dialog)
+        usuarios.add_separator()
+        usuarios.add_command(label="Purgar…", command=self.purge_selected_user)
+        menubar.add_cascade(label="Usuarios", menu=usuarios)
+
+        ayuda = tk.Menu(menubar, tearoff=0)
+        ayuda.add_command(
+            label="Conectar un dispositivo…", command=self.show_device_help
+        )
+        ayuda.add_separator()
+        ayuda.add_command(label="Acerca de English Tutor…", command=self.show_about)
+        menubar.add_cascade(label="Ayuda", menu=ayuda)
+
+        self.root.config(menu=menubar)
+
+    # --- Barra de herramientas ---
+    def _build_toolbar(self) -> None:
+        """Marca compacta + las acciones de siempre, en una franja superior.
+
+        Los botones son los mismos (mismos comandos y estilos), solo cambian de
+        sitio: la cabecera grande desaparece porque el estado, la versión y el
+        crédito viven ahora en la barra de estado inferior y en «Acerca de».
+        """
+        container = ttk.Frame(self.root, style="Card.TFrame")
+        ttk.Separator(container, style="Card.TSeparator").pack(side="bottom", fill="x")
+        bar = ttk.Frame(container, style="Card.TFrame")
+        bar.pack(fill="x")
+
+        brand = ttk.Frame(bar, style="Card.TFrame")
+        brand.pack(side="left", padx=16, pady=8)
+        ttk.Label(brand, text="EN", style="Badge.TLabel").pack(side="left")
+        ttk.Label(brand, text="English Tutor", style="Title.TLabel").pack(
+            side="left", padx=(10, 0)
+        )
+        ttk.Separator(bar, orient="vertical", style="Card.TSeparator").pack(
+            side="left", fill="y", padx=(0, 4), pady=10
+        )
+
+        tools = ttk.Frame(bar, style="Card.TFrame")
+        tools.pack(side="left", pady=8)
         self._start_btn = ttk.Button(
-            actions,
+            tools,
             text=f"  {ACTION_ICONS['start']}  Iniciar app",
             style="Success.TButton",
             command=self.start,
         )
-        self._start_btn.pack(side="left")
+        self._start_btn.pack(side="left", padx=(10, 0))
         self._stop_btn = ttk.Button(
-            actions,
+            tools,
             text=f"  {ACTION_ICONS['stop']}  Detener app",
             style="Ghost.TButton",
             command=self.stop,
         )
         self._stop_btn.pack(side="left", padx=(8, 0))
         self._restart_btn = ttk.Button(
-            actions,
+            tools,
             text=f"  {ACTION_ICONS['restart']}  Reiniciar servidor",
             style="Ghost.TButton",
             command=self.restart,
         )
         self._restart_btn.pack(side="left", padx=(8, 0))
         self._open_btn = ttk.Button(
-            actions,
+            tools,
             text=f"  {ACTION_ICONS['open']}  Abrir app",
             style="Ghost.TButton",
             command=self.open_app,
         )
         self._open_btn.pack(side="left", padx=(8, 0))
         ttk.Button(
-            actions,
+            tools,
             text=f"  {ACTION_ICONS['refresh']}  Actualizar",
             style="Ghost.TButton",
             command=self.refresh,
         ).pack(side="left", padx=(8, 0))
 
-        # Panel de estado final (footer): se empaqueta primero para que quede
-        # anclado abajo.
-        self._msg = tk.StringVar(value="")
-        footer = ttk.Frame(root, style="Card.TFrame")
-        footer.pack(fill="x", side="bottom")
-        ttk.Separator(footer, style="Card.TSeparator").pack(fill="x")
-        ttk.Label(
-            footer, textvariable=self._msg, style="DimCard.TLabel"
-        ).pack(anchor="w", padx=16, pady=6)
+        container.pack(fill="x")
+        self._toolbar_frame = container
 
-        # PanedWindow horizontal: dos columnas redimensionables arrastrando el
-        # divisor central. Cada columna tiene su propio scroll vertical.
-        paned = ttk.PanedWindow(root, orient="horizontal")
-        paned.pack(fill="both", expand=True, padx=16, pady=(0, 10))
-        left_outer, self._col_left = self._make_scrollable_column(paned)
-        right_outer, self._col_right = self._make_scrollable_column(paned)
-        paned.add(left_outer, weight=1)
-        paned.add(right_outer, weight=1)
-        self._paned = paned
+    # --- Barra de estado ---
+    def _build_statusbar(self) -> None:
+        """Barra inferior: punto y estado, mensaje, versión, red/PIN y frescura.
 
-        # El wraplength del detalle de la BD y del diagnóstico de cookies sigue
-        # al ancho real de su columna.
-        self._col_left.bind("<Configure>", lambda e: self._update_detail_wrap())
-        self._col_right.bind("<Configure>", lambda e: self._update_detail_wrap())
+        Se empaqueta antes que el cuaderno central a propósito (ver `_build_ui`).
+        """
+        container = ttk.Frame(self.root, style="Card.TFrame")
+        ttk.Separator(container, style="Card.TSeparator").pack(side="top", fill="x")
+        row = ttk.Frame(container, style="Card.TFrame")
+        row.pack(fill="x")
+        row.columnconfigure(2, weight=1)
 
-        self._build_services(self._col_left)
-        self._build_activity(self._col_left)
-        self._build_access(self._col_left)
-        self._build_database(self._col_left)
-        # V3.81: «Usuarios» es la **consola de gestión** y va arriba porque es
-        # donde el webmaster tiene algo que hacer; «Actividad por usuario» es el
-        # recuento de lo que hay, leído de la BD sin depender del backend.
-        self._build_users(self._col_right)
-        self._build_user_activity(self._col_right)
-        self._build_cookies(self._col_right)
-        self._build_logs(self._col_right)
-
-    def _make_scrollable_column(self, parent: tk.Misc) -> tuple[ttk.Frame, ttk.Frame]:
-        """Columna con scroll vertical: devuelve (contenedor, frame interior)."""
-        outer = ttk.Frame(parent, style="TFrame")
-        canvas = tk.Canvas(outer, bg=COLORS["bg"], highlightthickness=0)
-        vbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
-        inner = ttk.Frame(canvas, style="TFrame")
-        inner.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        self._status_dot_label = ttk.Label(
+            row, textvariable=self._status_dot, style="Card.TLabel"
         )
-        win = canvas.create_window((0, 0), window=inner, anchor="nw")
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        canvas.configure(yscrollcommand=vbar.set)
-        vbar.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        return outer, inner
+        self._status_dot_label.grid(row=0, column=0, padx=(12, 4), pady=5, sticky="w")
+        self._status_label = ttk.Label(
+            row, textvariable=self._status, style="Status.TLabel"
+        )
+        self._status_label.grid(row=0, column=1, pady=5, sticky="w")
+        self._msg_label = ttk.Label(
+            row, textvariable=self._msg, style="DimCard.TLabel", anchor="w"
+        )
+        self._msg_label.grid(row=0, column=2, padx=16, pady=5, sticky="ew")
+        self._status_right = tk.StringVar(value="")
+        self._status_right_label = ttk.Label(
+            row, textvariable=self._status_right, style="DimCard.TLabel"
+        )
+        self._status_right_label.grid(row=0, column=3, padx=(0, 12), pady=5, sticky="e")
+
+        container.pack(fill="x", side="bottom")
+        self._statusbar_frame = container
+        self._refresh_status_right()
+
+    # --- Área central: pestañas ---
+    def _build_tabs(self) -> None:
+        """Reparte lo que antes vivían en dos columnas largas.
+
+        Cada pestaña lleva su propio scroll, así que el contenido alto (la consola
+        de Usuarios, sobre todo) se recorre con la rueda sin depender del tamaño
+        de la ventana. «Registros» no lleva scroll propio: los `Text` de los logs
+        ya tienen el suyo y deben ocupar todo el alto disponible.
+        """
+        nb = ttk.Notebook(self.root)
+        nb.pack(fill="both", expand=True)
+        self._notebook = nb
+
+        estado = self._add_tab(nb, "Estado")
+        self._build_services(estado)
+        self._build_activity(estado)
+        self._build_access(estado)
+        self._build_database(estado)
+
+        usuarios = self._add_tab(nb, "Usuarios")
+        # V3.81: «Usuarios» es la **consola de gestión** y va arriba porque es donde
+        # el webmaster tiene algo que hacer; «Actividad por usuario» es el recuento
+        # de lo que hay, leído de la BD sin depender del backend.
+        self._build_users(usuarios)
+        self._build_user_activity(usuarios)
+
+        diagnostico = self._add_tab(nb, "Diagnóstico")
+        self._build_cookies(diagnostico)
+
+        registros = self._add_tab(nb, "Registros", scroll=False)
+        self._build_logs(registros)
+
+        nb.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+
+    def _add_tab(self, nb: ttk.Notebook, title: str, *, scroll: bool = True) -> tk.Misc:
+        """Crea una pestaña y devuelve dónde empaquetar su contenido.
+
+        Con scroll devuelve el **cuerpo** del `ScrollableFrame` (lo que se
+        desplaza) y lo engancha al recálculo del wraplength; sin scroll devuelve
+        la propia pestaña, que se estira para llenar el hueco.
+        """
+        icon = TAB_ICONS.get(title, "")
+        frame: tk.Misc
+        if scroll:
+            frame = ScrollableFrame(nb)
+            body: tk.Misc = frame.body
+            body.bind("<Configure>", lambda _e: self._update_detail_wrap(), add="+")
+        else:
+            frame = ttk.Frame(nb, style="TFrame")
+            body = frame
+        nb.add(frame, text=f"  {icon}  {title}  ")
+        self._tabs[title] = frame
+        return body
+
+    @staticmethod
+    def _tab_body(frame: tk.Misc) -> tk.Misc:
+        """Cuerpo empaquetable de una pestaña (el del `ScrollableFrame`, si lo es)."""
+        return getattr(frame, "body", frame)
+
+    def _tab_name(self) -> str:
+        """Nombre de la pestaña activa, según el orden real de `TAB_ORDER`."""
+        try:
+            index = self._notebook.index(self._notebook.select())
+        except (tk.TclError, AttributeError):
+            return self._current_tab_name
+        if 0 <= index < len(TAB_ORDER):
+            return TAB_ORDER[index]
+        return self._current_tab_name
+
+    def show_tab(self, name: str) -> None:
+        """Abre una pestaña por su nombre (menú Ver y «Ir a Usuarios»)."""
+        if name not in TAB_ORDER:
+            return
+        try:
+            self._notebook.select(TAB_ORDER.index(name))
+        except (tk.TclError, AttributeError):
+            return
+        self._current_tab_name = name
+        self._tab_var.set(name)
+        self._update_detail_wrap()
+
+    def _on_tab_changed(self, _event: object = None) -> None:
+        """Cambio de pestaña: actualiza el nombre, la barra de estado y el wrap."""
+        self._current_tab_name = self._tab_name()
+        self._tab_var.set(self._current_tab_name)
+        self._refresh_status_right()
+        self._update_detail_wrap()
+
+    def _refresh_status_right(self) -> None:
+        """Repinta el extremo derecho de la barra de estado."""
+        if not hasattr(self, "_status_right"):
+            return
+        self._status_right.set(
+            statusbar_right(
+                version=self._version.get(),
+                lan=lan_mode(),
+                pin_set=bool(admin_pin(self._config)),
+                tab=self._current_tab_name,
+                checked_at=self._checked_at,
+            )
+        )
+
+    def _toggle_toolbar(self) -> None:
+        """Muestra u oculta la barra de herramientas (menú Ver)."""
+        if self._toolbar_visible.get():
+            self._toolbar_frame.pack(fill="x", before=self._notebook)
+        else:
+            self._toolbar_frame.pack_forget()
+
+    def _set_all_sections(self, expanded: bool) -> None:
+        """Expande o colapsa todas las secciones desplegables (menú Ver)."""
+        for section in self._sections_map.values():
+            if section.is_expanded() != expanded:
+                section.toggle()
+
+    # --- Menús: acciones de apoyo ---
+    def focus_admin_pin(self) -> None:
+        """Lleva al campo del PIN de administración (pestaña Usuarios)."""
+        self.show_tab("Usuarios")
+        self._admin_pin_entry.focus_set()
+
+    def _toggle_lan_from_menu(self) -> None:
+        """Alterna la red local desde «Herramientas» sin duplicar la lógica.
+
+        El checkbutton ya cambió su variable; si coincide con el modo real, no hay
+        nada que hacer (así un doble clic no invierte dos veces).
+        """
+        if bool(self._lan_var.get()) == lan_mode():
+            return
+        self.toggle_lan_mode()
+
+    def open_logs_folder(self) -> None:
+        """Abre la carpeta de registros en el explorador (Windows)."""
+        opener = getattr(os, "startfile", None)
+        if opener is None:
+            self._msg.set(f"Registros en: {LOG_DIR}")
+            return
+        try:
+            opener(str(LOG_DIR))
+        except OSError as exc:
+            self._msg.set(f"No se pudo abrir la carpeta de registros: {exc}")
+
+    def show_device_help(self) -> None:
+        """Instrucciones para conectar un móvil/tablet (certificado autofirmado)."""
+        activa = lan_mode()
+        url = lan_url() if activa else "(activa antes la red local)"
+        messagebox.showinfo(
+            "Conectar un dispositivo",
+            "Para usar la app desde un móvil o una tablet de la misma red:\n\n"
+            "1. Activa la red local (menú Herramientas; reinicia el servidor).\n"
+            "2. Abre el puerto con launcher\\allow-firewall.ps1 (una sola vez).\n"
+            "3. Abre en el dispositivo la dirección:\n" + url + "\n\n"
+            "El certificado es local y autofirmado: la primera vez el navegador "
+            "avisará. Acepta la excepción (o instala el certificado) y listo.\n\n"
+            "La entrada por LAN está cerrada: sigue haciendo falta pedir el alta.",
+            parent=self.root,
+        )
+
+    def show_about(self) -> None:
+        """Créditos, versión y rutas útiles (lo que antes iba en la cabecera)."""
+        messagebox.showinfo(
+            "Acerca de English Tutor",
+            f"English Tutor\n{author_line()}\n\n"
+            f"Versión: {self._version.get() or '—'}\n\n"
+            f"Base de datos:\n{DB_PATH}\n\n"
+            f"Registros:\n{LOG_DIR}",
+            parent=self.root,
+        )
 
     def _section(
         self, parent: tk.Misc, title: str, expanded: bool = True
@@ -701,6 +1007,9 @@ class LauncherApp:
                     "con launcher\\allow-firewall.ps1."
                 )
             )
+        # El menú «Herramientas» marca el modo real, no lo que se creía marcar.
+        self._lan_var.set(expuesta)
+        self._refresh_status_right()
 
     def toggle_lan_mode(self) -> None:
         """Activa/desactiva el acceso desde la red local y lo aplica reiniciando.
@@ -849,16 +1158,22 @@ class LauncherApp:
         pending_wrap = ttk.Frame(sec.body, style="Card.TFrame")
         pending_wrap.pack(fill="both", expand=True, padx=14, pady=(4, 0))
         self._pending_tree = ttk.Treeview(
-            pending_wrap, columns=("kind", "who", "when"), show="headings", height=4
+            pending_wrap,
+            columns=("kind", "who", "email", "when"),
+            show="headings",
+            height=4,
         )
         for column, title, width, anchor in (
             ("kind", "Tipo", 90, "w"),
-            ("who", "Cuenta", 250, "w"),
+            ("who", "Cuenta", 230, "w"),
+            ("email", "Email", 190, "w"),
             ("when", "Llegó", 130, "e"),
         ):
             self._pending_tree.heading(column, text=title)
             self._pending_tree.column(column, width=width, anchor=anchor)
-        self._pending_tree.pack(fill="both", expand=True)
+        # V3.81.3: con scroll vertical y horizontal. En una ventana estrecha las
+        # columnas de la derecha se quedaban fuera y no había forma de verlas.
+        attach_scrollbars(self._pending_tree, pending_wrap)
 
         decision_row = ttk.Frame(sec.body, style="Card.TFrame")
         decision_row.pack(fill="x", padx=14, pady=(6, 0))
@@ -897,7 +1212,9 @@ class LauncherApp:
         ):
             self._profiles_tree.heading(column, text=title)
             self._profiles_tree.column(column, width=width, anchor=anchor)
-        self._profiles_tree.pack(fill="both", expand=True)
+        # Igual que la cola: sin la barra horizontal, «Contraseña»/«Creada» se
+        # cortaban en ventanas estrechas y no había manera de alcanzarlas.
+        attach_scrollbars(self._profiles_tree, profiles_wrap)
 
         # Primera fila de botones: la identidad y la credencial.
         account_row_1 = ttk.Frame(sec.body, style="Card.TFrame")
@@ -919,6 +1236,15 @@ class LauncherApp:
             text="✉️ Verificar email",
             style="Ghost.TButton",
             command=self.verify_email_selected,
+        ).pack(side="left", padx=(6, 0))
+        # V3.82: la invitación se puede reemitir a mano. Es lo que hace falta
+        # cuando el correo se perdió o cuando no hay SMTP y hay que entregar el
+        # enlace uno mismo.
+        ttk.Button(
+            account_row_1,
+            text="📨 Reenviar invitación",
+            style="Ghost.TButton",
+            command=self.resend_activation_selected,
         ).pack(side="left", padx=(6, 0))
         ttk.Button(
             account_row_1,
@@ -969,12 +1295,13 @@ class LauncherApp:
                 "toma antes una copia de seguridad."
             )
         )
-        ttk.Label(
+        self._profiles_note_label = ttk.Label(
             sec.body,
             textvariable=self._profiles_note_var,
             style="DimCard.TLabel",
             wraplength=COLUMN_W - 30,
-        ).pack(anchor="w", fill="x", padx=14, pady=(6, 12))
+        )
+        self._profiles_note_label.pack(anchor="w", fill="x", padx=14, pady=(6, 12))
 
         # El estado del correo depende solo de la configuración local, así que se
         # pinta al construir en vez de esperar a un refresco de red.
@@ -987,6 +1314,7 @@ class LauncherApp:
         self._admin_state_label.configure(
             foreground=COLORS["success"] if activated else COLORS["warning"]
         )
+        self._refresh_status_right()
 
     def _apply_admin_pin_change(self, applied: str, pending: str) -> None:
         """Aplica al backend un cambio del PIN: reinicia, o avisa si no corre.
@@ -1085,8 +1413,15 @@ class LauncherApp:
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _run_admin_action(self, call, success_message) -> None:
-        """Ejecuta una acción admin en un hilo y refresca la sección al terminar."""
+    def _run_admin_action(self, call, success_message, *, invitation=False) -> None:
+        """Ejecuta una acción admin en un hilo y refresca la sección al terminar.
+
+        `invitation=True` (V3.82) pide además que el resultado se lleve a la
+        ventana de invitación: aprobar un alta y reemitir una invitación devuelven
+        el **enlace en claro**, y ese enlace solo existe en esa respuesta —en la
+        BD queda su hash—, así que si no se enseña aquí no se puede recuperar sin
+        emitir otro.
+        """
         if self._admin_busy:
             return
         self._admin_busy = True
@@ -1101,6 +1436,8 @@ class LauncherApp:
             result = call(pin)
             message = success_message if result.ok else result.message()
             if result.ok:
+                if invitation:
+                    self._queue.put(("invitation", (result.data,)))
                 # Tras escribir, se relee: el contador y las filas tienen que
                 # reflejar el estado del backend, no lo que creíamos que iba a pasar.
                 pending = pending_requests(pin)
@@ -1180,9 +1517,9 @@ class LauncherApp:
             self._pending_tree.insert("", "end", values=fila)
 
         # V3.81: la lista de cuentas lleva su propia frase, que es la **lista de
-        # tareas** (cuántas siguen sin contraseña y sin verificar). Se pinta
-        # aparte de la cola de solicitudes porque una puede estar vacía mientras la
-        # otra tiene trabajo.
+        # tareas** (cuántas están pendientes de activación y cuántas con el email
+        # sin verificar). Se pinta aparte de la cola de solicitudes porque una
+        # puede estar vacía mientras la otra tiene trabajo.
         data = profiles.data if profiles is not None else {}
         self._accounts_var.set(
             "Cuentas: sin datos (define el PIN para verlas)"
@@ -1247,6 +1584,36 @@ class LauncherApp:
         self._run_admin_action(
             lambda pin: approve_request(pin, request_id),
             "Solicitud aprobada.",
+            # V3.82: aprobar un alta emite la invitación, y su enlace solo existe
+            # en la respuesta. Hay que enseñarlo aquí o se pierde.
+            invitation=request.get("kind") != "delete",
+        )
+
+    def resend_activation_selected(self) -> None:
+        """Reemite la invitación de activación de la cuenta seleccionada (V3.82).
+
+        Es lo que hace falta cuando el correo se perdió, caducó o nunca salió por
+        no haber SMTP. Emite un token nuevo —el anterior deja de valer— y enseña el
+        enlace para entregarlo a mano.
+        """
+        user = self._selected_user()
+        if user is None:
+            return
+        name = str(user.get("name") or "")
+        if user.get("has_password"):
+            if not messagebox.askyesno(
+                "Reenviar la invitación",
+                f"«{name}» ya tiene contraseña. Reemitir la invitación le permite "
+                "elegir una nueva desde el correo (la actual dejará de valer).\n\n"
+                "Para un restablecimiento normal, lo suyo es que lo pida desde "
+                "«He olvidado la contraseña». ¿Emitir la invitación igualmente?",
+                parent=self.root,
+            ):
+                return
+        self._run_admin_action(
+            lambda pin: resend_activation(pin, str(user["id"])),
+            f"Invitación reemitida para «{name}».",
+            invitation=True,
         )
 
     def reject_selected_request(self) -> None:
@@ -1492,6 +1859,61 @@ class LauncherApp:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _show_invitation(self, data: dict) -> None:
+        """Ventana con el enlace de invitación para copiarlo (V3.82).
+
+        El modo híbrido, resuelto en el único sitio donde tiene sentido: si el
+        correo salió, esto solo lo confirma y no hay nada que copiar; si no salió,
+        el enlace se entrega desde aquí. Se pinta en el hilo principal porque es
+        tkinter, y todo el texto lo compone `ui` —que es donde tiene test—.
+        """
+        win = tk.Toplevel(self.root)
+        win.title("Invitación")
+        win.geometry("640x300")
+        frame = ttk.Frame(win, style="Card.TFrame")
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        ttk.Label(
+            frame,
+            text=invitation_message(data),
+            style="Service.TLabel",
+            wraplength=600,
+        ).pack(anchor="w", pady=(0, 8))
+
+        link = str(data.get("activation_link") or "")
+        if not link:
+            return
+
+        ttk.Label(
+            frame,
+            text="Enlace de activación (caduca y solo sirve una vez):",
+            style="DimCard.TLabel",
+        ).pack(anchor="w")
+
+        text = tk.Text(frame, height=6, wrap="word")
+        text.insert("1.0", invitation_copy_text(data))
+        text.pack(fill="both", expand=True, pady=(4, 6))
+
+        def copiar() -> None:
+            # Se copia **todo el texto**, no solo el enlace: lo normal es pegarlo
+            # en un mensaje, y el contexto («invitación para …») es parte del
+            # mensaje que el webmaster va a mandar.
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text.get("1.0", "end-1c"))
+            self._msg.set("Enlace de invitación copiado al portapapeles.")
+
+        buttons = ttk.Frame(frame, style="Card.TFrame")
+        buttons.pack(fill="x")
+        ttk.Button(
+            buttons, text="📋 Copiar", style="Success.TButton", command=copiar
+        ).pack(side="left")
+        ttk.Button(
+            buttons,
+            text="Cerrar",
+            style="Ghost.TButton",
+            command=win.destroy,
+        ).pack(side="left", padx=(6, 0))
+
     def _show_history_window(self, name: str, result) -> None:
         """Ventana de historial (hilo principal). `result` es un `AdminResult`."""
         win = tk.Toplevel(self.root)
@@ -1719,7 +2141,7 @@ class LauncherApp:
         self._tree.column("name", width=230, anchor="w")
         self._tree.column("conversations", width=110, anchor="e")
         self._tree.column("messages", width=100, anchor="e")
-        self._tree.pack(fill="both", expand=True)
+        attach_scrollbars(self._tree, wrap)
 
     def _build_cookies(self, parent: tk.Misc) -> None:
         sec = self._section(parent, "Cookies navegador")
@@ -1763,12 +2185,17 @@ class LauncherApp:
         self._cookie_tree.column("host", width=130, anchor="w")
         self._cookie_tree.column("expires", width=90, anchor="w")
         self._cookie_tree.column("value", width=280, anchor="w")
-        self._cookie_tree.pack(fill="both", expand=True, pady=(6, 0))
+        attach_scrollbars(self._cookie_tree, wrap)
 
     def _build_logs(self, parent: tk.Misc) -> None:
-        sec = self._section(parent, "Registros", expanded=False)
-        wrap = ttk.Frame(sec.body, style="Card.TFrame")
-        wrap.pack(fill="both", expand=True, padx=14, pady=(4, 12))
+        """Pestaña de registros: `backend.log` y `frontend.log` con su scroll.
+
+        Ya no es un desplegable: ahora es una pestaña, así que puede quedarse con
+        todo el alto de la pestaña y leer los logs sin encoger la ventana. El
+        `Text` se lleva su propia rueda (lo enruta `enable_mousewheel_scrolling`).
+        """
+        wrap = ttk.Frame(parent, style="TFrame")
+        wrap.pack(fill="both", expand=True, padx=10, pady=10)
         nb = ttk.Notebook(wrap)
         nb.pack(fill="both", expand=True)
         self._log_widgets: dict[str, tk.Text] = {}
@@ -1815,6 +2242,11 @@ class LauncherApp:
         elif kind == "accounts":
             # V3.81: resultado de una lectura/acción de la consola «Usuarios».
             self._apply_accounts(*item[1])
+        elif kind == "invitation":
+            # V3.82: aprobar o reemitir devuelve el enlace de activación en claro
+            # (en la BD queda su hash), así que se enseña para poder entregarlo
+            # cuando no hay SMTP.
+            self._show_invitation(dict(item[1]))
         elif kind == "history":
             # Ventana de historial (solo lectura): se pinta en el hilo principal,
             # que es el único que puede tocar tkinter.
@@ -2071,6 +2503,10 @@ class LauncherApp:
         self._set_log("backend", backend_log)
         self._set_log("frontend", frontend_log)
 
+        # V3.81.3: la hora de esta lectura viaja a la barra de estado, para que se
+        # distinga «no hay nada» de «hace rato que no se mira».
+        self._checked_at = time.strftime("%H:%M")
+        self._refresh_status_right()
         self._msg.set("Última comprobación realizada.")
         self._busy = False
 
@@ -2137,25 +2573,84 @@ class LauncherApp:
         widget.see("end")
 
     def _update_detail_wrap(self) -> None:
-        """Ajusta el wraplength de detalle y diagnóstico al ancho de su columna."""
-        width = self._col_left.winfo_width()
-        if width > 60:
-            self._db_detail_label.configure(wraplength=width - 30)
-            self._db_file_label.configure(wraplength=width - 30)
-        rwidth = self._col_right.winfo_width()
-        if rwidth > 60:
-            self._cookie_diag_label.configure(wraplength=rwidth - 30)
+        """Ajusta el wraplength de los textos largos al ancho de su pestaña.
+
+        Antes se medía cada columna del `PanedWindow`; ahora manda la pestaña
+        visible, porque las ocultas miden 1 hasta que se muestran y no sirven de
+        referencia. Se repasan todas las etiquetas de texto largo de golpe: cada
+        una vive en una pestaña distinta y solo se ve la de la pestaña activa.
+        """
+        frame = self._tabs.get(self._current_tab_name)
+        if frame is None:
+            return
+        width = self._tab_body(frame).winfo_width()
+        if width <= 60:
+            return
+        wrap = max(width - 60, 200)
+        for name in (
+            "_db_detail_label",
+            "_db_file_label",
+            "_cookie_diag_label",
+            "_access_note",
+            "_admin_state_label",
+            "_smtp_label",
+            "_profiles_note_label",
+        ):
+            label = getattr(self, name, None)
+            if label is not None:
+                label.configure(wraplength=wrap)
+
+    def _screen_size(self) -> tuple[int, int]:
+        """Tamaño de la pantalla (0,0 si el entorno no lo sabe)."""
+        try:
+            return self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        except tk.TclError:
+            return 0, 0
+
+    def _clamp_size(self, width: int, height: int) -> tuple[int, int]:
+        """Acota el tamaño a la pantalla actual y al mínimo usable."""
+        screen_w, screen_h = self._screen_size()
+        return clamp_window_size(
+            width,
+            height,
+            screen_w=screen_w,
+            screen_h=screen_h,
+            min_w=MIN_W,
+            min_h=MIN_H,
+        )
+
+    def _centered(self, width: int, height: int) -> tuple[int, int]:
+        """Posición centrada (algo hacia arriba) para el tamaño dado."""
+        screen_w, screen_h = self._screen_size()
+        return centered_position(width, height, screen_w=screen_w, screen_h=screen_h)
+
+    def _position_visible(self, x: int, y: int) -> bool:
+        """True si la ventana cae dentro de la pantalla con margen suficiente."""
+        screen_w, screen_h = self._screen_size()
+        return window_position_visible(x, y, screen_w=screen_w, screen_h=screen_h)
 
     def _restore_window(self) -> None:
-        """Restaura tamaño/posición de la ventana y el divisor desde el estado."""
+        """Restaura tamaño/posición y pestaña, encajándolos en la pantalla.
+
+        El estado guardado puede venir de un monitor que ya no existe (o de una
+        medición más alta que la pantalla): restaurarlo tal cual dejaba la parte
+        de abajo —barra de estado incluida— fuera del escritorio. Se acota al
+        área visible y se centra si la posición guardada cae fuera.
+        """
         win = self._state["window"]
+        width, height = self._clamp_size(win["width"], win["height"])
         x, y = win["x"], win["y"]
-        if x is not None and y is not None:
-            self.root.geometry(f"{win['width']}x{win['height']}+{x}+{y}")
-        else:
-            self.root.geometry(f"{win['width']}x{win['height']}")
-        # Fijar el divisor una vez la ventana esté mapeada.
-        self.root.after(50, lambda: self._paned.sashpos(0, self._state["sash"]))
+        if x is None or y is None or not self._position_visible(x, y):
+            x, y = self._centered(width, height)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        # La pestaña guardada se abre una vez existe el cuaderno.
+        self.show_tab(str(self._state.get("tab") or TAB_ORDER[0]))
+
+    def _reset_window(self) -> None:
+        """Devuelve la ventana a su tamaño por defecto, centrada (menú Ver)."""
+        width, height = self._clamp_size(WINDOW_W, WINDOW_H)
+        x, y = self._centered(width, height)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
 
     def _on_close(self) -> None:
         """Guarda el estado visual y cierra la ventana."""
@@ -2166,7 +2661,11 @@ class LauncherApp:
                 "x": self.root.winfo_x(),
                 "y": self.root.winfo_y(),
             }
-            self._state["sash"] = self._paned.sashpos(0)
+            # V3.81.3: se guarda la pestaña activa y si la barra de herramientas se
+            # ve. `sash` se deja de escribir (ya no hay divisor) pero se conserva
+            # en el JSON por compatibilidad con estados anteriores.
+            self._state["tab"] = self._current_tab_name
+            self._state["toolbar"] = bool(self._toolbar_visible.get())
             self._state["sections"] = {
                 title: sec.is_expanded() for title, sec in self._sections_map.items()
             }

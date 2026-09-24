@@ -87,13 +87,16 @@ GATES: tuple[Gate, ...] = (
         id="identidad-cuentas",
         title="G0 · Identidad y ciclo de vida de cuentas",
         protocol=(
-            "backend/scripts/e2e_accounts_v381.py · "
-            "docs/audit/PLAN-P0-IDENTIDAD.md §16"
+            "backend/scripts/e2e_accounts_v382.py · "
+            "docs/audit/PLAN-P0-IDENTIDAD.md §17"
         ),
         evidence=(
-            "El E2E de cuentas verde sobre una copia de la BD **y** "
-            "`without_password == 0` en la BD de uso: la migración de las cuentas "
-            "heredadas está cerrada y el historial no conserva PII tras la purga."
+            "El E2E de cuentas verde sobre una copia de la BD —incluida la "
+            "migración de una cuenta heredada por **invitación**— y ninguna "
+            "cuenta de la BD de uso esperando contraseña **sin invitación "
+            "entregada**. El contador `without_password` es la lista de tareas "
+            "del webmaster, no un agujero: entrar sin contraseña está cerrado "
+            "**por construcción** (`403 ACCOUNT_NOT_ACTIVATED`)."
         ),
         human=True,
     ),

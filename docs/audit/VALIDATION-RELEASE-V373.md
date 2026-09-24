@@ -63,24 +63,27 @@ guarda el id).
 humana)» de notas históricas de V3.73.0 se refería a los **cinco bloques físicos
 que V3.72 declaró** (corte de red, máquina limpia, Windows real, dispositivos y
 audio); el instrumento los cubre y añade `journeys` y `pedagogia`, que también
-exigen una persona, y **G0** (`identidad-cuentas`), que exige el E2E de cuentas
-verde y `without_password == 0`. `Gate.human` se declara gate a gate y vale
-`True` en los ocho: no hay dos cifras válidas.
+exigen una persona,   y **G0** (`identidad-cuentas`), que exige el E2E de cuentas verde y que ninguna
+cuenta pendiente de activación se quede sin su invitación. `Gate.human` se declara
+gate a gate y vale `True` en los ocho: no hay dos cifras válidas.
 
 ## Los 8 gates
 
 ### G0 · `identidad-cuentas` — identidad y ciclo de vida de cuentas
 
-- **Protocolo:** `backend/scripts/e2e_accounts_v381.py` ·
-  `docs/audit/PLAN-P0-IDENTIDAD.md` §16.
-- **Qué se hace:** el E2E de cuentas sobre una **copia** de la BD (alta, contraseña
-  y freno, email, baja autoservicio, baja forzada, reactivación, revocación por
-  época, purga con copia e historial sin PII) **y** la migración completa de una
-  cuenta heredada hasta `without_password == 0`.
+- **Protocolo:** `backend/scripts/e2e_accounts_v382.py` ·
+  `docs/audit/PLAN-P0-IDENTIDAD.md` §17.
+- **Qué se hace:** el E2E de cuentas sobre una **copia** de la BD (solicitud con
+  email y avatar, autorización e invitación, activación, entrada por email,
+  recuperación con correo y sin correo, migración de una cuenta heredada por
+  invitación, baja autoservicio, reactivación, purga con copia e historial sin PII).
 - **Qué se registra:** el resultado del E2E y el contador `without_password` de la
-  BD de uso (que debe ser **0**).
-- **Criterio:** con `without_password > 0` el P0 de identidad **no** está cerrado;
-  el gate queda `pending` hasta que el contador llegue a cero.
+  BD de uso, con la constancia de que cada cuenta de esa lista tiene su invitación
+  emitida y entregada.
+- **Criterio:** entrar sin contraseña ya **no existe** (V3.82 lo cierra por
+  construcción: `403 ACCOUNT_NOT_ACTIVATED`), así que el contador es una lista de
+  tareas, no un agujero. El gate queda `pending` mientras el E2E no esté verde o
+  haya una cuenta esperando contraseña **sin invitación entregada**.
 
 ### G1 · `offline-fisico` — los 12 flujos con la red cortada
 

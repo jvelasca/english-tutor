@@ -14,10 +14,11 @@ import { GearIcon, HelpIcon, TrendIcon } from "../components/Icons";
 interface HeaderProps {
   route: Route;
   onNavigate: (route: Route) => void;
-  users: User[];
-  currentUserId: string | null;
-  onSelectUser: (id: string) => void;
-  onRequestUser: (name: string) => Promise<ProfileRequestOutcome>;
+  /**
+   * V3.82: la cuenta de la sesión, o `null` mientras no hay ninguna. Ya no es
+   * una lista: el menú dejó de ser un selector de usuarios.
+   */
+  user: User | null;
   onEditUser: (id: string, patch: UserPatch) => Promise<User | null>;
   /** V3.77: la cuenta de la sesión pide su baja (la resuelve el webmaster). */
   onRequestDeleteUser?: (note: string) => Promise<ProfileRequestOutcome>;
@@ -39,10 +40,7 @@ interface HeaderProps {
 export function Header({
   route,
   onNavigate,
-  users,
-  currentUserId,
-  onSelectUser,
-  onRequestUser,
+  user,
   onEditUser,
   onRequestDeleteUser,
   onOpenAccount,
@@ -126,10 +124,7 @@ export function Header({
           <GearIcon size={18} />
         </button>
         <UserMenu
-          users={users}
-          currentUserId={currentUserId}
-          onSelect={onSelectUser}
-          onRequest={onRequestUser}
+          user={user}
           onEdit={onEditUser}
           {...(onRequestDeleteUser ? { onRequestDelete: onRequestDeleteUser } : {})}
           {...(onOpenAccount ? { onOpenAccount } : {})}

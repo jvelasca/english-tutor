@@ -21,77 +21,67 @@ import { ApiError, deleteJson, getJsonOptional, postJson, putJson } from "./clie
  * peticiones condenadas.
  */
 
-/** Por qué falló la apertura de sesión. */
-export type SessionPasswordReason =
-  | "password-required"
-  | "password-invalid"
-  | "password-throttled";
+/** Por qué falló la apertura de sesión (V3.82: login por email + contraseña). */
+export type SessionLoginReason =
+  // Email o contraseña que no cuadran. El backend **no** distingue los dos casos
+  // para no servir de oráculo de qué correos tienen cuenta.
+  | "invalid-credentials"
+  // La cuenta existe y está autorizada, pero todavía no tiene contraseña: su
+  // invitación está esperando en el correo.
+  | "not-activated"
+  | "disabled"
+  | "unenrolled"
+  | "throttled";
 
 /**
- * La apertura de sesión necesita una contraseña (correcta). Es un desenlace
- * **normal** del producto, no una avería: la puerta lo usa para pedirla. Por eso es
- * un error propio y no un `Error` genérico que se confundiría con «backend caído».
+ * La apertura de sesión no pudo completarse por un motivo **del producto**, no por
+ * una avería: credenciales que no cuadran, cuenta sin activar, cuenta fuera de
+ * servicio o el freno de intentos. Se separa de un `Error` genérico para que la
+ * puerta pueda decir qué pasa sin confundirlo con «el backend no responde».
  */
-export class SessionPasswordError extends Error {
-  readonly reason: SessionPasswordReason;
+export class SessionLoginError extends Error {
+  readonly reason: SessionLoginReason;
   /** Segundos que faltan cuando el freno de intentos está activo (si no, 0). */
   readonly retryAfterSeconds: number;
 
-  constructor(reason: SessionPasswordReason, retryAfterSeconds = 0) {
+  constructor(reason: SessionLoginReason, retryAfterSeconds = 0) {
     super(reason);
-    this.name = "SessionPasswordError";
+    this.name = "SessionLoginError";
     this.reason = reason;
     this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
-/** Abre sesión para una cuenta existente (404 si no existe). */
-export async function openSession(
-  userId: string,
-  password?: string,
-): Promise<User> {
+/**
+ * Abre sesión con **email + contraseña** (V3.82).
+ *
+ * Es el único camino de entrada. Ya no se entra **eligiendo** una cuenta de una
+ * lista: eso permitía nombrar a cualquiera y, con las cuentas heredadas sin
+ * contraseña, entrar como esa persona. Ahora hay que demostrar la credencial.
+ */
+export async function openSession(email: string, password: string): Promise<User> {
   try {
-    return await postJson<User>("/api/session", {
-      user_id: userId,
-      ...(password !== undefined && password !== "" ? { password } : {}),
-    });
+    return await postJson<User>("/api/session", { email: email.trim(), password });
   } catch (err) {
     if (err instanceof ApiError) {
-      if (err.detail === "PASSWORD_REQUIRED") {
-        throw new SessionPasswordError("password-required");
+      if (err.status === 429 || err.detail === "PASSWORD_THROTTLED") {
+        throw new SessionLoginError("throttled", err.retryAfterSeconds);
       }
-      if (err.detail === "PASSWORD_INVALID") {
-        throw new SessionPasswordError("password-invalid");
+      if (err.detail === "ACCOUNT_NOT_ACTIVATED") {
+        throw new SessionLoginError("not-activated");
       }
-      if (err.detail === "PASSWORD_THROTTLED") {
-        throw new SessionPasswordError("password-throttled", err.retryAfterSeconds);
+      if (err.detail === "PROFILE_DISABLED") {
+        throw new SessionLoginError("disabled");
+      }
+      if (err.detail === "ACCOUNT_UNENROLLED") {
+        throw new SessionLoginError("unenrolled");
+      }
+      if (err.status === 401) {
+        throw new SessionLoginError("invalid-credentials");
       }
     }
     throw err;
   }
-}
-
-/**
- * Registro de una cuenta nueva: nombre, email y contraseña (V3.81).
- *
- * Sustituye al «pide un perfil» de V3.77: cualquier persona puede crear su cuenta
- * desde el equipo, y el email sirve para **verificar** y **recuperar** — no para
- * entrar (la entrada sigue siendo el selector con avatar). El backend solo lo
- * acepta desde el propio equipo; por LAN se sigue **pidiendo**.
- */
-export function createAccount(
-  name: string,
-  email: string,
-  password: string,
-): Promise<User> {
-  // El email se limpia aquí (y el nombre también): lo normal es pegarlo, y un
-  // espacio al final es un «ese email no parece válido» que el alumno no ve.
-  // La contraseña **no** se toca: los espacios ahí pueden ser parte de la clave.
-  return postJson<User>("/api/users", {
-    name: name.trim(),
-    email: email.trim(),
-    password,
-  });
 }
 
 /**
@@ -159,6 +149,91 @@ export function resendVerification(): Promise<{
  */
 export function verifyEmail(token: string): Promise<User> {
   return postJson<User>("/api/account/verify", { token });
+}
+
+/**
+ * Activa la cuenta desde el enlace de **invitación** (V3.82): elige la
+ * contraseña y deja la sesión abierta.
+ *
+ * Los desenlaces que la página tiene que contar: token inválido (400),
+ * caducado (400) y contraseña que no cumple la política (400). Se traducen a
+ * códigos porque la pantalla dice frases distintas con cada uno.
+ */
+export type ActivationReason = "invalid" | "expired" | "password-format" | "error";
+
+export class ActivationError extends Error {
+  readonly reason: ActivationReason;
+  constructor(reason: ActivationReason) {
+    super(reason);
+    this.name = "ActivationError";
+    this.reason = reason;
+  }
+}
+
+export async function activateAccount(
+  token: string,
+  password: string,
+): Promise<User> {
+  try {
+    return await postJson<User>("/api/account/activate", { token, password });
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.detail === "ACTIVATION_TOKEN_EXPIRED") {
+        throw new ActivationError("expired");
+      }
+      if (err.detail === "ACTIVATION_TOKEN_INVALID") {
+        throw new ActivationError("invalid");
+      }
+      if (err.detail === "PASSWORD_FORMAT") {
+        throw new ActivationError("password-format");
+      }
+    }
+    throw new ActivationError("error");
+  }
+}
+
+/**
+ * «Olvidé mi contraseña» (V3.82). **Responde siempre igual**, exista o no la
+ * cuenta: el backend no revela si un correo tiene cuenta, y la pantalla tampoco
+ * puede prometer que ha enviado algo que quizá no ha salido (sin SMTP no sale
+ * ningún correo, y eso es el modo híbrido declarado).
+ */
+export function forgotPassword(email: string): Promise<{ sent: boolean }> {
+  return postJson<{ sent: boolean }>("/api/account/forgot-password", {
+    email: email.trim(),
+  });
+}
+
+/** Por qué falló el restablecimiento de la contraseña. */
+export type ResetReason = "invalid" | "expired" | "password-format" | "error";
+
+export class ResetError extends Error {
+  readonly reason: ResetReason;
+  constructor(reason: ResetReason) {
+    super(reason);
+    this.name = "ResetError";
+    this.reason = reason;
+  }
+}
+
+/** Elige contraseña nueva desde el enlace del correo de restablecimiento. */
+export async function resetPassword(token: string, password: string): Promise<User> {
+  try {
+    return await postJson<User>("/api/account/reset-password", { token, password });
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.detail === "RESET_TOKEN_EXPIRED") {
+        throw new ResetError("expired");
+      }
+      if (err.detail === "RESET_TOKEN_INVALID") {
+        throw new ResetError("invalid");
+      }
+      if (err.detail === "PASSWORD_FORMAT") {
+        throw new ResetError("password-format");
+      }
+    }
+    throw new ResetError("error");
+  }
 }
 
 /**

@@ -7,28 +7,26 @@ import type { Page } from "@playwright/test";
  * Perfil estable para tests visuales.
  *
  * Desde V3.52.1 el perfil lo crea UNA sola vez `globalSetup` (en un proceso
- * único, marcado `is_test` e invisible en la app) y lo borra `globalTeardown`.
- * Este helper ya NO hace find-or-create: aquel GET+POST no atómico, ejecutado en
- * paralelo por los 9 specs × 3 proyectos contra la base de datos real, era la
- * causa de los perfiles duplicados «Visual Tester». Aquí solo se mockea
- * `GET /api/users` con ese único perfil para que la app lo auto-seleccione y la
- * ProfileGate no aparezca.
+ * único, marcado `is_test` e invisible en la app). V3.82 retira esa creación por
+ * API (la alta ya no es pública) y la identidad **entera** se resuelve en el
+ * navegador: este helper mockea `GET /api/users` con ese único perfil y
+ * `GET/POST /api/session`, que es lo que la app consulta al arrancar. Como el
+ * login por email retiró el selector, el mock ya no «auto-selecciona» nada: la
+ * sesión llega ya abierta y la `ProfileGate` no aparece.
  *
- * V3.75 (Fase 2 del P0 de identidad) añade la segunda mitad: el perfil único ya
- * **no basta**. La app pregunta `GET /api/session` al arrancar y, si no hay
- * sesión, la abre con `POST /api/session` antes de pintar nada (la identidad la
- * firma el servidor en una cookie `et_session` HttpOnly). Por eso se mockea
- * también `/api/session`: sin ello la ProfileGate se queda abierta y **todo**
- * clic acaba interceptado por el `dialog-backdrop` — que es exactamente lo que
- * pasó en la primera ejecución real de CI sobre el commit de V3.75.0.
+ * V3.75 (Fase 2 del P0 de identidad) añadió la segunda mitad: la app pregunta
+ * `GET /api/session` al arrancar y, si no hay sesión, la abre con
+ * `POST /api/session` antes de pintar nada (la identidad la firma el servidor en
+ * una cookie `et_session` HttpOnly). Por eso se mockea también `/api/session`:
+ * sin ello la ProfileGate se queda abierta y **todo** clic acaba interceptado por
+ * el `dialog-backdrop` — que es exactamente lo que pasó en la primera ejecución
+ * real de CI sobre el commit de V3.75.0.
  *
  * El perfil se lee del fichero de handshake escrito por `globalSetup` (los
  * workers pueden vivir en otro proceso; `process.env` no es fiable) y, si no
- * existe, se degrada al id ficticio de siempre. Un perfil recién creado no tiene
+ * existe, se degrada al id ficticio de siempre. Un id recién inventado no tiene
  * preferencias en backend, así que el idioma de la UI es el del navegador
- * (inglés) y los tests son deterministas. Al ser un perfil real (persistido) la
- * app puede escribir settings (resize.spec persiste el ancho de panel) sin
- * errores.
+ * (inglés) y los tests son deterministas.
  */
 export const VISUAL_TESTER_NAME =
   process.env.VISUAL_TESTER_NAME ?? "Visual Tester";
@@ -69,8 +67,10 @@ function testerUser(): TesterUser {
 export async function ensureProfile(page: Page): Promise<TesterUser> {
   const user = testerUser();
 
-  // Mock GET /api/users → un único perfil: la app lo auto-selecciona al recargar
-  // y la ProfileGate (que solo aparece con 0 o varios perfiles) no llega a salir.
+  // Mock GET /api/users → un único perfil. V3.82: la app ya no lo usa para
+  // «auto-seleccionar» a nadie (no hay selector); se mantiene porque el armazón
+  // sigue pidiendo la lista para el menú de usuario y sin respuesta se quedaría
+  // cargando.
   await page.route("**/api/users", (route) => {
     if (route.request().method() === "GET") {
       void route.fulfill({ json: [user] });
@@ -94,16 +94,16 @@ export async function ensureProfile(page: Page): Promise<TesterUser> {
  * diseño: esta suite mide layout y responsive— no puede satisfacerlas de verdad.
  *
  * Se resuelven en el navegador, igual que `GET /api/users`, y con el **mismo**
- * perfil que el resto del arnés: así `planSession` (`src/utils/session.ts`) toma
- * la rama `adopt` y la puerta no aparece. Lo que este mock **no** prueba —y no
- * pretende— es que el servidor emita, firme y verifique la sesión: eso vive en
+ * perfil que el resto del arnés: así la app arranca con sesión y la puerta de
+ * entrada no aparece. Lo que este mock **no** prueba —y no pretende— es que el
+ * servidor emita, firme y verifique la sesión: eso vive en
  * `backend/tests/test_sessions.py`, `test_identity_source.py`,
  * `test_users_self_only.py`, `test_public_surface.py` y en
- * `frontend/src/utils/session.test.ts`. Aquí se fija layout, no identidad.
+ * `frontend/src/hooks/useChat.test.tsx`. Aquí se fija layout, no identidad.
  *
  * Importante: el `user` debe ser el MISMO objeto que se devuelve en
- * `GET /api/users`; si los ids no coinciden, `planSession` no adopta la sesión y
- * la puerta vuelve a aparecer.
+ * `GET /api/users`; si los ids no coinciden, el menú de usuario y la sesión
+ * hablan de personas distintas y los tests dejan de ser deterministas.
  */
 export async function mockIdentitySession(
   page: Page,

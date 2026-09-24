@@ -190,7 +190,19 @@ def _identidad_por_sesion(request, monkeypatch, _session_secret_aislado: None) -
         # llamadas serían 556 avisos) y **conserva la semántica por petición**: una
         # petición POSTERIOR sin identidad sigue llegando sin identidad, como antes
         # de V3.75, en vez de heredar la sesión del tarro.
-        self.cookies.set(sessions.SESSION_COOKIE, sessions.issue(str(claimed)))
+        #
+        # V3.82: el token se emite con la **época real** de la cuenta. Antes se
+        # emitía con la de defecto (cero), que funcionaba mientras ninguna suite
+        # preparase su escenario con una contraseña (`set_password_hash` sube la
+        # época). Con V3.82 varias la preparan, y un token de época cero llegaría
+        # como `SESSION_STALE`: el adaptador tiene que emitir la sesión que emitiría
+        # un login de verdad, no una caducada.
+        from repositories import users as users_repo
+
+        epoch = users_repo.get_auth_epoch(str(claimed)) or 0
+        self.cookies.set(
+            sessions.SESSION_COOKIE, sessions.issue(str(claimed), epoch=epoch)
+        )
         try:
             return original(self, method, clean_url, **kwargs)
         finally:

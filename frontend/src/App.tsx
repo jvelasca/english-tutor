@@ -8,7 +8,7 @@ import { AppShell } from "./app/AppShell";
 import { Header } from "./app/Header";
 import { Workspace } from "./app/Workspace";
 import type { Route } from "./app/routes";
-import { navigateTo, useHashPath } from "./router/hash";
+import { navigateTo, splitQuery, useHashPath } from "./router/hash";
 import { pathToRoute, routeToPath } from "./router/routeMap";
 import { learnActivityPath } from "./router/paths";
 import { chatSkillFromPath, chatSkillPath, isChatSkill } from "./router/chat";
@@ -20,11 +20,14 @@ import {
 } from "./router/learnHub";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ProfileGate } from "./components/ProfileGate";
+import { AccountActivate } from "./features/account/AccountActivate";
+import { AccountReset } from "./features/account/AccountReset";
+import { AccountVerify } from "./features/account/AccountVerify";
 import { AccountDialog } from "./components/AccountDialog";
 import { DegradedVoiceNotice } from "./components/DegradedVoiceNotice";
 import { VoiceDownloadDialog } from "./components/VoiceDownloadDialog";
 import { completeSessionStep } from "./api/academy";
-import { isLocalDevice } from "./utils/localDevice";
+import { forgotPassword } from "./api/session";
 import type { Section } from "./utils/sections";
 import type { NextBestActivity, SessionStep, TutorMode } from "./types/api";
 
@@ -83,13 +86,14 @@ export default function App() {
     users,
     currentUserId,
     usersLoaded,
-    // V3.80.2: si la lista no se pudo leer, la puerta ofrece reintentar.
+    // V3.80.2: si la sesión no se pudo comprobar, la puerta ofrece reintentar.
     usersLoadFailed,
-    reloadUsers,
-    selectUser,
-    // V3.77: la app ya no crea cuentas a la primera; las pide, y el webmaster las
-    // autoriza desde el programa de gestión. V3.81 añade el **registro** desde el
-    // propio equipo, que es el camino nuevo, y deja la petición para la LAN.
+    reloadSession,
+    // V3.82: entrar es escribir email + contraseña; la app ya no enumera las
+    // cuentas ni deja elegir un nombre.
+    login,
+    // V3.77: la app ya no crea cuentas a la primera; las **pide**, con nombre,
+    // email y avatar, y el webmaster las autoriza por correo.
     requestProfileForGate,
     requestProfileRemoval,
     editUser,
@@ -97,13 +101,7 @@ export default function App() {
     refreshEvents,
     startLesson,
     completeLesson,
-    // V3.81 (Fase 3 del P0): paso de contraseña de la puerta y ciclo de vida de
-    // la cuenta.
-    passwordPromptUserId,
-    passwordFeedback,
-    submitPassword,
-    cancelPassword,
-    createAccountForGate,
+    // V3.81 (Fase 3 del P0): ciclo de vida de la cuenta.
     mustChangePassword,
     changePasswordNow,
     changeEmailNow,
@@ -111,10 +109,6 @@ export default function App() {
     unenrollNow,
     signOut,
   } = chat;
-
-  const passwordUser = passwordPromptUserId
-    ? (users.find((u) => u.id === passwordPromptUserId) ?? null)
-    : null;
 
   // La cuenta del diálogo sale de la lista local, que es la que se refresca con
   // cada respuesta del servidor (cambiar contraseña, email). El email ajeno llega
@@ -130,6 +124,16 @@ export default function App() {
 
   const path = useHashPath();
   const route = pathToRoute(path);
+  // V3.82: páginas de cuenta a las que apunta un enlace del correo
+  // (`#/cuenta/activar?token=…`). El token viaja en la consulta del propio
+  // fragmento, así que se lee de ahí y se pasa a la página.
+  const accountToken = splitQuery(path).query.get("token") ?? "";
+  // Se pintan **fuera** del armazón y **por encima** de la puerta de entrada: el
+  // enlace puede abrirse en otro navegador, sin sesión, con la app sin abrir.
+  const isAccountRoute =
+    route === "accountActivate" ||
+    route === "accountReset" ||
+    route === "accountVerify";
   // Sub-ruta de práctica activa dentro de APRENDER (null = hub u otra raíz).
   const learnActivity = learnActivityFromPath(path);
   // Destreza del chat libre activa (`/chat/lectura`, `/chat/escritura`), o null
@@ -308,6 +312,38 @@ export default function App() {
     assistantCountRef.current = count;
   }, [chat.messages, completeActiveStep]);
 
+  /**
+   * V3.82: salir de una página de cuenta. Vuelve a Inicio y **relee la sesión**:
+   * activar y restablecer dejan la sesión abierta en el servidor, así que al
+   * volver la app entra sola; verificar no la abre, y entonces reaparece la
+   * puerta de entrada, que es lo honesto.
+   */
+  const leaveAccountPage = useCallback(() => {
+    navigateTo(routeToPath("home"));
+    void reloadSession();
+  }, [reloadSession]);
+
+  // Las páginas de cuenta se sirven antes que nada: no son un destino de la app
+  // (no llevan cabecera, ni navegación, ni puerta delante), son el destino de un
+  // enlace de correo.
+  if (isAccountRoute) {
+    return (
+      <I18nProvider lang={lang} setLang={setLang}>
+        <MotionConfig reducedMotion="user">
+          {route === "accountActivate" && (
+            <AccountActivate token={accountToken} onDone={leaveAccountPage} />
+          )}
+          {route === "accountReset" && (
+            <AccountReset token={accountToken} onDone={leaveAccountPage} />
+          )}
+          {route === "accountVerify" && (
+            <AccountVerify token={accountToken} onDone={leaveAccountPage} />
+          )}
+        </MotionConfig>
+      </I18nProvider>
+    );
+  }
+
   return (
     <I18nProvider lang={lang} setLang={setLang}>
       {/* V3.73.1 (GUI-05): las animaciones de `motion/react` no pasan por CSS, así
@@ -323,10 +359,7 @@ export default function App() {
             <Header
               route={route}
               onNavigate={navigate}
-              users={users}
-              currentUserId={currentUserId}
-              onSelectUser={selectUser}
-              onRequestUser={requestProfileForGate}
+              user={accountUser}
               onEditUser={editUser}
               onRequestDeleteUser={requestProfileRemoval}
               onOpenAccount={() => setAccountOpen(true)}
@@ -360,27 +393,17 @@ export default function App() {
         <DegradedVoiceNotice />
         <VoiceDownloadDialog />
 
-        {/* Al arrancar en un navegador nuevo sin ninguna cuenta definida (sin
-            sesión abierta y varias cuentas, o todavía sin ninguna), se pide elegir
-            o crear una antes de usar la app.
-
-            V3.81: la misma puerta se muestra cuando hay una cuenta esperando su
-            contraseña (`passwordPromptUserId`), incluso si ya había otra activa:
-            cambiar de cuenta en el selector es una acción del alumno y el paso de
-            contraseña no puede quedar invisible detrás de la app. */}
-        {usersLoaded && (!currentUserId || passwordPromptUserId) && (
+        {/* V3.82: la puerta de entrada. Se muestra al arrancar sin sesión (o si
+            la comprobación falló) y es la **única** forma de entrar: email +
+            contraseña, o pedir una cuenta, o recuperar la contraseña. Ya no hay
+            lista de cuentas que elegir, ni forma de nombrar a otra persona. */}
+        {usersLoaded && !currentUserId && (
           <ProfileGate
-            users={users}
-            onSelect={selectUser}
+            onLogin={login}
             onRequest={requestProfileForGate}
-            onCreateAccount={createAccountForGate}
-            canCreateAccount={isLocalDevice()}
-            passwordUser={passwordUser}
-            passwordFeedback={passwordFeedback}
-            onSubmitPassword={submitPassword}
-            onCancelPassword={cancelPassword}
+            onForgot={forgotPassword}
             loadFailed={usersLoadFailed}
-            onRetry={() => void reloadUsers()}
+            onRetry={() => void reloadSession()}
           />
         )}
 

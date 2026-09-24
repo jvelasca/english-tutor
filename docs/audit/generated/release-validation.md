@@ -1,13 +1,13 @@
 # Validación automática de la release (V3.73)
 
-Versión del árbol: `3.81.2` · **10 pass · 0 fail · 0 skip**
+Versión del árbol: `3.82.0` · **10 pass · 0 fail · 0 skip**
 
 Generado por `scripts/validation_gate.py auto`. No sustituye a los gates
 humanos: solo cubre lo que se puede comprobar estáticamente.
 
 | # | Comprobación | Estado | Detalle |
 |---|---|---|---|
-| 1 | La versión es consistente en todos los orígenes | ✅ pass | OK: Release consistency (3.81.2) en todos los orígenes |
+| 1 | La versión es consistente en todos los orígenes | ✅ pass | OK: Release consistency (3.82.0) en todos los orígenes |
 | 2 | i18n sin claves huérfanas ni sin definir | ✅ pass |   -> docs/audit/generated/i18n-report.{json,md} |
 | 3 | El producto no arranca sin la UI compilada | ✅ pass | fail-closed cableado en launcher y backend |
 | 4 | El descubrimiento de la LAN no usa direcciones públicas | ✅ pass | net_interfaces.py enumera el propio equipo |
