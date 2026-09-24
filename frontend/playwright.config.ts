@@ -17,6 +17,13 @@ export default defineConfig({
   globalSetup: "./tests/visual/globalSetup.ts",
   globalTeardown: "./tests/visual/globalTeardown.ts",
   timeout: 30_000,
+  // V3.83.0: los specs comparten UN dev server de Vite y el bootstrap de la app
+  // (`GET/POST /api/session` + `GET /api/users`) es sensible a la carga. En
+  // paralelo, varios workers compiten por el arranque en frío de Vite y algunos
+  // specs se quedan con la app en «Loading…» hasta agotar el timeout (falsos
+  // negativos). En serie la suite es determinista (~2,7 min). Se puede subir con
+  // `PW_WORKERS` cuando el arranque esté caliente; `0` deja el valor por defecto.
+  workers: Number(process.env.PW_WORKERS ?? 1) || undefined,
   reporter: [["list"]],
   use: {
     // El dev server de Vite sirve por HTTPS con certificado autofirmado
