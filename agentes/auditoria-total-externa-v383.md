@@ -639,6 +639,16 @@ sesión tipo juego**.
 
 ## 8. Nota de prefijos y cierre
 
+> **AMPLIACIÓN (2026-09-24, commit documental posterior).** El prefijo **`AV`** queda
+> reservado por el punto de entrada **`agentes/auditoria-total-externa-v382.md`**, que
+> audita el eslabón **`v3.81.2..v3.82.0`** —el que **cambia el contrato de
+> `POST /api/session` y migra la BD**— y espera
+> `docs/audit/AV-AUDITORIA-TOTAL-V382.md`. La **cadena de puntos de entrada** pasa a ser
+> `… → v3812 → v382 → v383`, y la cifra vigente de prefijos reservados **incluye `AV`**.
+> **Este documento se conserva tal cual**: era correcto para su fecha (`AV` no existía
+> cuando se escribió), y ese es el mismo criterio de historicidad que este encargo exige
+> a los documentos que audita.
+
 - **El primer prefijo libre es `AU`**, y **este es el punto de entrada que lo
   reserva**: el informe esperado es `docs/audit/AU-AUDITORIA-TOTAL-V383.md`.
   Reservados y **sin dictamen** a fecha de este commit: **`AP`** (`v3.75.7`),

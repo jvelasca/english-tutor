@@ -172,7 +172,7 @@ cerrada. Es la deuda de auditoría más grande que este informe deja al descubie
 | E3 | ¿Arnés con tag propio? | **pass** (matiz) | `fd086e8` no mueve producto y su run está verde; pero deja el tag sin cubrir el arnés → §5-H4 | P2 |
 | E4 | Promesas cerradas / PARKED | **pass** | `CHANGELOG §3.83.0`, `PLAN.md` entrada V3.83.0 y `PARKED.md §V3.83.0` con etiquetas `[PRODUCTO]`/`[UX]`/`[VALIDACIÓN]`, sin presentar deuda como cerrada | P3 |
 | E5 | Las cinco de «Honestidad» | **fail** (1 de 5) | §3.1: la (i) es **literalmente falsa** y la (v) es **solo-UI** | P2 |
-| E6 | La señal de CI en PRs | **no verificado** | requiere `gh pr checks` sobre los PRs de Dependabot (no ejecutado aquí) | P2 |
+| E6 | La señal de CI en PRs | **fail**, dictaminado en §11 | §11: los rojos **no** son el arnés — `#10` `react`/`react-dom` desparejados, `#13` `vite` 8 no instalable | P2 |
 
 ### 3.1 El ejercicio de contradicción (E5)
 
@@ -339,6 +339,9 @@ puedo decir: `fd086e8` (fijar `workers`) reduce el ruido **local**, y **nadie ha
 demostrado** que los rojos de Dependabot y la no determinación local sean el mismo
 problema —son **dos** observaciones, como el propio encargo admite (§6-D4).
 
+**Cerrado después (2026-09-24):** ver **§11**. La sospecha se confirma —son dos
+observaciones distintas— y **además** queda descartado que el arnés tenga nada que ver.
+
 ---
 
 ## 6. Evidencia nueva producida por este informe (§7 del plan)
@@ -433,8 +436,9 @@ notas se reproducen por comando**.
    severidad. Es **heredado**, no lo introduce esta release y **no es alcanzable desde
    la UI**, así que no bloquea el cierre; pero la promesa «un pack curado no es un
    destino» no debería ser solo de cliente. **No lo he corregido.**
-4. **E6 (recomendado):** cerrar el dictamen de los PRs de Dependabot, que sigue
-   `no verificado` y arrastra dos documentos.
+4. ~~**E6 (recomendado):** cerrar el dictamen de los PRs de Dependabot, que sigue
+   `no verificado` y arrastra dos documentos.~~ **Hecho en §11** (addendum
+   2026-09-24): no era el arnés; son **dos** bumps no instalables.
 5. **D1 (el grande, fuera de este parche):** abrir el punto de entrada `…-v382.md`.
    **Mientras no exista, la serie no puede declararse auditada**, por mucho que
    `v3.83.0` salga impecable.
@@ -474,4 +478,54 @@ python -c "print('retention.py:185 -> return not owner or owner == user_id')"
 `AA`–`AF` (dossiers V3.70), `AG`–`AM` (pausa pedagógica y psicometría), `AN` (`v3.75.1`),
 `AO` (política psicométrica V4.0). Reservados **sin dictamen** a fecha de este informe:
 **`AP`** (`v3.75.7`), **`AQ`** (`v3.77.1`), **`AR`** (`v3.80.0`), **`AS`** (`v3.81.1`),
-**`AT`** (`v3.81.2`) y **`AU`** (este). Y **sin punto de entrada**: `v3.82.0`.
+**`AT`** (`v3.81.2`) y **`AU`** (este).
+
+**Ampliación (2026-09-24, posterior a este informe).** `v3.82.0` **ya tiene punto de
+entrada**: `agentes/auditoria-total-externa-v382.md`, que reserva el prefijo **`AV`** y
+espera `docs/audit/AV-AUDITORIA-TOTAL-V382.md`. La frase «sin punto de entrada:
+`v3.82.0`» **era correcta cuando este informe se escribió** y dejó de serlo con ese
+commit; la cifra vigente **incluye `AV`** y la cadena queda
+`… → v3812 → v382 → v383`.
+
+---
+
+## 11. Addendum (2026-09-24) — E6/H6 dictaminado: los rojos de Dependabot **no** son el arnés
+
+**Qué se hizo.** `gh pr checks` sobre los PRs de Dependabot —**12 abiertos**, todos del
+2026-09-18— y lectura de los logs de los **dos** fallos. Es lo que H6 dejó
+`no verificado` y lo que §8.4 pedía cerrar.
+
+**Los dos rojos no comparten causa, ni entre sí ni con el arnés.**
+
+| PR | Bump | Firma del fallo | Causa, en la letra del log |
+|---|---|---|---|
+| **`#10`** | `react` + `@types/react` | **43/109** ficheros de test caídos; Playwright con `expect(locator).toBeVisible() failed` / `element(s) not found` | `Error: Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got: - react-dom: 19.2.8` |
+| **`#13`** | `vite` 6.4.3 → 8.3.0 | **9–11 s**, en la **instalación** | `npm error code ERESOLVE` · `peer vite@"^4.2.0 \|\| ^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0" from @vitejs/plugin-react@4.7.0` |
+
+**Lectura.**
+
+1. **`#10` es un bump PARTIDO.** Sube `react` **sin** subir `react-dom`; React 19
+   **aborta al arrancar** si las dos no son la **misma** versión. Por eso caen los 43
+   ficheros **de golpe** y por eso Playwright falla con «la app no monta» —**no** por
+   contención de `workers`—. En `main` hoy las dos están en `^19.1.0`
+   (`frontend/package.json`): el PR las **despareja**.
+2. **`#13` es un bump NO INSTALABLE.** `npm ci` no resuelve y falla en segundos, **antes
+   de compilar**: `@vitejs/plugin-react` (el que hay, `^4.5.0`) declara peer **hasta
+   vite 7**, y el PR pide **vite 8**. Necesita `@vitejs/plugin-react` 5.x en el mismo PR.
+3. **H6 se cierra, y en el sentido contrario al que yo apunté.** Dejé escrito que
+   «nadie ha demostrado» que los rojos y la no determinación local fueran el mismo
+   problema. Ahora está demostrado que **no lo son**: ninguno de los dos toca el arnés,
+   y `fd086e8` (fijar `workers`) es **ajeno** a esto. **Lo que en §6-D4 se sospechaba
+   como posible causa compartida queda refutado por la evidencia.**
+4. **Severidad `P2`: mantenimiento, no release.** Ninguno de los dos PRs es producto ni
+   alcanza a la app publicada: son **PRs abiertos**, no ramas mergeadas. No bloquean el
+   cierre de `v3.83.0` —igual que H1 no lo hacía—, pero son **deuda visible**: 12 PRs
+   del 2026-09-18 sin dictamen.
+
+**Recomendación (`P2`, mantenimiento):** cerrar `#13` y reabrirlo **agrupado** (`vite` +
+`@vitejs/plugin-react`); añadir `react-dom` a `#10`, o agrupar `react`/`react-dom`/
+`@types/react` en `.github/dependabot.yml`; y dictaminar los **10** restantes uno a uno.
+
+**Lo que este addendum NO cambia:** H1, H2 (ya corregida), H4, H5, la cola post-tag ni el
+veredicto de §8. Solo mueve la fila `E6` de la matriz de `no verificado` a **`fail`
+dictaminado**.
