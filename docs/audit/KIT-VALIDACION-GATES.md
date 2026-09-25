@@ -54,6 +54,18 @@
 > /api/session/pin` desaparece y `POST /api/session` exige contraseña si la cuenta
 > la tiene—, así que los instrumentos de campo deben conocerlo. Los 7 gates siguen
 > `pending`.
+> **RE-CONGELACIÓN (2026-09-24, `v3.83.1`):** el árbol que se certifica pasa a ser el
+> de **`v3.83.1`** (`4ee32e5`) —el **patch de instrumento y honestidad** que publica el
+> arreglo del gate `reduced-motion` (H2: `page.emulateMedia` + guarda `matchMedia`, ya no
+> emula en vacío), cierra la letra de `release-notes-v3.83.0.md §5.1` y **aparca H1**
+> como deuda aceptada—. La campaña sigue con **0 `record`** grabados (**no hay nada que
+> invalidar**) y el ancla se mueve **por tag, sin fijar SHA a mano** (regla de V3.73.5).
+> **Ojo: este salto SÍ mueve producto respecto a `v3.81.0`** —`V3.82.0` cambió el
+> contrato de `POST /api/session` (exige `{email, password}`, retira `PUT
+> /api/session/pin`) y migró la BD de forma aditiva; `V3.83.0` movió la UI—, así que los
+> instrumentos de campo deben conocerlo y el pre-vuelo hay que **repetirlo** sobre
+> `v3.83.1` (§A). Lo que **no** cambia: siguen los **ocho** gates, todos `pending`. Ver
+> `docs/audit/CIERRE-GLOBAL-V383.md` §5.
 
 **Regla de oro:** un gate no se cierra con una opinión. Se cierra con `record`, y
 **sin `--notes` el instrumento rechaza el registro**. Un `fail` o un `skip` son
@@ -157,6 +169,36 @@ Lo que sí cambia, y hay que leerlo antes de empezar la campaña:
 | Dossiers de G7 regenerados tras el diff del PIN | **cero diferencia** |
 | 7 gates | **`pending`** (la campaña sigue sin ejecutarse: exige hardware, corte de red real y una máquina limpia) |
 
+
+### Re-congelación del 2026-09-24 — el árbol que se certifica pasa a ser `v3.83.1`
+
+`v3.81.0` fue el último ancla, y **desde entonces se publicó producto que mueve el
+contrato y la BD**: `V3.82.0` (alta profesional de cuentas: `POST /api/session` pasa de
+`{user_id}` a `{email, password}`, se retira `PUT /api/session/pin`, se añaden los
+endpoints de activación/recuperación y migran ocho columnas aditivas) y `V3.83.0` (UI).
+Y sobre todo: `v3.83.1` **publica el arreglo del gate que emulaba en vacío** (H2), que es
+**instrumento que la campaña necesita**. Certificar sobre `v3.81.0` probaría un arnés que
+ya se sabe **vacuo**.
+
+**No invalida nada, y la razón es medible:** la campaña tiene **0 `record`** —los ocho
+gates en `pending`— así que no hay evidencia que desmentir (`--same-tree` no puede
+marcar nada como «de otro árbol» porque no hay grabaciones).
+
+Lo que cambia, y hay que leerlo antes de empezar la campaña:
+
+- **El árbol certificado es el de `v3.83.1`**, identificado **por tag** y **sin fijar un
+  SHA a mano** (regla de V3.73.5): el `head_sha` de los ocho `record` es el **`HEAD` real
+  en el momento de grabar**. Las tablas de identidad anteriores (`v3.75.8`, `v3.76.0`,
+  `v3.80.1`, `v3.81.0`) son **historia del pre-vuelo**, no el árbol a validar.
+- **El pre-vuelo hay que repetirlo sobre `v3.83.1`** antes de la campaña (los comandos de
+  §A). No se ha ejecutado aquí: este cierre solo mueve el ancla documental y deja el
+  pre-vuelo para la sesión de campo, que exige hardware.
+- **El contrato de la API cambió respecto a `v3.81.0`** (ver arriba): cualquier
+  instrumento de campo que abriera sesión con un `user_id` a secas **debe** conocer el
+  contrato nuevo. `G0` depende de una **acción de uso** (llevar `without_password` a 0),
+  no de código.
+- **Los ocho gates siguen `pending`.** Este cierre **no** ejecuta ni cierra ninguno. Ver
+  `docs/audit/CIERRE-GLOBAL-V383.md`.
 
 ### Re-congelación del 2026-09-23 — el árbol que se certifica pasa a ser `v3.81.0`
 

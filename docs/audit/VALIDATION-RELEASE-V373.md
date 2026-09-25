@@ -55,7 +55,7 @@ guarda el id).
 - Un **`pass` sin commit no se registra**: sin git en el árbol, el instrumento
   rechaza el cierre. Un `pass` que no dice de qué árbol es no es evidencia.
 - `fail`, `skip` y `pending` **sí** se registran sin SHA: declaran un no-cierre.
-- `--strict` exige los 7 en `pass`. `--same-tree` exige además que los siete
+- `--strict` exige los 8 en `pass`. `--same-tree` exige además que los ocho
   `head_sha` sean el commit actual: es lo que impide que ocho gates verdes en
   ocho commits distintos se presenten como «los ocho gates».
 
@@ -175,3 +175,11 @@ El estado real y con notas vive en `docs/audit/validation-evidence.json`, que
 **se crea con el primer `record`** y se consulta con `validation_gate.py status`.
 Esta tabla es el punto de partida, no la verdad: la verdad es la que registra el
 instrumento.
+
+> **Árbol de la campaña (2026-09-24, `v3.83.1`).** El ancla documental pasa de
+> `v3.81.0` a **`v3.83.1`** (`4ee32e5`): `V3.82.0` movió el contrato de sesión y migró
+> la BD, `V3.83.0` movió la UI y `v3.83.1` publica el arreglo del gate
+> `reduced-motion` (H2) que la campaña necesita. La campaña sigue con **0 `record`**
+> (no hay nada que invalidar). Siguen los **ocho** gates, todos `pending`. Detalle en
+> `docs/audit/KIT-VALIDACION-GATES.md` (re-congelación) y
+> `docs/audit/CIERRE-GLOBAL-V383.md` §5.
