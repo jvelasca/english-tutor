@@ -95,6 +95,8 @@ interface FlashcardsScreenProps {
   /** Lista o pack con el que abrir el estudio (desde «Mis listas»/packs). */
   focusCollectionId?: number | null;
   focusCollectionLabel?: string;
+  /** V3.84.0: mazo manual concreto al que saltar (desde el alta del diccionario). */
+  focusDeckId?: number | null;
   /** Cambia en cada petición de estudio, para reabrir aunque sea el mismo foco. */
   focusNonce?: number;
 }
@@ -103,6 +105,7 @@ export function FlashcardsScreen({
   userId,
   focusCollectionId = null,
   focusCollectionLabel = "",
+  focusDeckId = null,
   focusNonce = 0,
 }: FlashcardsScreenProps) {
   const { t } = useI18n();
@@ -173,12 +176,20 @@ export function FlashcardsScreen({
   useEffect(() => {
     if (focusNonce <= 0) return;
     setTab("study");
-    setDeckId(decks?.auto_deck_id ?? 0);
-    setCollection(
-      focusCollectionId != null
-        ? { id: focusCollectionId, label: focusCollectionLabel }
-        : null,
-    );
+    if (focusDeckId != null) {
+      // V3.84.0: el alta del diccionario eligió un mazo manual concreto: se abre
+      // ESE mazo, no el automático. Sin filtro de colección (el filtro es cosa
+      // del mazo automático).
+      setDeckId(focusDeckId);
+      setCollection(null);
+    } else {
+      setDeckId(decks?.auto_deck_id ?? 0);
+      setCollection(
+        focusCollectionId != null
+          ? { id: focusCollectionId, label: focusCollectionLabel }
+          : null,
+      );
+    }
     setAutoStart(true);
     // `decks` se lee pero no debe re-disparar el efecto: el foco se aplica una
     // vez por petición (focusNonce), no cada vez que llega la lista de mazos.
@@ -255,6 +266,7 @@ export function FlashcardsScreen({
           deckId={deckId}
           onPick={setDeckId}
           collection={collection}
+          onPickCollection={setCollection}
           autoStart={autoStart}
           onAutoStarted={() => setAutoStart(false)}
           onClearCollection={() => setCollection(null)}
@@ -350,6 +362,7 @@ function StudyTab({
   deckId,
   onPick,
   collection,
+  onPickCollection,
   autoStart,
   onAutoStarted,
   onClearCollection,
@@ -362,6 +375,8 @@ function StudyTab({
   deckId: number | null;
   onPick: (id: number) => void;
   collection: CollectionFilter | null;
+  /** V3.84.0: la ruta genérica (mazo automático) se acota a un pack o lista. */
+  onPickCollection: (filter: CollectionFilter | null) => void;
   autoStart: boolean;
   onAutoStarted: () => void;
   onClearCollection: () => void;
@@ -370,12 +385,33 @@ function StudyTab({
   onAddCards: (id: number) => void;
   onExit: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [queue, setQueue] = useState<FlashcardQueue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [studying, setStudying] = useState(false);
   const [sessionNonce, setSessionNonce] = useState(0);
+  // V3.84.0: catálogo para el filtro de la ruta genérica (Todas / pack / lista).
+  // Se carga al montar; si falla, el filtro queda solo en «Todas» y la ruta
+  // sigue funcionando (degradación honesta, no una pantalla rota).
+  const [catalog, setCatalog] = useState<VocabCollection[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const data = await listVocabCollections(userId);
+        if (alive) {
+          setCatalog(Array.isArray(data?.collections) ? data.collections : []);
+        }
+      } catch {
+        if (alive) setCatalog([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId, reloadNonce]);
 
   const deck = deckId ?? 0;
   const isAuto = deck === (decks?.auto_deck_id ?? 0);
@@ -480,6 +516,58 @@ function StudyTab({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <DeckSelect decks={decks} value={deck} onChange={onPick} />
+        {/* V3.84.0: la ruta genérica. Sobre el mazo automático («Mi
+            diccionario», todo el léxico) se elige estudiar TODAS las palabras,
+            las de un pack o las de una lista. Reutiliza el `collection_id` que
+            la cola ya soportaba: no hay backend nuevo. */}
+        {isAuto ? (
+          <select
+            aria-label={t("flashcards.study.filterLabel")}
+            value={collection?.id ?? ""}
+            onChange={(e) => {
+              const id = Number(e.target.value);
+              if (!id) {
+                onPickCollection(null);
+                return;
+              }
+              const found = catalog.find((c) => c.id === id);
+              if (found) {
+                onPickCollection({
+                  id: found.id,
+                  label:
+                    lang === "es" && found.title_es
+                      ? found.title_es
+                      : found.title,
+                });
+              }
+            }}
+            className={cn(INPUT, "w-full sm:w-56")}
+          >
+            <option value="">{t("flashcards.study.filterAll")}</option>
+            {catalog.some((c) => c.kind === "theme_pack") ? (
+              <optgroup label={t("flashcards.study.filterPacks")}>
+                {catalog
+                  .filter((c) => c.kind === "theme_pack")
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {lang === "es" && c.title_es ? c.title_es : c.title}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : null}
+            {catalog.some((c) => c.kind === "user_list") ? (
+              <optgroup label={t("flashcards.study.filterLists")}>
+                {catalog
+                  .filter((c) => c.kind === "user_list")
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : null}
+          </select>
+        ) : null}
         {collection ? (
           <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-xs">
             {t("flashcards.study.filtered").replace("{name}", collection.label)}
@@ -673,7 +761,7 @@ function DecksTab({
               <span className="text-sm font-semibold">
                 <DeckLabel deck={auto} />
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">
                   {t("flashcards.decks.cards").replace(
                     "{n}",

@@ -955,12 +955,29 @@ const STRINGS: Record<string, Entry> = {
   },
   "flashcards.study.deck": { en: "Deck", es: "Mazo" },
   "flashcards.study.filtered": {
-    en: "List: {name}",
-    es: "Lista: {name}",
+    en: "Filter: {name}",
+    es: "Filtro: {name}",
   },
   "flashcards.study.clearFilter": {
     en: "Study the whole dictionary",
     es: "Estudiar todo el diccionario",
+  },
+  // V3.84.0: filtro de la ruta genérica (mazo automático).
+  "flashcards.study.filterLabel": {
+    en: "Study what",
+    es: "Estudiar qué",
+  },
+  "flashcards.study.filterAll": {
+    en: "All my words",
+    es: "Todas mis palabras",
+  },
+  "flashcards.study.filterPacks": {
+    en: "Themed packs",
+    es: "Packs temáticos",
+  },
+  "flashcards.study.filterLists": {
+    en: "My lists",
+    es: "Mis listas",
   },
   "flashcards.study.deckHint": {
     en: "The auto deck is everything the app has registered for you; a manual deck is only what you put in it.",
@@ -1242,20 +1259,36 @@ const STRINGS: Record<string, Entry> = {
     es: "Aparece en Personal y en tu mazo «Mi diccionario», y sigue el proceso de estudio completo (repetición espaciada).",
   },
   "dictionary.lookup.addHint": {
-    en: "The word joins your study flow: it stays in learning, shows up in Personal and in the auto deck, and repeats with spaced review.",
-    es: "La palabra entra en tu proceso de estudio: queda en aprendizaje, aparece en Personal y en el mazo automático, y se repasa con repetición espaciada.",
+    en: "The word always joins your study flow: it stays in learning, shows up in Personal and in the auto deck, and repeats with spaced review. You can also save it as a card in a manual deck.",
+    es: "La palabra entra siempre en tu proceso de estudio: queda en aprendizaje, aparece en Personal y en el mazo automático, y se repasa con repetición espaciada. Además puedes guardarla como tarjeta en un mazo manual.",
   },
-  "dictionary.lookup.addListLabel": {
-    en: "Also file it in a list (optional)",
-    es: "Archivar también en una lista (opcional)",
+  "dictionary.lookup.addDeckLabel": {
+    en: "Also save it as a card in a deck (optional)",
+    es: "Guardar también como tarjeta en un mazo (opcional)",
   },
-  "dictionary.lookup.addListNone": {
-    en: "No list — just my dictionary",
-    es: "Ninguna — solo mi diccionario",
+  "dictionary.lookup.addDeckNone": {
+    en: "No deck — just keep it learning",
+    es: "Ningún mazo — solo dejarla en aprendizaje",
   },
-  "dictionary.lookup.addListError": {
-    en: "Your lists could not be loaded. You can still add it to your dictionary.",
-    es: "No se pudieron cargar tus listas. Puedes añadirla igualmente a tu diccionario.",
+  "dictionary.lookup.addDeckNew": {
+    en: "Create a new deck…",
+    es: "Crear un mazo nuevo…",
+  },
+  "dictionary.lookup.addDeckCreate": {
+    en: "Create deck",
+    es: "Crear mazo",
+  },
+  "dictionary.lookup.addDeckNamePlaceholder": {
+    en: "New deck name",
+    es: "Nombre del mazo nuevo",
+  },
+  "dictionary.lookup.addDeckError": {
+    en: "Your decks could not be loaded. You can still add it to your dictionary.",
+    es: "No se pudieron cargar tus mazos. Puedes añadirla igualmente a tu diccionario.",
+  },
+  "dictionary.lookup.addOkDeck": {
+    en: "Saved as a card in “{deck}”.",
+    es: "Guardada como tarjeta en «{deck}».",
   },
   "dictionary.lookup.addError": {
     en: "Could not add the word.",

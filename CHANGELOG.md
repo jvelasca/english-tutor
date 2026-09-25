@@ -4,6 +4,64 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.84.0] — 2026-09-25
+
+**Responsive global, mazos estándar y ruta de aprendizaje: la app deja de recortar botones
+en pantallas estrechas, el alta del diccionario elige MAZO manual (y lo crea sin salir), y el
+vocabulario pasa de 3 packs de ~25 palabras a 15 packs de 40–60.** Release de **PRODUCTO
+(minor)** con **backend y frontend**, **SIN migración de BD** (los packs se siembran solos por
+`slug` desde `backend/curriculum/vocab_packs/*.json`) y **SIN endpoints nuevos** (reutiliza
+`listFlashcardDecks`, `createFlashcardDeck`, `createFlashcard` y el `collection_id` que la cola
+FSRS ya aceptaba); **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION`
+(`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones. **No se
+añade ni se retira gate** —siguen los **ocho**, todos en `pending`—.
+
+**El defecto reportado, y su clase.** «Practicar esta palabra» se **cortaba** en
+DICCIONARIO/CONSULTAR. La causa no era un ancho mal puesto: el cluster de acciones era
+`flex items-center gap-2` **sin `flex-wrap`** dentro de un `Card` con `overflow-hidden`, así
+que a 320–390 px el navegador **recortaba en silencio** (sin scroll horizontal, que es lo que
+lo hacía invisible a los tests). Se arregla el defecto y, sobre todo, **la clase**: `wordDrill`
+(el conmutador de 5 peldaños, que **sí** provocaba scroll real), `Header`, `StudySession`
+(cabecera y caras del volteo), las filas de `FlashcardsScreen`, las pestañas de
+`DictionaryScreen`, y las filas con `shrink-0` de `AddVocabSection` y `PersonalDictionary`.
+
+**Guardia automática nueva.** `frontend/tests/visual/layoutHelper.ts`
+(`expectNoHorizontalOverflow` + `expectInsideClippingAncestor`) y
+`responsiveOverflow.spec.ts`: recorre **11 rutas** y las **3 pestañas del diccionario** a
+390/768/1280 y, en un `describe` propio, a **320 px** (un ancho que la suite no probaba). La
+regresión del botón se fija además en `dictionarySmoke.spec.ts`, que compara los rectángulos
+de las acciones contra el ancestro que las recorta —la única forma de detectar un recorte por
+`overflow`—.
+
+**Diccionario → MAZO.** El panel de alta deja de archivar en **listas**: ofrece **elegir mazo
+manual** (`Solo aprendizaje` / mazos propios / `Crear mazo nuevo…` con input en línea) y, al
+confirmar, además del léxico + carta FSRS de siempre, crea la **tarjeta** en el mazo elegido
+(`createFlashcard`). El éxito declara **las dos cosas** («en aprendizaje» + «guardada como
+tarjeta en *X*») y «Estudiar en Flashcards» abre **ese mazo** (`onOpenFlashcards(deckId)` →
+`StudyFocus.deckId` → `focusDeckId`). *Honestidad:* entrar en un mazo manual **duplica** el
+ítem (queda en el léxico/«Mi diccionario» **y** como tarjeta manual); es el precio de no
+compartir el modelo de tarjetas, y la UI lo declara.
+
+**Contenido: 12 packs nuevos y 3 enriquecidos.** `tools`, `computing`, `health`, `home`,
+`city`, `nature`, `body`, `sports`, `clothes`, `feelings`, `school` y `business`, y `food`,
+`travel`, `work` ampliados: **15 packs de 40–60 palabras** (~650 entradas nuevas), con
+`word/lemma/translation/pos`. Sin migración: `ensure_theme_packs_seeded` los inserta por
+`slug` en el siguiente arranque/consulta. Test nuevo
+`backend/tests/test_vocab_packs_content.py` valida forma, `slug` único, 40–60 ítems y
+palabras únicas por pack.
+
+**Ruta de aprendizaje genérica.** En el mazo automático («Mi diccionario», que es todo el
+léxico) Estudiar gana un **filtro** —Todas / por pack / por lista— que reutiliza el
+`collection_id` que la cola ya soportaba: **frontend puro, sin endpoint nuevo**.
+
+**Verificación.** `tsc --noEmit` limpio · `vitest run` **1036/1036** (109 ficheros) · `ruff`
+limpio · `pytest` **3140/3140** · i18n `--strict` **1780** cadenas con **0 huérfanas / 0
+usadas sin definir / 0 duplicadas** · contraste **480 pares + 6 guardas / 0 bloqueantes** ·
+`validation_gate.py auto` **10/10** (8 gates) · **barrido Playwright COMPLETO: 90 passed · 0
+failed · 30 skipped** (no solo los specs nuevos: el barrido entero cazó
+`dictionaryFlashcardsBridge`, que aún exigía el panel de listas) · `check_release_consistency`
+OK en los **6 orígenes** (`3.84.0`).
+
 ## [3.83.1] — 2026-09-24
 
 **Release de INSTRUMENTO Y HONESTIDAD (patch): publica la versión que el informe `AU`

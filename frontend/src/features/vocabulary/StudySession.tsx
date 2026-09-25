@@ -433,9 +433,9 @@ export function StudySession({
 
   return (
     <Card className="gap-4 p-5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{deckName}</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {ownBacks[key] ? (
             <Badge variant="outline">{t("flashcards.study.ownBack")}</Badge>
           ) : null}
@@ -480,7 +480,7 @@ export function StudySession({
         >
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-6 text-center [backface-visibility:hidden]">
             <span
-              className="text-2xl font-bold tracking-tight"
+              className="text-2xl font-bold tracking-tight break-words"
               lang={isLexicon ? "en" : undefined}
             >
               {current.front}
@@ -503,7 +503,7 @@ export function StudySession({
             ) : null}
             {!generating && back ? (
               <span
-                className="text-lg font-semibold"
+                className="text-lg font-semibold break-words"
                 lang={isLexicon ? "es" : undefined}
               >
                 {back}
@@ -511,7 +511,7 @@ export function StudySession({
             ) : null}
             {!generating && definition ? (
               <span
-                className="text-sm text-muted-foreground"
+                className="text-sm text-muted-foreground break-words"
                 lang={isLexicon ? "en" : undefined}
               >
                 {definition}

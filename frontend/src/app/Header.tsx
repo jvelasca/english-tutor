@@ -53,7 +53,7 @@ export function Header({
 }: HeaderProps) {
   const { t } = useI18n();
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-border bg-background/80 px-4 py-2.5 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/80 px-4 py-2.5 backdrop-blur-xl">
       <div className="flex min-w-0 items-center gap-2.5">
         <button
           type="button"
@@ -85,7 +85,11 @@ export function Header({
         <Navigation route={route} onNavigate={onNavigate} layoutId="nav-pill" className="mx-auto" />
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      {/* V3.84.0: `shrink-0` impedía encoger y a 320px el cluster (manos libres
+          + 3 acciones + usuario) desbordaba. La cabecera ahora envuelve
+          (`flex-wrap`) y el cluster puede pasar a una segunda línea en vez de
+          recortarse. */}
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
         <HandsFreeToggle
           enabled={handsFreeEnabled}
           status={handsFreeStatus}

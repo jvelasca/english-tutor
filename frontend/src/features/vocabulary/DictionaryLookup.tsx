@@ -6,7 +6,6 @@ import {
   Check,
   Languages,
   Layers,
-  ListPlus,
   Loader2,
   Mic,
   Plus,
@@ -17,7 +16,9 @@ import {
 import { normalizeDictionaryEntry } from "../../api/normalize";
 import {
   addVocabularyItem,
-  listVocabCollections,
+  createFlashcard,
+  createFlashcardDeck,
+  listFlashcardDecks,
   lookupDictionaryWord,
 } from "../../api/vocabulary";
 import type {
@@ -25,9 +26,9 @@ import type {
   DictionaryEntry,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
+  FlashcardDeck,
   LexicalCompetence,
   LexicalStatus,
-  VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
@@ -55,6 +56,9 @@ const STATUS_TONE: Record<LexicalStatus, string> = {
 
 const MAX_QUERY_LENGTH = 80;
 
+/** Valor centinela del selector de mazo: «crear uno nuevo» (V3.84.0). */
+const NEW_DECK_OPTION = "__new__";
+
 interface DictionaryLookupProps {
   userId: string | null;
   /**
@@ -69,8 +73,11 @@ interface DictionaryLookupProps {
    * —o si la consultada ya está en el léxico—, el panel ofrece «Estudiar en
    * Flashcards». Quien monta la vista dice cómo se llega allí; si no se ofrece,
    * el botón no se pinta (no se promete un destino que no existe).
+   *
+   * V3.84.0: recibe el mazo con el que abrir el estudio. Si la palabra se
+   * archivó en un mazo manual, se abre ESE mazo; sin argumento, el automático.
    */
-  onOpenFlashcards?: () => void;
+  onOpenFlashcards?: (deckId?: number) => void;
 }
 
 /** Diccionario de consulta (V3.30, D2/D3): busca CUALQUIER palabra (esté o no
@@ -116,14 +123,20 @@ export function DictionaryLookup({
   const [practiceWord, setPracticeWord] = useState<string | null>(null);
   const [addStatus, setAddStatus] = useState<"idle" | "ok" | "error">("idle");
   const [adding, setAdding] = useState(false);
-  // V3.83.0: el panel de alta. `lists` es `null` mientras no se ha pedido (se
-  // carga de forma perezosa al abrir el panel, para no pagar una consulta en
-  // cada búsqueda). `selectedList` es el id de la lista donde archivar la
-  // palabra ADEMÁS de dejarla en aprendizaje; vacío = solo aprendizaje.
+  const [creatingDeck, setCreatingDeck] = useState(false);
+  // V3.83.0: el panel de alta. V3.84.0: el destino es un MAZO manual (no una
+  // lista): `decks` es `null` mientras no se ha pedido (carga perezosa al abrir
+  // el panel, para no pagar una consulta en cada búsqueda). `selectedDeck` es el
+  // id del mazo donde guardar la tarjeta ADEMÁS de dejarla en aprendizaje;
+  // vacío = solo aprendizaje.
   const [addOpen, setAddOpen] = useState(false);
-  const [lists, setLists] = useState<VocabCollection[] | null>(null);
-  const [listError, setListError] = useState(false);
-  const [selectedList, setSelectedList] = useState("");
+  const [decks, setDecks] = useState<FlashcardDeck[] | null>(null);
+  const [deckError, setDeckError] = useState(false);
+  const [selectedDeck, setSelectedDeck] = useState("");
+  // Nombre del mazo donde se guardó de verdad (para declararlo y para abrirlo).
+  const [savedDeck, setSavedDeck] = useState<{ id: number; name: string } | null>(
+    null,
+  );
 
   async function runLookup(raw: string, dir: DictionaryDirection = direction) {
     if (!userId) return;
@@ -146,7 +159,8 @@ export function DictionaryLookup({
     setPracticeWord(null);
     setAddStatus("idle");
     setAddOpen(false);
-    setSelectedList("");
+    setSelectedDeck("");
+    setSavedDeck(null);
     try {
       const data = await lookupDictionaryWord(userId, word, dir);
       setEntry(normalizeDictionaryEntry(data));
@@ -158,27 +172,28 @@ export function DictionaryLookup({
     }
   }
 
-  /** Abre el panel y, la primera vez, carga las listas propias del alumno.
-   *  Solo se ofrecen las de tipo `user_list`: un pack temático no es un destino
-   *  de archivo, es contenido curado. */
+  /** Abre el panel y, la primera vez, carga los mazos manuales del alumno.
+   *  El mazo automático (id 0) no se ofrece: es una vista del léxico, no un
+   *  destino; y los packs temáticos tampoco, porque son contenido curado. */
   async function openAddPanel() {
     setAddOpen(true);
     setAddStatus("idle");
-    if (!userId || lists !== null || listError) return;
+    if (!userId || decks !== null || deckError) return;
     try {
-      const data = await listVocabCollections(userId);
-      const collections = Array.isArray(data?.collections) ? data.collections : [];
-      setLists(collections.filter((c) => c.kind === "user_list"));
+      const data = await listFlashcardDecks(userId);
+      const all = Array.isArray(data?.decks) ? data.decks : [];
+      setDecks(all.filter((d) => !d.is_auto));
     } catch {
-      setListError(true);
-      setLists([]);
+      setDeckError(true);
+      setDecks([]);
     }
   }
 
   function closeAddPanel() {
     setAddOpen(false);
     setAddStatus("idle");
-    setSelectedList("");
+    setSelectedDeck("");
+    setSavedDeck(null);
   }
 
   function toggleAddPanel() {
@@ -189,19 +204,47 @@ export function DictionaryLookup({
     void openAddPanel();
   }
 
+  /** Crea un mazo desde el propio panel y lo deja seleccionado (V3.84.0).
+   *  Sin este camino, elegir mazo obligaba a salir a Flashcards. */
+  async function handleCreateDeck(name: string) {
+    if (!userId || creatingDeck) return;
+    setCreatingDeck(true);
+    setDeckError(false);
+    try {
+      const created = await createFlashcardDeck(userId, { name });
+      setDecks((current) => [...(current ?? []), created]);
+      setSelectedDeck(String(created.id));
+    } catch {
+      setDeckError(true);
+    } finally {
+      setCreatingDeck(false);
+    }
+  }
+
   async function handleAddToFlashcards() {
     if (!userId || !practiceTerm || adding) return;
     setAdding(true);
     setAddStatus("idle");
+    setSavedDeck(null);
     try {
       const translation =
         entry?.direction === "en-es" ? entry.translation ?? "" : entry?.word ?? "";
-      await addVocabularyItem(userId, practiceTerm, {
-        translation,
-        collectionId: selectedList ? Number(selectedList) : undefined,
-      });
+      // 1) El alta que ya existía: léxico + carta FSRS + estado `learning`.
+      await addVocabularyItem(userId, practiceTerm, { translation });
+      // 2) V3.84.0: además, si el alumno eligió un mazo manual, se guarda la
+      //    tarjeta con anverso/reverso. Son dos escrituras y así se declara.
+      if (selectedDeck) {
+        const deckId = Number(selectedDeck);
+        const deckName =
+          decks?.find((d) => d.id === deckId)?.name ?? practiceTerm;
+        await createFlashcard(userId, deckId, {
+          front: practiceTerm,
+          back: translation,
+        });
+        setSavedDeck({ id: deckId, name: deckName });
+      }
       setAddStatus("ok");
-      setSelectedList("");
+      setSelectedDeck("");
       // El alta ya deja la palabra en el léxico (estado `learning`): se refresca
       // en silencio para que la marca de uso lo refleje sin desmontar la tarjeta.
       void refreshEntry(lastQuery, lastDirection);
@@ -236,7 +279,8 @@ export function DictionaryLookup({
     setNetworkError(false);
     setAddOpen(false);
     setAddStatus("idle");
-    setSelectedList("");
+    setSelectedDeck("");
+    setSavedDeck(null);
   }
 
   const practiceTerm = entry
@@ -269,7 +313,8 @@ export function DictionaryLookup({
     setNetworkError(false);
     setAddStatus("idle");
     setAddOpen(false);
-    setSelectedList("");
+    setSelectedDeck("");
+    setSavedDeck(null);
     setLastQuery("");
   }
 
@@ -497,10 +542,13 @@ export function DictionaryLookup({
               addOpen && practiceTerm ? (
                 <AddToFlashcardsPanel
                   term={practiceTerm}
-                  lists={lists}
-                  listError={listError}
-                  selectedList={selectedList}
-                  onSelectList={setSelectedList}
+                  decks={decks}
+                  deckError={deckError}
+                  selectedDeck={selectedDeck}
+                  onSelectDeck={setSelectedDeck}
+                  creatingDeck={creatingDeck}
+                  onCreateDeck={(name) => void handleCreateDeck(name)}
+                  savedDeck={savedDeck}
                   adding={adding}
                   status={addStatus}
                   onConfirm={() => void handleAddToFlashcards()}
@@ -541,19 +589,25 @@ export function DictionaryLookup({
 
 /**
  * V3.83.0: panel de alta del diccionario a Flashcards.
+ * V3.84.0: el destino es un **mazo manual**, no una lista, y se puede crear el
+ * mazo sin salir del panel.
  *
- * No es un botón de un solo uso: declara **qué** significa añadir (la palabra
- * entra en el proceso de estudio con estado `learning` y su carta FSRS, así que
- * aparecerá en PERSONAL y en el mazo automático «Mi diccionario») y permite
- * además archivarla en una lista propia. La confirmación deja un estado de
- * éxito con la salida natural: estudiar en Flashcards.
+ * Declara **qué** significa añadir (la palabra entra en el proceso de estudio
+ * con estado `learning` y su carta FSRS, así que aparecerá en PERSONAL y en el
+ * mazo automático «Mi diccionario») y, además, permite guardarla como tarjeta
+ * en un mazo manual. Son dos destinos distintos y el panel los declara: la
+ * palabra SIEMPRE queda en aprendizaje, y SOLO si se elige mazo se crea además
+ * una tarjeta allí. El éxito deja la salida natural: estudiar en Flashcards.
  */
 function AddToFlashcardsPanel({
   term,
-  lists,
-  listError,
-  selectedList,
-  onSelectList,
+  decks,
+  deckError,
+  selectedDeck,
+  onSelectDeck,
+  creatingDeck,
+  onCreateDeck,
+  savedDeck,
   adding,
   status,
   onConfirm,
@@ -561,17 +615,22 @@ function AddToFlashcardsPanel({
   onOpenFlashcards,
 }: {
   term: string;
-  lists: VocabCollection[] | null;
-  listError: boolean;
-  selectedList: string;
-  onSelectList: (id: string) => void;
+  decks: FlashcardDeck[] | null;
+  deckError: boolean;
+  selectedDeck: string;
+  onSelectDeck: (id: string) => void;
+  creatingDeck: boolean;
+  onCreateDeck: (name: string) => void;
+  savedDeck: { id: number; name: string } | null;
   adding: boolean;
   status: "idle" | "ok" | "error";
   onConfirm: () => void;
   onClose: () => void;
-  onOpenFlashcards?: () => void;
+  onOpenFlashcards?: (deckId?: number) => void;
 }) {
   const { t } = useI18n();
+  const [newName, setNewName] = useState("");
+  const creating = selectedDeck === NEW_DECK_OPTION;
 
   if (status === "ok") {
     return (
@@ -588,11 +647,19 @@ function AddToFlashcardsPanel({
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t("dictionary.lookup.addLearning")}
         </p>
+        {savedDeck ? (
+          <p className="text-xs leading-relaxed text-success">
+            {t("dictionary.lookup.addOkDeck").replace(
+              "{deck}",
+              savedDeck.name,
+            )}
+          </p>
+        ) : null}
         {onOpenFlashcards ? (
           <Button
             type="button"
             size="sm"
-            onClick={onOpenFlashcards}
+            onClick={() => onOpenFlashcards(savedDeck?.id)}
             className="gap-1.5"
           >
             <Layers className="size-3.5" aria-hidden="true" />
@@ -613,36 +680,73 @@ function AddToFlashcardsPanel({
         {t("dictionary.lookup.addHint")}
       </p>
 
-      {listError ? (
+      {deckError ? (
         <p className="text-[11px] text-muted-foreground">
-          {t("dictionary.lookup.addListError")}
+          {t("dictionary.lookup.addDeckError")}
         </p>
-      ) : lists && lists.length > 0 ? (
+      ) : (
         <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <ListPlus className="size-3.5" aria-hidden="true" />
-            {t("dictionary.lookup.addListLabel")}
+            <Layers className="size-3.5" aria-hidden="true" />
+            {t("dictionary.lookup.addDeckLabel")}
           </span>
           <select
-            value={selectedList}
-            onChange={(e) => onSelectList(e.target.value)}
+            value={selectedDeck}
+            onChange={(e) => onSelectDeck(e.target.value)}
             className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
           >
-            <option value="">{t("dictionary.lookup.addListNone")}</option>
-            {lists.map((list) => (
-              <option key={list.id} value={list.id}>
-                {list.title}
+            <option value="">{t("dictionary.lookup.addDeckNone")}</option>
+            {(decks ?? []).map((deck) => (
+              <option key={deck.id} value={deck.id}>
+                {deck.name}
               </option>
             ))}
+            <option value={NEW_DECK_OPTION}>
+              {t("dictionary.lookup.addDeckNew")}
+            </option>
           </select>
         </label>
+      )}
+
+      {creating ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={t("dictionary.lookup.addDeckNamePlaceholder")}
+            aria-label={t("dictionary.lookup.addDeckNamePlaceholder")}
+            maxLength={120}
+            className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newName.trim() && !creatingDeck) {
+                e.preventDefault();
+                onCreateDeck(newName.trim());
+                setNewName("");
+              }
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={creatingDeck || !newName.trim()}
+            onClick={() => {
+              onCreateDeck(newName.trim());
+              setNewName("");
+            }}
+          >
+            {creatingDeck
+              ? t("common.saving")
+              : t("dictionary.lookup.addDeckCreate")}
+          </Button>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"
-          disabled={adding}
+          disabled={adding || creating}
           onClick={onConfirm}
           className="gap-1.5"
         >
@@ -851,7 +955,8 @@ function ResultCard({
   /** V3.83.0: el panel de alta está abierto (cambia el rótulo del botón). */
   addOpen?: boolean;
   onToggleAdd?: () => void;
-  onOpenFlashcards?: () => void;
+  /** V3.84.0: mazo con el que abrir el estudio (si se archivó en uno manual). */
+  onOpenFlashcards?: (deckId?: number) => void;
   /** Panel de alta, ya construido por el contenedor (null si está cerrado). */
   addPanel?: ReactNode;
 }) {
@@ -882,7 +987,7 @@ function ResultCard({
         />
         {/* Palabra + badges de contexto */}
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
               <span
                 className={cn(
@@ -913,7 +1018,10 @@ function ResultCard({
               <span lang={isReverse ? "es" : "en"}>{entry.word}</span>
             </h2>
           </div>
-          <div className="flex items-center gap-2">
+          {/* V3.84.0: con hasta 3 acciones + el audio, este cluster no cabía a
+              320-390px y el `overflow-hidden` de la tarjeta lo recortaba en
+              silencio. Envuelve (`flex-wrap`) y puede encoger (`min-w-0`). */}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {audioText && (
               /* V3.75.5: la palabra se puede oír en A o B (dos acentos). */
               <ItemReplayButton prompt={audioText} userId={userId} />
@@ -941,7 +1049,7 @@ function ResultCard({
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={onOpenFlashcards}
+                onClick={() => onOpenFlashcards()}
                 className="gap-1.5"
               >
                 <Layers className="size-3.5" aria-hidden="true" />
@@ -1049,7 +1157,7 @@ function ResultCard({
                 aria-hidden="true"
               />
               <span
-                className="min-w-0 flex-1 py-2.5 text-base font-medium"
+                className="min-w-0 flex-1 py-2.5 text-base font-medium break-words"
                 lang="en"
               >
                 {entry.example.phrase}

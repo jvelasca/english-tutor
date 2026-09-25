@@ -344,6 +344,49 @@ describe("FlashcardsScreen", () => {
     ).toBe("true");
   });
 
+  it("el salto con un mazo del diccionario abre ESE mazo (V3.84.0)", async () => {
+    // El alta del diccionario puede guardar la palabra en un mazo manual: al
+    // pulsar «Estudiar en Flashcards» se abre ese mazo, no el automático.
+    renderScreen({ focusDeckId: 5, focusNonce: 1 });
+
+    await waitFor(() =>
+      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 5, {
+        collectionId: null,
+      }),
+    );
+    expect(await screen.findByText("airport")).toBeTruthy();
+  });
+
+  it("la ruta genérica se acota a un pack o lista con el filtro (V3.84.0)", async () => {
+    vi.mocked(listVocabCollections).mockResolvedValue({
+      collections: [
+        {
+          id: 3,
+          kind: "theme_pack",
+          slug: "food",
+          title: "Food & Drink",
+          title_es: "Comida",
+          cefr_hint: "A1",
+          item_count: 25,
+          enrolled: false,
+          is_global: true,
+        },
+      ],
+    } as never);
+    renderScreen();
+
+    // El filtro solo existe sobre el mazo automático (el de entrada): acota la
+    // ruta genérica a las palabras de un pack o de una lista.
+    const filter = await screen.findByLabelText("Study what");
+    fireEvent.change(filter, { target: { value: "3" } });
+
+    await waitFor(() =>
+      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
+        collectionId: 3,
+      }),
+    );
+  });
+
   it("sin perfil no pide nada y lo dice", async () => {
     renderScreen({ userId: null });
 

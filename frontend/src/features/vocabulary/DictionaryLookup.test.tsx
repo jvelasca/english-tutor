@@ -877,26 +877,54 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
   });
 
   // Una lista propia (destino de archivo) y un pack curado (NO es destino).
-  const USER_LIST = {
-    id: 7,
-    kind: "user_list",
-    slug: "mi-lista",
-    title: "Mi lista",
-    title_es: "Mi lista",
-    cefr_hint: "",
-    item_count: 0,
-    enrolled: true,
-    is_global: false,
+  // V3.84.0: el destino del alta es un MAZO manual, no una lista. El mazo
+  // automático (id 0) no se ofrece: es una vista del léxico, no un destino.
+  const AUTO_DECK = {
+    id: 0,
+    name: "auto",
+    slug: "",
+    is_auto: true,
+    new_per_day: 10,
+    review_per_day: 50,
+    card_count: 0,
+    due_count: 0,
+    new_count: 0,
+    reviewed_today: 0,
   };
-  const PACK = { ...USER_LIST, id: 3, kind: "pack", title: "Pack A1" };
+  const MANUAL_DECK = {
+    ...AUTO_DECK,
+    id: 7,
+    name: "Mi mazo",
+    slug: "mi-mazo",
+    is_auto: false,
+  };
 
-  it("añade la palabra como aprendizaje (traducción + lista) y ofrece estudiar", async () => {
+  it("añade la palabra como aprendizaje y como tarjeta de un mazo, y ofrece estudiar ese mazo", async () => {
     const onOpenFlashcards = vi.fn();
     const fn = routeFetch([
       { url: "/api/vocabulary/dictionary", data: NEBULA },
+      // OJO al orden: `routeFetch` casa por `includes`, así que la ruta de las
+      // tarjetas (más específica) va ANTES que la de la lista de mazos.
       {
-        url: "/api/vocabulary/collections",
-        data: { collections: [PACK, USER_LIST] },
+        url: "/api/vocabulary/decks/7/cards",
+        data: {
+          id: 11,
+          deck_id: 7,
+          front: "nebula",
+          back: "",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "2026-09-25T10:00:00Z",
+        },
+      },
+      {
+        url: "/api/vocabulary/decks",
+        data: {
+          decks: [AUTO_DECK, MANUAL_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
       },
       {
         url: "/api/vocabulary/items",
@@ -917,34 +945,110 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
 
     // El panel declara el vínculo ANTES de confirmar: la palabra entra en el
     // proceso de estudio (PERSONAL + mazo automático), no es un cajón aparte.
-    expect(screen.getByText(/The word joins your study flow/)).toBeTruthy();
-    // Solo se ofrecen las listas propias: un pack curado no es un destino.
+    expect(
+      screen.getByText(/The word always joins your study flow/),
+    ).toBeTruthy();
+    // Solo se ofrecen mazos MANUALES: el automático no es un destino.
     const select = await screen.findByRole("combobox");
-    expect(screen.getByRole("option", { name: "Mi lista" })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: "Pack A1" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Mi mazo" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "auto" })).toBeNull();
 
     fireEvent.change(select, { target: { value: "7" } });
     fireEvent.click(
       screen.getByRole("button", { name: "Add and start learning" }),
     );
 
-    // El alta pasa por el mismo endpoint que crea léxico + carta FSRS, y lleva
-    // la traducción y la lista de archivo.
+    // El éxito llega cuando terminan LAS DOS escrituras (léxico + tarjeta), así
+    // que se espera a él antes de inspeccionar las llamadas: la segunda va en un
+    // microtask posterior al `await` de la primera.
+    expect(
+      await screen.findByText("nebula is now learning."),
+    ).toBeTruthy();
+
+    // 1) El alta de léxico: léxico + carta FSRS, sin colección.
     const addCall = fn.mock.calls.find((call) =>
       String(call[0]).includes("/api/vocabulary/items"),
     );
     expect(JSON.parse(String(addCall?.[1]?.body))).toEqual({
       word: "nebula",
       translation: "",
-      collection_id: 7,
+      collection_id: null,
     });
 
-    // Éxito honesto: «ya está en aprendizaje» + salida natural a estudiar.
-    expect(
-      await screen.findByText("nebula is now learning."),
-    ).toBeTruthy();
+    // 2) La tarjeta del mazo manual, con anverso y reverso.
+    const cardCall = fn.mock.calls.find((call) =>
+      String(call[0]).includes("/api/vocabulary/decks/7/cards"),
+    );
+    expect(cardCall).toBeTruthy();
+    expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
+      front: "nebula",
+      back: "",
+    });
+
+    // Éxito honesto: «ya está en aprendizaje» + dónde se guardó + salida a
+    // estudiar ESE mazo.
+    expect(screen.getByText(/Saved as a card in/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
-    expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
+    expect(onOpenFlashcards).toHaveBeenCalledWith(7);
+  });
+
+  it("permite crear un mazo desde el propio panel y lo deja seleccionado", async () => {
+    const onOpenFlashcards = vi.fn();
+    // La misma URL responde distinto según sea el GET (lista) o el POST (alta):
+    // se cuentan las llamadas porque `routeFetch` casa por URL, no por método.
+    let deckCalls = 0;
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: NEBULA },
+      {
+        url: "/api/vocabulary/decks",
+        data: () => {
+          deckCalls += 1;
+          if (deckCalls === 1) {
+            return {
+              decks: [AUTO_DECK],
+              auto_deck_id: 0,
+              fsrs_version: "test",
+            };
+          }
+          return {
+            ...AUTO_DECK,
+            id: 7,
+            name: "Verbos",
+            slug: "verbos",
+            is_auto: false,
+          };
+        },
+      },
+    ]);
+    renderPanel(
+      <DictionaryLookup userId="u1" onOpenFlashcards={onOpenFlashcards} />,
+    );
+
+    fillAndSubmit("nebula");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to Flashcards" }),
+    );
+
+    const select = await screen.findByRole("combobox");
+    fireEvent.change(select, { target: { value: "__new__" } });
+
+    fireEvent.change(screen.getByLabelText("New deck name"), {
+      target: { value: "Verbos" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create deck" }));
+
+    // El mazo recién creado queda seleccionado: no hay que volver a elegirlo.
+    await waitFor(() =>
+      expect((select as HTMLSelectElement).value).toBe("7"),
+    );
+    const createCall = fn.mock.calls.find(
+      (call) =>
+        String(call[0]).includes("/api/vocabulary/decks") &&
+        call[1]?.method === "POST",
+    );
+    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({
+      name: "Verbos",
+    });
   });
 
   it("una palabra ya rastreada no se re-da de alta: declara el vínculo y ofrece estudiar", async () => {

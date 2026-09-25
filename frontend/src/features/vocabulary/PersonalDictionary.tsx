@@ -692,12 +692,12 @@ function LexicalRow({ lexical }: { lexical: LexicalItem }) {
           </p>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className="flex min-w-0 max-w-[45%] shrink-0 flex-col items-end gap-1">
         <Badge className={cn(STATUS_TONE[lexical.status])}>{statusLabel}</Badge>
         {memoryText ? (
           <span
             className={cn(
-              "text-[11px] tabular-nums",
+              "text-right text-[11px] tabular-nums break-words",
               memory?.due
                 ? "text-warning"
                 : "text-muted-foreground",

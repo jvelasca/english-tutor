@@ -2068,6 +2068,115 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **Todo lo declarado abierto en V3.82.0 y anteriores sigue abierto** salvo lo que
   esta release cierra de forma explícita arriba.
 
+## V3.83.1 — Instrumento y honestidad: la versión que el informe `AU` pedía y que no existía · 2026-09-24
+
+> Release **DE INSTRUMENTO Y HONESTIDAD (patch)**, SIN producto nuevo: `frontend/src`
+> y `launcher/` intactos; el único cambio en `backend/` es la línea de `VERSION`. Existe
+> porque **la versión que se estaba auditando no existía** (la última etiqueta era
+> `v3.83.0` y el arreglo H2 vivía en `main` sin etiqueta). Publica el parche que
+> `docs/audit/AU-AUDITORIA-TOTAL-V383.md` §8 pidió. Detalle en
+> `release-notes-v3.83.1.md` y `docs/audit/CIERRE-GLOBAL-V383.md`.
+
+### Cerrado en V3.83.1 (deja de ser deuda)
+
+- **H2 — el gate `reduced-motion` que emulaba en vacío.** `test.use({ reducedMotion:
+  "reduce" })` no es opción válida en Playwright 1.62 y se ignoraba en silencio desde
+  `V3.73.1`, así que `GUI-05` pasaba **sin emular nada**. Ahora emula de verdad
+  (`page.emulateMedia`) y lleva **guarda de mordida** (`matchMedia(...).matches ===
+  true`): si alguien vuelve a un arnés que no muerde, el test **falla**.
+- **E5/i — la contradicción literal de la letra.** `release-notes-v3.83.0.md §5.1`
+  («No se toca ni el backend ni la BD») queda como «sin lógica de backend (solo el bump
+  de `VERSION`) y sin tocar la BD», que es lo que el diff dice.
+- **H4 — el cambio de arnés ya tiene tag.** `fd086e8` (`playwright.config.ts`) queda
+  **dentro** de `v3.83.1`, así que se cierra la observación de `AU` §5-H4.
+- **El ancla reproducible existe.** El tag `v3.83.1` (`4ee32e5`) es el último y su
+  commit es el tip de `main`; su run de CI (`36042834375`, `success`) lo certifica.
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **H1 sigue vivo en el código** y **no se endurece aquí.** `_collection_writable`
+  (`backend/domain/retention.py` ~185) devuelve `True` para un pack global (`not
+  owner`): la promesa «un pack curado no es un destino» sigue siendo **solo de
+  cliente**. Se **sitúa fuera** de un patch de instrumento y queda como **deuda
+  aceptada `P2`** en `AU §12`, con la recomendación viva
+  (`return bool(owner) and owner == user_id`). Mientras siga en el código, sigue
+  declarada. `[SEGURIDAD]` `[PRODUCTO]`
+- **H5 (`add_item` no atómico) sigue abierto.** Un fallo posterior a `seed_study_items`
+  puede pintar «No se pudo añadir» cuando la palabra **ya está** en el léxico: el modo
+  de fallo es del lado seguro, pero el **mensaje** miente sobre el estado. `[PRODUCTO]`
+- **H3 (`Sparkles` celebra también el 0 %) sigue abierto** como `P3` cosmético. `[UX]`
+- **Los 8 gates humanos siguen `pending`** y `docs/audit/validation-evidence.json`
+  **no existe**. `[VALIDACIÓN]`
+- **El ancla de certificación estaba desfasada y este cierre la mueve a `v3.83.1`.**
+  El kit (`docs/audit/KIT-VALIDACION-GATES.md`) y el runbook
+  (`docs/audit/VALIDATION-RELEASE-V373.md`) ya declaran la re-congelación; el pre-vuelo
+  hay que **repetirlo** sobre este árbol. `[VALIDACIÓN]`
+- **El informe `AV` del arco `v3.81.2..v3.82.0` (contrato + migración) sigue
+  pendiente** aunque su encargo existe (`agentes/auditoria-total-externa-v382.md`). Es
+  la mayor deuda de auditoría de la serie. `[AUDITORÍA]`
+- **Los 12 PRs de Dependabot siguen abiertos** (`#7`–`#18`); `#10` y `#13` siguen
+  rojos y los diez restantes sin dictaminar. `[MANTENIMIENTO]`
+- **`frontend/dist` puede estar desfasado** respecto a `3.83.1` (no se reconstruyó);
+  `check_dist_artifact` solo comprueba que el `index.html` sea servible. `[VALIDACIÓN]`
+- **Todo lo declarado abierto en V3.83.0 y anteriores sigue abierto** salvo lo que esta
+  release cierra de forma explícita arriba.
+
+## V3.84.0 — Responsive global, mazos estándar y ruta de aprendizaje · 2026-09-25
+
+> Release **DE PRODUCTO (minor)** con backend y frontend, **SIN migración de BD**
+> (los packs se siembran solos por `slug` desde `backend/curriculum/vocab_packs/*.json`)
+> y **SIN endpoints nuevos** (mazos, tarjetas y `collection_id` ya existían). Detalle en
+> `release-notes-v3.84.0.md`.
+
+### Cerrado en V3.84.0 (deja de ser deuda)
+
+- **El recorte del botón «Practicar esta palabra»** en DICCIONARIO/CONSULTAR y **su
+  clase**: clusters sin `flex-wrap` dentro de contenedores con `overflow-hidden`
+  (cluster de la `ResultCard`, conmutador de 5 peldaños de `wordDrill`, `Header`,
+  cabecera y caras de `StudySession`, filas de `FlashcardsScreen`, pestañas de
+  `DictionaryScreen` y filas con `shrink-0` de `AddVocabSection`/`PersonalDictionary`).
+  `[UX]` `[RESPONSIVE]`
+- **No había guardia contra el recorte silencioso.** Nuevo
+  `frontend/tests/visual/layoutHelper.ts` (`expectNoHorizontalOverflow` +
+  `expectInsideClippingAncestor`) y `responsiveOverflow.spec.ts`: 11 rutas y las 3
+  pestañas del diccionario a 390/768/1280 y a **320 px**, más la regresión del botón en
+  `dictionarySmoke.spec.ts`. `[VALIDACIÓN]`
+- **El diccionario no dejaba elegir destino.** El panel de alta ofrece ahora
+  **mazo manual** (elegir / `Crear mazo nuevo…` en línea) y crea la tarjeta con
+  `createFlashcard`, además del léxico + carta FSRS de siempre; «Estudiar en Flashcards»
+  abre **ese mazo**. `[PRODUCTO]`
+- **Solo había 3 packs de ~25 palabras.** Ahora **15 packs de 40–60** (12 nuevos + 3
+  enriquecidos), con test de contenido `test_vocab_packs_content.py`. `[CONTENIDO]`
+- **El mazo automático no se podía filtrar.** Gana el filtro Todas / por pack / por
+  lista, reutilizando el `collection_id` que la cola ya soportaba. `[PRODUCTO]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **El alta en un mazo manual DUPLICA el ítem**: la palabra queda en el léxico/«Mi
+  diccionario» **y** como tarjeta manual del mazo. Es el precio de no compartir el
+  modelo de tarjetas; se declara en la UI y consolidarlo queda aparcado. `[PRODUCTO]`
+- **Archivar en listas desde el panel del diccionario se retira.** Las listas siguen
+  existiendo y se crean desde PERSONAL; el destino del diccionario pasa a ser el mazo
+  elegido. `[UX]`
+- **El contenido de los packs es autoría acotada** (~650 entradas nuevas): el test
+  garantiza forma, `slug` único y 40–60 ítems, **no** calidad léxica. `[CONTENIDO]`
+- **320 px es un ancho nuevo** que la suite no probaba y reveló más defectos de los
+  enumerados; los encontrados se cerraron, pero el ancho entra en la guardia desde
+  ahora. `[RESPONSIVE]`
+- **H1 sigue vivo en el código** (`_collection_writable` devuelve `True` para un pack
+  global, `backend/domain/retention.py` ~185; **deuda aceptada `P2`** en
+  `AU §12`). `[SEGURIDAD]` `[PRODUCTO]`
+- **H5 (`add_item` no atómico) y H3 (`Sparkles` celebra también el 0 %) siguen
+  abiertos.** `[PRODUCTO]` `[UX]`
+- **Los 8 gates humanos siguen `pending`** y `docs/audit/validation-evidence.json`
+  **no existe**; el ancla de certificación sigue en `v3.83.1`. `[VALIDACIÓN]`
+- **El informe `AV` del arco `v3.81.2..v3.82.0` sigue pendiente.** `[AUDITORÍA]`
+- **Los 12 PRs de Dependabot siguen abiertos** (`#7`–`#18`). `[MANTENIMIENTO]`
+- **`frontend/dist` se reconstruyó** en esta release (`npm run build` + gate con
+  `--require-dist`), así que deja de estar desfasado respecto a `3.84.0`.
+- **Todo lo declarado abierto en V3.83.1 y anteriores sigue abierto** salvo lo que esta
+  release cierra de forma explícita arriba.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

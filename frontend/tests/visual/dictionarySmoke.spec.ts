@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
 import { ensureProfile } from "./gateHelper";
+import { expectInsideClippingAncestor } from "./layoutHelper";
 
 /**
  * Smoke visual permanente del DICCIONARIO (V3.80.1).
@@ -163,6 +164,20 @@ test("smoke del diccionario: tres modos, buscador y borrado (3 breakpoints)", as
     timeout: 15_000,
   });
   await expect(page.getByText(COFFEE_ENTRY.definition)).toBeVisible();
+
+  // V3.84.0: la guarda de mordida del defecto reportado. La tarjeta del
+  // resultado recorta (`overflow-hidden`) y su fila de acciones no envolvía, así
+  // que «Practicar esta palabra» se cortaba en pantallas estrechas sin que el
+  // scroll horizontal creciera. Se mide que cada acción cabe DENTRO del
+  // contenedor que recorta. En este fixture la palabra ya está en el léxico, así
+  // que se ven las dos acciones más el audio: el mismo número de controles que
+  // el caso de alta.
+  for (const name of ["Study in Flashcards", "Practice this word"]) {
+    const action = page.getByRole("button", { name, exact: true });
+    await expect(action).toBeVisible();
+    await expectInsideClippingAncestor(action, name);
+  }
+
   await page.waitForTimeout(400);
   await page.screenshot({ path: shot("dictionary-lookup"), fullPage: true });
 

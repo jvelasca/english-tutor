@@ -688,9 +688,9 @@ export function WordDrill({
     (step === "transfer" && transferOutcome === null);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-background/60 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {hideTarget ? (
             <span
               className={cn(
@@ -726,11 +726,13 @@ export function WordDrill({
       </div>
 
       {/* Escalera Recognize -> Recall -> Sentence en la misma tarjeta
-          (V3.21/F6.1 + V3.33 Recognition + V3.34 Recall por texto). */}
+          (V3.21/F6.1 + V3.33 Recognition + V3.34 Recall por texto).
+          V3.84.0: con 5 peldaños etiquetados no cabía en una fila a 320px y
+          empujaba la página a scroll horizontal: ahora envuelve. */}
       <div
         role="group"
         aria-label={t("dictionary.drill.steps")}
-        className="flex w-fit items-center gap-1 rounded-md bg-secondary p-1"
+        className="flex flex-wrap items-center gap-1 rounded-md bg-secondary p-1"
       >
         {DRILL_STEPS.map((option) => (
           <button

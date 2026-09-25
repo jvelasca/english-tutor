@@ -29,12 +29,19 @@ const VIEW_IDS = VIEWS.map((entry) => entry.id);
 /** Petición de estudio: qué mazo/léxico abrir en Flashcards y con qué etiqueta. */
 interface StudyFocus {
   collectionId: number | null;
+  /** V3.84.0: mazo manual concreto al que saltar (si se eligió uno al añadir). */
+  deckId: number | null;
   label: string;
   /** Cambia en cada petición para que un segundo clic vuelva a abrir la sesión. */
   nonce: number;
 }
 
-const NO_FOCUS: StudyFocus = { collectionId: null, label: "", nonce: 0 };
+const NO_FOCUS: StudyFocus = {
+  collectionId: null,
+  deckId: null,
+  label: "",
+  nonce: 0,
+};
 
 /**
  * Pantalla dedicada del diccionario (ruta `/diccionario`, V3.38.1).
@@ -65,7 +72,26 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
     (opts: { collectionId?: number | null; label?: string } = {}) => {
       setFocus((prev) => ({
         collectionId: opts.collectionId ?? null,
+        deckId: null,
         label: opts.label ?? "",
+        nonce: prev.nonce + 1,
+      }));
+      setView("flashcards");
+    },
+    [setView],
+  );
+
+  /**
+   * V3.84.0: salta a Flashcards desde el diccionario de consulta. Si el alta
+   * archivó la palabra en un mazo manual, se abre ESE mazo; sin argumento, se
+   * abre el automático (el comportamiento de V3.83.0).
+   */
+  const openFlashcards = useCallback(
+    (deckId?: number) => {
+      setFocus((prev) => ({
+        collectionId: null,
+        deckId: deckId ?? null,
+        label: "",
         nonce: prev.nonce + 1,
       }));
       setView("flashcards");
@@ -88,7 +114,7 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
         <div
           role="tablist"
           aria-label={t("dictionary.viewsLabel")}
-          className="bg-secondary mb-4 flex w-fit items-center gap-1 rounded-md p-1"
+          className="bg-secondary mb-4 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-md p-1"
           onKeyDown={onKeyDown}
         >
           {VIEWS.map((entry) => {
@@ -136,8 +162,10 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
               showHeader={false}
               /* V3.83.0: tras añadir (o si la palabra ya está en el léxico), el
                  panel ofrece estudiar. El destino es el modo Flashcards de esta
-                 misma pantalla: el foco no persiste, es un salto de un clic. */
-              onOpenFlashcards={() => setView("flashcards")}
+                 misma pantalla: el foco no persiste, es un salto de un clic.
+                 V3.84.0: si el alta guardó la palabra en un mazo manual, se
+                 abre ese mazo. */
+              onOpenFlashcards={openFlashcards}
             />
           ) : view === "personal" ? (
             /* V3.77.2: la pantalla es la única dueña del layout (un solo `h1`
@@ -153,6 +181,7 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
               userId={userId}
               focusCollectionId={focus.collectionId}
               focusCollectionLabel={focus.label}
+              focusDeckId={focus.deckId}
               focusNonce={focus.nonce}
             />
           )}

@@ -216,7 +216,7 @@ export function AddVocabSection({
               return (
                 <li
                   key={pack.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-md border border-border/60 px-3 py-2"
                 >
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="truncate text-sm font-medium">{title}</span>
@@ -284,7 +284,7 @@ export function AddVocabSection({
               {lists.map((list) => (
                 <li
                   key={list.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-md border border-border/60 px-3 py-2"
                 >
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="truncate text-sm font-medium">
