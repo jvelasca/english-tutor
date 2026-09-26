@@ -1,21 +1,26 @@
-import { BookOpen, Layers, Search } from "lucide-react";
+import { Layers, Search } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
 import { useTabList } from "../../hooks/useTabList";
-import type { DictionaryView } from "../../utils/dictionaryView";
 import { cn } from "../../lib/utils";
-import { PersonalDictionary } from "./PersonalDictionary";
 import { DictionaryLookup } from "./DictionaryLookup";
-import { FlashcardsScreen } from "./FlashcardsScreen";
+import { FlashcardsScreen, type FlashcardsTab } from "./FlashcardsScreen";
 
-const VIEWS: {
-  id: DictionaryView;
+/**
+ * V3.85.0: dos pestañas. El inventario del léxico deja de ser una pestaña de
+ * primer nivel («Personal») y pasa a ser la sub-pestaña «Mi léxico» de
+ * Flashcards, que es donde vive el estudio. Una pestaña de primer nivel para
+ * mirar y otra para trabajar.
+ */
+type DictionaryTab = "lookup" | "flashcards";
+
+const TABS: {
+  id: DictionaryTab;
   labelKey: string;
-  Icon: typeof BookOpen;
+  Icon: typeof Search;
 }[] = [
   { id: "lookup", labelKey: "dictionary.tabs.lookup", Icon: Search },
-  { id: "personal", labelKey: "dictionary.tabs.personal", Icon: BookOpen },
   {
     id: "flashcards",
     labelKey: "dictionary.tabs.flashcards",
@@ -24,22 +29,21 @@ const VIEWS: {
 ];
 
 /** Ids estables (a nivel de módulo) para el roving tabindex del hook. */
-const VIEW_IDS = VIEWS.map((entry) => entry.id);
+const TAB_IDS = TABS.map((entry) => entry.id);
 
-/** Petición de estudio: qué mazo/léxico abrir en Flashcards y con qué etiqueta. */
+/**
+ * Petición de estudio: qué mazo abrir en Flashcards. El `nonce` cambia en cada
+ * petición para que un segundo clic vuelva a abrir la sesión aunque sea el mismo
+ * mazo.
+ */
 interface StudyFocus {
-  collectionId: number | null;
   /** V3.84.0: mazo manual concreto al que saltar (si se eligió uno al añadir). */
   deckId: number | null;
-  label: string;
-  /** Cambia en cada petición para que un segundo clic vuelva a abrir la sesión. */
   nonce: number;
 }
 
 const NO_FOCUS: StudyFocus = {
-  collectionId: null,
   deckId: null,
-  label: "",
   nonce: 0,
 };
 
@@ -55,45 +59,75 @@ const NO_FOCUS: StudyFocus = {
  * `useDictionaryView`, así que al volver a abrir la app se recuerda la última
  * pestaña usada.
  *
- * V3.78.0: los dos modos pasan a TRES, en el orden en que se usan —Consultar ·
- * Personal · Flashcards— y la pantalla se convierte en el punto de encuentro
- * entre posesión y estudio: PERSONAL ya no estudia, gestiona, y su botón
- * «Estudiar» (igual que el de una lista o un pack en «Añadir») cambia a
- * Flashcards con el foco puesto. El foco vive aquí, no en la vista, porque es
- * un encargo de una sola pantalla y no una preferencia que deba persistirse.
+ * V3.85.0: las tres pestañas de V3.78 pasan a DOS —Consultar · Flashcards— y el
+ * inventario se convierte en la sub-pestaña «Mi léxico» de Flashcards. La
+ * persistencia NO se migra: el valor `"personal"` sigue siendo válido y ahora
+ * **proyecta** a Flashcards abierto en «Mi léxico», de modo que un valor guardado
+ * antes de esta versión abre exactamente donde el alumno lo dejó. Al revés,
+ * elegir «Mi léxico» vuelve a persistir `"personal"`; cualquier otra sub-pestaña
+ * persiste `"flashcards"`. El diccionario incrustado en la práctica de rutas
+ * (APRENDER → Vocabulario) sigue funcionando sin cambios vía `toPanelView`.
  */
 export function DictionaryScreen({ userId }: { userId: string | null }) {
   const { t } = useI18n();
   const { view, setView } = useDictionaryView(userId);
   const [focus, setFocus] = useState<StudyFocus>(NO_FOCUS);
-  const { onKeyDown, register } = useTabList(VIEW_IDS, view, setView);
+  /**
+   * Sub-pestaña REAL de Flashcards. `view` solo guarda la proyección
+   * (`"personal"` = léxico, `"flashcards"` = estudio), así que «Mazos»,
+   * «Tarjetas» y «Estadísticas» no se pueden derivar de él: sin este estado,
+   * pasar de «Mazos» a la pestaña Consultar y volver caería en «Estudiar». Se
+   * inicializa desde el valor persistido para que un `"personal"` guardado
+   * abra directamente en «Mi léxico».
+   */
+  const [flashcardsTab, setFlashcardsTab] = useState<FlashcardsTab>(() =>
+    view === "personal" ? "lexicon" : "study",
+  );
 
-  const openStudy = useCallback(
-    (opts: { collectionId?: number | null; label?: string } = {}) => {
-      setFocus((prev) => ({
-        collectionId: opts.collectionId ?? null,
-        deckId: null,
-        label: opts.label ?? "",
-        nonce: prev.nonce + 1,
-      }));
-      setView("flashcards");
+  const activeTab: DictionaryTab = view === "lookup" ? "lookup" : "flashcards";
+
+  /** Persiste la sub-pestaña: «Mi léxico» es `"personal"`, el resto `"flashcards"`. */
+  const changeFlashcardsTab = useCallback(
+    (next: FlashcardsTab) => {
+      setFlashcardsTab(next);
+      setView(next === "lexicon" ? "personal" : "flashcards");
     },
     [setView],
   );
+
+  /** Pestaña de primer nivel: recuerda la sub-pestaña de Flashcards al volver. */
+  const selectTab = useCallback(
+    (next: DictionaryTab) => {
+      setView(
+        next === "lookup"
+          ? "lookup"
+          : flashcardsTab === "lexicon"
+            ? "personal"
+            : "flashcards",
+      );
+    },
+    [flashcardsTab, setView],
+  );
+
+  const { onKeyDown, register } = useTabList(TAB_IDS, activeTab, selectTab);
 
   /**
    * V3.84.0: salta a Flashcards desde el diccionario de consulta. Si el alta
    * archivó la palabra en un mazo manual, se abre ESE mazo; sin argumento, se
    * abre el automático (el comportamiento de V3.83.0).
+   *
+   * V3.85.0: el salto a estudio con una lista o un pack («Repasar» en «Mi
+   * léxico») ya no pasa por aquí —ocurre dentro de `FlashcardsScreen`, que es
+   * quien conoce el mazo automático—, así que el foco solo transporta el mazo
+   * manual del alta.
    */
   const openFlashcards = useCallback(
     (deckId?: number) => {
       setFocus((prev) => ({
-        collectionId: null,
         deckId: deckId ?? null,
-        label: "",
         nonce: prev.nonce + 1,
       }));
+      setFlashcardsTab("study");
       setView("flashcards");
     },
     [setView],
@@ -117,8 +151,8 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
           className="bg-secondary mb-4 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-md p-1"
           onKeyDown={onKeyDown}
         >
-          {VIEWS.map((entry) => {
-            const isActive = view === entry.id;
+          {TABS.map((entry) => {
+            const isActive = activeTab === entry.id;
             const Icon = entry.Icon;
             return (
               <button
@@ -130,7 +164,7 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
                 aria-controls={`dictionary-panel-${entry.id}`}
                 tabIndex={isActive ? 0 : -1}
                 ref={register(entry.id)}
-                onClick={() => setView(entry.id)}
+                onClick={() => selectTab(entry.id)}
                 className={cn(
                   "inline-flex min-h-9 items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors",
                   isActive
@@ -147,12 +181,12 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
 
         <div
           role="tabpanel"
-          id={`dictionary-panel-${view}`}
-          aria-labelledby={`dictionary-tab-${view}`}
+          id={`dictionary-panel-${activeTab}`}
+          aria-labelledby={`dictionary-tab-${activeTab}`}
           tabIndex={0}
           className="min-h-0 flex-1 focus:outline-none"
         >
-          {view === "lookup" ? (
+          {activeTab === "lookup" ? (
             /* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
                vista de consulta no repite cabecera (antes había dos `h1` en la
                misma página) ni vuelve a aplicar el ancho y el relleno de
@@ -167,22 +201,15 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
                  abre ese mazo. */
               onOpenFlashcards={openFlashcards}
             />
-          ) : view === "personal" ? (
-            /* V3.77.2: la pantalla es la única dueña del layout (un solo `h1`
-               y un solo contenedor de ancho). V3.78.0: PERSONAL ya no estudia;
-               `onStudy` es el puente al modo Flashcards. */
-            <PersonalDictionary
-              userId={userId}
-              showHeader={false}
-              onStudy={openStudy}
-            />
           ) : (
+            /* V3.85.0: Flashcards es el dueño de las cinco sub-pestañas y esta
+               pantalla controla cuál está activa y qué valor se persiste. */
             <FlashcardsScreen
               userId={userId}
-              focusCollectionId={focus.collectionId}
-              focusCollectionLabel={focus.label}
               focusDeckId={focus.deckId}
               focusNonce={focus.nonce}
+              tab={flashcardsTab}
+              onTabChange={changeFlashcardsTab}
             />
           )}
         </div>

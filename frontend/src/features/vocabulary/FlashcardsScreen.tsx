@@ -1,12 +1,13 @@
 /**
  * Modo Flashcards del diccionario (V3.78.0): la ÚNICA superficie de estudio.
  *
- * Cuatro subpestañas, en el orden en que se usan:
+ * Cinco subpestañas, en el orden en que se usan:
  *
- * - **Estudiar**: la cola unificada (léxico + tarjetas a mano) con los límites
- *   del día. Es lo que antes hacía la sesión de retención incrustada en
- *   Personal y lo que hacía la sesión acotada de «Mis listas»; ahora hay una
- *   sola.
+ * - **Estudiar**: las dos superficies de estudio, cada una con su acción
+ *   etiquetada —«Repasar hoy (N)» (drill de competencia) y «Estudiar tarjetas
+ *   (N)» (cola FSRS)— más los límites del día.
+ * - **Mi léxico** (V3.85.0): el inventario que antes era la pestaña PERSONAL
+ *   del diccionario (buscador, filtros, estadísticas, añadir).
  * - **Mazos**: el mazo automático (todo el léxico, no editable ni borrable) y
  *   los manuales, con sus límites.
  * - **Tarjetas**: navegador y CRUD de las tarjetas de un mazo manual.
@@ -29,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   BookOpen,
+  CalendarClock,
   Library,
   Layers,
   Plus,
@@ -68,16 +70,22 @@ import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 import { StudySession } from "./StudySession";
+import { LexiconInventory } from "./LexiconInventory";
+import { ReviewSession, useReviewToday } from "./ReviewToday";
 
 const INPUT =
   "rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground";
 
-type Tab = "study" | "decks" | "cards" | "stats";
+export type FlashcardsTab = "study" | "lexicon" | "decks" | "cards" | "stats";
 
-const TABS: { id: Tab; labelKey: string; Icon: typeof Layers }[] = [
-  { id: "study", labelKey: "flashcards.tabs.study", Icon: Layers },
+const TABS: { id: FlashcardsTab; labelKey: string; Icon: typeof Layers }[] = [
+  // V3.85.0: «Mi léxico» (el inventario que vivía en la pestaña PERSONAL) entra
+  // como sub-pestaña, y el icono de Estudiar pasa a `CalendarClock`: `Layers`
+  // identifica mejor «Tarjetas» y así los cinco iconos no se repiten.
+  { id: "study", labelKey: "flashcards.tabs.study", Icon: CalendarClock },
+  { id: "lexicon", labelKey: "dictionary.myLexicon", Icon: BookOpen },
   { id: "decks", labelKey: "flashcards.tabs.decks", Icon: Library },
-  { id: "cards", labelKey: "flashcards.tabs.cards", Icon: BookOpen },
+  { id: "cards", labelKey: "flashcards.tabs.cards", Icon: Layers },
   { id: "stats", labelKey: "flashcards.tabs.stats", Icon: BarChart3 },
 ];
 
@@ -99,6 +107,15 @@ interface FlashcardsScreenProps {
   focusDeckId?: number | null;
   /** Cambia en cada petición de estudio, para reabrir aunque sea el mismo foco. */
   focusNonce?: number;
+  /**
+   * V3.85.0: sub-pestaña activa. La pantalla pasa a estar CONTROLADA porque su
+   * padre (`DictionaryScreen`) tiene que poder abrirla directamente en «Mi
+   * léxico» cuando el valor persistido es el antiguo `"personal"`, y porque el
+   * padre es quien decide qué valor se guarda al navegar. Sin `tab` funciona en
+   * modo libre (uso interno de tests), con estado propio.
+   */
+  tab?: FlashcardsTab;
+  onTabChange?: (tab: FlashcardsTab) => void;
 }
 
 export function FlashcardsScreen({
@@ -107,9 +124,19 @@ export function FlashcardsScreen({
   focusCollectionLabel = "",
   focusDeckId = null,
   focusNonce = 0,
+  tab: controlledTab,
+  onTabChange,
 }: FlashcardsScreenProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>("study");
+  const [internalTab, setInternalTab] = useState<FlashcardsTab>("study");
+  const tab = controlledTab ?? internalTab;
+  const setTab = useCallback(
+    (next: FlashcardsTab) => {
+      setInternalTab(next);
+      onTabChange?.(next);
+    },
+    [onTabChange],
+  );
   const { onKeyDown, register } = useTabList(TAB_IDS, tab, setTab);
   const [decks, setDecks] = useState<FlashcardDecks | null>(null);
   const [deckId, setDeckId] = useState<number | null>(null);
@@ -126,12 +153,15 @@ export function FlashcardsScreen({
   const [addCardsNonce, setAddCardsNonce] = useState(0);
 
   /** Abre Tarjetas con `id` seleccionado y el campo del anverso listo. */
-  const openCardsFor = useCallback((id: number) => {
-    setDeckId(id);
-    setCollection(null);
-    setTab("cards");
-    setAddCardsNonce((n) => n + 1);
-  }, []);
+  const openCardsFor = useCallback(
+    (id: number) => {
+      setDeckId(id);
+      setCollection(null);
+      setTab("cards");
+      setAddCardsNonce((n) => n + 1);
+    },
+    [setTab],
+  );
 
   /**
    * Abre Estudiar con un mazo (y, si procede, filtrado por una lista o pack) y
@@ -145,7 +175,24 @@ export function FlashcardsScreen({
       setAutoStart(true);
       setTab("study");
     },
-    [],
+    [setTab],
+  );
+
+  /**
+   * V3.85.0: «Mis listas» y los packs se estudian en el mazo AUTOMÁTICO filtrado
+   * por la colección —son sus palabras, no una copia—, igual que hace una fila
+   * de mazo listo en la sub-pestaña Mazos. Vive aquí y no en
+   * `LexiconInventory` porque el salto necesita el mazo automático, que solo
+   * esta pantalla conoce.
+   */
+  const studyCollection = useCallback(
+    (opts: { collectionId: number; label: string }) => {
+      openStudy(decks?.auto_deck_id ?? 0, {
+        id: opts.collectionId,
+        label: opts.label,
+      });
+    },
+    [decks?.auto_deck_id, openStudy],
   );
 
   const loadDecks = useCallback(async () => {
@@ -203,7 +250,7 @@ export function FlashcardsScreen({
       <div
         role="tablist"
         aria-label={t("flashcards.viewsLabel")}
-        className="flex flex-wrap items-center gap-1"
+        className="flex items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-x-visible sm:pb-0"
         onKeyDown={onKeyDown}
       >
         {TABS.map((entry) => {
@@ -221,7 +268,7 @@ export function FlashcardsScreen({
               ref={register(entry.id)}
               onClick={() => setTab(entry.id)}
               className={cn(
-                "inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors",
+                "inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors",
                 active
                   ? "bg-secondary text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -241,7 +288,18 @@ export function FlashcardsScreen({
         tabIndex={0}
         className="focus:outline-none"
       >
-        {error ? (
+        {tab === "lexicon" ? (
+          /* V3.85.0: el inventario que vivía en la pestaña PERSONAL. Se resuelve
+             ANTES de los estados de error/perfil porque no depende de la carga
+             de mazos: un fallo al listar mazos no puede tumbar «Mi léxico».
+             Sin cabecera propia (`showHeader={false}`): el `h1` y el ancho los
+             pone `DictionaryScreen`, igual que con `DictionaryLookup`. */
+          <LexiconInventory
+            userId={userId}
+            showHeader={false}
+            onStudyCollection={studyCollection}
+          />
+        ) : error ? (
         <Card className="gap-2 p-4">
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             {t("dictionary.loadError")}
@@ -395,6 +453,24 @@ function StudyTab({
   // Se carga al montar; si falla, el filtro queda solo en «Todas» y la ruta
   // sigue funcionando (degradación honesta, no una pantalla rota).
   const [catalog, setCatalog] = useState<VocabCollection[]>([]);
+  // V3.85.0: la cola de repaso del día (drill de competencia). Es una superficie
+  // distinta de la cola de tarjetas: la primera pide a `GET /api/learning/review`
+  // —qué palabra toca y en qué peldaño—, la segunda la cola FSRS del mazo. Se
+  // desestructura para que `refreshReview` (estable) sea la dependencia real y
+  // no el objeto que se recrea en cada render.
+  const {
+    items: reviewItems,
+    dueCount: reviewDue,
+    loadError: reviewError,
+    refresh: refreshReview,
+  } = useReviewToday(userId);
+  const [reviewing, setReviewing] = useState(false);
+
+  /** Cierra la sesión encadenada y refresca el recuento del día. */
+  const exitReview = useCallback(() => {
+    setReviewing(false);
+    void refreshReview();
+  }, [refreshReview]);
 
   useEffect(() => {
     let alive = true;
@@ -502,6 +578,14 @@ function StudyTab({
     );
   }
 
+  // La sesión de repaso encadenada sustituye al bloque entero: mientras se
+  // repasa no se ofrecen las otras acciones, igual que hace la sesión FSRS.
+  if (reviewing && reviewItems.length > 0) {
+    return (
+      <ReviewSession userId={userId} items={reviewItems} onExit={exitReview} />
+    );
+  }
+
   return (
     <Card className="gap-3 p-5">
       <div className="flex flex-col gap-2">
@@ -587,83 +671,138 @@ function StudyTab({
         ) : null}
       </div>
 
-      {error ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          {t("dictionary.loadError")}
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium hover:border-primary/50"
-          >
-            <RefreshCw className="size-3.5" aria-hidden="true" />
-            {t("common.retry")}
-          </button>
-        </p>
-      ) : loading ? (
-        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-      ) : (
-        <>
-          <p className="text-sm font-medium">
-            {t("flashcards.study.pendingToday").replace(
-              "{n}",
-              String(items.length),
-            )}
+      {/* V3.85.0: DOS acciones, una por superficie, cada una rotulada y con su
+          recuento. Antes había un solo botón («Iniciar sesión») y el repaso
+          vivía al otro lado, en la pestaña Personal, como una lista con un botón
+          que se leía como un estado. En móvil van a ancho completo y en una
+          columna; a partir de `sm` comparten fila. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
+          <span className="flex items-center gap-1.5 text-xs font-semibold">
+            <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
+            {t("dictionary.review.title")}
+          </span>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {reviewError
+              ? t("dictionary.review.loadError")
+              : reviewDue > 0
+                ? t("dictionary.review.todaySummary").replace(
+                    "{count}",
+                    String(reviewDue),
+                  )
+                : t("dictionary.review.empty")}
           </p>
-          {queue ? (
-            <p className="text-[11px] text-muted-foreground">
-              {t("flashcards.study.limitsNote")
-                .replace("{new}", String(queue.limits.new_remaining))
-                .replace("{review}", String(queue.limits.review_remaining))}
-            </p>
-          ) : null}
-          {items.length === 0 ? (
-            // V3.80.0: «no hay nada pendiente» y «el mazo está vacío» son cosas
-            // distintas y solo una tiene arreglo aquí. Un mazo manual sin
-            // tarjetas ofrece el camino para meterlas; el automático vacío manda
-            // al diccionario, que es donde se añaden palabras. Decir «nada
-            // pendiente» en los dos casos dejaba al alumno sin saber qué hacer.
-            queue && queue.deck.card_count === 0 ? (
-              isAuto ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("flashcards.study.emptyAuto")}
-                </p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm text-muted-foreground">
-                    {t("flashcards.study.emptyDeck")}
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="w-fit"
-                    onClick={() => onAddCards(deck)}
-                  >
-                    <Plus className="size-3.5" aria-hidden="true" />
-                    {t("flashcards.study.addCards")}
-                  </Button>
-                </div>
-              )
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("flashcards.study.empty")}
-              </p>
-            )
-          ) : (
+          {reviewError ? (
             <Button
               type="button"
               size="sm"
-              className="w-fit"
+              variant="outline"
+              className="w-full"
+              onClick={() => void refreshReview()}
+            >
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+              {t("common.retry")}
+            </Button>
+          ) : reviewDue > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              onClick={() => setReviewing(true)}
+            >
+              {t("dictionary.review.todayAction").replace(
+                "{count}",
+                String(reviewDue),
+              )}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
+          <span className="flex items-center gap-1.5 text-xs font-semibold">
+            <Layers className="size-3.5 text-primary" aria-hidden="true" />
+            {t("flashcards.study.cardsTitle")}
+          </span>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {error
+              ? t("dictionary.loadError")
+              : loading
+                ? t("common.loading")
+                : t("flashcards.study.pendingToday").replace(
+                    "{n}",
+                    String(items.length),
+                  )}
+          </p>
+          {error ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => void load()}
+            >
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+              {t("common.retry")}
+            </Button>
+          ) : !loading && items.length > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full"
               onClick={() => {
                 setSessionNonce((n) => n + 1);
                 setStudying(true);
               }}
             >
-              {t("flashcards.study.start").replace("{n}", String(items.length))}
+              {t("flashcards.study.startCards").replace(
+                "{n}",
+                String(items.length),
+              )}
             </Button>
-          )}
-        </>
-      )}
+          ) : null}
+        </div>
+      </div>
+
+      {!error && !loading && queue ? (
+        <p className="text-[11px] text-muted-foreground">
+          {t("flashcards.study.limitsNote")
+            .replace("{new}", String(queue.limits.new_remaining))
+            .replace("{review}", String(queue.limits.review_remaining))}
+        </p>
+      ) : null}
+
+      {/* El mazo no tiene nada que estudiar. «Nada pendiente» y «el mazo está
+          vacío» son cosas distintas y solo una tiene arreglo aquí (V3.80.0). */}
+      {!error && !loading && items.length === 0 ? (
+        queue && queue.deck.card_count === 0 ? (
+          isAuto ? (
+            <p className="text-sm text-muted-foreground">
+              {t("flashcards.study.emptyAuto")}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-muted-foreground">
+                {t("flashcards.study.emptyDeck")}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-fit"
+                onClick={() => onAddCards(deck)}
+              >
+                <Plus className="size-3.5" aria-hidden="true" />
+                {t("flashcards.study.addCards")}
+              </Button>
+            </div>
+          )
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t("flashcards.study.empty")}
+          </p>
+        )
+      ) : null}
     </Card>
   );
 }

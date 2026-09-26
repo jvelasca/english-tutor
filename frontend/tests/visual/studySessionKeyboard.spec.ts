@@ -126,7 +126,12 @@ async function startSession(page: Page) {
   await page.goto("/#/diccionario");
   await page.getByRole("tab", { name: "Flashcards", exact: true }).click();
   await expect(page.getByText("2 cards due")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: /Start session/ }).click();
+  // V3.85.0: el botón pasó a llamarse «Study cards (N)» porque el bloque de
+  // estudio ahora ofrece DOS acciones y esta es la de la cola FSRS (la otra,
+  // «Review now (N)», es el drill de competencia).
+  await page
+    .getByRole("button", { name: /Study cards|Estudiar tarjetas/ })
+    .click();
   await expect(page.getByRole("button", { name: "Flip card" })).toBeVisible({
     timeout: 15_000,
   });

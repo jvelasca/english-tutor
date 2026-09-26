@@ -8,7 +8,8 @@ import { expectInsideClippingAncestor } from "./layoutHelper";
  *
  * No sustituye al barrido de capturas de `smoke.spec.ts` (que recorre las rutas
  * raíz): fija el **contrato de UI** de la pantalla que más superficie acumula
- * —tres modos, buscador, resultado y borrado— y lo deja **capturado en los tres
+ * —dos modos, buscador, resultado y borrado, con el inventario como sub-pestaña
+ * «Mi léxico» de Flashcards (V3.85.0)— y lo deja **capturado en los tres
  * breakpoints** (390 / 768 / 1280), sin `skip` por proyecto. Era el hueco que
  * declaró V3.80.0: la autoridad visual estaba solo en CI y no había una sonda
  * permanente que mordiera si el diccionario se rompía al pintar (el fallo de
@@ -134,7 +135,7 @@ async function installDictionaryMocks(page: Page) {
   });
 }
 
-test("smoke del diccionario: tres modos, buscador y borrado (3 breakpoints)", async ({
+test("smoke del diccionario: dos modos, buscador y borrado (3 breakpoints)", async ({
   page,
 }, testInfo) => {
   const project = testInfo.project.name;
@@ -186,20 +187,9 @@ test("smoke del diccionario: tres modos, buscador y borrado (3 breakpoints)", as
   await expect(page.getByRole("heading", { name: "coffee" })).toHaveCount(0);
   await expect(page.getByText("Try an example")).toBeVisible();
 
-  // --- Modo Personal ------------------------------------------------------
-  await page.getByRole("tab", { name: "Personal", exact: true }).click();
-  await expect(page.getByRole("tab", { name: "Personal", exact: true })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await expect(page.getByRole("tabpanel", { name: "Personal", exact: true })).toHaveAttribute(
-    "aria-labelledby",
-    "dictionary-tab-personal",
-  );
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: shot("dictionary-personal"), fullPage: true });
-
-  // --- Modo Flashcards (el detalle vive en flashcardsSmoke) ---------------
+  // --- Modo Flashcards · «Mi léxico» (V3.85.0) ----------------------------
+  // El inventario dejó de ser una pestaña de primer nivel: vive DENTRO de
+  // Flashcards como sub-pestaña, junto al estudio.
   await page.getByRole("tab", { name: "Flashcards", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Flashcards", exact: true })).toHaveAttribute(
     "aria-selected",
@@ -210,6 +200,16 @@ test("smoke del diccionario: tres modos, buscador y borrado (3 breakpoints)", as
     "aria-labelledby",
     "dictionary-tab-flashcards",
   );
+  await page.getByRole("tab", { name: "My lexicon", exact: true }).click();
+  await expect(page.getByRole("tabpanel", { name: "My lexicon", exact: true })).toHaveAttribute(
+    "aria-labelledby",
+    "flashcards-tab-lexicon",
+  );
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: shot("dictionary-lexicon"), fullPage: true });
+
+  // --- Modo Flashcards · Estudiar (el detalle vive en flashcardsSmoke) -----
+  await page.getByRole("tab", { name: "Study", exact: true }).click();
   await expect(page.getByRole("tabpanel", { name: "Study", exact: true })).toHaveAttribute(
     "aria-labelledby",
     "flashcards-tab-study",

@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, type Variants } from "motion/react";
-import { BookOpen, Layers, RefreshCw, Search } from "lucide-react";
-import {
-  getDrillCandidates,
-  getLexicon,
-  listFlashcardDecks,
-} from "../../api/vocabulary";
+import { BookOpen, RefreshCw, Search } from "lucide-react";
+import { getDrillCandidates, getLexicon } from "../../api/vocabulary";
 import { normalizeDrillCandidates, normalizeLexicon } from "../../api/normalize";
 import type { LexicalItem, LexicalStatus, Lexicon } from "../../types/api";
 import { cefrBarValue, sortLexicalItems } from "./dictionary";
-import { ReviewQueueSection } from "./ReviewQueueSection";
 import { SpeakingDrillSection } from "./wordDrill";
 import { AddVocabSection } from "./AddVocabSection";
 import { useI18n } from "../../hooks/useI18n";
@@ -42,22 +37,24 @@ const STATUS_TONE: Record<LexicalStatus, string> = {
   weak: "border-transparent bg-destructive/10 text-destructive",
 };
 
-interface PersonalDictionaryProps {
+interface LexiconInventoryProps {
   userId: string | null;
   /**
    * V3.77.2: dueño del layout. `DictionaryScreen` ya pinta el `h1`, el subtítulo
    * y el ancho de página (igual que hace con `DictionaryLookup`), así que la
    * vista incrustada no debe repetirlos: con `showHeader={false}` no emite su
    * propio `h1` ni el contenedor `max-w-3xl/px-4/py-8` (antes había dos `h1` en
-   * la misma página y el ancho quedaba reducido dos veces).
+   * la misma página y el ancho quedaba reducido dos veces). El diccionario
+   * incrustado en la práctica de rutas sí lo deja por defecto.
    */
   showHeader?: boolean;
   /**
-   * V3.78.0: puente a la única superficie de estudio. PERSONAL deja de estudiar
-   * —su sesión incrustada desaparece— y pasa a ser el inventario: esto es lo que
-   * salta a Flashcards, con una lista/pack concreta si se pide desde ahí.
+   * V3.85.0: «Mis listas» y los packs ya no repasan DENTRO del inventario.
+   * Calificar tarjetas tiene una sola superficie (la sesión de Flashcards), así
+   * que estas acciones saltan allí con la colección ya filtrada. El componente
+   * no sabe cómo se hace ese salto: se lo dice el dueño de la navegación.
    */
-  onStudy?: (opts?: { collectionId?: number | null; label?: string }) => void;
+  onStudyCollection?: (opts: { collectionId: number; label: string }) => void;
 }
 
 /** Estados del léxico, en el orden en que se ofrecen como filtro. */
@@ -75,23 +72,24 @@ const SOURCE_FILTERS: { id: string; labelKey: string }[] = [
   { id: "imported", labelKey: "dictionary.inventory.sourceImported" },
 ];
 
-/** Diccionario personal (V2.3): evidencia por ítem léxico con estado y recall.
- * V3.19: la sección de candidatas al speaking micro-drill se nutre de la señal
- * determinista del servidor (`getDrillCandidates`) y cada palabra gana una
- * acción de micro-práctica oral dentro del panel. V3.32: la escalera de drill
- * (Recall → Sentence) vive en `./wordDrill` y se comparte con el diccionario
- * de consulta («Practicar esta palabra»).
+/**
+ * Inventario del léxico (antes «Diccionario personal», V3.85.0).
  *
- * V3.78.0: la vista deja de ser 「práctica」 y pasa a ser 「posesión」: buscador,
- * filtro por estado y procedencia, fuerza de memoria por fila y una única
- * entrada al estudio. Lo que se practica aquí (la cola de competencia del
- * drill) se queda porque es superficie de PRODUCCIÓN, no de calificación de
- * tarjetas; lo que se estudia se mudó a Flashcards. */
-export function PersonalDictionary({
+ * V3.78.0 convirtió esta vista en 「posesión」: buscador, filtro por estado y
+ * procedencia, fuerza de memoria por fila y una única entrada al estudio.
+ *
+ * V3.85.0 la separa del ESTUDIO: el repaso (cola FSRS + drill de competencia) y
+ * la sesión de tarjetas viven en la pestaña Flashcards, y aquí solo queda lo que
+ * es inventario —mirar, buscar, acotar, añadir— más la cola de competencia del
+ * drill oral, que es superficie de PRODUCCIÓN. El componente ya no pide la cola
+ * de repaso ni pinta un resumen de estudio: eso era lo que llenaba la vista de
+ * una lista larga que no se podía trabajar.
+ */
+export function LexiconInventory({
   userId,
   showHeader = true,
-  onStudy,
-}: PersonalDictionaryProps) {
+  onStudyCollection,
+}: LexiconInventoryProps) {
   const { t } = useI18n();
   const [lexicon, setLexicon] = useState<Lexicon | null>(null);
   const [candidates, setCandidates] = useState<string[]>([]);
@@ -100,7 +98,6 @@ export function PersonalDictionary({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<LexicalStatus | "all">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
-  const [pending, setPending] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -123,28 +120,10 @@ export function PersonalDictionary({
     }
   }, [userId]);
 
-  /**
-   * V3.78.0: cuántas tarjetas quedan hoy. Se lee del mazo automático en lugar de
-   * pedir una cola: el inventario solo necesita el número, y la cola se pide al
-   * entrar a estudiar. Va en su propio efecto para que un fallo aquí no tumbe el
-   * léxico entero (y al revés).
-   */
-  const loadPending = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const decks = await listFlashcardDecks(userId);
-      const auto = decks.decks.find((d) => d.is_auto);
-      setPending(auto ? auto.due_count + auto.new_count : 0);
-    } catch {
-      setPending(null);
-    }
-  }, [userId]);
-
   useEffect(() => {
     if (!userId) return;
     void refresh();
-    void loadPending();
-  }, [userId, refresh, loadPending]);
+  }, [userId, refresh]);
 
   const sorted = useMemo(
     () => (lexicon ? sortLexicalItems(lexicon.items) : []),
@@ -218,35 +197,29 @@ export function PersonalDictionary({
       >
         {showHeader && <DictionaryHeader total={summary.total} />}
 
-        {/* V3.78.0: una sola entrada al estudio (Flashcards) + la cola de
-            competencia del drill, que es superficie de PRODUCCIÓN y por eso se
-            queda aquí. */}
-        {userId && (
+        {/* V3.85.0: aquí solo queda la cola de competencia del drill oral, que
+            es PRODUCCIÓN y no calificación de tarjetas. Estudio y repaso se
+            mudan a Flashcards. La sección se omite si no hay nada que practicar:
+            una cabecera sin contenido era parte del ruido. */}
+        {userId && (candidates.length > 0 || drillWord !== null) && (
           <motion.section
             variants={item}
-            aria-label={t("dictionary.practiceToday")}
-            className="flex flex-col gap-4"
+            aria-label={t("dictionary.speakingPractice")}
+            className="flex flex-col gap-3"
           >
             <h2 className="text-sm font-semibold tracking-tight">
-              {t("dictionary.practiceToday")}
+              {t("dictionary.speakingPractice")}
             </h2>
-            <StudyEntryCard
-              pending={pending}
-              onStudy={onStudy ? () => onStudy() : undefined}
+            <SpeakingDrillSection
+              userId={userId}
+              words={candidates}
+              drillWord={drillWord}
+              onDrillChange={setDrillWord}
+              onProduced={(word) => {
+                setCandidates((prev) => prev.filter((w) => w !== word));
+                void refresh();
+              }}
             />
-            <ReviewQueueSection userId={userId} />
-            {(candidates.length > 0 || drillWord !== null) && (
-              <SpeakingDrillSection
-                userId={userId}
-                words={candidates}
-                drillWord={drillWord}
-                onDrillChange={setDrillWord}
-                onProduced={(word) => {
-                  setCandidates((prev) => prev.filter((w) => w !== word));
-                  void refresh();
-                }}
-              />
-            )}
           </motion.section>
         )}
 
@@ -262,11 +235,8 @@ export function PersonalDictionary({
             </h2>
             <AddVocabSection
               userId={userId}
-              onChanged={() => {
-                void refresh();
-                void loadPending();
-              }}
-              onStudy={onStudy}
+              onChanged={() => void refresh()}
+              onStudy={onStudyCollection}
             />
           </motion.section>
         )}
@@ -567,57 +537,6 @@ function FilterChip({
   );
 }
 
-/**
- * V3.78.0: entrada única al estudio desde PERSONAL.
- *
- * Sustituye a la `RetentionSession` que vivía incrustada aquí. No estudia: dice
- * cuánto queda hoy y salta a Flashcards, que es donde se califica. El recuento
- * puede faltar (`null`) si el mazo no se pudo leer; en ese caso se dice que no
- * consta en vez de pintar un «0» que sería una afirmación falsa.
- */
-function StudyEntryCard({
-  pending,
-  onStudy,
-}: {
-  pending: number | null;
-  /** Ausente en el diccionario incrustado (panel de destreza): allí no hay
-   * Flashcards, así que se explica dónde se estudia en vez de ofrecer un botón
-   * que no llevaría a ninguna parte. */
-  onStudy?: () => void;
-}) {
-  const { t } = useI18n();
-  const detail =
-    pending == null
-      ? t("dictionary.inventory.studyUnknown")
-      : pending === 0
-        ? t("dictionary.inventory.studyDone")
-        : t("dictionary.inventory.studyPending").replace(
-            "{count}",
-            String(pending),
-          );
-  return (
-    <Card className="gap-3 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
-            <Layers className="size-4 text-primary" aria-hidden="true" />
-            {t("dictionary.inventory.studyTitle")}
-          </p>
-          <p className="text-xs text-muted-foreground">{detail}</p>
-        </div>
-        {onStudy ? (
-          <Button type="button" size="sm" onClick={onStudy}>
-            {t("dictionary.inventory.studyAction")}
-          </Button>
-        ) : null}
-      </div>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        {onStudy ? t("dictionary.inventory.studyHint") : t("dictionary.inventory.studyElsewhere")}
-      </p>
-    </Card>
-  );
-}
-
 function LexicalRow({ lexical }: { lexical: LexicalItem }) {
   const { t } = useI18n();
   const kindLabel = lexicalKindLabel(lexical.kind, t);
@@ -698,9 +617,7 @@ function LexicalRow({ lexical }: { lexical: LexicalItem }) {
           <span
             className={cn(
               "text-right text-[11px] tabular-nums break-words",
-              memory?.due
-                ? "text-warning"
-                : "text-muted-foreground",
+              memory?.due ? "text-warning" : "text-muted-foreground",
             )}
             title={memoryTitle}
           >

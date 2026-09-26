@@ -158,10 +158,13 @@ def test_el_ci_prueba_el_servido_estatico_por_https():
 # --- §UC · «por qué esta actividad» en las superficies que lo descartaban ---
 
 # Superficies que RECIBEN el `why` declarado por el motor y deben pintarlo.
+# V3.85.0: la cola de repaso del diccionario deja de ser una lista de filas
+# (`ReviewQueueSection`) y pasa a ser una sesión encadenada (`ReviewToday`), que
+# es quien sigue pintando la traza de la palabra que se está trabajando.
 SUPERFICIES_DEL_PORQUE = (
     "components/NextBestCard.tsx",
     "components/NextStep.tsx",
-    "features/vocabulary/ReviewQueueSection.tsx",
+    "features/vocabulary/ReviewToday.tsx",
 )
 
 
@@ -191,7 +194,9 @@ def test_las_superficies_del_porque_usan_la_pieza_compartida():
 
 def test_los_docs_declaran_la_extension_del_porque():
     journey = _normalized(DOCS / "audit" / "F-UX-JOURNEY.md")
-    for surface in ("NextStep", "ReviewQueueSection", "WhyThisActivity"):
+    # V3.85.0: la superficie de repaso se llama `ReviewToday`; el nombre viejo
+    # (`ReviewQueueSection`) se conserva porque el documento es histórico.
+    for surface in ("NextStep", "ReviewQueueSection", "ReviewToday", "WhyThisActivity"):
         assert surface in journey, (
             f"F-UX-JOURNEY.md no declara la superficie del «por qué» {surface}"
         )

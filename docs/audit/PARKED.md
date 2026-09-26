@@ -2231,6 +2231,51 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **Todo lo declarado abierto en V3.84.0 y anteriores sigue abierto** salvo lo que esta
   release cierra de forma explícita arriba.
 
+## V3.85.0 — Diccionario en dos pestañas y «Repasar hoy» accionable · 2026-09-26
+
+> Release de **PRODUCTO** (minor) **SOLO FRONTEND**, **SIN migración de BD**, **SIN
+> endpoints nuevos** y **SIN cambio de contrato de API**. Detalle en
+> `release-notes-v3.85.0.md`.
+
+### Cerrado en V3.85.0 (deja de ser deuda)
+
+- **«Repasar hoy» deja de ser una lista de estados y pasa a ser una acción.** Era una
+  lista de hasta 20 filas con un botón por ítem cuya etiqueta era una **palabra de
+  estado** («vencida»), así que no se leía como algo que se pulsa. Ahora es un
+  **resumen** («tienes N palabras para repasar hoy») con **una sola acción**,
+  «Repasar ahora (N)», que **encadena la cola del día** montando `WordDrill` palabra a
+  palabra con su peldaño recomendado y su `decision_id`. Con `N = 0` no hay botón.
+  `[PRODUCTO]` `[UX]`
+- **El diccionario pasa de tres pestañas a dos y el inventario se coloca donde se
+  trabaja.** `Consultar` · `Flashcards`, con el inventario del léxico como
+  **sub-pestaña `Mi léxico`** de Flashcards (Estudiar · Mi léxico · Mazos · Tarjetas ·
+  Estadísticas). La sub-pestaña de Estudiar presenta **dos acciones etiquetadas**
+  —«Repasar hoy (N)» y «Estudiar tarjetas (N)»— que antes se confundían en un solo
+  botón «Iniciar sesión». `[PRODUCTO]` `[UX]`
+- **La traza declarada del «por qué» deja de repetirse veinte veces y se muestra una
+  sola vez**, para la palabra que se está trabajando, que es cuando significa algo.
+  `[UX]`
+- **El barrido responsive cubre las cinco sub-pestañas de Flashcards a 320 px**, que es
+  donde vive la sub-tablist estrecha que esta release añade. `[VALIDACIÓN]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **La sesión encadenada no es un motor nuevo.** Reutiliza `WordDrill` ítem a ítem y el
+  mismo `GET /api/learning/review`; no hay planificador de sesión ni estado persistido
+  de «sesión en curso»: salir del drill sale de la sesión. `[ARQUITECTURA]`
+- **El panel incrustado de APRENDER → Vocabulario pierde el acceso al drill de repaso.**
+  Decisión declarada: conserva sus dos modos (consulta + inventario) y el estudio vive
+  en Flashcards. `[PRODUCTO]`
+- **`StudyEntryCard` desaparece** y con él el alta directa a estudio desde la fila del
+  inventario: esa puerta sigue en Flashcards (Estudiar y Mazos). `[PRODUCTO]`
+- **Renombrar «Estadísticas» a «Progreso» no se incluye.** `[UX]`
+- **La consolidación del ítem (léxico + tarjeta manual) sigue aparcada** (heredada de
+  V3.84.1), igual que **H5**, **`delete_deck` no transaccional** y **H1**. `[PRODUCTO]`
+- **Los 8 gates humanos siguen `pending`** y `docs/audit/validation-evidence.json` **no
+  existe**. `[VALIDACIÓN]`
+- **Todo lo declarado abierto en V3.84.1 y anteriores sigue abierto** salvo lo que esta
+  release cierra de forma explícita arriba.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

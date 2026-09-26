@@ -1,19 +1,24 @@
 // @vitest-environment jsdom
 /**
- * Vitest de `PersonalDictionary` (V3.19). Corre en jsdom, mockea `fetch` por URL,
- * el micrófono y `MediaRecorder` para simular el flujo del speaking micro-drill:
+ * Vitest de `LexiconInventory` (V3.19, renombrado en V3.85.0). Corre en jsdom,
+ * mockea `fetch` por URL, el micrófono y `MediaRecorder` para simular el flujo
+ * del speaking micro-drill:
  *
  * - la sección de candidatas se nutre de la señal del servidor (no de un
  *   recálculo cliente) y pinta un chip por palabra con su acción de micrófono.
  * - error de carga → mensaje de error con reintento (A6-03).
  * - abrir el drill de una palabra, grabarla y producirla → la palabra sale de
  *   la lista y el léxico se refresca.
+ *
+ * V3.85.0: el inventario deja de contener el estudio. Ya NO se prueba aquí la
+ * tarjeta «Estudiar» (retirada con `StudyEntryCard`) ni la cola de repaso (que
+ * vive en `ReviewToday.test.tsx`): inventario es mirar, buscar, acotar y añadir.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { I18nProvider } from "../../hooks/useI18n";
-import { PersonalDictionary } from "./PersonalDictionary";
+import { LexiconInventory } from "./LexiconInventory";
 import type { Lexicon } from "../../types/api";
 
 // Micrófono disponible en el test: `getMicrophoneStream` devuelve un stream
@@ -126,7 +131,7 @@ function renderPanel(ui: ReactElement) {
   );
 }
 
-describe("PersonalDictionary (V3.19 drill)", () => {
+describe("LexiconInventory (V3.19 drill)", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
     cleanup();
@@ -138,7 +143,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
       { url: "/api/vocabulary/lexicon", data: LEXICON },
       { url: "/api/vocabulary/drill/candidates", data: { words: ["travel"] } },
     ]);
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
 
     expect(await screen.findByRole("button", { name: "Say travel" })).toBeTruthy();
   });
@@ -192,7 +197,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
     });
     vi.stubGlobal("fetch", fn);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     expect(await screen.findByText(/Could not load your dictionary/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -247,7 +252,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
       },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     const chip = await screen.findByRole("button", { name: "Say travel" });
     fireEvent.click(chip);
 
@@ -298,7 +303,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
       },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     const chip = await screen.findByRole("button", { name: "Say travel" });
     fireEvent.click(chip);
 
@@ -317,7 +322,7 @@ describe("PersonalDictionary (V3.19 drill)", () => {
   });
 });
 
-describe("PersonalDictionary · contratos incompletos (V3.77.2)", () => {
+describe("LexiconInventory · contratos incompletos (V3.77.2)", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
     cleanup();
@@ -333,7 +338,7 @@ describe("PersonalDictionary · contratos incompletos (V3.77.2)", () => {
       { url: "/api/vocabulary/drill/candidates", data: {} },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
 
     // La pantalla sigue viva y ofrece su estado vacío honesto.
     expect(await screen.findByText(/No words yet/)).toBeTruthy();
@@ -348,13 +353,13 @@ describe("PersonalDictionary · contratos incompletos (V3.77.2)", () => {
       { url: "/api/vocabulary/drill/candidates", data: { words: "go" } },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
 
     expect(await screen.findByText(/No words yet/)).toBeTruthy();
   });
 
   it("sin perfil activo no se queda en «Cargando…» indefinidamente", () => {
-    renderPanel(<PersonalDictionary userId={null} />);
+    renderPanel(<LexiconInventory userId={null} />);
 
     expect(
       screen.getByText(
@@ -365,7 +370,7 @@ describe("PersonalDictionary · contratos incompletos (V3.77.2)", () => {
   });
 });
 
-describe("PersonalDictionary · V3.78.0 inventario (buscador, filtros, memoria)", () => {
+describe("LexiconInventory · V3.78.0 inventario (buscador, filtros, memoria)", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
     cleanup();
@@ -464,61 +469,89 @@ describe("PersonalDictionary · V3.78.0 inventario (buscador, filtros, memoria)"
   function renderInventory(ui?: ReactElement) {
     routeFetch([{ url: "/api/vocabulary/lexicon", data: INVENTORY }]);
     return renderPanel(
-      ui ?? <PersonalDictionary userId="u1" showHeader={false} />,
+      ui ?? <LexiconInventory userId="u1" showHeader={false} />,
     );
   }
 
-  it("la tarjeta de estudio dice cuánto queda hoy y salta a Flashcards", async () => {
+  it("no ofrece estudio ni repaso: inventario es mirar, buscar, acotar y añadir", async () => {
+    // V3.85.0: el estudio (cola FSRS y repaso encadenado) vive en la sub-pestaña
+    // Estudiar de Flashcards. Si alguna de esas superficies reaparece aquí, es
+    // una regresión de la separación.
+    renderInventory();
+    await screen.findByText("airport");
+
+    expect(screen.queryByText(/Review now/)).toBeNull();
+    expect(screen.queryByText(/Study cards/)).toBeNull();
+    expect(screen.queryByText("Today's review")).toBeNull();
+  });
+
+  it("«Repasar» una lista o un pack salta al estudio con la colección filtrada", async () => {
+    // El salto lo ejecuta el dueño de la navegación (Flashcards), no el
+    // inventario: aquí solo se comprueba que el inventario lo pide con el id y
+    // la etiqueta correctos.
     routeFetch([
       { url: "/api/vocabulary/lexicon", data: INVENTORY },
       {
-        url: "/api/vocabulary/decks",
+        url: "/api/vocabulary/collections",
         data: {
-          auto_deck_id: 0,
-          decks: [
+          collections: [
             {
-              id: 0,
-              slug: "auto",
-              name: "auto",
-              is_auto: true,
-              new_per_day: 10,
-              review_per_day: 50,
-              card_count: 9,
-              due_count: 2,
-              new_count: 3,
-              created_at: "",
+              id: 7,
+              slug: "travel",
+              title: "Travel",
+              title_es: "Viajes",
+              kind: "theme_pack",
+              item_count: 12,
+              cefr_hint: "A2",
+              enrolled: true,
             },
           ],
         },
       },
     ]);
-    const onStudy = vi.fn();
+    const onStudyCollection = vi.fn();
     renderPanel(
-      <PersonalDictionary
+      <LexiconInventory
         userId="u1"
         showHeader={false}
-        onStudy={onStudy}
+        onStudyCollection={onStudyCollection}
       />,
     );
 
-    expect(await screen.findByText("5 cards waiting today")).toBeTruthy();
-    // La sesión incrustada ya no existe: aquí no se califica ninguna tarjeta.
-    expect(screen.queryByText(/Start session/)).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Study" }));
-    expect(onStudy).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole("button", { name: "Review" }));
+    expect(onStudyCollection).toHaveBeenCalledWith({
+      collectionId: 7,
+      label: "Travel",
+    });
   });
 
-  it("sin contenedor de estudio explica dónde se estudia en vez de ofrecer un botón muerto", async () => {
-    // El diccionario incrustado en una ruta de destreza no tiene Flashcards.
-    renderInventory();
+  it("sin contenedor de estudio no ofrece un botón muerto para repasar", async () => {
+    // El diccionario incrustado en una ruta de destreza no tiene Flashcards: el
+    // puente al estudio queda deshabilitado en vez de prometer un salto.
+    routeFetch([
+      { url: "/api/vocabulary/lexicon", data: INVENTORY },
+      {
+        url: "/api/vocabulary/collections",
+        data: {
+          collections: [
+            {
+              id: 7,
+              slug: "travel",
+              title: "Travel",
+              title_es: "Viajes",
+              kind: "theme_pack",
+              item_count: 12,
+              cefr_hint: "A2",
+              enrolled: true,
+            },
+          ],
+        },
+      },
+    ]);
+    renderPanel(<LexiconInventory userId="u1" showHeader={false} />);
 
-    expect(
-      await screen.findByText(
-        "Open the dictionary screen to study them in the Flashcards tab.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Study" })).toBeNull();
+    const review = await screen.findByRole("button", { name: "Review" });
+    expect((review as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("el buscador acota el léxico y distingue «sin coincidencias» de «sin palabras»", async () => {
@@ -604,7 +637,7 @@ describe("PersonalDictionary · V3.78.0 inventario (buscador, filtros, memoria)"
       ],
     };
     routeFetch([{ url: "/api/vocabulary/lexicon", data: withOwnBack }]);
-    renderPanel(<PersonalDictionary userId="u1" showHeader={false} />);
+    renderPanel(<LexiconInventory userId="u1" showHeader={false} />);
 
     const airport = (await screen.findByText("airport")).closest("li")!;
     expect(airport.textContent).toContain("Your reverse: aeropuerto");
@@ -621,7 +654,7 @@ describe("PersonalDictionary · V3.78.0 inventario (buscador, filtros, memoria)"
   });
 });
 
-describe("PersonalDictionary · V3.33 paso Recognition", () => {
+describe("LexiconInventory · V3.33 paso Recognition", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
     cleanup();
@@ -654,7 +687,7 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
       { url: "/api/vocabulary/drill/recognition", data: QUESTION },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
 
     // V3.33.1: el drill abre directamente en Recognize (primer peldaño) y la
@@ -694,7 +727,7 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
         String(call[0]).includes("/api/vocabulary/drill/recognition?"),
       ).length;
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
     expect(await screen.findByText(/What does this word mean/)).toBeTruthy();
     expect(recognitionGets()).toBe(1);
@@ -725,7 +758,7 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
       },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
 
     // V3.33.1: sin pregunta disponible el drill degrada a Recall automáticamente
@@ -741,7 +774,7 @@ describe("PersonalDictionary · V3.33 paso Recognition", () => {
   });
 });
 
-describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
+describe("LexiconInventory · V3.34 paso Recall (texto)", () => {
   beforeEach(() => stubMediaRecorder());
   afterEach(() => {
     cleanup();
@@ -774,7 +807,7 @@ describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
       { url: "/api/vocabulary/drill/recall", data: CUE },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
     await screen.findByText(/What does this word mean/);
 
@@ -813,7 +846,7 @@ describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
       { url: "/api/vocabulary/drill/recall", data: CUE },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
     await screen.findByText(/What does this word mean/);
     fireEvent.click(screen.getByRole("button", { name: "2 · Recall" }));
@@ -852,7 +885,7 @@ describe("PersonalDictionary · V3.34 paso Recall (texto)", () => {
       { url: "/api/vocabulary/drill/recall", data: CUE },
     ]);
 
-    renderPanel(<PersonalDictionary userId="u1" />);
+    renderPanel(<LexiconInventory userId="u1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Say travel" }));
     await screen.findByText(/What does this word mean/);
 

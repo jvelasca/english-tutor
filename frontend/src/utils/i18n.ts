@@ -386,13 +386,28 @@ const STRINGS: Record<string, Entry> = {
     en: "Today's review",
     es: "Repaso de hoy",
   },
-  "dictionary.review.hint": {
-    en: "Words the spaced-repetition scheduler marks as due. Each one suggests the step that closes your current gap.",
-    es: "Palabras que el planificador de repaso marca como vencidas. Cada una propone el paso que cierra tu hueco actual.",
+  // V3.85.0: «Repasar hoy» deja de ser una lista y pasa a resumen + una sola
+  // acción que encadena la cola del día. `dictionary.review.empty` sigue siendo
+  // el estado vacío y `loadError` el fallo de carga.
+  "dictionary.review.todaySummary": {
+    en: "{count} words are due. One session, one step each.",
+    es: "{count} palabras vencidas. Una sesión, un paso por palabra.",
   },
-  "dictionary.review.dueCount": {
-    en: "{count} due",
-    es: "{count} pendientes",
+  "dictionary.review.todayAction": {
+    en: "Review now ({count})",
+    es: "Repasar ahora ({count})",
+  },
+  "dictionary.review.sessionProgress": {
+    en: "{index} of {total}",
+    es: "{index} de {total}",
+  },
+  "dictionary.review.sessionNext": {
+    en: "Next word",
+    es: "Siguiente palabra",
+  },
+  "dictionary.review.sessionFinish": {
+    en: "Finish",
+    es: "Terminar",
   },
   "dictionary.review.empty": {
     en: "Nothing to review right now — come back later.",
@@ -402,39 +417,9 @@ const STRINGS: Record<string, Entry> = {
     en: "Could not load the review queue. ",
     es: "No se pudo cargar la cola de repaso. ",
   },
-  "dictionary.review.practice": {
-    en: "Review {word}",
-    es: "Repasar {word}",
-  },
   // V3.35.1 (P1-03): en Recall/Sentence la forma esperada se OCULTA hasta el
-  // intento (el drill ya la oculta); la cola no debe spoilearla.
-  "dictionary.review.practiceHidden": {
-    en: "Review word",
-    es: "Repasar palabra",
-  },
-  "dictionary.review.hidden.recall": {
-    en: "Word hidden — recall from meaning",
-    es: "Palabra oculta — recupérala por significado",
-  },
-  "dictionary.review.hidden.sentence": {
-    en: "Word hidden — produce it in a sentence",
-    es: "Palabra oculta — prodúcela en una frase",
-  },
-  // V3.43 (P1-01): `transfer` ya NO muestra la palabra en la cola (la consigna
-  // da un escenario, no el target), así que se sirve la etiqueta de oculta. El
-  // `write` sí la muestra porque la palabra es el recurso de la tarea.
-  "dictionary.review.hidden.write": {
-    en: "Use the word shown above",
-    es: "Usa la palabra de arriba",
-  },
-  "dictionary.review.hidden.transfer": {
-    en: "Word hidden — use it on your own in a new situation",
-    es: "Palabra oculta — úsala por tu cuenta en una situación nueva",
-  },
-  "dictionary.review.overdue": {
-    en: "overdue",
-    es: "vencida",
-  },
+  // intento (el drill ya la oculta). V3.85.0 ya no hay lista que la enseñe: el
+  // peldaño la sirve cuando toca.
   "dictionary.review.activity.recognition": {
     en: "Recognize",
     es: "Reconoce",
@@ -826,9 +811,12 @@ const STRINGS: Record<string, Entry> = {
     en: "No words yet. Add a word, paste a list, or activate a theme pack — or keep practising in the rest of the app.",
     es: "Aún no hay palabras. Añade una, pega una lista o activa un tema — o sigue practicando en el resto de la app.",
   },
-  "dictionary.practiceToday": {
-    en: "Practice today",
-    es: "Practicar hoy",
+  // V3.85.0: la sección solo contiene el micro-drill oral (producción con voz),
+  // no el estudio. El nombre anterior («Practicar hoy») prometía un estudio que
+  // se ha mudado a Flashcards.
+  "dictionary.speakingPractice": {
+    en: "Out-loud practice",
+    es: "Práctica oral",
   },
   "dictionary.myLexicon": {
     en: "My lexicon",
@@ -856,16 +844,24 @@ const STRINGS: Record<string, Entry> = {
     es: "Este mazo aún no tiene tarjetas. Añade la primera y podrá estudiarse enseguida.",
   },
   "flashcards.study.emptyAuto": {
-    en: "Your dictionary has no words yet. Add them in Personal and they will show up here.",
-    es: "Tu diccionario aún no tiene palabras. Añádelas en Personal y aparecerán aquí.",
+    en: "Your dictionary has no words yet. Add them in My lexicon and they will show up here.",
+    es: "Tu diccionario aún no tiene palabras. Añádelas en Mi léxico y aparecerán aquí.",
   },
   "flashcards.study.addCards": {
     en: "Add cards",
     es: "Añadir tarjetas",
   },
-  "flashcards.study.start": {
-    en: "Start session ({n})",
-    es: "Empezar sesión ({n})",
+  // V3.85.0: el bloque de estudio ofrece DOS acciones etiquetadas. La de
+  // tarjetas dice explícitamente que es la sesión FSRS, para no confundirla con
+  // el repaso de competencia («Repasar ahora (N)»). Antes era «Iniciar sesión
+  // (N)», que no distinguía una superficie de la otra.
+  "flashcards.study.cardsTitle": {
+    en: "Cards",
+    es: "Tarjetas",
+  },
+  "flashcards.study.startCards": {
+    en: "Study cards ({n})",
+    es: "Estudiar tarjetas ({n})",
   },
   "flashcards.study.finished": {
     en: "Session done — {n} cards reviewed.",
@@ -1335,7 +1331,6 @@ const STRINGS: Record<string, Entry> = {
     es: "Consulta cualquier palabra, mira todo lo que has aprendido y estúdialo con tarjetas.",
   },
   "dictionary.tabs.lookup": { en: "Look up", es: "Consultar" },
-  "dictionary.tabs.personal": { en: "Personal", es: "Personal" },
   "dictionary.tabs.flashcards": { en: "Flashcards", es: "Flashcards" },
   // V3.78.0: PERSONAL pasa a ser posesión y gestión (buscador, filtros y
   // procedencia); el estudio se muda al modo Flashcards.
@@ -1396,31 +1391,9 @@ const STRINGS: Record<string, Entry> = {
     en: "Filter by origin",
     es: "Filtrar por procedencia",
   },
-  "dictionary.inventory.studyTitle": {
-    en: "Study with flashcards",
-    es: "Estudiar con tarjetas",
-  },
-  "dictionary.inventory.studyPending": {
-    en: "{count} cards waiting today",
-    es: "{count} tarjetas esperando hoy",
-  },
-  "dictionary.inventory.studyDone": {
-    en: "Nothing due today.",
-    es: "Hoy no queda nada pendiente.",
-  },
-  "dictionary.inventory.studyUnknown": {
-    en: "Couldn't check what's pending today.",
-    es: "No se ha podido comprobar lo pendiente de hoy.",
-  },
-  "dictionary.inventory.studyAction": { en: "Study", es: "Estudiar" },
-  "dictionary.inventory.studyHint": {
-    en: "Studying happens in the Flashcards tab, where you grade each card.",
-    es: "El estudio vive en la pestaña Flashcards, donde calificas cada tarjeta.",
-  },
-  "dictionary.inventory.studyElsewhere": {
-    en: "Open the dictionary screen to study them in the Flashcards tab.",
-    es: "Abre la pantalla del diccionario para estudiarlas en la pestaña Flashcards.",
-  },
+  // V3.85.0: el inventario deja de pedir la cola de estudio (`StudyEntryCard`,
+  // retirada) y las claves de ese bloque se retiran con él. Estudiar vive en la
+  // sub-pestaña «Estudiar» de Flashcards.
   // V3.30: diccionario de consulta (vista «Consultar»).
   "dictionary.viewsLabel": {
     en: "Dictionary views",

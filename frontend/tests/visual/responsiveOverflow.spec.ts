@@ -11,8 +11,10 @@ import { expectNoHorizontalOverflow } from "./layoutHelper";
  * (el más estrecho en uso real, iPhone SE de 1.ª generación).
  *
  * Las tres rutas de las pestañas del diccionario se miden una a una porque cada
- * una monta una vista distinta (`Consultar` / `Personal` / `Flashcards`): el
- * defecto confirmado vivía en la primera y no se habría visto midiendo solo `/`.
+ * una monta una vista distinta (`Consultar` / `Flashcards`). Desde V3.85.0 hay
+ * DOS pestañas y el inventario es la sub-pestaña «Mi léxico» de Flashcards, así
+ * que el barrido recorre también las cinco sub-pestañas: es donde vive la
+ * sub-tablist estrecha que esta release tiene que dejar sin desbordar.
  */
 
 const ROUTES = [
@@ -29,7 +31,15 @@ const ROUTES = [
   { id: "translator", url: "/#/traductor" },
 ] as const;
 
-const DICTIONARY_TABS = ["Look up", "Personal", "Flashcards"] as const;
+const DICTIONARY_TABS = ["Look up", "Flashcards"] as const;
+/** Sub-pestañas de Flashcards (V3.85.0): incluye el inventario «Mi léxico». */
+const FLASHCARDS_SUBTABS = [
+  "Study",
+  "My lexicon",
+  "Decks",
+  "Cards",
+  "Stats",
+] as const;
 
 async function waitForShell(page: Page) {
   await expect(
@@ -59,6 +69,13 @@ test("ninguna ruta desborda horizontalmente (390 / 768 / 1280)", async ({
     await page.getByRole("tab", { name: tab, exact: true }).click();
     await page.waitForTimeout(400);
     await expectNoHorizontalOverflow(page, `diccionario/${tab}`);
+  }
+  // Y las cinco sub-pestañas de Flashcards, que es donde vive la sub-tablist
+  // estrecha que V3.85.0 añade (incluida «Mi léxico»).
+  for (const sub of FLASHCARDS_SUBTABS) {
+    await page.getByRole("tab", { name: sub, exact: true }).click();
+    await page.waitForTimeout(400);
+    await expectNoHorizontalOverflow(page, `diccionario/Flashcards/${sub}`);
   }
 });
 
@@ -90,6 +107,11 @@ test.describe("ancho mínimo 320 px", () => {
       await page.getByRole("tab", { name: tab, exact: true }).click();
       await page.waitForTimeout(400);
       await expectNoHorizontalOverflow(page, `320/diccionario/${tab}`);
+    }
+    for (const sub of FLASHCARDS_SUBTABS) {
+      await page.getByRole("tab", { name: sub, exact: true }).click();
+      await page.waitForTimeout(400);
+      await expectNoHorizontalOverflow(page, `320/diccionario/Flashcards/${sub}`);
     }
   });
 });

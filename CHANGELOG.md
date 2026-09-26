@@ -4,6 +4,87 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.85.0] — 2026-09-26
+
+**DICCIONARIO en dos pestañas y «Repasar hoy» accionable: el inventario pasa a sub-pestaña de
+Flashcards y la cola del día deja de ser una lista de estados para convertirse en una sesión
+que se maneja.** Release de **PRODUCTO (minor)** **SOLO FRONTEND**: **SIN migración de BD, SIN
+endpoints nuevos y SIN cambio de contrato de API**; **SIN bump** de `GENERATOR_VERSION` /
+`DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de
+las evaluaciones. **No se añade ni se retira gate** —siguen los **ocho**, todos en `pending`—.
+
+**El defecto, y era de diseño.** «Repasar hoy» era una **lista de hasta 20 filas** con cuatro
+capas de texto por fila y **un botón por ítem cuya etiqueta era una palabra de estado**
+(«vencida»), así que no se leía como algo que se pulsa: en móvil parecía un informe, no una
+acción. Ahora es un **resumen** —«tienes N palabras para repasar hoy»— con **una sola acción**,
+«Repasar ahora (N)», que **encadena toda la cola del día** montando el mismo `WordDrill` de
+siempre, palabra a palabra, con su peldaño recomendado y su `decision_id`. Con `N = 0` no hay
+botón: se dice que no hay nada pendiente.
+
+**Por qué un botón «Siguiente palabra» y no auto-avance.** `WordDrill` dispara `onProduced` en
+cuanto el intento pasa el peldaño, y desmontarlo en ese instante **ocultaría el feedback** de lo
+que el alumno acaba de escribir. La sesión deja el drill montado y ofrece **«Siguiente palabra»**
+(«Terminar» en la última); al agotar la cola o cerrar el drill se vuelve al resumen con los
+conteos refrescados. La traza declarada (motivo, `why` y señales de la decisión) **no se pierde**:
+deja de repetirse veinte veces y pasa a mostrarse **una sola vez**, para la palabra que se está
+trabajando, que es cuando significa algo.
+
+**Dos pestañas, y el inventario dentro.** El diccionario deja de tener tres modos: pasan a
+**`Consultar` · `Flashcards`** y el inventario del léxico se convierte en la **sub-pestaña
+`Mi léxico`** de Flashcards (Estudiar · Mi léxico · Mazos · Tarjetas · Estadísticas). Una
+pestaña de primer nivel para mirar y otra para trabajar. La sub-pestaña de Estudiar presenta
+**un bloque con dos acciones etiquetadas**: «Repasar hoy (N)» (drill de competencia) y
+«Estudiar tarjetas (N)» (la cola FSRS), que antes se confundían en un solo botón «Iniciar
+sesión».
+
+**La persistencia no se migra, se proyecta.** `DictionaryView` conserva sus tres valores
+(`"lookup" | "personal" | "flashcards"`): `"personal"` abre Flashcards **directamente en
+`Mi léxico`**, y elegir esa sub-pestaña vuelve a persistir `"personal"` (cualquier otra persiste
+`"flashcards"`). Así un valor guardado antes de esta versión abre **exactamente donde el alumno
+lo dejó**, sin tocar `localStorage` ni el ajuste por usuario, y el panel incrustado de
+APRENDER → Vocabulario sigue funcionando **sin cambios** vía `toPanelView`.
+
+**Lo que se retira, declarado.** `PersonalDictionary` pasa a `LexiconInventory` y pierde
+`StudyEntryCard` y `ReviewQueueSection`: el inventario es **posesión y producción** (buscador,
+filtros por estado y procedencia, resumen, matriz de competencia, CEFR, alta de palabras, listas,
+packs y el micro-drill oral), no estudio. El **panel incrustado** (APRENDER → Vocabulario)
+conserva sus dos modos y **pierde el acceso al drill de repaso**: el estudio vive en Flashcards.
+
+**Responsive.** La sub-tablist de **cinco** elementos se desplaza en horizontal en anchos
+estrechos sin desbordar, las dos acciones de estudio van a ancho completo en móvil y la sesión
+encadenada envuelve su cabecera y sus botones (`flex-wrap`). El barrido `responsiveOverflow`
+recorre ahora también las cinco sub-pestañas a **320/390/768/1280 px**.
+
+**i18n.** Nuevas: `dictionary.review.todaySummary`, `dictionary.review.todayAction`,
+`dictionary.review.sessionProgress`, `dictionary.review.sessionNext`,
+`dictionary.review.sessionFinish`, `flashcards.study.cardsTitle` y
+`flashcards.study.startCards`. Retiradas por huérfanas: `dictionary.tabs.personal`,
+`dictionary.review.overdue`, `dictionary.review.practice`, `dictionary.review.practiceHidden`,
+`dictionary.review.hidden.*`, `dictionary.review.dueCount`/`hint` y las de
+`dictionary.inventory.study*`.
+
+**Pruebas.** Vitest **1041/1041** (109 ficheros): dos pestañas y proyección del valor heredado
+(`DictionaryScreen`), inventario sin estudio ni repaso (`LexiconInventory`), resumen y **sesión
+encadenada** avanzando hasta terminar (`ReviewToday`), cinco sub-pestañas y las dos acciones de
+estudio (`FlashcardsScreen`). Playwright: `dictionarySmoke` y `flashcardsSmoke` recorren las dos
+pestañas y la sub-pestaña `Mi léxico`, `responsiveOverflow` barre las cinco sub-pestañas,
+`drillProvenance` entra al drill por **Flashcards → Estudiar → Repasar ahora** (ya no por
+Personal) y `reviewSession.spec.ts` es nuevo: arranca la sesión, avanza de palabra y termina
+volviendo al resumen. **Verificación:** `tsc --noEmit` limpio · `ruff` limpio (backend y
+lanzador) · `pytest` backend **3141/3141** y lanzador **269/269** · i18n `--strict` **1774**
+cadenas con **0 huérfanas / 0 usadas sin definir / 0 duplicadas** · contraste `--strict` **0
+bloqueantes** · `npm run build` correcto · `validation_gate.py auto --require-dist` **10/10**
+(8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.85.0`) · **barrido
+Playwright completo: 99 passed · 0 failed · 30 skipped**.
+
+**Honestidad.** (i) **No hay motor de sesión nuevo:** la sesión encadenada reutiliza `WordDrill`
+ítem a ítem, con el mismo endpoint (`GET /api/learning/review`). (ii) **El panel incrustado
+pierde el drill de repaso** (decisión declarada): sigue ofreciendo inventario y consulta. (iii)
+**`StudyEntryCard` desaparece** y con él el alta directa a estudio desde la fila del inventario:
+esa puerta sigue en Flashcards (Estudiar y Mazos). (iv) **Renombrar «Estadísticas» a «Progreso»
+no se incluye.** (v) Se apila sobre la `3.84.1`, que se publica **antes** con su propio commit y
+su propio tag `v3.84.1`.
+
 ## [3.84.1] — 2026-09-25
 
 **Cierre del estado parcial Diccionario → léxico + mazo: la app deja de decir «error» cuando

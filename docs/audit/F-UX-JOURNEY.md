@@ -80,11 +80,13 @@ Validación: `npx tsc --noEmit` (exit 0) y `npx vitest run` (31 ficheros / 245 t
   un fallo de carga en silencio.
 - **Q5 (Why)** — el `why` que el motor **ya declaraba** se pinta ahora en todas las
   superficies que lo reciben: `NextBestCard` (tarjeta protagonista), `NextStep` (el
-  pie «Next» que ve el alumno al terminar cualquier práctica) y las filas de
-  `ReviewQueueSection` (cola de repaso). Una sola pieza compartida
+  pie «Next» que ve el alumno al terminar cualquier práctica) y la superficie de
+  repaso del diccionario —`ReviewQueueSection` hasta V3.84.x; **`ReviewToday`
+  desde V3.85.0**, que es su sucesora y sigue pintando la traza de la palabra que
+  se está trabajando—. Una sola pieza compartida
   (`components/WhyThisActivity.tsx`) y ninguna señal recalculada en cliente
   (premisa 21): sin `why` ni `because` no se pinta nada. Fijado por
-  `WhyThisActivity.test.tsx`, `NextStep.test.tsx` y `ReviewQueueSection.test.tsx`.
+  `WhyThisActivity.test.tsx`, `NextStep.test.tsx` y `ReviewToday.test.tsx`.
 - **F5** — 0 claves huérfanas (ver la sección V3.72 de `PARKED.md`); el checker
   corre en CI en `--strict`.
 

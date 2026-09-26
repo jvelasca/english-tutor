@@ -203,7 +203,7 @@ async function installFlashcardMocks(page: Page) {
   });
 }
 
-test("smoke de Flashcards: cuatro vistas y una sesión (3 breakpoints)", async ({
+test("smoke de Flashcards: cinco vistas y una sesión (3 breakpoints)", async ({
   page,
 }, testInfo) => {
   const project = testInfo.project.name;
@@ -233,14 +233,28 @@ test("smoke de Flashcards: cuatro vistas y una sesión (3 breakpoints)", async (
   await page.waitForTimeout(400);
   await page.screenshot({ path: shot("flashcards-study"), fullPage: true });
 
-  // La sesión: anverso, volteo (con el reverso que ya sirvió el backend).
-  await page.getByRole("button", { name: /Start session/ }).click();
+  // La sesión: anverso, volteo (con el reverso que ya sirvió el backend). V3.85.0
+  // rotula la acción como «Study cards (N)» para no confundirla con el repaso de
+  // competencia, que es la otra acción del mismo bloque.
+  await page.getByRole("button", { name: /Study cards/ }).click();
   await expect(page.getByText("airport")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Flip card" }).click();
   await expect(page.getByText("aeropuerto")).toBeVisible();
   await page.waitForTimeout(400);
   await page.screenshot({ path: shot("flashcards-session"), fullPage: true });
   await page.getByRole("button", { name: "End session" }).click();
+
+  // --- Mi léxico (V3.85.0) ------------------------------------------------
+  // El inventario dejó de ser la pestaña PERSONAL del diccionario: ahora es una
+  // sub-pestaña de Flashcards y comparte contenedor con el estudio.
+  await page.getByRole("tab", { name: "My lexicon", exact: true }).click();
+  await expect(page.getByRole("tabpanel", { name: "My lexicon", exact: true })).toHaveAttribute(
+    "aria-labelledby",
+    "flashcards-tab-lexicon",
+  );
+  await expect(page.getByText("Add vocabulary")).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: shot("flashcards-lexicon"), fullPage: true });
 
   // --- Mazos --------------------------------------------------------------
   await page.getByRole("tab", { name: "Decks", exact: true }).click();

@@ -198,29 +198,26 @@ function lifecycleDecisionId(call: Call): string {
   }
 }
 
-/** Abre el drill desde la cola de repaso del diccionario y devuelve la sección. */
-async function openDrillFromQueue(page: Page) {
+/** Abre el drill desde «Repasar hoy» de Flashcards y devuelve el ámbito de página. */
+async function openDrillFromQueue(page: Page): Promise<Page> {
   await page.goto("/#/diccionario");
-  // V3.78.0: el diccionario abre en «Look up» (el defecto cambió en esta
-  // versión) y la cola de repaso vive en «Personal», que es el inventario. La
-  // spec mide el drill, no la pestaña por defecto, así que entra al modo donde
-  // está la cola en lugar de depender del orden de las pestañas.
-  // V3.80.1: los modos del diccionario son pestañas ARIA reales (`role="tab"`),
-  // no grupos de botones.
-  await page.getByRole("tab", { name: "Personal", exact: true }).first().click();
-  // El botón de práctica del ítem (`aria-pressed`) es la entrada al drill: se
-  // localiza por su ATRIBUTO y no por su etiqueta, que depende del idioma y del
-  // hecho de que el peldaño de recall oculta la palabra.
-  const practice = page
-    .locator("li:has(button[aria-pressed]) button[aria-pressed]")
-    .first();
-  await expect(practice).toBeVisible({ timeout: 15_000 });
-  await practice.click();
-  const section = page.locator("section").filter({ has: practice }).first();
+  // V3.85.0: la cola de repaso dejó de ser una lista de filas con un botón por
+  // ítem (que vivía en la pestaña PERSONAL) y pasó a ser una ÚNICA acción
+  // («Review now (N)») en la sub-pestaña Estudiar de Flashcards. La spec mide el
+  // drill, así que entra por donde ahora vive la acción; el ámbito que devuelve
+  // es la página (el drill se localiza por su propio contenido).
+  // V3.80.1: los modos del diccionario son pestañas ARIA reales (`role="tab"`).
+  await page
+    .getByRole("tab", { name: "Flashcards", exact: true })
+    .first()
+    .click();
+  const start = page.getByRole("button", { name: /review now|repasar ahora/i });
+  await expect(start).toBeVisible({ timeout: 15_000 });
+  await start.click();
   // El peldaño está CARGADO cuando la cue se ve: es el instante declarado en el
   // que el cliente puede declarar `started`.
-  await expect(section.getByText("río")).toBeVisible({ timeout: 15_000 });
-  return section;
+  await expect(page.getByText("río")).toBeVisible({ timeout: 15_000 });
+  return page;
 }
 
 test("desktop: el drill devuelve el decision_id y declara started/abandoned", async ({
@@ -306,6 +303,6 @@ test("desktop: sin decision_id (ítem sin provenance) no se declara nada", async
   await page.evaluate(() => {
     window.location.hash = "#/progreso";
   });
-  await expect(section).toHaveCount(0);
+  await expect(page.getByText("río")).toHaveCount(0);
   expect(lifecycleCalls(calls)).toEqual([]);
 });

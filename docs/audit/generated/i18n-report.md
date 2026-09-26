@@ -5,9 +5,9 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1785,
- "literal_uses": 1267,
- "referenced_keys": 1465,
+ "defined": 1774,
+ "literal_uses": 1261,
+ "referenced_keys": 1458,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",
@@ -36,7 +36,6 @@
   "dictionary.review.decision.fit.",
   "dictionary.review.decision.gap.",
   "dictionary.review.decision.transfer.",
-  "dictionary.review.hidden.",
   "dictionary.review.reason.",
   "dictionary.review.transfer.level.",
   "dictionary.status.",

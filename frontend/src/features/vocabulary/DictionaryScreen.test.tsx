@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 /**
- * Vitest de `DictionaryScreen` (V3.39, ampliado en V3.78.0): persistencia de la
- * pestaña y los TRES modos (Consultar · Personal · Flashcards).
+ * Vitest de `DictionaryScreen` (V3.39, reorganizado en V3.85.0): persistencia de
+ * la pestaña y los DOS modos (Consultar · Flashcards), con el inventario como
+ * sub-pestaña «Mi léxico» de Flashcards.
  *
- * Se mockean las tres vistas hijas (no son el objeto de estas pruebas) y la API
- * de settings para verificar el patrón doble: arranque desde `localStorage`,
- * hidratación desde `GET /api/settings` al montar y escritura a
- * `localStorage` + `PUT /api/settings` al cambiar de pestaña.
+ * El punto delicado es la PROYECCIÓN del valor persistido: `"personal"` sigue
+ * siendo un valor válido (cero migración) y abre Flashcards en «Mi léxico»; el
+ * resto de sub-pestañas abren Estudiar y persisten `"flashcards"`. Se mockean
+ * las vistas hijas (no son el objeto de estas pruebas) y la API de settings para
+ * verificar el patrón doble: arranque desde `localStorage`, hidratación desde
+ * `GET /api/settings` al montar y escritura a `localStorage` + `PUT
+ * /api/settings` al navegar.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -15,14 +19,35 @@ import { I18nProvider } from "../../hooks/useI18n";
 import { DICTIONARY_VIEW_STORAGE_KEY } from "../../utils/dictionaryView";
 import { DictionaryScreen } from "./DictionaryScreen";
 
-vi.mock("./PersonalDictionary", () => ({
-  PersonalDictionary: () => <div>personal-view</div>,
+vi.mock("./LexiconInventory", () => ({
+  LexiconInventory: () => <div>lexicon-view</div>,
 }));
 vi.mock("./DictionaryLookup", () => ({
   DictionaryLookup: () => <div>lookup-view</div>,
 }));
+/**
+ * Doble de `FlashcardsScreen`: expone la sub-pestaña CONTROLADA que le pasa la
+ * pantalla y dos botones para cambiarla, que es lo único que necesita el
+ * contrato de proyección/persistencia.
+ */
 vi.mock("./FlashcardsScreen", () => ({
-  FlashcardsScreen: () => <div>flashcards-view</div>,
+  FlashcardsScreen: ({
+    tab,
+    onTabChange,
+  }: {
+    tab?: string;
+    onTabChange?: (next: string) => void;
+  }) => (
+    <div>
+      <div>{`flashcards-view:${tab ?? "uncontrolled"}`}</div>
+      <button type="button" onClick={() => onTabChange?.("study")}>
+        goto-study
+      </button>
+      <button type="button" onClick={() => onTabChange?.("lexicon")}>
+        goto-lexicon
+      </button>
+    </div>
+  ),
 }));
 vi.mock("../../api/settings", () => ({
   getSettings: vi.fn(),
@@ -45,7 +70,7 @@ function tabNames(): string[] {
   return screen.getAllByRole("tab").map((b) => b.textContent ?? "");
 }
 
-describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
+describe("DictionaryScreen · V3.85.0 dos pestañas y proyección", () => {
   beforeEach(() => {
     window.localStorage.clear();
     getSettingsMock.mockResolvedValue({ settings: {} });
@@ -58,29 +83,61 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
   });
 
   it("arranca en Consultar por defecto", () => {
-    // V3.78.0: el defecto cambió de `personal` a `lookup`: es el primer modo del
-    // orden y el que responde a la pregunta con la que se abre un diccionario.
     renderScreen();
     expect(screen.getByText("lookup-view")).toBeTruthy();
-    expect(screen.queryByText("personal-view")).toBeNull();
+    expect(screen.queryByText("lexicon-view")).toBeNull();
     expect(
-      screen
-        .getByRole("tab", { name: "Look up" })
-        .getAttribute("aria-selected"),
+      screen.getByRole("tab", { name: "Look up" }).getAttribute("aria-selected"),
     ).toBe("true");
   });
 
-  it("las tres pestañas se ofrecen en el orden Consultar · Personal · Flashcards", () => {
+  it("solo hay dos pestañas, en el orden Consultar · Flashcards", () => {
     renderScreen();
-    expect(tabNames()).toEqual(["Look up", "Personal", "Flashcards"]);
+    expect(tabNames()).toEqual(["Look up", "Flashcards"]);
   });
 
-  it("la pestaña Flashcards monta la superficie de estudio y la persiste", async () => {
+  it("un `personal` heredado abre Flashcards en «Mi léxico» (cero migración)", () => {
+    // El valor guardado por una versión anterior debe seguir abriendo donde el
+    // alumno lo dejó: no se migra el dominio persistido, se proyecta.
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "personal");
+
+    renderScreen();
+
+    expect(screen.getByText("flashcards-view:lexicon")).toBeTruthy();
+    expect(
+      screen.getByRole("tab", { name: "Flashcards" }).getAttribute("aria-selected"),
+    ).toBe("true");
+  });
+
+  it("un `flashcards` heredado abre Flashcards en Estudiar", () => {
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "flashcards");
+
+    renderScreen();
+
+    expect(screen.getByText("flashcards-view:study")).toBeTruthy();
+  });
+
+  it("elegir «Mi léxico» persiste `personal` (el recuerdo sigue teniendo sentido)", async () => {
     renderScreen("u1");
-
     fireEvent.click(screen.getByRole("tab", { name: "Flashcards" }));
+    fireEvent.click(screen.getByRole("button", { name: "goto-lexicon" }));
 
-    expect(screen.getByText("flashcards-view")).toBeTruthy();
+    expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
+      "personal",
+    );
+    await waitFor(() =>
+      expect(saveSettingsMock).toHaveBeenCalledWith("u1", {
+        dictionary_view: "personal",
+      }),
+    );
+  });
+
+  it("cualquier otra sub-pestaña persiste `flashcards`", async () => {
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "personal");
+
+    renderScreen("u1");
+    fireEvent.click(screen.getByRole("button", { name: "goto-study" }));
+
     expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
       "flashcards",
     );
@@ -91,17 +148,20 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
     );
   });
 
-  it("arranca en la pestaña guardada en localStorage", () => {
-    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "flashcards");
-
+  it("al volver a Flashcards se recuerda la sub-pestaña en la que estabas", () => {
     renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Flashcards" }));
+    fireEvent.click(screen.getByRole("button", { name: "goto-lexicon" }));
 
-    expect(screen.getByText("flashcards-view")).toBeTruthy();
-    expect(
-      screen
-        .getByRole("tab", { name: "Flashcards" })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
+    // A Consultar y de vuelta: no se cae al estudio, se vuelve a «Mi léxico».
+    fireEvent.click(screen.getByRole("tab", { name: "Look up" }));
+    expect(screen.getByText("lookup-view")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Flashcards" }));
+
+    expect(screen.getByText("flashcards-view:lexicon")).toBeTruthy();
+    expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
+      "personal",
+    );
   });
 
   it("hidrata desde los settings del usuario al montar", async () => {
@@ -115,7 +175,6 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
   });
 
   it("ignora un valor de settings inválido y cae al defecto", async () => {
-    window.localStorage.clear();
     getSettingsMock.mockResolvedValue({ settings: { dictionary_view: "nope" } });
 
     renderScreen("u1");
@@ -124,26 +183,11 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
     expect(screen.getByText("lookup-view")).toBeTruthy();
   });
 
-  it("al cambiar de pestaña persiste en localStorage y en settings", async () => {
-    renderScreen("u1");
-
-    fireEvent.click(screen.getByRole("tab", { name: "Personal" }));
-
-    expect(screen.getByText("personal-view")).toBeTruthy();
-    expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
-      "personal",
-    );
-    await waitFor(() =>
-      expect(saveSettingsMock).toHaveBeenCalledWith("u1", {
-        dictionary_view: "personal",
-      }),
-    );
-  });
-
-  it("sin perfil sigue persistiendo en localStorage (sin llamada a settings)", async () => {
+  it("sin perfil sigue persistiendo en localStorage (sin llamada a settings)", () => {
     renderScreen(null);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Personal" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Flashcards" }));
+    fireEvent.click(screen.getByRole("button", { name: "goto-lexicon" }));
 
     expect(window.localStorage.getItem(DICTIONARY_VIEW_STORAGE_KEY)).toBe(
       "personal",
@@ -157,13 +201,9 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
     renderScreen();
     const tablist = screen.getByRole("tablist", { name: "Dictionary views" });
     const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(2);
     // Roving tabindex: solo la activa es tabulable.
-    expect(tabs.map((tab) => tab.getAttribute("tabindex"))).toEqual([
-      "0",
-      "-1",
-      "-1",
-    ]);
+    expect(tabs.map((tab) => tab.getAttribute("tabindex"))).toEqual(["0", "-1"]);
 
     const panel = screen.getByRole("tabpanel");
     expect(panel.getAttribute("aria-labelledby")).toBe("dictionary-tab-lookup");
@@ -176,9 +216,9 @@ describe("DictionaryScreen · V3.39 persistencia de la pestaña", () => {
     lookup.focus();
     fireEvent.keyDown(lookup, { key: "ArrowRight" });
 
-    expect(screen.getByText("personal-view")).toBeTruthy();
-    const personal = screen.getByRole("tab", { name: "Personal" });
-    expect(personal.getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(personal);
+    expect(screen.getByText("flashcards-view:study")).toBeTruthy();
+    const flashcards = screen.getByRole("tab", { name: "Flashcards" });
+    expect(flashcards.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(flashcards);
   });
 });

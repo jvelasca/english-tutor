@@ -6,19 +6,27 @@
  * contrato tiene sus propias pruebas). Lo que se fija aquí es el
  * comportamiento de la pantalla:
  *
- * 1. Las cuatro subpestañas existen y Estudiar es la de entrada.
+ * 1. Las cinco subpestañas existen (V3.85.0 añade «Mi léxico») y Estudiar es la
+ *    de entrada.
  * 2. Estudiar califica por el endpoint del MAZO con `card_type`/`card_id`, y el
- *    resumen final queda alcanzable.
+ *    resumen final queda alcanzable. Su bloque ofrece DOS acciones rotuladas:
+ *    el repaso de competencia («Review now (N)») y la sesión FSRS («Study cards
+ *    (N)»).
  * 3. El mazo automático no se puede borrar ni editar (no es una fila).
  * 4. El navegador filtra por texto y estado, y el CRUD llama a lo que dice.
- * 5. El salto desde PERSONAL («Mis listas»/packs) abre Estudiar con la lista
- *    filtrada y arranca la sesión.
+ * 5. El salto desde «Mis listas»/packs abre Estudiar con la lista filtrada y
+ *    arranca la sesión.
+ * 6. «Mi léxico» monta el inventario (buscador, filtros, añadir) sin estudio.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { I18nProvider } from "../../hooks/useI18n";
 import type { FlashcardDeck, FlashcardQueue } from "../../types/api";
 import { FlashcardsScreen } from "./FlashcardsScreen";
+
+vi.mock("../../api/learning", () => ({
+  getReviewQueue: vi.fn(),
+}));
 
 vi.mock("../../api/vocabulary", () => ({
   listFlashcardDecks: vi.fn(),
@@ -35,6 +43,12 @@ vi.mock("../../api/vocabulary", () => ({
   getFlashcardStats: vi.fn(),
   listVocabCollections: vi.fn(),
   enrollVocabCollection: vi.fn(),
+  // V3.85.0: la sub-pestaña «Mi léxico» monta el inventario, que lee el léxico,
+  // las candidatas del drill oral y el alta de palabras/listas.
+  getLexicon: vi.fn(),
+  getDrillCandidates: vi.fn(),
+  addVocabularyItem: vi.fn(),
+  addVocabularyBulk: vi.fn(),
 }));
 
 vi.mock("../../components/ItemReplayButton", () => ({
@@ -48,13 +62,16 @@ import {
   deleteFlashcard,
   deleteFlashcardDeck,
   enrollVocabCollection,
+  getDrillCandidates,
   getFlashcardQueue,
   getFlashcardStats,
+  getLexicon,
   listFlashcardCards,
   listFlashcardDecks,
   listVocabCollections,
   reviewFlashcard,
 } from "../../api/vocabulary";
+import { getReviewQueue } from "../../api/learning";
 
 const AUTO: FlashcardDeck = {
   id: 0,
@@ -173,6 +190,34 @@ describe("FlashcardsScreen", () => {
     // listos» no se pinta (no se promete lo que no existe). Los tests que lo
     // ejercitan ponen su propio catálogo.
     vi.mocked(listVocabCollections).mockResolvedValue({ collections: [] });
+    // V3.85.0: por defecto no hay nada vencido que repasar, así que el bloque de
+    // estudio ofrece solo la acción de tarjetas.
+    vi.mocked(getReviewQueue).mockResolvedValue({
+      due_count: 0,
+      items: [],
+      fsrs_version: "test",
+    });
+    // «Mi léxico» no se abre salvo que la prueba lo pida; se deja un vacío honesto.
+    vi.mocked(getLexicon).mockResolvedValue({
+      summary: {
+        total: 0,
+        known: 0,
+        learning: 0,
+        weak: 0,
+        mastered: 0,
+        by_cefr: [],
+        recognized: 0,
+        produced: 0,
+        transfer: 0,
+        retention: 0,
+        spaced_exposure: 0,
+        production_gap: 0,
+        transfer_gap: 0,
+      },
+      items: [],
+      coverage: null,
+    } as never);
+    vi.mocked(getDrillCandidates).mockResolvedValue({ words: [] } as never);
   });
 
   afterEach(() => {
@@ -180,11 +225,11 @@ describe("FlashcardsScreen", () => {
     vi.clearAllMocks();
   });
 
-  it("ofrece las cuatro subpestañas y entra por Estudiar", async () => {
+  it("ofrece las cinco subpestañas y entra por Estudiar", async () => {
     renderScreen();
 
     expect(await screen.findByRole("tab", { name: "Study" })).toBeTruthy();
-    for (const name of ["Study", "Decks", "Cards", "Stats"]) {
+    for (const name of ["Study", "My lexicon", "Decks", "Cards", "Stats"]) {
       expect(screen.getByRole("tab", { name })).toBeTruthy();
     }
     expect(
@@ -204,21 +249,68 @@ describe("FlashcardsScreen", () => {
       name: "Flashcard views",
     });
     const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs).toHaveLength(4);
+    expect(tabs).toHaveLength(5);
 
     const study = screen.getByRole("tab", { name: "Study" });
     study.focus();
+    // V3.85.0: «Mi léxico» entra entre Estudiar y Mazos.
     fireEvent.keyDown(study, { key: "ArrowRight" });
 
+    expect(await screen.findByText("Add vocabulary")).toBeTruthy();
+    const lexicon = screen.getByRole("tab", { name: "My lexicon" });
+    expect(lexicon.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(lexicon);
+
+    fireEvent.keyDown(lexicon, { key: "ArrowRight" });
     expect(await screen.findByPlaceholderText("Deck name")).toBeTruthy();
     const decks = screen.getByRole("tab", { name: "Decks" });
     expect(decks.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(decks);
   });
 
+  it("«Mi léxico» monta el inventario, sin estudio ni repaso (V3.85.0)", async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "My lexicon" }));
+
+    // El inventario pide el léxico y las candidatas del drill oral, no la cola
+    // de tarjetas ni la de repaso.
+    await waitFor(() => expect(getLexicon).toHaveBeenCalledWith("u1"));
+    expect(getDrillCandidates).toHaveBeenCalledWith("u1");
+    expect(screen.getByText("Add vocabulary")).toBeTruthy();
+    expect(screen.queryByText("Study cards (1)")).toBeNull();
+  });
+
+  it("el bloque de estudio ofrece dos acciones rotuladas con su recuento (V3.85.0)", async () => {
+    vi.mocked(getReviewQueue).mockResolvedValue({
+      due_count: 2,
+      items: [],
+      fsrs_version: "test",
+    });
+    renderScreen();
+
+    // Repaso de competencia: el recuento viene de la cola del día.
+    expect(
+      await screen.findByRole("button", { name: "Review now (2)" }),
+    ).toBeTruthy();
+    // Sesión FSRS: el recuento es la cola del mazo.
+    expect(screen.getByRole("button", { name: "Study cards (1)" })).toBeTruthy();
+    expect(
+      screen.getByText("2 words are due. One session, one step each."),
+    ).toBeTruthy();
+  });
+
+  it("sin nada vencido no ofrece un botón muerto de repaso", async () => {
+    renderScreen();
+
+    expect(
+      await screen.findByText("Nothing to review right now — come back later."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Review now/ })).toBeNull();
+  });
+
   it("estudiar califica por el endpoint del mazo y el resumen es alcanzable", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: /Start session/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Study cards/ }));
 
     expect(screen.getByText("airport")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
@@ -467,7 +559,7 @@ describe("FlashcardsScreen", () => {
         "This deck has no cards yet. Add the first one and it can be studied right away.",
       ),
     ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Start session/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Study cards/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Add cards" }));
     await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 5));
@@ -484,7 +576,7 @@ describe("FlashcardsScreen", () => {
     renderScreen();
     expect(
       await screen.findByText(
-        "Your dictionary has no words yet. Add them in Personal and they will show up here.",
+        "Your dictionary has no words yet. Add them in My lexicon and they will show up here.",
       ),
     ).toBeTruthy();
     // No hay tarjetas manuales que añadir aquí: no se ofrece el atajo.
