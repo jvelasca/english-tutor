@@ -2273,6 +2273,14 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   V3.84.1), igual que **H5**, **`delete_deck` no transaccional** y **H1**. `[PRODUCTO]`
 - **Los 8 gates humanos siguen `pending`** y `docs/audit/validation-evidence.json` **no
   existe**. `[VALIDACIÓN]`
+- **El encargo externo de auditoría de este arco está entregado** en
+  `agentes/auditoria-total-externa-v385.md` (**prefijo `AY`**; informe esperado
+  `docs/audit/AY-AUDITORIA-TOTAL-V385.md`), en un commit documental **posterior** a los tags
+  `v3.84.1` y `v3.85.0`. Declara dos cosas que **este tag no declara** y que el auditor debe
+  dictaminar: el límite de presentación de la cola pasó **de 20 a 50** (`§6-D3`) y las notas
+  nombran un `ReviewTodayCard` **que no existe en el código** (`§6-D2`). `[AUDITORÍA]`
+- **La cola de auditoría sigue atrasada:** `AV` (`v3.82.0`, contrato + migración), `AW` (cierre
+  V3.83.x) y `AX` (`v3.84.0`) **esperan informe**; `AY` es el cuarto encargo abierto. `[AUDITORÍA]`
 - **Todo lo declarado abierto en V3.84.1 y anteriores sigue abierto** salvo lo que esta
   release cierra de forma explícita arriba.
 
