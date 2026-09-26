@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 import config
 import security
 from dependencies import require_admin
+from repositories import flashcards as flashcards_repo
 from repositories import listening as listening_repo
 from repositories import speaking_routes as speaking_repo
 from services import backup
@@ -44,6 +45,11 @@ async def server_status() -> dict:
         {**j, "kind": "speaking"}
         for j in speaking_jobs
     ]
+    # V3.86.1: health check de la migración N:M ficha ↔ mazo. El dominio nunca
+    # deja una ficha sin mazo, así que un valor > 0 delata una restauración a
+    # medias; `init_db()` lo repara al arrancar y esto lo delata si la BD cambió
+    # con el proceso ya en marcha. Es un contador, sin datos personales.
+    cards_without_deck = await run_in_threadpool(flashcards_repo.cards_without_deck)
     return {
         "generation": {
             "running": len(jobs),
@@ -60,6 +66,9 @@ async def server_status() -> dict:
         },
         "rate_limited": {
             "rejected_last_minute": security.rate_limit_snapshot(60.0),
+        },
+        "flashcards": {
+            "cards_without_deck": cards_without_deck,
         },
     }
 

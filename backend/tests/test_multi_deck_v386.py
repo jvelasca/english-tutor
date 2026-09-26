@@ -12,11 +12,14 @@ Fija las promesas de la release que serían caras de descubrir en producción:
    la UI pueda avisar antes y después.
 4. **Regla de no duplicar.** El mismo anverso no genera una segunda ficha al
    entrar en otro mazo: se reutiliza la que hay y se añade la pertenencia.
-5. **Migración aditiva, idempotente y con backfill de UNA sola vez.**
+5. **Migración aditiva e idempotente.** Al backfill inicial de la tabla puente se
+   suma la reparación de arranque de V3.86.1 (identidad fuerte + salud N:M), que
+   solo toca las fichas SIN pertenencia y no resucita una retirada a propósito.
 """
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi.testclient import TestClient
 
@@ -416,3 +419,162 @@ def test_init_db_is_idempotent_and_backfills_only_once(monkeypatch, tmp_path):
     assert _count("flashcard_deck_cards", "deck_id = ?", (deck,)) == 1
     db.init_db()
     assert _count("flashcard_deck_cards", "deck_id = ?", (deck,)) == 1
+
+
+# --- 6. V3.86.1: identidad fuerte, atomicidad y salud de la BD --------------
+
+
+def test_concurrent_creations_of_the_same_front_do_not_duplicate(monkeypatch, tmp_path):
+    """El candado del arco: dos altas a la vez del mismo anverso → 1 ficha.
+
+    La garantía es de la BD (`UNIQUE (user_id, front_key)`), no de un SELECT
+    previo: antes, dos peticiones simultáneas o un doble clic podían crear dos
+    fichas del mismo anverso. Las dos pertenencias deben quedar.
+    """
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        tools = _make_deck(client, a, "Herramientas")
+        home = _make_deck(client, a, "Casa")
+
+        def create(deck_id: int):
+            return client.post(
+                "/api/vocabulary/cards",
+                params={"user_id": a},
+                json={"front": "lima", "back": "file", "deck_ids": [deck_id]},
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = [
+                future.result()
+                for future in [pool.submit(create, d) for d in (tools, home)]
+            ]
+
+        assert all(r.status_code == 200 for r in responses), [r.text for r in responses]
+        assert _count("flashcard_cards", "user_id = ?", (a,)) == 1
+        assert _count("flashcard_deck_cards", "deck_id IN (?, ?)", (tools, home)) == 2
+        # Las dos respuestas hablan de la MISMA ficha, no de dos gemelas.
+        assert len({r.json()["id"] for r in responses}) == 1
+
+
+def test_editing_a_front_into_another_cards_front_is_a_conflict(monkeypatch, tmp_path):
+    """Editar el anverso hasta el de otra ficha no crea una gemela: 409."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck = _make_deck(client, a, "Casa")
+        _create_card(client, a, front="house", deck_ids=[deck])
+        home = _create_card(client, a, front="home", deck_ids=[deck]).json()
+
+        res = client.patch(
+            f"/api/vocabulary/cards/{home['id']}",
+            params={"user_id": a},
+            json={"front": "  HOUSE "},  # mismo anverso normalizado
+        )
+        assert res.status_code == 409, res.text
+        assert res.json()["detail"] == "CARD_FRONT_TAKEN"
+
+        cards = client.get("/api/vocabulary/cards", params={"user_id": a}).json()[
+            "cards"
+        ]
+        assert {c["front"] for c in cards} == {"house", "home"}
+        assert _count("flashcard_cards", "user_id = ?", (a,)) == 2
+
+
+def test_patch_is_atomic_when_the_decks_are_invalid(monkeypatch, tmp_path):
+    """Un `deck_ids` inválido no deja el resto del PATCH aplicado."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck = _make_deck(client, a, "Casa")
+        card = _create_card(
+            client, a, front="nebula", back="nebulosa", mnemonic="nube rara",
+            deck_ids=[deck],
+        ).json()
+
+        res = client.patch(
+            f"/api/vocabulary/cards/{card['id']}",
+            params={"user_id": a},
+            json={"mnemonic": "otra cosa", "deck_ids": [999_999]},
+        )
+        assert res.status_code == 400, res.text
+
+        # Ni el recordatorio ni los mazos cambiaron: la transacción entera se
+        # deshizo (antes el mnemónico sí quedaba escrito).
+        after = client.get("/api/vocabulary/cards", params={"user_id": a}).json()[
+            "cards"
+        ][0]
+        assert after["mnemonic"] == "nube rara"
+        assert after["deck_ids"] == [deck]
+
+
+def test_init_db_fuses_duplicate_cards_and_builds_the_unique_index(
+    monkeypatch, tmp_path
+):
+    """Una BD que ya venía con duplicados se sanea al arrancar, sin perder mazos."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        tools = _make_deck(client, a, "Herramientas")
+        home = _make_deck(client, a, "Casa")
+
+    # Estado pre-V3.86.1: sin índice único y con DOS fichas del mismo anverso,
+    # cada una en un mazo distinto.
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        conn.execute("DROP INDEX IF EXISTS idx_flashcard_cards_identity")
+        now = "2026-01-01"
+        ids = []
+        for deck in (tools, home):
+            cur = conn.execute(
+                "INSERT INTO flashcard_cards "
+                "(user_id, deck_id, front, front_key, back, mnemonic, "
+                " created_at, updated_at) "
+                "VALUES (?, ?, 'lima', '', 'file', '', ?, ?)",
+                (a, deck, now, now),
+            )
+            ids.append(int(cur.lastrowid))
+        for card_id, deck in zip(ids, (tools, home), strict=True):
+            conn.execute(
+                "INSERT INTO flashcard_deck_cards (card_id, deck_id, created_at) "
+                "VALUES (?, ?, ?)",
+                (card_id, deck, now),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    db.init_db()
+
+    # Una sola ficha (la de id menor) y sus DOS pertenencias fusionadas: no se
+    # pierde el mazo al que solo apuntaba la copia.
+    assert _count("flashcard_cards", "user_id = ?", (a,)) == 1
+    assert _count("flashcard_deck_cards", "card_id = ?", (ids[0],)) == 2
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        index = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' "
+            "AND name = 'idx_flashcard_cards_identity'"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert index is not None
+
+
+def test_init_db_repairs_a_card_without_membership(monkeypatch, tmp_path):
+    """El health check detecta una ficha huérfana y el arranque la repara."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck = _make_deck(client, a, "Casa")
+        card = _create_card(client, a, front="lima", deck_ids=[deck]).json()
+
+    # Migración a medias: la ficha existe, su pertenencia no.
+    conn = sqlite3.connect(db.DB_PATH)
+    try:
+        conn.execute(
+            "DELETE FROM flashcard_deck_cards WHERE card_id = ?", (card["id"],)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert flashcards_repo.cards_without_deck() == 1
+    db.init_db()
+    assert flashcards_repo.cards_without_deck() == 0
+    assert _count("flashcard_deck_cards", "card_id = ?", (card["id"],)) == 1

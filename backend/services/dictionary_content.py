@@ -301,8 +301,15 @@ def normalize_meanings(raw: object) -> list[dict]:
     - descarta los elementos que no son objetos o sin `term`;
     - normaliza `pos` a la taxonomía canónica ("" si no lo es: nunca se inventa);
     - colapsa y recorta `term`/`gloss`/`domain`;
-    - deduplica por `(term normalizado, pos)` conservando el primer orden de
-      entrada;
+    - deduplica por `term` normalizado —espacios colapsados y `casefold()`, la
+      MISMA clave que usa el índice único de las fichas—, conservando el primer
+      orden de entrada: en `meanings` el término ES el significado, así que dos
+      apariciones del mismo equivalente son la misma acepción aunque declaren
+      `pos` distinto (la primera trae la mejor metadata);
+    - acepta `proper_noun` **solo si es boolean** (`True`/`False`). Cualquier
+      otro valor —incluido el string `"false"`, que en Python es *truthy*— se
+      trata como `False`: el contenido lo genera un modelo y el parser no puede
+      fiarse de su tipo;
     - **reordena los nombres propios al final** (regla dura: un nombre propio
       nunca puede ser el significado por defecto si hay uno común);
     - limita a `MAX_MEANINGS`.
@@ -313,7 +320,7 @@ def normalize_meanings(raw: object) -> list[dict]:
     if not isinstance(raw, list):
         return []
     meanings: list[dict] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[str] = set()
     for item in raw:
         if not isinstance(item, dict):
             continue
@@ -331,8 +338,10 @@ def normalize_meanings(raw: object) -> list[dict]:
         # Dedupe por TÉRMINO (sin distinguir mayúsculas): en `meanings` el término
         # ES el significado, así que dos apariciones del mismo equivalente son la
         # misma acepción aunque declaren `pos` distinto. Conserva la primera, que
-        # es la que trae la mejor metadata (ámbito/glosa).
-        key = term.lower()
+        # es la que trae la mejor metadata (ámbito/glosa). `casefold()` —la misma
+        # clave que el índice único de `flashcard_cards`— cubre mejor que
+        # `lower()` los alfabetos no ASCII.
+        key = term.casefold()
         if key in seen:
             continue
         seen.add(key)
@@ -342,7 +351,10 @@ def normalize_meanings(raw: object) -> list[dict]:
                 "pos": pos,
                 "gloss": gloss,
                 "domain": domain,
-                "proper_noun": bool(item.get("proper_noun")),
+                # Estricto a propósito: `bool("false")` es `True` en Python, y el
+                # modelo a veces devuelve el booleano como string. Solo el boolean
+                # de verdad marca un nombre propio.
+                "proper_noun": item.get("proper_noun") is True,
             }
         )
     # Regla dura (V3.86.0): un nombre propio jamás representa el significado por

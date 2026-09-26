@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from contextlib import closing
 
-from repositories.db import _conn, _now
+from repositories.db import _conn, _now, front_key
 from repositories.users import get_user
 
 #: Id del mazo automático (todo el léxico). No existe como fila.
@@ -30,6 +30,27 @@ DEFAULT_REVIEW_PER_DAY = 50
 
 #: Tope defensivo de los límites por mazo (una sesión no es un atracón).
 MAX_PER_DAY = 9_999
+
+
+class CardFrontConflictError(Exception):
+    """El anverso nuevo ya es de OTRA ficha del mismo alumno (V3.86.1).
+
+    La identidad fuerte (`UNIQUE (user_id, front_key)`) convierte lo que era una
+    duplicación silenciosa en un conflicto declarado: editar el anverso de una
+    ficha hasta el de otra no crea una gemela, avisa. El router lo traduce a 409.
+    """
+
+    def __init__(self, existing_card_id: int) -> None:
+        super().__init__(existing_card_id)
+        self.existing_card_id = int(existing_card_id)
+
+
+class NoValidDecksError(Exception):
+    """Ninguno de los mazos declarados existe o es del alumno (V3.86.1).
+
+    En el PATCH atómico esto aborta la transacción ENTERA: si los mazos no son
+    válidos no se escribe tampoco el resto de la ficha.
+    """
 
 
 def _clamp_limit(value: int | None, default: int) -> int:
@@ -65,35 +86,26 @@ def _card_row(row) -> dict:
 _CARD_COLUMNS = "id, deck_id, front, back, mnemonic, created_at, updated_at"
 
 
-def front_key(front: str) -> str:
-    """Clave de comparación del anverso (V3.86.0).
-
-    La MISMA política que el deduplicado del pegado masivo: espacios colapsados y
-    `casefold()`. Se hace en Python y no con `COLLATE NOCASE` porque el NOCASE de
-    SQLite solo cubre ASCII, y aquí manda el criterio del producto.
-    """
-    return " ".join((front or "").split()).casefold()
-
-
 def _find_card_by_front(conn, user_id: str, front: str) -> dict | None:
     """Ficha EXISTENTE del alumno con el mismo anverso, dentro de una transacción.
 
     V3.86.0: una misma palabra no debe generar una segunda ficha por el hecho de
     entrar en otro mazo —eso es justo lo que la tabla puente existe para
     evitar—, así que el alta REUTILIZA la ficha y solo añade la pertenencia.
+
+    V3.86.1: la búsqueda va por `front_key` (la columna con índice ÚNICO), no por
+    un escaneo en Python. `front_key` se importa de `repositories.db` porque es
+    la MISMA política que usa la migración para construir el índice.
     """
     needle = front_key(front)
     if not needle:
         return None
-    rows = conn.execute(
+    row = conn.execute(
         f"SELECT {_CARD_COLUMNS} FROM flashcard_cards "
-        "WHERE user_id = ? ORDER BY id",
-        (user_id,),
-    ).fetchall()
-    for row in rows:
-        if front_key(str(row["front"])) == needle:
-            return _card_row(row)
-    return None
+        "WHERE user_id = ? AND front_key = ?",
+        (user_id, needle),
+    ).fetchone()
+    return _card_row(row) if row is not None else None
 
 
 def _card_cols(alias: str = "") -> str:
@@ -341,8 +353,13 @@ def deck_ids_for_cards(user_id: str, card_ids: list[int]) -> dict[int, list[int]
     return out
 
 
-def _owned_deck_ids(user_id: str, deck_ids: list[int]) -> list[int]:
-    """Filtra y ordena ids de mazo que existen y son del usuario (sin duplicados)."""
+def _owned_deck_ids_in(conn, user_id: str, deck_ids: list[int]) -> list[int]:
+    """Filtra y ordena ids de mazo del usuario usando una conexión YA abierta.
+
+    Es la pieza que permite validar los mazos DENTRO de la transacción del PATCH
+    atómico: abrir otra conexión ahí sería un interbloqueo de escritura y, sobre
+    todo, dejaría una ventana entre «validar» y «escribir».
+    """
     unique: list[int] = []
     for raw in deck_ids:
         try:
@@ -354,13 +371,18 @@ def _owned_deck_ids(user_id: str, deck_ids: list[int]) -> list[int]:
     if not unique:
         return []
     placeholders = ",".join("?" for _ in unique)
-    with closing(_conn()) as conn:
-        rows = conn.execute(
-            f"SELECT id FROM flashcard_decks WHERE user_id = ? "
-            f"AND id IN ({placeholders}) ORDER BY id",
-            (user_id, *unique),
-        ).fetchall()
+    rows = conn.execute(
+        f"SELECT id FROM flashcard_decks WHERE user_id = ? "
+        f"AND id IN ({placeholders}) ORDER BY id",
+        (user_id, *unique),
+    ).fetchall()
     return [int(r["id"]) for r in rows]
+
+
+def _owned_deck_ids(user_id: str, deck_ids: list[int]) -> list[int]:
+    """Igual que `_owned_deck_ids_in`, con su propia conexión de solo lectura."""
+    with closing(_conn()) as conn:
+        return _owned_deck_ids_in(conn, user_id, deck_ids)
 
 
 def set_card_decks(user_id: str, card_id: int, deck_ids: list[int]) -> list[int] | None:
@@ -372,11 +394,11 @@ def set_card_decks(user_id: str, card_id: int, deck_ids: list[int]) -> list[int]
     """
     if get_card(user_id, card_id) is None:
         return None
-    owned = _owned_deck_ids(user_id, deck_ids)
-    if not owned:
-        return None
     now = _now()
     with closing(_conn()) as conn, conn:
+        owned = _owned_deck_ids_in(conn, user_id, deck_ids)
+        if not owned:
+            return None
         conn.execute(
             "DELETE FROM flashcard_deck_cards WHERE card_id = ?", (int(card_id),)
         )
@@ -475,51 +497,64 @@ def create_card(
     clean_front = " ".join((front or "").split())
     if not clean_front:
         return None
+    key = front_key(clean_front)
     now = _now()
     clean_back = (back or "").strip()
     clean_mnemonic = (mnemonic or "").strip()
     with closing(_conn()) as conn, conn:
         existing = _find_card_by_front(conn, user_id, clean_front)
+        inserted = False
         if existing is not None:
             card_id = int(existing["id"])
-            if clean_back or clean_mnemonic:
-                conn.execute(
-                    "UPDATE flashcard_cards SET back = ?, mnemonic = ?, "
-                    "updated_at = ? WHERE user_id = ? AND id = ?",
-                    (
-                        clean_back or existing["back"],
-                        clean_mnemonic or existing["mnemonic"],
-                        now,
-                        user_id,
-                        card_id,
-                    ),
-                )
-            conn.executemany(
-                "INSERT OR IGNORE INTO flashcard_deck_cards "
-                "(card_id, deck_id, created_at) VALUES (?, ?, ?)",
-                [(card_id, deck_id, now) for deck_id in owned],
-            )
         else:
             cur = conn.execute(
                 "INSERT INTO flashcard_cards "
-                "(user_id, deck_id, front, back, mnemonic, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "(user_id, deck_id, front, front_key, back, mnemonic, "
+                " created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                # La identidad fuerte la garantiza la BD: si otra petición ganó
+                # la carrera entre el SELECT y el INSERT, esta no falla ni
+                # duplica; justo debajo se reutiliza la que entró.
+                "ON CONFLICT(user_id, front_key) DO NOTHING",
                 (
                     user_id,
                     owned[0],
                     clean_front,
+                    key,
                     clean_back,
                     clean_mnemonic,
                     now,
                     now,
                 ),
             )
-            card_id = int(cur.lastrowid)
-            conn.executemany(
-                "INSERT OR IGNORE INTO flashcard_deck_cards "
-                "(card_id, deck_id, created_at) VALUES (?, ?, ?)",
-                [(card_id, deck_id, now) for deck_id in owned],
+            if cur.rowcount:
+                card_id = int(cur.lastrowid)
+                inserted = True
+            else:
+                raced = _find_card_by_front(conn, user_id, clean_front)
+                if raced is None:  # imposible salvo corrupción de la BD
+                    return None
+                card_id = int(raced["id"])
+                existing = raced
+        # Un campo VACÍO no borra lo que ya había (para borrar el recordatorio
+        # está el PATCH explícito); una ficha recién insertada ya trae sus valores.
+        if not inserted and (clean_back or clean_mnemonic):
+            conn.execute(
+                "UPDATE flashcard_cards SET back = ?, mnemonic = ?, "
+                "updated_at = ? WHERE user_id = ? AND id = ?",
+                (
+                    clean_back or existing["back"],
+                    clean_mnemonic or existing["mnemonic"],
+                    now,
+                    user_id,
+                    card_id,
+                ),
             )
+        conn.executemany(
+            "INSERT OR IGNORE INTO flashcard_deck_cards "
+            "(card_id, deck_id, created_at) VALUES (?, ?, ?)",
+            [(card_id, deck_id, now) for deck_id in owned],
+        )
     return get_card(user_id, card_id)
 
 
@@ -548,21 +583,55 @@ def create_cards(
             clean_front = " ".join(str(raw.get("front") or "").split())
             if not clean_front:
                 continue
-            cur = conn.execute(
-                "INSERT INTO flashcard_cards "
-                "(user_id, deck_id, front, back, mnemonic, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    user_id,
-                    int(deck_id),
-                    clean_front,
-                    str(raw.get("back") or "").strip(),
-                    str(raw.get("mnemonic") or "").strip(),
-                    now,
-                    now,
-                ),
-            )
-            card_id = int(cur.lastrowid)
+            clean_back = str(raw.get("back") or "").strip()
+            clean_mnemonic = str(raw.get("mnemonic") or "").strip()
+            # V3.86.1: el pegado respeta la identidad fuerte. Si el anverso ya era
+            # una ficha del alumno NO se duplica: se le añade este mazo (y se
+            # completan reverso/recordatorio si llegan). `added` sigue contando lo
+            # que entró en el mazo, que es lo que la UI promete.
+            existing = _find_card_by_front(conn, user_id, clean_front)
+            inserted = False
+            if existing is not None:
+                card_id = int(existing["id"])
+            else:
+                cur = conn.execute(
+                    "INSERT INTO flashcard_cards "
+                    "(user_id, deck_id, front, front_key, back, mnemonic, "
+                    " created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(user_id, front_key) DO NOTHING",
+                    (
+                        user_id,
+                        int(deck_id),
+                        clean_front,
+                        front_key(clean_front),
+                        clean_back,
+                        clean_mnemonic,
+                        now,
+                        now,
+                    ),
+                )
+                if cur.rowcount:
+                    card_id = int(cur.lastrowid)
+                    inserted = True
+                else:
+                    raced = _find_card_by_front(conn, user_id, clean_front)
+                    if raced is None:  # imposible salvo corrupción de la BD
+                        continue
+                    card_id = int(raced["id"])
+                    existing = raced
+            if not inserted and (clean_back or clean_mnemonic):
+                conn.execute(
+                    "UPDATE flashcard_cards SET back = ?, mnemonic = ?, "
+                    "updated_at = ? WHERE user_id = ? AND id = ?",
+                    (
+                        clean_back or existing["back"],
+                        clean_mnemonic or existing["mnemonic"],
+                        now,
+                        user_id,
+                        card_id,
+                    ),
+                )
             conn.execute(
                 "INSERT OR IGNORE INTO flashcard_deck_cards "
                 "(card_id, deck_id, created_at) VALUES (?, ?, ?)",
@@ -573,8 +642,8 @@ def create_cards(
                     "id": card_id,
                     "deck_id": int(deck_id),
                     "front": clean_front,
-                    "back": str(raw.get("back") or "").strip(),
-                    "mnemonic": str(raw.get("mnemonic") or "").strip(),
+                    "back": clean_back,
+                    "mnemonic": clean_mnemonic,
                     "created_at": now,
                     "updated_at": now,
                 }
@@ -602,16 +671,106 @@ def update_card(
     new_front = current["front"] if front is None else " ".join(front.split())
     if not new_front:
         return None
+    new_key = front_key(new_front)
     new_back = current["back"] if back is None else (back or "").strip()
     new_mnemonic = (
         current["mnemonic"] if mnemonic is None else (mnemonic or "").strip()
     )
+    now = _now()
     with closing(_conn()) as conn, conn:
+        # V3.86.1: cambiar el anverso al de OTRA ficha no crea una gemela (lo que
+        # el índice único rechazaría con un `IntegrityError` opaco): se declara el
+        # conflicto para que la UI pueda decir «ya tienes una ficha con ese
+        # anverso» en vez de reventar.
+        if new_key != front_key(current["front"]):
+            clash = conn.execute(
+                "SELECT id FROM flashcard_cards "
+                "WHERE user_id = ? AND front_key = ? AND id <> ?",
+                (user_id, new_key, int(card_id)),
+            ).fetchone()
+            if clash is not None:
+                raise CardFrontConflictError(int(clash["id"]))
         conn.execute(
-            "UPDATE flashcard_cards SET front = ?, back = ?, mnemonic = ?, "
-            "updated_at = ? WHERE user_id = ? AND id = ?",
-            (new_front, new_back, new_mnemonic, _now(), user_id, int(card_id)),
+            "UPDATE flashcard_cards SET front = ?, front_key = ?, back = ?, "
+            "mnemonic = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+            (new_front, new_key, new_back, new_mnemonic, now, user_id, int(card_id)),
         )
+    return get_card(user_id, card_id)
+
+
+def update_card_with_decks(
+    user_id: str,
+    card_id: int,
+    *,
+    front: str | None = None,
+    back: str | None = None,
+    mnemonic: str | None = None,
+    deck_ids: list[int] | None = None,
+) -> dict | None:
+    """Edita la ficha y/o reemplaza sus mazos en UNA transacción (V3.86.1).
+
+    Es lo que hace atómico el PATCH: antes el router encadenaba `update_card` y
+    `set_card_decks`, así que un `deck_ids` inválido dejaba el mnemónico ya
+    escrito y devolvía 400 (el cliente veía error, pero parte del PATCH sí se
+    había aplicado). Aquí, si algo no es válido no se escribe NADA.
+
+    `deck_ids = None` significa «no toques los mazos»; una lista —aunque venga
+    vacía— significa «este es el conjunto nuevo» y exige al menos un mazo válido.
+    Devuelve la ficha o `None` si no es del usuario; lanza
+    `CardFrontConflictError` / `NoValidDecksError` para los conflictos.
+    """
+    with closing(_conn()) as conn, conn:
+        row = conn.execute(
+            f"SELECT {_CARD_COLUMNS} FROM flashcard_cards "
+            "WHERE user_id = ? AND id = ?",
+            (user_id, int(card_id)),
+        ).fetchone()
+        if row is None:
+            return None
+        current = _card_row(row)
+        new_front = current["front"] if front is None else " ".join(front.split())
+        if not new_front:
+            return None
+        new_key = front_key(new_front)
+        if new_key != front_key(current["front"]):
+            clash = conn.execute(
+                "SELECT id FROM flashcard_cards "
+                "WHERE user_id = ? AND front_key = ? AND id <> ?",
+                (user_id, new_key, int(card_id)),
+            ).fetchone()
+            if clash is not None:
+                raise CardFrontConflictError(int(clash["id"]))
+        owned: list[int] | None = None
+        if deck_ids is not None:
+            owned = _owned_deck_ids_in(conn, user_id, deck_ids)
+            if not owned:
+                # Aborta la transacción ENTERA (rollback del `with`): el PATCH no
+                # queda medio aplicado.
+                raise NoValidDecksError()
+        new_back = current["back"] if back is None else (back or "").strip()
+        new_mnemonic = (
+            current["mnemonic"] if mnemonic is None else (mnemonic or "").strip()
+        )
+        now = _now()
+        conn.execute(
+            "UPDATE flashcard_cards SET front = ?, front_key = ?, back = ?, "
+            "mnemonic = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+            (new_front, new_key, new_back, new_mnemonic, now, user_id, int(card_id)),
+        )
+        if owned:
+            conn.execute(
+                "DELETE FROM flashcard_deck_cards WHERE card_id = ?", (int(card_id),)
+            )
+            conn.executemany(
+                "INSERT OR IGNORE INTO flashcard_deck_cards "
+                "(card_id, deck_id, created_at) VALUES (?, ?, ?)",
+                [(int(card_id), deck_id, now) for deck_id in owned],
+            )
+            conn.execute(
+                "UPDATE flashcard_cards SET deck_id = ?, updated_at = ? "
+                "WHERE user_id = ? AND id = ?",
+                (owned[0], now, user_id, int(card_id)),
+            )
     return get_card(user_id, card_id)
 
 
@@ -661,6 +820,33 @@ def shared_cards_by_deck(user_id: str) -> dict[int, int]:
             (user_id,),
         ).fetchall()
     return {int(r["deck_id"]): int(r["n"]) for r in rows}
+
+
+def cards_without_deck(user_id: str | None = None) -> int:
+    """Fichas SIN ninguna fila en la tabla puente (V3.86.1).
+
+    Es el health check de la migración N:M: el dominio no produce este estado —o
+    la ficha tiene mazo o se borra—, así que un contador > 0 delata una
+    restauración a medias. `init_db()` lo repara al arrancar; `user_id = None`
+    cuenta TODAS (lo que publica `/api/system/status`) y con un `user_id` se
+    acota a un alumno.
+    """
+    with closing(_conn()) as conn:
+        if user_id is None:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM flashcard_cards c WHERE NOT EXISTS ("
+                "  SELECT 1 FROM flashcard_deck_cards dc WHERE dc.card_id = c.id"
+                ")"
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM flashcard_cards c WHERE c.user_id = ? "
+                "AND NOT EXISTS ("
+                "  SELECT 1 FROM flashcard_deck_cards dc WHERE dc.card_id = c.id"
+                ")",
+                (user_id,),
+            ).fetchone()
+    return int(row["n"] or 0)
 
 
 # --- Ledger de revisiones --------------------------------------------------

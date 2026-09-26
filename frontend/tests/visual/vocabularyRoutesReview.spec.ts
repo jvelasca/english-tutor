@@ -402,9 +402,10 @@ test("V3.85.1: el panel APRENDER → Vocabulario recupera el acceso al repaso (D
 
 test("V3.86.0: el diccionario incrustado da salida a una palabra ya rastreada", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "Solo desktop");
-
+}) => {
+  // V3.86.1: sin guard de proyecto. Era la superficie modificada de V3.86.0 y su
+  // flujo es el mismo en los tres anchos; dejarlo solo en desktop silenciaba su
+  // cobertura en tablet y móvil (ver docs/audit/PLAYWRIGHT-SKIPS-V386.md).
   await page.goto("/");
   await ensureProfile(page);
   await installMocks(page);

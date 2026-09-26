@@ -1,6 +1,6 @@
 """Modo Flashcards del diccionario (V3.78.0): mazos, cola y calificación.
 
-Tres cosas que este módulo decide y conviene entender antes de tocarlo:
+Cuatro cosas que este módulo decide y conviene entender antes de tocarlo:
 
 1. **Hay DOS clases de tarjeta y una sola cola.** El mazo automático son las
    cartas `lexicon` —todo lo que la app ha registrado del alumno: currículum,
@@ -17,6 +17,12 @@ Tres cosas que este módulo decide y conviene entender antes de tocarlo:
 3. **Nada de esto acredita mastery.** Igual que la retención léxica (D5/E3): la
    calificación programa el próximo repaso y escribe un evento informativo; no
    toca `learning_evidence`, ni Assessment, ni CEFR.
+
+4. **La pertenencia ficha ↔ mazo la manda la tabla puente (V3.86.1).** La autoridad
+   es `flashcard_deck_cards`; `flashcard_cards.deck_id` se conserva **deprecada**
+   como proyección legacy del «mazo principal» (`MIN(mazos)`), con un solo
+   escritor, solo para que el esquema anterior siga abriendo. No es una segunda
+   fuente de verdad y no debe leerse como tal.
 """
 from __future__ import annotations
 
@@ -585,6 +591,50 @@ async def update_card(
             front=front,
             back=back,
             mnemonic=mnemonic,
+        )
+    )
+    if row is None:
+        return None
+    out = await _cards_out(user_id, [row])
+    return out[0] if out else None
+
+
+async def update_card_with_decks(
+    user_id: str,
+    card_id: int,
+    *,
+    front: str | None = None,
+    back: str | None = None,
+    mnemonic: str | None = None,
+    deck_ids: list[int] | None = None,
+) -> dict | None:
+    """Edita la ficha y/o reemplaza sus mazos en UNA sola operación (V3.86.1).
+
+    Mismos topes y saneado que `update_card`, pero ATÓMICO con los mazos: o se
+    aplica el PATCH entero o no se aplica nada. Sustituye a la secuencia
+    `update_card` + `set_card_decks` que dejaba el recordatorio escrito aunque los
+    mazos fueran inválidos. `deck_ids = None` no toca las pertenencias.
+    """
+    if front is not None:
+        front = " ".join(front.split())[:MAX_CARD_FRONT]
+        if not front:
+            return None
+    if back is not None:
+        back = back[:MAX_CARD_BACK]
+    if mnemonic is not None:
+        mnemonic = mnemonic[:MAX_CARD_MNEMONIC]
+    targets: list[int] | None = None
+    if deck_ids is not None:
+        targets = [int(d) for d in deck_ids][:MAX_CARD_DECKS]
+    row = await run_in_threadpool(
+        partial(
+            flashcards_repo.update_card_with_decks,
+            user_id,
+            card_id,
+            front=front,
+            back=back,
+            mnemonic=mnemonic,
+            deck_ids=targets,
         )
     )
     if row is None:

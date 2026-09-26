@@ -4,6 +4,46 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.86.1] — 2026-09-26
+
+**La identidad de una ficha deja de depender solo del código: la garantiza la BD, el `PATCH` deja
+de aplicarse a medias y el diccionario deja de poder leer un nombre propio de un booleano que no lo
+era.** Release **DE ROBUSTEZ (patch)** **CON backend y frontend**, **CON migración de BD aditiva e
+idempotente** (`front_key` + índice único, y reparación de arranque), **CON cambio de contrato en un
+único código de error** (`409 CARD_FRONT_TAKEN`) y **SIN bump** de `GENERATOR_VERSION` /
+`DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION`. **No se
+añade ni se retira gate** —siguen los **ocho**, todos en `pending`— y `validation-evidence.json`
+sigue sin existir. Cierra los ocho puntos que la auditoría externa de V3.86.0 dejó abiertos antes de
+diseñar la FASE 2 (estudio configurable).
+
+**El agujero, y era de integridad.** La regla «un anverso no genera dos fichas» la sostenía **solo
+`create_card`** con un `SELECT` + `INSERT`: **dos peticiones concurrentes** del mismo anverso (doble
+clic, alta desde dos pantallas) podían crear **dos fichas**, y `update_card` podía **editar** el
+anverso de una ficha hasta el de otra **sin comprobar nada**. La pertenencia real vivía además en
+dos sitios —`flashcard_cards.deck_id` y la tabla puente— sin declarar cuál mandaba.
+
+**Lo que cambia. (A) Identidad fuerte.** Columna aditiva `front_key` (espacios colapsados +
+`casefold()`, la misma política que ya usaba el deduplicado) con **índice `UNIQUE (user_id,
+front_key)`**: la garantía pasa a la BD. La migración **reliega el anverso de las fichas viejas,
+funde los duplicados que ya existieran** (conserva la de id menor y **suma** las pertenencias de sus
+gemelas, sin perder mazos) y crea el índice. `create_card`/`create_cards` usan `ON CONFLICT … DO
+NOTHING` y reutilizan la ficha ganadora si otra petición ganó la carrera; `update_card` declara
+**`409 CARD_FRONT_TAKEN`** en vez de duplicar. **(B) `PATCH` atómico.** `PATCH
+/api/vocabulary/cards/{id}` escribe ficha y mazos en **UNA transacción**: un `deck_ids` inválido ya
+no deja el recordatorio escrito y devuelve 400 (antes el cliente veía error y parte del PATCH se
+había aplicado). **(C) Salud de la BD.** `cards_without_deck` cuenta las fichas sin ninguna
+pertenencia; `init_db()` las repara al arrancar y `/api/system/status` publica el contador.
+**(D) Parser hostil.** `proper_noun` solo acepta un **boolean de verdad**: el string `"false"` es
+*truthy* en Python y podía colocar un nombre propio como significado por defecto. **(E)
+Documentación.** El contrato de dedupe de `normalize_meanings` se alinea con el código (**por
+término**, no por término + `pos`) y `deck_id` queda declarado como **proyección legacy** de la
+tabla puente. **(F) QA.** Los **34 skipped** de Playwright quedan clasificados
+(`docs/audit/PLAYWRIGHT-SKIPS-V386.md`); se restaura la cobertura tablet/móvil del diccionario
+polisémico (**32 skipped**) y se corrige el CTA del panel incrustado, que en móvil era un botón
+**sin nombre accesible**.
+
+Ver `release-notes-v3.86.1.md`.
+
 ## [3.86.0] — 2026-09-26
 
 **El diccionario deja de servir UN solo significado por palabra, el alta en mazo deja de

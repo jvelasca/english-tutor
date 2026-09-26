@@ -1024,25 +1024,29 @@ async def update_vocabulary_card(
 
     Parcial: un campo ausente no se toca (editar solo el recordatorio no obliga a
     reenviar el anverso). Si llega `deck_ids`, el conjunto no puede quedar vacío.
+    V3.86.1: la ficha y sus mazos se escriben en UNA transacción, así que un
+    `deck_ids` inválido no deja el resto del PATCH aplicado.
+
+    Códigos: 409 `CARD_FRONT_TAKEN` si el anverso nuevo ya es de otra ficha; 400
+    si los mazos no son válidos; 404 si la ficha no es del alumno.
     """
-    result = await flashcards_service.update_card(
-        user["id"],
-        card_id,
-        front=body.front,
-        back=body.back,
-        mnemonic=body.mnemonic,
-    )
+    try:
+        result = await flashcards_service.update_card_with_decks(
+            user["id"],
+            card_id,
+            front=body.front,
+            back=body.back,
+            mnemonic=body.mnemonic,
+            deck_ids=body.deck_ids,
+        )
+    except flashcards_repo.CardFrontConflictError:
+        raise HTTPException(status_code=409, detail="CARD_FRONT_TAKEN") from None
+    except flashcards_repo.NoValidDecksError:
+        raise HTTPException(
+            status_code=400, detail="La ficha debe pertenecer a algún mazo"
+        ) from None
     if result is None:
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
-    if body.deck_ids is not None:
-        updated = await flashcards_service.set_card_decks(
-            user["id"], card_id, body.deck_ids
-        )
-        if updated is None:
-            raise HTTPException(
-                status_code=400, detail="La ficha debe pertenecer a algún mazo"
-            )
-        result = updated
     return result
 
 
@@ -1142,24 +1146,23 @@ async def update_flashcard_card(
         user["id"], card_id, deck_id
     ):
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
-    result = await flashcards_service.update_card(
-        user["id"],
-        card_id,
-        front=body.front,
-        back=body.back,
-        mnemonic=body.mnemonic,
-    )
+    try:
+        result = await flashcards_service.update_card_with_decks(
+            user["id"],
+            card_id,
+            front=body.front,
+            back=body.back,
+            mnemonic=body.mnemonic,
+            deck_ids=body.deck_ids,
+        )
+    except flashcards_repo.CardFrontConflictError:
+        raise HTTPException(status_code=409, detail="CARD_FRONT_TAKEN") from None
+    except flashcards_repo.NoValidDecksError:
+        raise HTTPException(
+            status_code=400, detail="La ficha debe pertenecer a algún mazo"
+        ) from None
     if result is None:
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
-    if body.deck_ids is not None:
-        updated = await flashcards_service.set_card_decks(
-            user["id"], card_id, body.deck_ids
-        )
-        if updated is None:
-            raise HTTPException(
-                status_code=400, detail="La ficha debe pertenecer a algún mazo"
-            )
-        result = updated
     return result
 
 

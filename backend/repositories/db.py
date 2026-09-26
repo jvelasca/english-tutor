@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 import uuid
@@ -11,6 +12,8 @@ from datetime import datetime, timezone
 from config import DATA_DIR
 
 DB_PATH = DATA_DIR / "tutor.db"
+
+_log = logging.getLogger(__name__)
 
 DEFAULT_USER_NAME = "Usuario"
 
@@ -32,6 +35,21 @@ DICTIONARY_LEGACY_VERSION = "1.0.0"
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def front_key(front: str) -> str:
+    """Clave de identidad del anverso de una ficha (V3.86.1).
+
+    Es la MISMA política que aplica el repositorio de flashcards —espacios
+    colapsados y `casefold()`—, pero vive aquí porque el esquema la necesita: el
+    índice `UNIQUE (user_id, front_key)` es lo que garantiza **en la BD** que un
+    alumno tenga una sola ficha por anverso (la regla la sostenía solo
+    `create_card` con un SELECT + INSERT, y dos peticiones concurrentes o una
+    edición del anverso podían saltársela). La migración calcula exactamente la
+    misma clave. `casefold()` y no `COLLATE NOCASE` porque el NOCASE de SQLite
+    solo cubre ASCII y aquí manda el criterio del producto.
+    """
+    return " ".join((front or "").split()).casefold()
 
 
 def redact_emails(text: str) -> str:
@@ -2008,6 +2026,9 @@ def init_db() -> None:
                 front TEXT NOT NULL,
                 back TEXT NOT NULL DEFAULT '',
                 mnemonic TEXT NOT NULL DEFAULT '',
+                -- V3.86.1: anverso normalizado (`casefold()` + espacios) con
+                -- índice ÚNICO por alumno. Columna aditiva (NULL → '').
+                front_key TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id),
@@ -2033,13 +2054,6 @@ def init_db() -> None:
         # que el esquema viejo siga abriendo, y la pertenencia real pasa a esta
         # tabla puente. `ON DELETE CASCADE` en la ficha: borrar una ficha no deja
         # pertenencias huérfanas.
-        deck_cards_existed = (
-            conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' "
-                "AND name = 'flashcard_deck_cards'"
-            ).fetchone()
-            is not None
-        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS flashcard_deck_cards (
@@ -2053,17 +2067,91 @@ def init_db() -> None:
             )
             """
         )
-        # Backfill SOLO la primera vez que nace la tabla: cada ficha existente
-        # entra en su `deck_id` actual como mazo principal. Repetirlo en cada
-        # arranque resucitaría una pertenencia que el alumno quitó a propósito
-        # (el `deck_id` deprecado seguiría apuntando ahí), así que la condición
-        # `deck_cards_existed` es la que evita el candado silencioso.
-        if not deck_cards_existed:
+        # V3.86.1 (identidad de ficha): el anverso normalizado pasa a ser una
+        # columna con índice ÚNICO por alumno. Hasta V3.86.0 la regla «un anverso
+        # no se duplica» la sostenía solo `create_card` (SELECT + INSERT), así que
+        # dos peticiones concurrentes —o una edición del anverso— podían dejar dos
+        # fichas iguales. Columna aditiva: una BD anterior abre sin migrar nada.
+        card_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(flashcard_cards)")
+        }
+        if "front_key" not in card_cols:
             conn.execute(
-                "INSERT OR IGNORE INTO flashcard_deck_cards "
-                "(card_id, deck_id, created_at) "
-                "SELECT id, deck_id, created_at FROM flashcard_cards"
+                "ALTER TABLE flashcard_cards ADD COLUMN "
+                "front_key TEXT NOT NULL DEFAULT ''"
             )
+        # Backfill de la clave desde el anverso. Se hace en Python (no en SQL)
+        # porque la política de normalización es del producto (`casefold()`, que
+        # SQLite no aplica fuera de ASCII). Una ficha sin anverso —estado que el
+        # modelo actual no produce— recibe una clave sintética para que el índice
+        # no choque por dos cadenas vacías.
+        pending = conn.execute(
+            "SELECT id, front FROM flashcard_cards WHERE front_key = ''"
+        ).fetchall()
+        for row in pending:
+            conn.execute(
+                "UPDATE flashcard_cards SET front_key = ? WHERE id = ?",
+                (front_key(str(row["front"])) or f"(legacy:{row['id']})", row["id"]),
+            )
+        # Deduplicación de las fichas que ya se duplicaron antes de existir el
+        # índice (carrera del alta o edición del anverso): se conserva la de id
+        # menor y sus hermanas se FUNDEN en ella —sus pertenencias se suman— en
+        # lugar de borrarse sin más, para no perder un mazo al que solo apuntaba
+        # la copia.
+        duplicates = conn.execute(
+            "SELECT user_id, front_key, MIN(id) AS keep_id, COUNT(*) AS n "
+            "FROM flashcard_cards GROUP BY user_id, front_key HAVING n > 1"
+        ).fetchall()
+        merged = 0
+        for group in duplicates:
+            losers = [
+                int(r["id"])
+                for r in conn.execute(
+                    "SELECT id FROM flashcard_cards "
+                    "WHERE user_id = ? AND front_key = ? AND id <> ?",
+                    (group["user_id"], group["front_key"], group["keep_id"]),
+                ).fetchall()
+            ]
+            for loser in losers:
+                conn.execute(
+                    "INSERT OR IGNORE INTO flashcard_deck_cards "
+                    "(card_id, deck_id, created_at) "
+                    "SELECT ?, deck_id, created_at FROM flashcard_deck_cards "
+                    "WHERE card_id = ?",
+                    (int(group["keep_id"]), loser),
+                )
+                conn.execute(
+                    "DELETE FROM flashcard_deck_cards WHERE card_id = ?", (loser,)
+                )
+                conn.execute("DELETE FROM flashcard_cards WHERE id = ?", (loser,))
+                merged += 1
+        if merged:
+            _log.warning(
+                "fichas: %d duplicado(s) por anverso fusionados en el arranque "
+                "(V3.86.1)",
+                merged,
+            )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_flashcard_cards_identity "
+            "ON flashcard_cards(user_id, front_key)"
+        )
+        # Pertenencia huérfana: una ficha SIN ninguna fila puente solo puede venir
+        # de una migración a medias —el dominio borra la ficha o le deja al menos
+        # un mazo—, así que se repara aquí. A diferencia del backfill de V3.86.0
+        # —que solo corría la primera vez que nacía la tabla— esto es idempotente
+        # y NO resucita una pertenencia que el alumno retiró: esas fichas conservan
+        # su otro mazo. El `EXISTS` sobre el mazo evita que un `deck_id` colgante
+        # de una BD vieja tumbe el arranque por la FK.
+        conn.execute(
+            "INSERT OR IGNORE INTO flashcard_deck_cards "
+            "(card_id, deck_id, created_at) "
+            "SELECT c.id, c.deck_id, c.created_at FROM flashcard_cards c "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM flashcard_deck_cards dc WHERE dc.card_id = c.id"
+            ") AND EXISTS ("
+            "  SELECT 1 FROM flashcard_decks d WHERE d.id = c.deck_id"
+            ")"
+        )
         # Ledger append-only de cada calificación. Es lo que hace EXACTOS los
         # límites diarios y las estadísticas: contar «cartas distintas con
         # `last_review_at` de hoy» no distingue nuevas de repaso y no cuenta las

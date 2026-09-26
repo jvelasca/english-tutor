@@ -56,3 +56,11 @@ def test_server_status_reports_rejections(monkeypatch, tmp_path):
         assert body["rate_limited"]["rejected_last_minute"] == 2
     finally:
         security._rejections.clear()
+
+
+def test_server_status_reports_flashcard_integrity(monkeypatch, tmp_path):
+    """El health check N:M (V3.86.1) sale en la superficie pública, en 0."""
+    _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        body = client.get("/api/system/status").json()
+    assert body["flashcards"]["cards_without_deck"] == 0

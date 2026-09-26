@@ -696,6 +696,10 @@ export function QuizRoutePage({
                 variant="ghost"
                 size="sm"
                 className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
+                // V3.86.1: en móvil el texto se oculta (`hidden sm:inline`), así
+                // que el botón necesita nombre accesible propio o queda mudo para
+                // lectores de pantalla y para las pruebas por rol.
+                aria-label={t(config.dictionary.ctaKey)}
                 onClick={() => {
                   setView({ kind: "dictionary" });
                   persistDictionaryView(PANEL_VIEW_BY_KIND.dictionary);
@@ -713,6 +717,7 @@ export function QuizRoutePage({
                 variant="ghost"
                 size="sm"
                 className="min-h-9 shrink-0 gap-1 px-2 text-sm font-medium"
+                aria-label={t(config.dictionaryLookup.ctaKey)}
                 onClick={() => {
                   setView({ kind: "lookup" });
                   persistDictionaryView(PANEL_VIEW_BY_KIND.lookup);

@@ -526,3 +526,53 @@ def test_repository_round_trips_the_meanings(monkeypatch, tmp_path):
         ensure_ascii=False,
         separators=(",", ":"),
     )
+
+
+# --- V3.86.1: contrato del parser de significados ---------------------------
+
+
+def test_normalize_meanings_only_trusts_a_real_boolean_for_proper_noun():
+    """Solo un boolean de verdad marca nombre propio (V3.86.1).
+
+    El contenido lo genera un modelo: `"false"` es un string *truthy* en Python,
+    así que `bool(...)` convertía una negación explícita en un nombre propio y
+    podía colocar «Lima» como significado por defecto.
+    """
+    out = dictionary_content.normalize_meanings(
+        [
+            {"term": "file", "proper_noun": "false"},  # string truthy: NO
+            {"term": "lime", "proper_noun": "true"},  # string: NO
+            {"term": "saw", "proper_noun": 1},  # número: NO
+            {"term": "Peru", "proper_noun": None},  # None: NO
+            {"term": "Lima", "proper_noun": True},  # boolean de verdad
+        ]
+    )
+    by_term = {m["term"]: m for m in out}
+    assert by_term["file"]["proper_noun"] is False
+    assert by_term["lime"]["proper_noun"] is False
+    assert by_term["saw"]["proper_noun"] is False
+    assert by_term["Peru"]["proper_noun"] is False
+    assert by_term["Lima"]["proper_noun"] is True
+    # El único nombre propio real va al final y no puede ser el por defecto.
+    assert out[-1]["term"] == "Lima"
+    assert dictionary_content.default_meaning_term(out, "x") == "file"
+
+
+def test_normalize_meanings_dedupes_by_term_not_by_pos():
+    """El contrato es dedupe por TÉRMINO: el término ES el significado.
+
+    Dos apariciones del mismo equivalente con `pos` distinto —`file`/noun y
+    `file`/verb— son una sola acepción; la documentación y el código dicen ahora
+    lo mismo.
+    """
+    out = dictionary_content.normalize_meanings(
+        [
+            {"term": "file", "pos": "noun", "gloss": "herramienta"},
+            {"term": "FILE", "pos": "verb", "gloss": "archivar"},
+            {"term": "lime", "pos": "noun"},
+        ]
+    )
+    assert [m["term"] for m in out] == ["file", "lime"]
+    # Conserva la primera, que es la que trae la mejor metadata.
+    assert out[0]["pos"] == "noun"
+    assert out[0]["gloss"] == "herramienta"

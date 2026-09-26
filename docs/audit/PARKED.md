@@ -2414,6 +2414,66 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **Todo lo declarado abierto en V3.85.0 y anteriores sigue abierto** salvo lo que esta
   release cierra de forma explícita arriba.
 
+## V3.86.1 — Cierre del núcleo técnico post-V3.86.0 · 2026-09-26
+
+> Release **DE ROBUSTEZ** (patch) **CON backend y frontend**, **CON migración de BD aditiva e
+> idempotente**, **SIN endpoints nuevos** y **CON un único cambio de contrato de error**
+> (`409 CARD_FRONT_TAKEN`). Detalle en `release-notes-v3.86.1.md`. Cierra los **ocho puntos** que
+> la auditoría externa de V3.86.0 dejó abiertos **antes** de diseñar la fase 2. El tag **`v3.86.1`
+> es propio y se publica** (no se repite la absorción de `v3.85.1`).
+
+### Cerrado en V3.86.1 (deja de ser deuda)
+
+- **P1 — Identidad fuerte de la ficha.** La regla «un anverso, una ficha» deja de depender de
+  `create_card` y pasa a la **BD**: columna `front_key` (política única en `db.front_key()`) +
+  **`UNIQUE INDEX idx_flashcard_cards_identity(user_id, front_key)`**. `create_card`/`create_cards`
+  usan `ON CONFLICT … DO NOTHING` y **reutilizan** la ficha ganadora si hay carrera; `update_card`
+  declara **`409`** en vez de duplicar. La migración **reliega** las claves y **funde** los
+  duplicados ya existentes (conserva el `id` menor y **suma** las pertenencias). `[DATOS]`
+- **P2 — `PATCH` ficha + mazos atómico.** `update_card_with_decks` escribe campos, pertenencias y
+  `deck_id` en **UNA transacción**: un `deck_ids` inválido **no deja nada escrito** (`400`). Se
+  elimina la ventana TOCTOU validando los mazos con `_owned_deck_ids_in` dentro de la
+  transacción. `[ARQUITECTURA]` `[DATOS]`
+- **P2 — Salud de la BD.** `cards_without_deck()` cuenta las fichas sin ninguna pertenencia;
+  `init_db()` las **repara** de forma idempotente y **sin resucitar** una pertenencia retirada a
+  propósito; `/api/system/status` publica el contador. `[DATOS]` `[VALIDACIÓN]`
+- **P2 — Parser hostil.** `proper_noun` **solo** acepta un `True` de verdad: `"false"` (string
+  *truthy*) ya no convierte una negación en nombre propio. `[PRODUCTO]`
+- **P2 — Contrato de dedupe declarado.** `normalize_meanings` deduplica **por término**
+  (`casefold()`), y el docstring y el tipo (`set[str]`) dicen lo mismo que el código. `[DOCUMENTACIÓN]`
+- **P2 — `deck_id` declarado proyección legacy.** Ver la nota de autoridad de pertenencia, abajo.
+  `[ARQUITECTURA]` `[DOCUMENTACIÓN]`
+- **P2 — Los 34 skips de Playwright clasificados** (`docs/audit/PLAYWRIGHT-SKIPS-V386.md`); guarda
+  de proyecto retirada del test del diccionario polisémico → **32 skipped**, y corregido un CTA del
+  panel incrustado que en móvil quedaba **sin nombre accesible**. `[VALIDACIÓN]`
+
+### Autoridad de pertenencia (declarado en V3.86.1)
+
+> **La autoridad de pertenencia ficha ↔ mazo es `flashcard_deck_cards`.** La columna
+> `flashcard_cards.deck_id` se conserva **DEPRECADA** como **proyección legacy** del «mazo
+> principal» (`MIN(mazos)`), con **un solo escritor** en el dominio, **solo** para que el esquema
+> anterior siga abriendo. No es una segunda fuente de verdad y no debe leerse como tal. Su
+> retirada exige una **ventana de reconstrucción de tabla** y queda **aparcada**. `[ARQUITECTURA]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **`deck_id` sigue existiendo** como proyección legacy. Retirarla es una migración de esquema
+  (reconstrucción de tabla en SQLite) y **no** se aborda aquí. `[DATOS]`
+- **La migración solo repara fichas SIN pertenencia.** Una ficha con una pertenencia **incorrecta**
+  (apuntando a un mazo que no debería) no es detectable por este chequeo; sería un `deck_id`
+  incoherente con la tabla puente, y el dominio lo evita por construcción. `[VALIDACIÓN]`
+- **El índice único no impide dos anversos que normalicen distinto** (`"house."` vs `"house"`): la
+  normalización colapsa espacios y mayúsculas, no puntuación. Si el producto quiere lo segundo, es
+  una decisión nueva. `[PRODUCTO]`
+- **La fusión de duplicados descarta reverso y recordatorio de las copias perdedoras** (la
+  pertenencia sí se suma). `[PRODUCTO]`
+- **La fase 2 (estudio configurable) no está.** Este patch es el cierre técnico **previo** a
+  diseñarla. `[PRODUCTO]`
+- **El ancla de certificación sigue en `v3.83.1`** y la cola de auditoría sigue atrasada (`AV`,
+  `AW`, `AX` y el informe `AZ` de este arco esperan dictamen). `[AUDITORÍA]`
+- **Todo lo declarado abierto en V3.86.0 y anteriores sigue abierto** salvo lo que esta release
+  cierra de forma explícita arriba.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
