@@ -2474,6 +2474,24 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **Todo lo declarado abierto en V3.86.0 y anteriores sigue abierto** salvo lo que esta release
   cierra de forma explícita arriba.
 
+### Estado de publicación (verificado el 2026-09-27)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.86.1` | **publicado** (`refs/tags/v3.86.1` en `origin`) → commit `1a49506` |
+| GitHub Release | https://github.com/jvelasca/english-tutor/releases/tag/v3.86.1 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `1a49506` | `success` — run `36279474597`, **12/12 jobs en verde** |
+| Orden tag/CI | el tag se creó **después** del verde: la evidencia queda anclada al commit de release |
+| `main` vs `origin/main` | al día en `1a49506` |
+| Encargo de auditoría de `v3.86.1` | **no existe** (`agentes/auditoria-total-externa-v3861.md` no está) |
+| Prefijo de dos letras | **`AZ` agotado** con el encargo de `v3.86.0`, que dejó a su informe dictaminar la convención antes de emitir otro |
+
+**Aviso de anclaje:** hay tags **SIN Release** —`v3.84.0`, `v3.84.1` y `v3.85.0` entre los
+recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `v3.77.0`,
+`v3.77.1`, `v3.77.2`, `v3.78.0`, `v3.79.0` y `v3.81.0` antes—, así que «no hay Release» **no**
+significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
+release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
