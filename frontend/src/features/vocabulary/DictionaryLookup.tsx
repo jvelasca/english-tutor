@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "motion/react";
 import {
+  AlertTriangle,
   ArrowLeftRight,
   BookOpen,
   Check,
@@ -13,6 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { ApiError } from "../../api/client";
 import { normalizeDictionaryEntry } from "../../api/normalize";
 import {
   addVocabularyItem,
@@ -58,6 +60,19 @@ const MAX_QUERY_LENGTH = 80;
 
 /** Valor centinela del selector de mazo: «crear uno nuevo» (V3.84.0). */
 const NEW_DECK_OPTION = "__new__";
+
+/** Destino de la tarjeta manual del alta (V3.84.1): lo que queda por guardar si
+ *  la SEGUNDA escritura falla, para poder reintentarla sin repetir el alta. */
+interface DeckCardTarget {
+  id: number;
+  name: string;
+  front: string;
+  back: string;
+}
+
+/** V3.84.1: el nombre de mazo ya existe para este alumno —el backend lo
+ *  distingue con `DECK_NAME_TAKEN`—, frente a cualquier otro fallo de creación. */
+type DeckCreateError = "duplicate" | "generic" | null;
 
 interface DictionaryLookupProps {
   userId: string | null;
@@ -121,9 +136,15 @@ export function DictionaryLookup({
   // tarjeta. La escalera vive debajo de la tarjeta de resultado. V3.39: en
   // ES→EN se practica siempre el EQUIVALENTE INGLÉS, nunca el término español.
   const [practiceWord, setPracticeWord] = useState<string | null>(null);
-  const [addStatus, setAddStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [addStatus, setAddStatus] = useState<
+    "idle" | "ok" | "partial" | "error"
+  >("idle");
   const [adding, setAdding] = useState(false);
   const [creatingDeck, setCreatingDeck] = useState(false);
+  // V3.84.1: fallo al CREAR un mazo, separado de `deckError` (fallo al CARGAR la
+  // lista). Antes compartían estado y un nombre duplicado ocultaba el selector.
+  const [deckCreateError, setDeckCreateError] =
+    useState<DeckCreateError>(null);
   // V3.83.0: el panel de alta. V3.84.0: el destino es un MAZO manual (no una
   // lista): `decks` es `null` mientras no se ha pedido (carga perezosa al abrir
   // el panel, para no pagar una consulta en cada búsqueda). `selectedDeck` es el
@@ -137,6 +158,10 @@ export function DictionaryLookup({
   const [savedDeck, setSavedDeck] = useState<{ id: number; name: string } | null>(
     null,
   );
+  // V3.84.1: la tarjeta que quedó pendiente cuando el léxico ya entró y el mazo
+  // falló. Es lo que declara el estado PARCIAL y lo que reintenta el botón: sin
+  // esto la UI diría «error» sobre una operación que ya está a medias.
+  const [pendingDeck, setPendingDeck] = useState<DeckCardTarget | null>(null);
 
   async function runLookup(raw: string, dir: DictionaryDirection = direction) {
     if (!userId) return;
@@ -161,6 +186,8 @@ export function DictionaryLookup({
     setAddOpen(false);
     setSelectedDeck("");
     setSavedDeck(null);
+    setPendingDeck(null);
+    setDeckCreateError(null);
     try {
       const data = await lookupDictionaryWord(userId, word, dir);
       setEntry(normalizeDictionaryEntry(data));
@@ -194,6 +221,8 @@ export function DictionaryLookup({
     setAddStatus("idle");
     setSelectedDeck("");
     setSavedDeck(null);
+    setPendingDeck(null);
+    setDeckCreateError(null);
   }
 
   function toggleAddPanel() {
@@ -205,20 +234,57 @@ export function DictionaryLookup({
   }
 
   /** Crea un mazo desde el propio panel y lo deja seleccionado (V3.84.0).
-   *  Sin este camino, elegir mazo obligaba a salir a Flashcards. */
+   *  Sin este camino, elegir mazo obligaba a salir a Flashcards.
+   *  V3.84.1: un nombre duplicado se declara como tal (el backend lo distingue
+   *  con `DECK_NAME_TAKEN`) y NO oculta el selector, que es lo que hacía al
+   *  compartir estado con el fallo de carga de mazos. */
   async function handleCreateDeck(name: string) {
     if (!userId || creatingDeck) return;
     setCreatingDeck(true);
-    setDeckError(false);
+    setDeckCreateError(null);
     try {
       const created = await createFlashcardDeck(userId, { name });
       setDecks((current) => [...(current ?? []), created]);
       setSelectedDeck(String(created.id));
-    } catch {
-      setDeckError(true);
+    } catch (err) {
+      const detail = err instanceof ApiError ? err.detail : "";
+      setDeckCreateError(detail === "DECK_NAME_TAKEN" ? "duplicate" : "generic");
     } finally {
       setCreatingDeck(false);
     }
+  }
+
+  /** V3.84.1: SEGUNDA escritura del alta, aislada para poder reintentarla sola.
+   *  Devuelve si la tarjeta entró de verdad; nunca lanza. */
+  async function saveDeckCard(target: DeckCardTarget): Promise<boolean> {
+    if (!userId) return false;
+    try {
+      await createFlashcard(userId, target.id, {
+        front: target.front,
+        back: target.back,
+      });
+      setSavedDeck({ id: target.id, name: target.name });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** V3.84.1: reintenta SOLO la tarjeta del mazo tras un alta parcial. El
+   *  aprendizaje ya está escrito, así que no se repite `addVocabularyItem`. */
+  async function handleRetryDeckCard() {
+    if (!pendingDeck || adding) return;
+    setAdding(true);
+    const target = pendingDeck;
+    const saved = await saveDeckCard(target);
+    setAdding(false);
+    if (!saved) {
+      setAddStatus("partial");
+      return;
+    }
+    setPendingDeck(null);
+    setAddStatus("ok");
+    setSelectedDeck("");
   }
 
   async function handleAddToFlashcards() {
@@ -226,33 +292,47 @@ export function DictionaryLookup({
     setAdding(true);
     setAddStatus("idle");
     setSavedDeck(null);
+    setPendingDeck(null);
+    const translation =
+      entry?.direction === "en-es" ? entry.translation ?? "" : entry?.word ?? "";
+    const term = practiceTerm;
+    // 1) El alta que ya existía: léxico + carta FSRS + estado `learning`.
+    //    Si ESTA falla, no se escribió nada: error simple, sin estado parcial.
     try {
-      const translation =
-        entry?.direction === "en-es" ? entry.translation ?? "" : entry?.word ?? "";
-      // 1) El alta que ya existía: léxico + carta FSRS + estado `learning`.
-      await addVocabularyItem(userId, practiceTerm, { translation });
-      // 2) V3.84.0: además, si el alumno eligió un mazo manual, se guarda la
-      //    tarjeta con anverso/reverso. Son dos escrituras y así se declara.
-      if (selectedDeck) {
-        const deckId = Number(selectedDeck);
-        const deckName =
-          decks?.find((d) => d.id === deckId)?.name ?? practiceTerm;
-        await createFlashcard(userId, deckId, {
-          front: practiceTerm,
-          back: translation,
-        });
-        setSavedDeck({ id: deckId, name: deckName });
-      }
-      setAddStatus("ok");
-      setSelectedDeck("");
-      // El alta ya deja la palabra en el léxico (estado `learning`): se refresca
-      // en silencio para que la marca de uso lo refleje sin desmontar la tarjeta.
-      void refreshEntry(lastQuery, lastDirection);
+      await addVocabularyItem(userId, term, { translation });
     } catch {
       setAddStatus("error");
-    } finally {
       setAdding(false);
+      return;
     }
+    // El alta ya deja la palabra en el léxico (estado `learning`): se refresca
+    // en silencio para que la marca de uso lo refleje sin desmontar la tarjeta.
+    void refreshEntry(lastQuery, lastDirection);
+    // 2) V3.84.0: además, si el alumno eligió un mazo manual, se guarda la
+    //    tarjeta con anverso/reverso. Son DOS escrituras y así se declara.
+    //    V3.84.1: si esta segunda falla, el aprendizaje YA está hecho; se
+    //    declara el estado PARCIAL y se ofrece reintentar solo la tarjeta, en
+    //    vez de pintar un «error» que miente sobre lo que sí se guardó.
+    if (selectedDeck) {
+      const deckId = Number(selectedDeck);
+      const deckName = decks?.find((d) => d.id === deckId)?.name ?? term;
+      const target: DeckCardTarget = {
+        id: deckId,
+        name: deckName,
+        front: term,
+        back: translation,
+      };
+      const saved = await saveDeckCard(target);
+      setAdding(false);
+      if (!saved) {
+        setPendingDeck(target);
+        setAddStatus("partial");
+        return;
+      }
+    }
+    setAdding(false);
+    setAddStatus("ok");
+    setSelectedDeck("");
   }
 
   // V3.32: tras producir la palabra en el drill, refresca la entrada en silencio
@@ -281,6 +361,8 @@ export function DictionaryLookup({
     setAddStatus("idle");
     setSelectedDeck("");
     setSavedDeck(null);
+    setPendingDeck(null);
+    setDeckCreateError(null);
   }
 
   const practiceTerm = entry
@@ -315,6 +397,8 @@ export function DictionaryLookup({
     setAddOpen(false);
     setSelectedDeck("");
     setSavedDeck(null);
+    setPendingDeck(null);
+    setDeckCreateError(null);
     setLastQuery("");
   }
 
@@ -544,14 +628,20 @@ export function DictionaryLookup({
                   term={practiceTerm}
                   decks={decks}
                   deckError={deckError}
+                  deckCreateError={deckCreateError}
                   selectedDeck={selectedDeck}
-                  onSelectDeck={setSelectedDeck}
+                  onSelectDeck={(id) => {
+                    setSelectedDeck(id);
+                    setDeckCreateError(null);
+                  }}
                   creatingDeck={creatingDeck}
                   onCreateDeck={(name) => void handleCreateDeck(name)}
                   savedDeck={savedDeck}
+                  pendingDeck={pendingDeck}
                   adding={adding}
                   status={addStatus}
                   onConfirm={() => void handleAddToFlashcards()}
+                  onRetryDeck={() => void handleRetryDeckCard()}
                   onClose={closeAddPanel}
                   onOpenFlashcards={onOpenFlashcards}
                 />
@@ -603,34 +693,90 @@ function AddToFlashcardsPanel({
   term,
   decks,
   deckError,
+  deckCreateError,
   selectedDeck,
   onSelectDeck,
   creatingDeck,
   onCreateDeck,
   savedDeck,
+  pendingDeck,
   adding,
   status,
   onConfirm,
+  onRetryDeck,
   onClose,
   onOpenFlashcards,
 }: {
   term: string;
   decks: FlashcardDeck[] | null;
   deckError: boolean;
+  deckCreateError: DeckCreateError;
   selectedDeck: string;
   onSelectDeck: (id: string) => void;
   creatingDeck: boolean;
   onCreateDeck: (name: string) => void;
   savedDeck: { id: number; name: string } | null;
+  pendingDeck: DeckCardTarget | null;
   adding: boolean;
-  status: "idle" | "ok" | "error";
+  status: "idle" | "ok" | "partial" | "error";
   onConfirm: () => void;
+  onRetryDeck: () => void;
   onClose: () => void;
   onOpenFlashcards?: (deckId?: number) => void;
 }) {
   const { t } = useI18n();
   const [newName, setNewName] = useState("");
   const creating = selectedDeck === NEW_DECK_OPTION;
+
+  // V3.84.1: el alta entró en el aprendizaje, pero la tarjeta del mazo no. Se
+  // declara el estado real (no un «error» genérico) y se ofrece reintentar SOLO
+  // la tarjeta; el estudio sigue disponible porque la palabra ya está en el flujo.
+  if (status === "partial") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3"
+        role="alert"
+      >
+        <p className="flex items-center gap-2 text-sm font-medium text-warning">
+          <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+          {t("dictionary.lookup.addPartial")
+            .replace("{word}", term)
+            .replace("{deck}", pendingDeck?.name ?? "")}
+        </p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("dictionary.lookup.addPartialHint")}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={adding}
+            onClick={onRetryDeck}
+            className="gap-1.5"
+          >
+            <RefreshCw className="size-3.5" aria-hidden="true" />
+            {adding
+              ? t("common.saving")
+              : t("dictionary.lookup.addPartialRetry")}
+          </Button>
+          {onOpenFlashcards ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onOpenFlashcards()}
+              className="gap-1.5"
+            >
+              <Layers className="size-3.5" aria-hidden="true" />
+              {t("dictionary.lookup.studyCta")}
+            </Button>
+          ) : null}
+        </div>
+      </motion.div>
+    );
+  }
 
   if (status === "ok") {
     return (
@@ -740,6 +886,14 @@ function AddToFlashcardsPanel({
               : t("dictionary.lookup.addDeckCreate")}
           </Button>
         </div>
+      ) : null}
+
+      {deckCreateError ? (
+        <p className="text-[11px] text-destructive" role="alert">
+          {deckCreateError === "duplicate"
+            ? t("dictionary.lookup.addDeckDuplicate")
+            : t("dictionary.lookup.addDeckCreateError")}
+        </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">

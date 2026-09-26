@@ -4,6 +4,37 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.84.1] — 2026-09-25
+
+**Cierre del estado parcial Diccionario → léxico + mazo: la app deja de decir «error» cuando
+el alta se quedó a medias, permite reintentar solo la tarjeta, y el nombre de mazo duplicado
+se dice como tal.** Release de **ROBUSTEZ (patch)** con **backend y frontend**, **SIN migración
+de BD** y **SIN endpoints nuevos** (solo se afina el `detail` de un `400` existente); **SIN
+bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) /
+`LISTENING_BANK_VERSION` ni de las evaluaciones. **No se añade ni se retira gate** —siguen los
+**ocho**, todos en `pending`—.
+
+**El defecto, y era real.** Añadir desde el diccionario elige MAZO manual desde V3.84.0, y eso
+son **dos escrituras**: `addVocabularyItem` (léxico + carta FSRS) y `createFlashcard` (tarjeta
+del mazo). Compartían un `catch`, así que un fallo de la segunda pintaba «No se pudo añadir la
+palabra» aunque **el aprendizaje ya estaba hecho**: un estado parcial declarado como error.
+Ahora el alta del léxico tiene su propio `try/catch`, la tarjeta fallida queda como pendiente,
+el panel declara el estado **parcial** —«ya está en aprendizaje, pero no se pudo guardar en el
+mazo»— y ofrece **reintentar solo la tarjeta**, sin repetir el alta. Se elige la opción **A**
+(dos escrituras + estado parcial + reintento) y no la **B** (endpoint transaccional), que queda
+declarada como deuda de arquitectura por cambiar el contrato de API.
+
+**Mazo duplicado.** El backend responde `400 DECK_NAME_TAKEN` y la UI lo traduce a «ya tienes
+un mazo con ese nombre» **sin ocultar el selector**: la creación de un mazo deja de compartir
+estado con la carga de la lista de mazos.
+
+**Pruebas.** E2E de los cuatro desenlaces del puente (crear mazo → añadir → estudiar ese mazo →
+tarjeta visible; mazo existente; solo aprendizaje; fallo de la tarjeta → parcial → reintento),
+con la cola de cada mazo construida **a partir de lo que entró de verdad**; tests unitarios del
+reintento y del duplicado; y test de backend del `detail`. La política de los packs sembrados
+por `slug` (**inmutables en la práctica**) queda documentada en `ensure_theme_packs_seeded`, y
+**H1 sigue vivo** como deuda aceptada `P2`.
+
 ## [3.84.0] — 2026-09-25
 
 **Responsive global, mazos estándar y ruta de aprendizaje: la app deja de recortar botones

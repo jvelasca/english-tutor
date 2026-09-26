@@ -27,6 +27,16 @@ def ensure_theme_packs_seeded() -> int:
     """Idempotente: carga packs JSON globales si el slug aún no existe.
 
     Devuelve el número de packs recién insertados.
+
+    **Política de actualización (V3.84.1).** El seed es **append-only por
+    `slug`**: si el slug ya existe no se compara ni se actualiza el contenido, de
+    modo que editar un `*.json` de `curriculum/vocab_packs/` **no** propaga nada a
+    las filas ya sembradas (título, hint, palabras, traducciones o POS). Los packs
+    publicados son, por tanto, **inmutables en la práctica** mientras no exista un
+    proceso explícito de actualización de catálogo: corregir o ampliar un pack ya
+    sembrado exige una migración/reconciliación propia (comparar y actualizar por
+    `slug`, o versionar el pack con un slug nuevo). No se hace aquí a propósito:
+    un `UPDATE` ciego en el arranque pisaría contenido y membresías de alumnos.
     """
     if not PACKS_DIR.is_dir():
         return 0

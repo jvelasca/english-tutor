@@ -859,7 +859,12 @@ async def create_flashcard_deck(
         review_per_day=body.review_per_day,
     )
     if result is None:
-        raise HTTPException(status_code=400, detail="No se pudo crear el mazo")
+        # Con el nombre ya validado y el usuario tomado de la sesión, el único
+        # desenlace posible aquí es la colisión `UNIQUE (user_id, name)`: se
+        # declara con un código para que la UI lo diga («ya tienes un mazo con
+        # ese nombre») en vez de un genérico que oculta el selector. Es un
+        # código máquina, como `SESSION_REQUIRED`, no un texto para el alumno.
+        raise HTTPException(status_code=400, detail="DECK_NAME_TAKEN")
     return result
 
 

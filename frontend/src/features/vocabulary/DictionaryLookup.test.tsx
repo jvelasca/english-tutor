@@ -118,13 +118,37 @@ const GO_UNIT = {
   },
 };
 
+/** Respuesta de error forzada por una ruta (V3.84.1): lo que `ApiError` necesita
+ *  para reconstruir el `detail` del backend en el cliente. */
+export interface RouteErrorSpec {
+  status: number;
+  detail?: string;
+}
+
 /** Mock de fetch por URL; los datos pueden ser un valor o una función evaluada
- * en el momento de la llamada (para mutar estado entre llamadas). */
-function routeFetch(routes: Array<{ url: string; data: unknown }>) {
+ * en el momento de la llamada (para mutar estado entre llamadas). V3.84.1:
+ * `error` fuerza una respuesta `ok:false` (estática o por llamada, para probar
+ * un fallo seguido de un reintento con éxito). */
+function routeFetch(
+  routes: Array<{
+    url: string;
+    data?: unknown;
+    error?: RouteErrorSpec | (() => RouteErrorSpec | null);
+  }>,
+) {
   const fn = vi.fn().mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     const hit = routes.find((r) => url.includes(r.url));
     if (!hit) return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    const err =
+      typeof hit.error === "function" ? hit.error() : (hit.error ?? null);
+    if (err) {
+      return Promise.resolve({
+        ok: false,
+        status: err.status,
+        json: async () => ({ detail: err.detail ?? `HTTP ${err.status}` }),
+      });
+    }
     const data = typeof hit.data === "function" ? hit.data() : hit.data;
     return Promise.resolve({ ok: true, json: async () => data });
   });
@@ -1070,5 +1094,135 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
     expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
+  });
+
+  it("V3.84.1: si falla la tarjeta del mazo, declara el estado PARCIAL y reintenta solo la tarjeta", async () => {
+    const onOpenFlashcards = vi.fn();
+    // La PRIMERA llamada de la tarjeta falla y la segunda entra: es justo el
+    // reintento que ofrece el panel. El alta del léxico nunca falla.
+    let cardCalls = 0;
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: NEBULA },
+      {
+        url: "/api/vocabulary/decks/7/cards",
+        error: () => {
+          cardCalls += 1;
+          return cardCalls === 1 ? { status: 500, detail: "boom" } : null;
+        },
+        data: {
+          id: 11,
+          deck_id: 7,
+          front: "nebula",
+          back: "",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "2026-09-25T10:00:00Z",
+        },
+      },
+      {
+        url: "/api/vocabulary/decks",
+        data: {
+          decks: [AUTO_DECK, MANUAL_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
+      },
+      {
+        url: "/api/vocabulary/items",
+        data: {
+          added: ["nebula"],
+          item: { word: "nebula", translation: "", definition: "" },
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" onOpenFlashcards={onOpenFlashcards} />);
+
+    fillAndSubmit("nebula");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to Flashcards" }),
+    );
+    const select = await screen.findByRole("combobox");
+    fireEvent.change(select, { target: { value: "7" } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add and start learning" }),
+    );
+
+    // Estado PARCIAL declarado: ni «ok» (mentiría) ni un «error» genérico que
+    // oculta que el aprendizaje sí se completó.
+    expect(
+      await screen.findByText(/is now learning, but it could not be saved in/),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Your word is saved in learning and follows the study flow/),
+    ).toBeTruthy();
+    // La primera escritura (léxico) sí ocurrió y la segunda falló una vez.
+    expect(
+      fn.mock.calls.filter((call) =>
+        String(call[0]).includes("/api/vocabulary/items"),
+      ),
+    ).toHaveLength(1);
+    expect(cardCalls).toBe(1);
+    // El estudio sigue disponible: la palabra ya está en el flujo.
+    fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
+    expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
+    expect(onOpenFlashcards.mock.calls[0][0]).toBeUndefined();
+
+    // Reintento: SOLO la tarjeta del mazo, y cierra en el éxito completo.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry saving to the deck" }),
+    );
+    expect(await screen.findByText("nebula is now learning.")).toBeTruthy();
+    expect(screen.getByText(/Saved as a card in/)).toBeTruthy();
+    expect(cardCalls).toBe(2);
+    // El reintento no repite el alta del léxico: sigue habiendo UNA sola.
+    expect(
+      fn.mock.calls.filter((call) =>
+        String(call[0]).includes("/api/vocabulary/items"),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("V3.84.1: un nombre de mazo duplicado se declara y NO oculta el selector", async () => {
+    // La llamada 1 es el GET de la lista (al abrir el panel) y la 2 el POST de
+    // creación: solo la creación falla, con el código que manda el backend.
+    let deckCalls = 0;
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: NEBULA },
+      {
+        url: "/api/vocabulary/decks",
+        error: () => {
+          deckCalls += 1;
+          return deckCalls === 2
+            ? { status: 400, detail: "DECK_NAME_TAKEN" }
+            : null;
+        },
+        data: {
+          decks: [AUTO_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("nebula");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to Flashcards" }),
+    );
+    const select = await screen.findByRole("combobox");
+    fireEvent.change(select, { target: { value: "__new__" } });
+    fireEvent.change(screen.getByLabelText("New deck name"), {
+      target: { value: "Verbos" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create deck" }));
+
+    expect(
+      await screen.findByText("You already have a deck with that name. Pick another one."),
+    ).toBeTruthy();
+    // El fallo de creación NO es un fallo de carga: el selector sigue visible y
+    // no se pinta el mensaje de «no se pudieron cargar tus mazos».
+    expect(screen.getByRole("combobox")).toBeTruthy();
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
   });
 });

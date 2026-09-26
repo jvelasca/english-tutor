@@ -116,6 +116,29 @@ def test_manual_deck_crud(monkeypatch, tmp_path):
         assert flashcards_repo.get_deck(a, deck_id) is None
 
 
+def test_duplicate_deck_name_is_declared_as_such(monkeypatch, tmp_path):
+    """V3.84.1: repetir un nombre no es un fallo genérico.
+
+    La UI necesita distinguirlo para decir «ya tienes un mazo con ese nombre» en
+    vez de un error opaco (y sin ocultar el selector). El desenlace lo dicta la
+    restricción `UNIQUE (user_id, name)`; aquí se fija el código que la declara.
+    """
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        first = _make_deck(client, a, "Frases")
+
+        res = client.post(
+            "/api/vocabulary/decks",
+            params={"user_id": a},
+            json={"name": "Frases"},
+        )
+        assert res.status_code == 400, res.text
+        assert res.json()["detail"] == "DECK_NAME_TAKEN"
+        # El mazo original sigue existiendo: el alta fallida no borra ni pisa.
+        assert flashcards_repo.get_deck(a, first) is not None
+        assert _count("flashcard_decks", "user_id = ?", (a,)) == 1
+
+
 def test_auto_deck_rejects_writes(monkeypatch, tmp_path):
     a, _b = _setup(monkeypatch, tmp_path)
     auto = flashcards_repo.AUTO_DECK_ID

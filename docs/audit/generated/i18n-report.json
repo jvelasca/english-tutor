@@ -1,8 +1,8 @@
 {
  "audit": "F-2026-09-02",
- "defined": 1780,
- "literal_uses": 1262,
- "referenced_keys": 1460,
+ "defined": 1785,
+ "literal_uses": 1267,
+ "referenced_keys": 1465,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",

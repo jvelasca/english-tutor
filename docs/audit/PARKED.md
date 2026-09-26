@@ -2177,6 +2177,60 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **Todo lo declarado abierto en V3.83.1 y anteriores sigue abierto** salvo lo que esta
   release cierra de forma explícita arriba.
 
+## V3.84.1 — Cierre del estado parcial Diccionario → léxico + mazo · 2026-09-25
+
+> Release **DE ROBUSTEZ** (patch), con backend y frontend, **SIN migración de BD** y
+> **SIN endpoints nuevos** (solo se afina el `detail` de un 400 existente). Detalle en
+> `release-notes-v3.84.1.md`.
+
+### Cerrado en V3.84.1 (deja de ser deuda)
+
+- **El estado parcial del alta del diccionario se declara y se puede reintentar.**
+  `addVocabularyItem` (léxico + FSRS) y `createFlashcard` (tarjeta del mazo) son dos
+  escrituras; si la segunda fallaba, la UI decía «No se pudo añadir la palabra» aunque
+  el aprendizaje **ya estaba hecho**. Ahora el alta del léxico tiene su propio
+  `try/catch`, la tarjeta fallida queda como `pendingDeck`, el panel declara el estado
+  **parcial** («ya está en aprendizaje, pero no se pudo guardar en el mazo») y ofrece
+  **reintentar solo la tarjeta** sin repetir el alta. `[PRODUCTO]` `[UX]`
+- **El nombre de mazo duplicado se dice como tal.** El backend responde
+  `400 DECK_NAME_TAKEN` (antes: «No se pudo crear el mazo») y la UI lo traduce a «ya
+  tienes un mazo con ese nombre» **sin ocultar el selector**: el fallo de creación deja
+  de compartir estado con el de carga de mazos. `[UX]`
+- **El puente Diccionario → Flashcards tiene E2E de sus cuatro desenlaces** (crear
+  mazo → añadir → estudiar ese mazo → tarjeta visible; mazo existente; solo
+  aprendizaje; fallo de la tarjeta → parcial → reintento), con la cola de cada mazo
+  construida a partir de lo que entró de verdad, más el test unitario del reintento y
+  del duplicado. `[VALIDACIÓN]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **La consolidación del ítem (léxico + tarjeta manual) sigue aparcada.** La palabra
+  continúa existiendo como léxico **y** como tarjeta manual: es el precio de no
+  compartir el modelo de tarjetas. `[PRODUCTO]`
+- **La opción B —un endpoint transaccional «alta de léxico + tarjeta de mazo»— queda
+  fuera de esta release.** Se eligió la opción A (dos escrituras + estado parcial
+  declarado + reintento) por ser quirúrgica y no cambiar el contrato de API; la B sigue
+  siendo arquitectónicamente más fuerte y queda pendiente de decidir. `[ARQUITECTURA]`
+- **H5 (`add_item` no atómico) sigue abierto para su propio flujo** (retención); lo que
+  V3.84.1 cierra es el estado parcial del puente Diccionario → mazo, que era su
+  variante de producto. `[PRODUCTO]`
+- **`delete_deck` tampoco es transaccional** (borra las cartas FSRS una a una y después
+  el mazo): deuda preexistente del módulo que gana peso ahora que los mazos son pieza
+  central. `[ROBUSTEZ]`
+- **H1 sigue vivo en el código** (`_collection_writable` devuelve `True` para un pack
+  global, `backend/domain/retention.py` ~185; **deuda aceptada `P2`** en `AU §12`). No
+  se endurece aquí. `[SEGURIDAD]` `[PRODUCTO]`
+- **Los packs sembrados por `slug` son inmutables en la práctica.** Editar un `*.json`
+  no propaga a la BD; la política se documenta en `ensure_theme_packs_seeded` y un
+  proceso de actualización de catálogo queda pendiente. `[CONTENIDO]`
+- **H3 (`Sparkles` celebra también el 0 %) sigue abierto** como `P3` cosmético. `[UX]`
+- **Los 8 gates humanos siguen `pending`** y `docs/audit/validation-evidence.json` **no
+  existe**; el ancla de certificación sigue en `v3.83.1`. `[VALIDACIÓN]`
+- **El informe `AV` del arco `v3.81.2..v3.82.0` sigue pendiente.** `[AUDITORÍA]`
+- **Los 12 PRs de Dependabot siguen abiertos** (`#7`–`#18`). `[MANTENIMIENTO]`
+- **Todo lo declarado abierto en V3.84.0 y anteriores sigue abierto** salvo lo que esta
+  release cierra de forma explícita arriba.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

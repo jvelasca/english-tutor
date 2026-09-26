@@ -1286,6 +1286,16 @@ const STRINGS: Record<string, Entry> = {
     en: "Your decks could not be loaded. You can still add it to your dictionary.",
     es: "No se pudieron cargar tus mazos. Puedes añadirla igualmente a tu diccionario.",
   },
+  // V3.84.1: crear un mazo es un fallo DISTINTO de cargar la lista: un nombre
+  // repetido se dice sin ocultar el selector ni culpar a la carga.
+  "dictionary.lookup.addDeckDuplicate": {
+    en: "You already have a deck with that name. Pick another one.",
+    es: "Ya tienes un mazo con ese nombre. Elige otro.",
+  },
+  "dictionary.lookup.addDeckCreateError": {
+    en: "The deck could not be created. Try again.",
+    es: "No se pudo crear el mazo. Inténtalo de nuevo.",
+  },
   "dictionary.lookup.addOkDeck": {
     en: "Saved as a card in “{deck}”.",
     es: "Guardada como tarjeta en «{deck}».",
@@ -1293,6 +1303,20 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.lookup.addError": {
     en: "Could not add the word.",
     es: "No se pudo añadir la palabra.",
+  },
+  // V3.84.1: estado PARCIAL del alta. El aprendizaje ya entró y solo falló la
+  // tarjeta del mazo: se declara así y se reintenta sin repetir el alta.
+  "dictionary.lookup.addPartial": {
+    en: "{word} is now learning, but it could not be saved in “{deck}”.",
+    es: "{word} ya está en aprendizaje, pero no se pudo guardar en «{deck}».",
+  },
+  "dictionary.lookup.addPartialHint": {
+    en: "Your word is saved in learning and follows the study flow. You can retry saving the card in the deck.",
+    es: "Tu palabra está guardada en aprendizaje y sigue el proceso de estudio. Puedes reintentar guardar la tarjeta en el mazo.",
+  },
+  "dictionary.lookup.addPartialRetry": {
+    en: "Retry saving to the deck",
+    es: "Reintentar guardar en el mazo",
   },
   "dictionary.lookup.alreadyTracked": {
     en: "Already in your dictionary — it is part of your study flow.",
