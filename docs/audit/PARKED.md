@@ -2348,9 +2348,15 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
   `[UX]`
 - **Los nombres propios se pueden elegir**, pero solo de forma **explícita**: van marcados, al final
   y nunca preseleccionados. `[PRODUCTO]`
-- **El ancla de certificación sigue en `v3.83.1`** y **la cola de auditoría sigue atrasada**: `AV`
-  (`v3.82.0`, contrato + migración), `AW` (cierre V3.83.x) y `AX` (`v3.84.0`) esperan informe.
-  `[AUDITORÍA]`
+- **El ancla de certificación sigue en `v3.83.1`** —ya con **cuatro** releases de deriva
+  (`v3.84.0`, `v3.84.1`, `v3.85.0`, `v3.86.0`)— y **la cola de auditoría sigue atrasada**: `AV`
+  (`v3.82.0`, contrato + migración), `AW` (cierre V3.83.x), `AX` (`v3.84.0`) y `AY`
+  (`v3.84.0..v3.85.0`) esperan informe. `[AUDITORÍA]`
+- **Encargo externo `AZ` entregado (2026-09-26) y SIN INFORME.**
+  `agentes/auditoria-total-externa-v386.md` es el punto de entrada autocontenido para auditar este
+  tag; el informe esperado es `docs/audit/AZ-AUDITORIA-TOTAL-V386.md`. **Es el quinto encargo
+  abierto** y con él **se agota el alfabeto de dos letras** (`AA`…`AZ`): el informe debe dictaminar
+  **la convención de prefijos**, no solo el producto. `[AUDITORÍA]`
 - **Todo lo declarado abierto en V3.85.1 y anteriores sigue abierto** salvo lo que esta release
   cierra de forma explícita arriba.
 
