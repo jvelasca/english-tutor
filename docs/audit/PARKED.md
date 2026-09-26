@@ -2276,12 +2276,136 @@ tuviera el backend arrancado seguiría viendo la tarjeta de dictado en B1. `[D]`
 - **El encargo externo de auditoría de este arco está entregado** en
   `agentes/auditoria-total-externa-v385.md` (**prefijo `AY`**; informe esperado
   `docs/audit/AY-AUDITORIA-TOTAL-V385.md`), en un commit documental **posterior** a los tags
-  `v3.84.1` y `v3.85.0`. Declara dos cosas que **este tag no declara** y que el auditor debe
-  dictaminar: el límite de presentación de la cola pasó **de 20 a 50** (`§6-D3`) y las notas
-  nombran un `ReviewTodayCard` **que no existe en el código** (`§6-D2`). `[AUDITORÍA]`
+  `v3.84.1` y `v3.85.0`. Declaraba dos cosas que **este tag no declara** —el límite de
+  presentación de la cola pasó **de 20 a 50** (`§6-D3`) y las notas nombran un
+  `ReviewTodayCard` **que no existe en el código** (`§6-D2`)—, **ambas ya declaradas como
+  errata y cerradas por V3.85.1** (ver el bloque siguiente). `[AUDITORÍA]`
 - **La cola de auditoría sigue atrasada:** `AV` (`v3.82.0`, contrato + migración), `AW` (cierre
   V3.83.x) y `AX` (`v3.84.0`) **esperan informe**; `AY` es el cuarto encargo abierto. `[AUDITORÍA]`
 - **Todo lo declarado abierto en V3.84.1 y anteriores sigue abierto** salvo lo que esta
+  release cierra de forma explícita arriba.
+
+## V3.86.0 — Diccionario polisémico y fichas en varios mazos (fase 1 de 2) · 2026-09-26
+
+> Release de **PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
+> idempotente**, **CON endpoints nuevos** (ficha-primero) y **CON bump de `GENERATOR_VERSION`**
+> (`1.4.0 → 1.5.0`). Detalle en `release-notes-v3.86.0.md`.
+
+### Cerrado en V3.86.0 (deja de ser deuda)
+
+- **«lima» → la capital del Perú, servido a todos para siempre.** La caché guardaba una sola
+  traducción por palabra y el prompt no prohibía nombres propios ni recibía contexto, así que un
+  nombre propio podía quedar como equivalente de un nombre común. Ahora los prompts devuelven
+  **significados elegibles** (`meanings`), la regla dura es que **un nombre propio nunca es el
+  equivalente de un nombre común** (si existe, va **el último** y marcado) y **el defecto es el
+  primer significado no nombre propio**. `GENERATOR_VERSION` a `1.5.0` invalida la fila envenenada.
+  `[PRODUCTO]` `[CONTENIDO]`
+- **La traducción curada ya existía y no se consultaba.** `match_pack_translation` lee los packs
+  globales (`vocab_collection_items`): es **autoridad determinista, gratis y sin latencia** sobre el
+  modelo (`tornillo → screw`, `lima → file`). `[ARQUITECTURA]` `[CONTENIDO]`
+- **El alta en mazo dejaba sin salida a una palabra ya rastreada.** El botón de añadir no se pintaba
+  con `usage.tracked` verdadero y la única acción saltaba al mazo automático **sin mazo elegido**.
+  El panel está siempre disponible, no reescribe el léxico si la palabra ya está, los mazos son
+  casillas y el CTA de estudio viaja con el mazo elegido. `[PRODUCTO]`
+- **Un `deckError` escondía el selector y no se reintentaba nunca.** Ahora hay «Reintentar».
+  `[ROBUSTEZ]`
+- **Sin `translation` no había ninguna acción.** Se pide el reverso a mano y la ficha se crea con
+  él. `[PRODUCTO]`
+- **Una ficha no podía estar en dos mazos.** Tabla puente `flashcard_deck_cards` (N:M), API
+  ficha-primero con `deck_ids` y borrado de mazo que **conserva** lo compartido y lo dice.
+  `[ARQUITECTURA]` `[PRODUCTO]`
+- **No existía recordatorio.** Columna `mnemonic` en la ficha, editable y borrable, visible en el
+  reverso de la sesión y en el buscador de fichas. `[PRODUCTO]`
+- **El diccionario incrustado de APRENDER → Vocabulario no daba salida a una palabra rastreada.**
+  La vista de consulta declara el salto y lo transporta con su mazo. `[PRODUCTO]`
+- **Un fallo real de arranque, destapado por la sonda:** `StudyTab` arrancaba con la cola del mazo
+  anterior si resolvía después del foco, y el alumno se quedaba en el panel sin sesión aunque su
+  mazo tuviera tarjetas. El arranque exige ahora `queue.deck.id === deck`. `[ROBUSTEZ]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **El léxico (`vocabulary`) y la ficha manual siguen separados.** El **recordatorio vive en la
+  ficha**, así que el **mazo automático (id 0)** —que es una vista del léxico— **no lo muestra**.
+  No se disimula con un campo espejo. `[ARQUITECTURA]` `[PRODUCTO]`
+- **`flashcard_cards.deck_id` queda deprecada como «mazo principal» de un solo escritor.** Se
+  conserva para que el esquema viejo siga abriendo; su retirada exige una **ventana de
+  reconstrucción de tabla**. La pertenencia real es `flashcard_deck_cards`. `[ARQUITECTURA]`
+- **La corrección de la caché es perezosa.** El bump de `GENERATOR_VERSION` invalidó la fila, pero
+  `lima` (y cualquier otra fila envenenada) se regenera **al consultarla**: no hay barrido ni
+  regeneración en el arranque, a propósito. `[CONTENIDO]`
+- **No hay transacción entre léxico y ficha.** Siguen siendo **dos escrituras** con estado parcial
+  declarado y reintento (decisión de V3.84.1, que se mantiene). `[ROBUSTEZ]`
+- **`delete_deck` gana responsabilidades y sigue sin ser transaccional** (borra pertenencias, borra
+  huérfanas con sus cartas FSRS y repunta la columna deprecada): la deuda heredada se agranda.
+  `[ROBUSTEZ]`
+- **`QUEUE_MAX` (100) y los límites diarios no cambian** en esta release. `[PRODUCTO]`
+- **La fase 2 no está y se declara fuera:** elegir mazos al estudiar (incluido el automático) con
+  dedupe, botón `(...)` de sesión con dirección ES↔EN y respuesta escrita persistida por usuario,
+  validación de la respuesta respetando la premisa 21 (el servidor puntúa) y ayuda escalonada por
+  **sílabas** (`syllables()` en `backend/services/phonemes.py` es hoy un proxy de grupos vocálicos
+  impreciso, p. ej. `file` daría 2). `[PRODUCTO]` `[UX]`
+- **El recordatorio no se puede ordenar ni filtrar por él** (solo se busca por su texto).
+  `[UX]`
+- **Los nombres propios se pueden elegir**, pero solo de forma **explícita**: van marcados, al final
+  y nunca preseleccionados. `[PRODUCTO]`
+- **El ancla de certificación sigue en `v3.83.1`** y **la cola de auditoría sigue atrasada**: `AV`
+  (`v3.82.0`, contrato + migración), `AW` (cierre V3.83.x) y `AX` (`v3.84.0`) esperan informe.
+  `[AUDITORÍA]`
+- **Todo lo declarado abierto en V3.85.1 y anteriores sigue abierto** salvo lo que esta release
+  cierra de forma explícita arriba.
+
+## V3.85.1 — La sesión de repaso deja de atascarse y cierra la auditoría `AY` · 2026-09-26
+
+> Release de **PRODUCTO** (patch) **SOLO FRONTEND**, **SIN migración de BD**, **SIN
+> endpoints nuevos** y **SIN cambio de contrato de API**. Detalle en
+> `release-notes-v3.85.1.md`; la auditoría que la origina es
+> `docs/audit/AY-AUDITORIA-TOTAL-V385.md`.
+>
+> **ERRATA (declarada el 2026-09-26, antes de publicar `v3.86.0`): esta versión nunca se
+> etiquetó.** El trabajo quedó **en el árbol de trabajo** y el `HEAD` público siguió en
+> `v3.85.0`, así que **`v3.85.1` no existe como tag** y **no se recrea**. **Su delta va
+> incluido íntegro en `v3.86.0`** (ver `§V3.86.0`), que lo absorbe; el rango
+> `v3.85.0..v3.86.0` tiene **un solo commit de release** y no se puede auditar `v3.85.1`
+> por separado.
+
+### Cerrado en V3.85.1 (deja de ser deuda)
+
+- **P0 (C1): «Repasar hoy» se quedaba clavada en un ítem reconductivo.** La sesión solo
+  avanzaba con `onProduced`, que `recognition` y `recall` no disparan: si el planner servía
+  uno de ellos como actividad inicial no aparecía «Siguiente palabra» y la única salida era
+  cerrar el drill (que aborta la sesión). Se separa **`stepCompleted`** (veredicto del
+  peldaño, apruebe o falle) de **`produced`** (evidencia productiva): el veredicto avanza, la
+  producción sigue siendo otra cosa. `[PRODUCTO]` `[ARQUITECTURA]`
+- **Accesibilidad de la sesión.** El contador es **región viva** (`role="status"` +
+  `aria-live`), y el foco **viaja al CTA** («Siguiente palabra»/«Terminar») al aparecer.
+  `[UX]`
+- **D4: el panel APRENDER → Vocabulario recupera el acceso al repaso**, con **un solo CTA**
+  que transporta a la superficie central (Flashcards → Estudiar) en vez de duplicar la sesión.
+  `[PRODUCTO]`
+- **G3: el artefacto de contraste identifica la release.** `contrast_audit.mjs` deriva
+  `audit`/`version` de `frontend/package.json` y el informe se regenera. `[VALIDACIÓN]`
+- **D3: el límite de la cola 20 → 50 queda declarado** (era errata de `v3.85.0`) y con
+  **decisión de UX** escrita. `[DOCUMENTACIÓN]` `[UX]`
+- **D2: la errata del `ReviewTodayCard` inexistente queda declarada** en
+  `release-notes-v3.85.0.md` (el tag no se recrea). `[DOCUMENTACIÓN]`
+- **C2: la semántica de «Repasar hoy» queda fijada.** Trabaja **competencia**; **no consume
+  vencimiento FSRS**, así que el contador puede reaparecer y eso no es un bucle. `[PRODUCTO]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **La sesión larga sigue sin resolverse.** Hasta 50 ítems con **un clic obligatorio por
+  ítem** y **sin estado persistido** (salir la pierde entera). Segmentar la sesión (lotes,
+  reanudación, o un techo de sesión menor que el techo del endpoint) queda **aparcado**.
+  `[PRODUCTO]` `[UX]`
+- **El panel incrustado tiene CTA, no sesión.** El CTA transporta; el estudio sigue viviendo
+  solo en Flashcards. `[PRODUCTO]`
+- **La evidencia específica contra recorte interno en las cinco sub-pestañas a 320 px puede
+  reforzarse** (la guardia vigila desborde de página, no recorte dentro del contenedor).
+  `[VALIDACIÓN]`
+- **El ancla de certificación sigue en `v3.83.1`** y **la cola de auditoría sigue atrasada**:
+  `AV` (`v3.82.0`, contrato + migración), `AW` (cierre V3.83.x) y `AX` (`v3.84.0`) esperan
+  informe; `AY` ya está dictaminado. `[AUDITORÍA]`
+- **Todo lo declarado abierto en V3.85.0 y anteriores sigue abierto** salvo lo que esta
   release cierra de forma explícita arriba.
 
 ## Pendientes de acción humana (no aparcados, en curso)

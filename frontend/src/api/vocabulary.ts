@@ -3,6 +3,7 @@ import {
   normalizeDeckList,
   normalizeDictionaryEntry,
   normalizeDrillCandidates,
+  normalizeFlashcardDeckDelete,
   normalizeFlashcardList,
   normalizeFlashcardStats,
   normalizeLexicon,
@@ -33,6 +34,7 @@ import type {
   FlashcardCards,
   FlashcardBulkAddResult,
   FlashcardDeck,
+  FlashcardDeckDeleteResult,
   FlashcardDecks,
   FlashcardQueue,
   FlashcardReviewResult,
@@ -521,8 +523,11 @@ export function updateFlashcardDeck(
 export function deleteFlashcardDeck(
   _userId: string,
   deckId: number,
-): Promise<void> {
-  return deleteJson<void>(`/api/vocabulary/decks/${deckId}`, undefined);
+): Promise<FlashcardDeckDeleteResult> {
+  return deleteJson<FlashcardDeckDeleteResult>(
+    `/api/vocabulary/decks/${deckId}`,
+    undefined,
+  ).then(normalizeFlashcardDeckDelete);
 }
 
 /**
@@ -561,6 +566,95 @@ export function listFlashcardCards(
 ): Promise<FlashcardCards> {
   return getJson<unknown>(`/api/vocabulary/decks/${deckId}/cards`).then(
     normalizeFlashcardList,
+  );
+}
+
+// --- V3.86.0: API FICHA-PRIMERO --------------------------------------------
+//
+// El id de una ficha es global del usuario y su pertenencia a mazos (1..N) se
+// gestiona aparte. Las funciones `listFlashcardCards`/`createFlashcard`/… de
+// arriba siguen existiendo (envoltorios legacy) para no romper pantallas
+// antiguas; estas son las que usa la pestaña Fichas rediseñada.
+
+/** Todas las fichas del alumno (o las de un mazo si se filtra por `deckId`). */
+export function listVocabularyCards(
+  _userId: string,
+  options: { deckId?: number | null } = {},
+): Promise<FlashcardCards> {
+  const q =
+    options.deckId != null ? `?deck_id=${encodeURIComponent(options.deckId)}` : "";
+  return getJson<unknown>(`/api/vocabulary/cards${q}`).then(
+    normalizeFlashcardList,
+  );
+}
+
+/** Crea una ficha en uno o varios mazos, con recordatorio opcional (V3.86.0). */
+export function createVocabularyCard(
+  _userId: string,
+  body: {
+    front: string;
+    back?: string;
+    mnemonic?: string;
+    deckIds: number[];
+  },
+): Promise<FlashcardCard> {
+  return postJson<unknown>("/api/vocabulary/cards", {
+    front: body.front,
+    back: body.back ?? "",
+    mnemonic: body.mnemonic ?? "",
+    deck_ids: body.deckIds,
+  }).then((raw) => normalizeFlashcardList({ cards: [raw] }).cards[0]!);
+}
+
+/** Edita anverso/reverso/recordatorio y/o reemplaza los mazos (parcial). */
+export function updateVocabularyCard(
+  _userId: string,
+  cardId: number,
+  body: {
+    front?: string;
+    back?: string;
+    mnemonic?: string;
+    deckIds?: number[];
+  },
+): Promise<FlashcardCard> {
+  const payload: Record<string, unknown> = {};
+  if (body.front !== undefined) payload.front = body.front;
+  if (body.back !== undefined) payload.back = body.back;
+  if (body.mnemonic !== undefined) payload.mnemonic = body.mnemonic;
+  if (body.deckIds !== undefined) payload.deck_ids = body.deckIds;
+  return patchJson<unknown>(
+    `/api/vocabulary/cards/${cardId}`,
+    payload,
+  ).then((raw) => normalizeFlashcardList({ cards: [raw] }).cards[0]!);
+}
+
+export function deleteVocabularyCard(
+  _userId: string,
+  cardId: number,
+): Promise<void> {
+  return deleteJson<void>(`/api/vocabulary/cards/${cardId}`, undefined);
+}
+
+/** Añade la ficha a un mazo sin tocar sus otras pertenencias. */
+export function addVocabularyCardToDeck(
+  _userId: string,
+  cardId: number,
+  deckId: number,
+): Promise<FlashcardCard> {
+  return postJson<unknown>(`/api/vocabulary/cards/${cardId}/decks`, {
+    deck_id: deckId,
+  }).then((raw) => normalizeFlashcardList({ cards: [raw] }).cards[0]!);
+}
+
+/** Quita la ficha de un mazo. Si era su última pertenencia, la ficha se borra. */
+export function removeVocabularyCardFromDeck(
+  _userId: string,
+  cardId: number,
+  deckId: number,
+): Promise<void> {
+  return deleteJson<void>(
+    `/api/vocabulary/cards/${cardId}/decks/${deckId}`,
+    undefined,
   );
 }
 

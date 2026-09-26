@@ -16,6 +16,7 @@ import config
 from domain import learner_state as learner_state_domain
 from domain import learning as learning_service
 from repositories import academy as academy_repo
+from repositories import collections as collections_repo
 from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
@@ -1730,6 +1731,62 @@ def _unit_usage_from_rows(rows: list[dict]) -> dict | None:
     }
 
 
+def _meanings_from_cache(cache: dict, default_term: str) -> list[dict]:
+    """Significados elegibles de una entrada cacheada (V3.86.0).
+
+    Normaliza lo persistido (por si una fila antigua trae JSON suelto) y, si no
+    hay ninguno, sintetiza uno desde el término por defecto: la UI siempre tiene
+    al menos un significado que ofrecer. Puro y determinista.
+    """
+    meanings = dictionary_content.normalize_meanings(cache.get("meanings"))
+    if not meanings and (default_term or "").strip():
+        meanings = dictionary_content.normalize_meanings([{"term": default_term}])
+    return meanings
+
+
+def _merge_reverse_meanings(
+    primary: str,
+    generated: list[dict],
+    curated: list[dict],
+    instant: list[str],
+) -> list[dict]:
+    """Significados de la dirección ES→EN, en orden de autoridad (V3.86.0).
+
+    Prioridad: el término PRINCIPAL elegido (curado/instantáneo, determinista) →
+    los que declara el contenido GENERADO (traen `pos`, glosa, ámbito y marca de
+    nombre propio; solo existen cuando hubo que consultar al modelo) → los pares
+    CURADOS de los packs → las coincidencias instantáneas de la caché.
+    `normalize_meanings` deduplica por término y envía los nombres propios al
+    final, de modo que el principal nunca queda desplazado por un nombre propio.
+    """
+    raw: list[dict] = []
+    if (primary or "").strip():
+        # El principal primero, con la metadata curada si existe (así conserva su
+        # `pos`): la dedupe por término de `normalize_meanings` haría ganar al
+        # primero, y un `{"term": primary}` sin `pos` perdería el dato del pack.
+        curated_primary = next(
+            (
+                item
+                for item in (curated or [])
+                if (item.get("word") or "").lower() == primary.lower()
+            ),
+            None,
+        )
+        raw.append(
+            {
+                "term": primary,
+                "pos": (curated_primary or {}).get("pos", ""),
+            }
+        )
+    raw.extend(generated or [])
+    raw.extend(
+        {"term": item.get("word", ""), "pos": item.get("pos", "")}
+        for item in (curated or [])
+    )
+    raw.extend({"term": word} for word in (instant or []))
+    return dictionary_content.normalize_meanings(raw)
+
+
 def _build_dictionary_entry(
     normalized: str, rows: list[dict], cached: dict | None
 ) -> dict:
@@ -1771,6 +1828,10 @@ def _build_dictionary_entry(
         # aditivo que explica por qué el scoring semántico no depende de una
         # `pos` global; [] si el modelo no los dio.
         "senses": list(cache.get("senses") or []),
+        # V3.86.0: significados ELEGIBLES que la UI ofrece para desambiguar la
+        # palabra (con su `pos`, glosa, ámbito y marca de nombre propio). Es
+        # contenido, no evidencia; [] nunca ocurre (se sintetiza uno).
+        "meanings": _meanings_from_cache(cache, translation or ""),
         "example": example_sentences.example_for(normalized),
         # V3.39 (diccionario reversible): dirección servida y alternativas de la
         # búsqueda inversa (siempre [] en EN→ES). Campos ADITIVOS.
@@ -1798,6 +1859,7 @@ def _build_reverse_entry(
     alternatives: list[str],
     rows: list[dict],
     content: dict | None,
+    meanings: list[dict] | None = None,
 ) -> dict:
     """Compone la entrada ES→EN reutilizando el constructor directo (V3.39).
 
@@ -1808,13 +1870,21 @@ def _build_reverse_entry(
 
     Pura y determinista; `alternatives` son las otras traducciones inglesas
     encontradas en la inversa instantánea (sin la principal).
+
+    V3.86.0: `meanings` son los significados ELEGIBLES en inglés (el principal
+    primero). Si se pasan, sustituyen a los derivados del contenido: son la
+    unión de lo generado, los pares curados de los packs y la caché.
     """
     base = _build_dictionary_entry(english, rows, content)
+    resolved = meanings
+    if resolved is None:
+        resolved = _meanings_from_cache(content or {}, english)
     return {
         **base,
         "word": normalized_es,
         "direction": "es-en",
         "translation": english or None,
+        "meanings": resolved,
         "alternatives": [
             word for word in alternatives if word and word.lower() != english.lower()
         ],
@@ -2017,6 +2087,7 @@ async def _generate_and_persist(
                 definition=content.get("definition", ""),
                 situation=content.get("situation", ""),
                 senses=content.get("senses") or [],
+                meanings=content.get("meanings") or [],
                 generator_version=dictionary_content.GENERATOR_VERSION,
             )
         else:
@@ -2028,6 +2099,7 @@ async def _generate_and_persist(
                 translation=content.get("translation", ""),
                 situation=content.get("situation", ""),
                 senses=content.get("senses") or [],
+                meanings=content.get("meanings") or [],
                 generator_version=dictionary_content.GENERATOR_VERSION,
             )
         persisted = await run_in_threadpool(read_cached, word)
@@ -2041,6 +2113,7 @@ async def _generate_and_persist(
         "definition": content.get("definition", ""),
         "situation": content.get("situation", ""),
         "senses": content.get("senses") or [],
+        "meanings": content.get("meanings") or [],
         "generator_version": dictionary_content.GENERATOR_VERSION,
     }
     if reverse:
@@ -2193,33 +2266,62 @@ async def lookup_dictionary(
 async def _lookup_dictionary_reverse(
     user_id: str, word: str, *, model: str | None = None
 ) -> dict:
-    """Entrada del diccionario ES→EN para el término `word` (V3.39, D3).
+    """Entrada del diccionario ES→EN para el término `word` (V3.39/V3.86.0, D3).
 
-    Dos caminos, en este orden:
-    1. **Inversa instantánea** — `dictionary_reverse.match_translation` sobre
-       las traducciones ya cacheadas en `dictionary_entries`. Devuelve el
-       equivalente inglés y sus alternativas sin pagar latencia del modelo.
-    2. **Generación** — si no hay ninguna coincidencia, genera y cachea el
-       contenido ES→EN en `dictionary_reverse_entries`.
+    Tres fuentes, en orden de autoridad para elegir el equivalente POR DEFECTO:
+
+    1. **Pares curados de los packs** — `dictionary_reverse.match_pack_translation`
+       sobre el catálogo global (`vocab_collection_items`): autoridad
+       determinista y gratis. Es lo que hace que «tornillo» dé «screw» y «lima»
+       dé «file» aunque la caché no tenga la entrada.
+    2. **Inversa instantánea** — `match_translation` sobre las traducciones ya
+       cacheadas en `dictionary_entries`, sin pagar latencia del modelo.
+    3. **Generación** — solo si no hay NINGUNA coincidencia, se genera y cachea
+       el contenido ES→EN en `dictionary_reverse_entries` (y su lista
+       `meanings` es entonces la fuente de los significados).
+
+    V3.86.0: los `meanings` que se devuelven son la unión del principal elegido,
+    los del contenido generado (si lo hubo) y los candidatos curados e
+    instantáneos; `normalize_meanings` envía los nombres propios al final, así
+    que un topónimo nunca es el significado por defecto.
     """
     normalized = _normalize_lookup_spanish(word)
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     entries = await run_in_threadpool(dictionary_repo.list_entries)
-    matches = dictionary_reverse.match_translation(normalized, entries)
-    if matches:
-        english = matches[0]
+    pack_items = await run_in_threadpool(collections_repo.list_pack_items)
+    instant = dictionary_reverse.match_translation(normalized, entries)
+    curated = dictionary_reverse.match_pack_translation(normalized, pack_items)
+    if curated or instant:
+        # El equivalente por defecto es el CURADO (packs) y, si no, el
+        # instantáneo: determinista y sin modelo. Solo se pide contenido del
+        # equivalente elegido para su definición/uso; los significados se
+        # completan con los candidatos, sin consultar al modelo.
+        english = curated[0]["word"] if curated else instant[0]
         content = await _ensure_cached_content(
             english, model=model, user_id=user_id
         )
+        alternatives = [
+            item["word"] for item in curated
+        ] + list(instant)
+        meanings = _merge_reverse_meanings(english, [], curated, instant)
         return await run_in_threadpool(
-            _build_reverse_entry, normalized, english, matches[1:], rows, content
+            _build_reverse_entry,
+            normalized,
+            english,
+            alternatives,
+            rows,
+            content,
+            meanings,
         )
     content = await _ensure_cached_content(
         normalized, model=model, user_id=user_id, direction=DIRECTION_ES_EN
     )
     english = (content or {}).get("english", "")
+    meanings = _merge_reverse_meanings(
+        english, list((content or {}).get("meanings") or []), [], []
+    )
     return await run_in_threadpool(
-        _build_reverse_entry, normalized, english, [], rows, content
+        _build_reverse_entry, normalized, english, [], rows, content, meanings
     )

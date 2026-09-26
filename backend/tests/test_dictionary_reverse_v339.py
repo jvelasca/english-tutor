@@ -220,20 +220,20 @@ def test_reverse_lookup_generates_persists_and_caches(monkeypatch, tmp_path):
         calls,
     )
 
-    first = _reverse_lookup(a, "casa")
+    first = _reverse_lookup(a, "morada")
 
     assert first["direction"] == "es-en"
-    assert first["word"] == "casa"
+    assert first["word"] == "morada"
     assert first["translation"] == "house"
     assert first["definition"] == "A building where people live."
     assert first["definition_source"] == "llm"
-    assert calls == [("casa", None)]
+    assert calls == [("morada", None)]
     assert _count_rows("dictionary_reverse_entries") == 1
 
     # Segunda consulta: caché fresca, sin nueva llamada al modelo.
-    second = _reverse_lookup(a, "Casa")
+    second = _reverse_lookup(a, "Morada")
     assert second["translation"] == "house"
-    assert calls == [("casa", None)]
+    assert calls == [("morada", None)]
 
 
 def test_reverse_lookup_uses_reverse_cache_even_if_direct_cache_present(
@@ -284,7 +284,7 @@ def test_reverse_lookup_is_read_only_no_evidence(monkeypatch, tmp_path):
     before_vocab = _count_rows("vocabulary")
     before_events = _count_rows("vocabulary_events")
 
-    _reverse_lookup(a, "casa")
+    _reverse_lookup(a, "morada")
 
     assert _count_rows("vocabulary") == before_vocab
     assert _count_rows("vocabulary_events") == before_events
@@ -296,7 +296,7 @@ def test_reverse_cache_does_not_pollute_mcq_bank(monkeypatch, tmp_path):
     calls: list = []
     _stub_reverse_fetcher(monkeypatch, _payload(english="house"), calls)
 
-    _reverse_lookup(a, "casa")
+    _reverse_lookup(a, "morada")
 
     assert dictionary_repo.list_entries() == []
     assert len(dictionary_repo.list_reverse_entries()) == 1
@@ -307,9 +307,9 @@ def test_reverse_content_version_is_current(monkeypatch, tmp_path):
     calls: list = []
     _stub_reverse_fetcher(monkeypatch, _payload(english="house"), calls)
 
-    _reverse_lookup(a, "casa")
+    _reverse_lookup(a, "morada")
 
-    stored = dictionary_repo.get_reverse_entry("casa")
+    stored = dictionary_repo.get_reverse_entry("morada")
     assert stored is not None
     assert stored["english"] == "house"
     assert stored["generator_version"] == dictionary_content.GENERATOR_VERSION
@@ -369,3 +369,160 @@ def test_generate_reverse_content_uses_injected_fetcher():
         dictionary_content.generate_reverse_content("casa", fetcher=_fake)
     )
     assert out["english"] == "house"
+
+
+# --- V3.86.0: significados elegibles (polisemia) -----------------------------
+
+
+def test_match_pack_translation_finds_curated_english():
+    items = [
+        {"word": "file", "translation": "lima", "pos": "noun"},
+        {"word": "vice", "translation": "tornillo de banco", "pos": "noun"},
+        {"word": "screw", "translation": "tornillo", "pos": "noun"},
+    ]
+    # Exacta antes que parcial: «screw» (tornillo) gana a «vice» (tornillo de
+    # banco) y «file» es el único candidato de «lima».
+    tornillo = dictionary_reverse.match_pack_translation("tornillo", items)
+    assert [m["word"] for m in tornillo] == ["screw", "vice"]
+    lima = dictionary_reverse.match_pack_translation("lima", items)
+    assert [m["word"] for m in lima] == ["file"]
+    assert dictionary_reverse.match_pack_translation("nada", items) == []
+
+
+def test_normalize_meanings_sends_proper_nouns_last_and_dedupes():
+    out = dictionary_content.normalize_meanings(
+        [
+            {"term": "Lima", "proper_noun": True, "domain": "geography"},
+            {"term": "file", "pos": "noun", "domain": "tools"},
+            {"term": "lime", "pos": "noun", "domain": "botany"},
+            {"term": "file", "pos": "noun"},
+        ]
+    )
+    assert [m["term"] for m in out] == ["file", "lime", "Lima"]
+    assert out[-1]["proper_noun"] is True
+    # El significado por defecto NUNCA es un nombre propio.
+    assert dictionary_content.default_meaning_term(out, "x") == "file"
+
+
+def test_parse_reverse_content_never_defaults_to_a_proper_noun():
+    raw = json.dumps(
+        {
+            "english": "Lima",
+            "pos": "noun",
+            "definition": "The capital of Peru.",
+            "meanings": [
+                {"term": "Lima", "proper_noun": True, "domain": "geography"},
+                {"term": "file", "pos": "noun", "domain": "tools"},
+            ],
+        }
+    )
+    out = dictionary_content.parse_reverse_content(raw, word="lima")
+    # La regla dura: el equivalente por defecto es el común («file»), no la
+    # capital. «Lima» queda como último significado, marcado.
+    assert out["english"] == "file"
+    assert out["meanings"][0]["term"] == "file"
+    assert out["meanings"][-1]["proper_noun"] is True
+
+
+def test_reverse_lookup_prefers_curated_pack_without_model(monkeypatch, tmp_path):
+    """«tornillo» → «screw» por el par curado, sin consultar al modelo."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    _seed_direct("screw", "tornillo", definition="A threaded fastener.")
+    calls: list = []
+    _offline_reverse_fetcher(monkeypatch, calls)
+
+    data = _reverse_lookup(a, "tornillo")
+
+    assert data["translation"] == "screw"
+    assert data["meanings"][0]["term"] == "screw"
+    assert all(not m["proper_noun"] for m in data["meanings"])
+    assert calls == []
+
+
+def test_reverse_lookup_of_lima_serves_the_tool_not_the_capital(
+    monkeypatch, tmp_path
+):
+    """El caso reportado: «lima» (herramienta) ya no se sirve como «Lima»."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    _seed_direct("file", "lima", definition="A tool for smoothing surfaces.")
+    calls: list = []
+    _offline_reverse_fetcher(monkeypatch, calls)
+
+    data = _reverse_lookup(a, "lima")
+
+    assert data["translation"] == "file"
+    assert data["meanings"][0]["term"] == "file"
+    assert "Lima" not in [m["term"] for m in data["meanings"]]
+    assert calls == []
+
+
+def test_reverse_lookup_merges_curated_meanings(monkeypatch, tmp_path):
+    """Los candidatos curados se exponen como significados elegibles."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    _seed_direct("screw", "tornillo", definition="A threaded fastener.")
+    calls: list = []
+    _offline_reverse_fetcher(monkeypatch, calls)
+
+    data = _reverse_lookup(a, "tornillo")
+
+    terms = [m["term"] for m in data["meanings"]]
+    # El principal primero y, detrás, el otro candidato curado del pack.
+    assert terms[0] == "screw"
+    assert "vice" in terms
+    assert data["translation"] == "screw"
+
+
+def test_direct_lookup_exposes_meanings_and_default_term(monkeypatch, tmp_path):
+    a, _b = _setup(monkeypatch, tmp_path)
+    assert dictionary_repo.save_entry(
+        "bank",
+        pos="noun",
+        definition="A financial institution.",
+        translation="banco",
+        meanings=[
+            {"term": "Lima", "proper_noun": True, "domain": "geography"},
+            {"term": "banco", "pos": "noun", "domain": "finance"},
+            {"term": "orilla", "pos": "noun", "domain": "geography"},
+        ],
+        generator_version=dictionary_content.GENERATOR_VERSION,
+    )
+
+    with TestClient(app) as client:
+        res = client.post(
+            f"/api/vocabulary/dictionary?user_id={a}",
+            json={"word": "bank", "direction": "en-es"},
+        )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    assert data["direction"] == "en-es"
+    assert data["translation"] == "banco"
+    assert [m["term"] for m in data["meanings"]] == ["banco", "orilla", "Lima"]
+    assert data["meanings"][-1]["proper_noun"] is True
+
+
+def test_repository_round_trips_the_meanings(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    meanings = [
+        {"term": "banco", "pos": "noun", "gloss": "seat", "domain": "home"},
+        {"term": "orilla", "pos": "noun", "gloss": "river bank", "domain": "nature"},
+    ]
+    assert dictionary_repo.save_entry(
+        "bank",
+        pos="noun",
+        definition="def",
+        translation="banco",
+        meanings=meanings,
+        generator_version=dictionary_content.GENERATOR_VERSION,
+    )
+    stored = dictionary_repo.get_entry("bank")
+    assert stored["meanings"] == [
+        {**m, "proper_noun": False} for m in meanings
+    ]
+    assert stored["meanings_json"] == json.dumps(
+        [
+            {**m, "proper_noun": False} for m in meanings
+        ],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )

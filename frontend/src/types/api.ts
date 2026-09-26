@@ -837,6 +837,13 @@ export interface DictionaryEntry {
    * dio. No es evidencia.
    */
   senses?: DictionarySense[];
+  /**
+   * V3.86.0: significados ELEGIBLES de la unidad. En `en-es` cada `term` es una
+   * traducción al español; en `es-en`, un equivalente inglés. El primero es el
+   * significado por defecto (nunca un nombre propio) y la UI permite elegir
+   * otro. Contenido aditivo: puede venir ausente en respuestas antiguas.
+   */
+  meanings?: DictionaryMeaning[];
   example: DictionaryExample | null;
   usage: DictionaryUsage;
 }
@@ -845,6 +852,21 @@ export interface DictionaryEntry {
 export interface DictionarySense {
   pos: string;
   gloss: string;
+}
+
+/**
+ * V3.86.0: significado ELEGIBLE de una unidad léxica. A diferencia de
+ * `DictionarySense` (que separa por categoría gramatical), es una ACEPCIÓN:
+ * `term` es la traducción (en-es) o el equivalente inglés (es-en) de esa
+ * acepción. `proper_noun` marca los nombres propios, que nunca son el
+ * significado por defecto.
+ */
+export interface DictionaryMeaning {
+  term: string;
+  pos: string;
+  gloss: string;
+  domain: string;
+  proper_noun: boolean;
 }
 
 /** Cuerpo de la consulta al diccionario (V3.30): la palabra tal como la
@@ -1065,6 +1087,8 @@ export interface FlashcardDeck {
   new_per_day: number;
   review_per_day: number;
   card_count: number;
+  /** V3.86.0: cuántas de `card_count` están también en otro mazo. */
+  shared_count: number;
   due_count: number;
   new_count: number;
   reviewed_today: number;
@@ -1079,9 +1103,14 @@ export interface FlashcardDecks {
 
 export interface FlashcardCard {
   id: number;
+  /** V3.86.0: «mazo principal» (columna deprecada). La verdad es `deck_ids`. */
   deck_id: number;
+  /** V3.86.0: mazos a los que pertenece la ficha (1..N). */
+  deck_ids: number[];
   front: string;
   back: string;
+  /** V3.86.0: recordatorio (mnemónico) personal. "" si no tiene. */
+  mnemonic: string;
   state: string;
   reps: number;
   due_at: string;
@@ -1090,6 +1119,12 @@ export interface FlashcardCard {
 
 export interface FlashcardCards {
   cards: FlashcardCard[];
+}
+
+/** Resultado de borrar un mazo (V3.86.0). */
+export interface FlashcardDeckDeleteResult {
+  deleted_count: number;
+  shared_count: number;
 }
 
 /** Resultado del pegado masivo de tarjetas (V3.80.0). */
@@ -1105,6 +1140,8 @@ export interface FlashcardStudyItem {
   front: string;
   back: string;
   definition: string;
+  /** V3.86.0: recordatorio de la ficha manual ("" en el léxico). */
+  mnemonic: string;
   is_new: boolean;
   state: string;
   due_at: string;

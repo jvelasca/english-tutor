@@ -35,6 +35,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   Frown,
   Layers,
+  Lightbulb,
   Pencil,
   RefreshCw,
   RotateCcw,
@@ -198,6 +199,10 @@ export function StudySession({
   const face = key ? faces[key] : undefined;
   const back = face ? face.back : (current?.back ?? "");
   const definition = face ? face.definition : (current?.definition ?? "");
+  // V3.86.0: recordatorio de la ficha manual. Vive en la FICHA, así que el mazo
+  // automático (vista del léxico) nunca lo trae. Se pinta en el reverso, sin
+  // tocar la máquina de estudio.
+  const mnemonic = current?.mnemonic ?? "";
   const generating = key !== "" && generatingKey === key;
   const lookupState = key ? lookupStates[key] : undefined;
   // El lápiz solo se ofrece en tarjetas del léxico: son las únicas cuya
@@ -515,6 +520,17 @@ export function StudySession({
                 lang={isLexicon ? "en" : undefined}
               >
                 {definition}
+              </span>
+            ) : null}
+            {/* V3.86.0: el recordatorio, en pequeño y separado: es una ayuda
+                para recordar, no la respuesta de la tarjeta. */}
+            {!generating && mnemonic ? (
+              <span
+                className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+                aria-label={t("flashcards.cards.mnemonic")}
+              >
+                <Lightbulb className="size-3 shrink-0" aria-hidden="true" />
+                <span className="break-words">{mnemonic}</span>
               </span>
             ) : null}
             {!generating && !hasFace ? (

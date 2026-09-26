@@ -33,10 +33,22 @@ const VOCABULARY_ROUTE_CONFIG: RouteQuizConfig = {
     View: LexiconInventory,
   },
   // V3.30 (D2): vista alterna «Consultar» junto al diccionario personal.
+  // V3.86.0: el diccionario de CONSULTA incrustado en la práctica de rutas puede
+  // saltar a la pantalla central de Flashcards cuando la palabra ya está
+  // rastreada (su única salida). El panel no hospeda la sesión, así que el salto
+  // persiste la vista y navega; el mazo elegido viaja en el recado de un solo uso.
   dictionaryLookup: {
     ctaKey: "vocRoutes.dictionaryLookupCta",
     hintKey: "vocRoutes.dictionaryLookupHint",
     View: DictionaryLookup,
+    allowFlashcardsJump: true,
+  },
+  // V3.85.1 (D4): APRENDER → Vocabulario perdió el drill de repaso al retirar
+  // `ReviewQueueSection`. Recupera la puerta con UN solo CTA que lleva a la
+  // superficie central (Flashcards → Estudiar) en vez de duplicar la sesión.
+  reviewCta: {
+    ctaKey: "vocRoutes.reviewCta",
+    hintKey: "vocRoutes.reviewHint",
   },
   api: {
     getStats: (userId) => getVocabularyStats(userId),

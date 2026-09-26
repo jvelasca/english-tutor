@@ -3,7 +3,7 @@ import { ensureProfile } from "./gateHelper";
 
 /**
  * Sonda visual permanente del PUENTE Diccionario → Flashcards (V3.83.0, V3.84.0,
- * V3.84.1).
+ * V3.84.1, V3.86.0).
  *
  * La release promete, en pantalla, una equivalencia: «añadir desde el diccionario
  * deja la palabra en aprendizaje y en el proceso de estudio». Esa promesa no
@@ -12,12 +12,16 @@ import { ensureProfile } from "./gateHelper";
  *
  * - EN→ES envía el término inglés y su traducción;
  * - ES→EN envía el EQUIVALENTE INGLÉS como palabra de práctica (nunca el español);
- * - una palabra ya rastreada NO se re-da de alta (no hay POST de alta);
- * - V3.84.0: el selector de **mazos** manuales es perezoso, no ofrece el mazo
- *   automático, y al elegir uno se crea además la tarjeta (`front`/`back`).
+ * - V3.84.0: el selector de **mazos** manuales es perezoso y no ofrece el mazo
+ *   automático, y al marcar uno se crea además la tarjeta (`front`/`back`).
  * - V3.84.1: si esa SEGUNDA escritura falla, el alta NO se declara en error: el
  *   aprendizaje ya está hecho y la UI lo declara como PARCIAL, ofreciendo
  *   reintentar SOLO la tarjeta (sin repetir el alta del léxico).
+ * - V3.86.0: (a) una palabra ya rastreada **ya no se queda sin salida** —el alta
+ *   solo guarda la ficha y sus mazos, sin reescribir el léxico—; (b) la consulta
+ *   que no encuentra equivalente pide el reverso a mano en vez de no ofrecer
+ *   nada; (c) los mazos son **casillas** y una sola escritura crea la ficha en
+ *   todos los marcados (tabla puente, `deck_ids`).
  *
  * Determinista: mockea el diccionario, el léxico, las colecciones y los mazos, y
  * **construye la cola de cada mazo con lo que de verdad entró** (el léxico para
@@ -132,6 +136,69 @@ const TRACKED_ENTRY = {
   alternatives: [],
   example: null,
   usage: trackedUsage(),
+};
+
+/**
+ * V3.86.0: la trampa reportada. «lima» (ES→EN) tiene un sentido de herramienta y
+ * otro de nombre propio geográfico; el modelo podía devolver «Lima (capital del
+ * Perú)» como único equivalente. Ahora hay candidatos y el nombre propio va
+ * marcado y NUNCA por defecto.
+ */
+const POLYSEMIC_ENTRY = {
+  word: "lima",
+  kind: "word",
+  cefr: "A2",
+  definition_source: "llm",
+  pos: "noun",
+  definition: "A tool with a rough surface used for smoothing wood or metal.",
+  translation: "file",
+  direction: "es-en",
+  alternatives: [],
+  meanings: [
+    {
+      id: 1,
+      term: "file",
+      pos: "noun",
+      gloss: "Herramienta con superficie rugosa.",
+      domain: "tools",
+      proper_noun: false,
+    },
+    {
+      id: 2,
+      term: "lime",
+      pos: "noun",
+      gloss: "Cítrico verde.",
+      domain: "food",
+      proper_noun: false,
+    },
+    {
+      id: 3,
+      term: "Lima",
+      pos: "noun",
+      gloss: "Capital del Perú.",
+      domain: "geography",
+      proper_noun: true,
+    },
+  ],
+  example: null,
+  usage: UNTRACKED_USAGE,
+};
+
+/** V3.86.0: consulta SIN equivalente (`translation: null`): el panel pide el
+ *  reverso a mano en vez de dejar la tarjeta sin contenido. */
+const NO_EQUIVALENT_ENTRY = {
+  word: "quintessential",
+  kind: "word",
+  cefr: "C1",
+  definition_source: "none",
+  pos: "",
+  definition: null,
+  translation: null,
+  direction: "en-es",
+  alternatives: [],
+  meanings: [],
+  example: null,
+  usage: UNTRACKED_USAGE,
 };
 
 interface BridgeState {
@@ -256,32 +323,44 @@ async function installBridgeMocks(
         },
       });
     }
-    // La tarjeta del mazo manual (V3.84.0): anverso/reverso. Es la SEGUNDA
+    // Inventario de fichas (V3.86.0): la pestaña «Fichas» lo pide. En estas
+    // sondas la ficha se sirve por la COLA de cada mazo, así que la lista va
+    // vacía pero con la forma del contrato (nunca `{}`).
+    if (pathname === "/api/vocabulary/cards" && method === "GET") {
+      return route.fulfill({ json: { cards: [] } });
+    }
+    // La tarjeta manual (V3.86.0): ficha-primero. Una sola escritura la crea en
+    // TODOS los mazos marcados (`deck_ids`, tabla puente). Es la SEGUNDA
     // escritura; `failCardTimes` permite que falle para probar el reintento.
-    const cardMatch = pathname.match(
-      /^\/api\/vocabulary\/decks\/([^/]+)\/cards$/,
-    );
-    if (cardMatch && method === "POST") {
+    if (pathname === "/api/vocabulary/cards" && method === "POST") {
       state.cardAttempts += 1;
       if (state.cardAttempts <= failCardTimes) {
         return route.fulfill({ status: 500, json: { detail: "boom" } });
       }
       const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       state.cardPosts.push(body);
-      const deckId = Number(cardMatch[1]);
+      const deckIds = Array.isArray(body.deck_ids)
+        ? (body.deck_ids as unknown[]).map(Number)
+        : [];
       const card = {
         id: nextCardId,
         front: String(body.front ?? ""),
         back: String(body.back ?? ""),
       };
       nextCardId += 1;
-      (state.cardsByDeck[deckId] ??= []).push(card);
+      // La ficha entra en CADA mazo marcado: la cola de cualquiera de ellos la
+      // sirve, que es la promesa de «una ficha, varios mazos».
+      for (const deckId of deckIds) {
+        (state.cardsByDeck[deckId] ??= []).push(card);
+      }
       return route.fulfill({
         json: {
           id: card.id,
-          deck_id: deckId,
+          deck_id: deckIds[0] ?? 0,
+          deck_ids: deckIds,
           front: card.front,
           back: card.back,
+          mnemonic: String(body.mnemonic ?? ""),
           state: "new",
           reps: 0,
           due_at: "",
@@ -372,13 +451,13 @@ test("EN→ES: el alta lleva la traducción y la tarjeta aparece en el mazo eleg
   });
   expect(state.deckListCalls).toBe(1);
 
-  // El selector ofrece el mazo manual y NO el mazo automático.
-  const select = page.getByLabel("Also save it as a card in a deck (optional)");
-  const options = await select.locator("option").allInnerTexts();
-  expect(options).toContain("Mi mazo");
-  expect(options).not.toContain("auto");
+  // Los mazos son CASILLAS (V3.86.0): se ofrece el manual y NO el automático.
+  await expect(page.getByRole("checkbox", { name: "Mi mazo" })).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "auto", exact: true }),
+  ).toHaveCount(0);
 
-  await select.selectOption("7");
+  await page.getByRole("checkbox", { name: "Mi mazo" }).check();
   await page.getByRole("button", { name: "Add and start learning" }).click();
 
   await expect(page.getByText("nebula is now learning.")).toBeVisible({
@@ -391,9 +470,15 @@ test("EN→ES: el alta lleva la traducción y la tarjeta aparece en el mazo eleg
     translation: "nebulosa",
     collection_id: null,
   });
-  // V3.84.0: además, la tarjeta del mazo manual con anverso y reverso.
+  // V3.84.0/V3.86.0: además, UNA escritura de ficha con anverso, reverso y la
+  // pertenencia al mazo marcado.
   expect(state.cardPosts).toHaveLength(1);
-  expect(state.cardPosts[0]).toMatchObject({ front: "nebula", back: "nebulosa" });
+  expect(state.cardPosts[0]).toMatchObject({
+    front: "nebula",
+    back: "nebulosa",
+    mnemonic: "",
+    deck_ids: [7],
+  });
   await expect(page.getByText(/Saved as a card in/)).toBeVisible();
 
   // Salida natural: el modo Flashcards de la propia pantalla, con ESE mazo.
@@ -467,13 +552,15 @@ test("V3.84.1: crear el mazo en el panel, añadir y estudiar ese mazo muestra la
   await lookup(page, "nebula");
   await page.getByRole("button", { name: "Add to Flashcards" }).click();
 
-  const select = page.getByLabel("Also save it as a card in a deck (optional)");
-  await select.selectOption("__new__");
+  await page.getByRole("button", { name: "New deck" }).click();
   await page.getByLabel("New deck name").fill("Verbos");
   await page.getByRole("button", { name: "Create deck" }).click();
 
-  // El mazo se crea sin salir del panel y queda seleccionado.
-  await expect(select).toHaveValue("8");
+  // El mazo se crea sin salir del panel y queda MARCADO: no hay que volver a
+  // elegirlo. Su casilla es la prueba de que la selección se conservó.
+  const verbos = page.getByRole("checkbox", { name: "Verbos" });
+  await expect(verbos).toBeVisible({ timeout: 15_000 });
+  await expect(verbos).toBeChecked();
   expect(state.deckPosts).toHaveLength(1);
   expect(state.deckPosts[0]).toMatchObject({ name: "Verbos" });
 
@@ -501,8 +588,7 @@ test("V3.84.1: si falla la tarjeta, declara el estado PARCIAL y el reintento no 
 
   await lookup(page, "nebula");
   await page.getByRole("button", { name: "Add to Flashcards" }).click();
-  const select = page.getByLabel("Also save it as a card in a deck (optional)");
-  await select.selectOption("7");
+  await page.getByRole("checkbox", { name: "Mi mazo" }).check();
   await page.getByRole("button", { name: "Add and start learning" }).click();
 
   // Estado PARCIAL: ni «ok» (mentiría) ni un «error» genérico. La primera
@@ -530,7 +616,7 @@ test("V3.84.1: si falla la tarjeta, declara el estado PARCIAL y el reintento no 
   expect(state.itemPosts).toHaveLength(1);
 });
 
-test("una palabra ya rastreada no se re-da de alta: declara el vínculo y ofrece estudiar", async ({
+test("V3.86.0: una palabra ya rastreada añade la ficha sin reescribir el léxico", async ({
   page,
 }) => {
   await page.goto("/");
@@ -543,19 +629,157 @@ test("una palabra ya rastreada no se re-da de alta: declara el vínculo y ofrece
   await expect(page.getByText(/Already in your dictionary/)).toBeVisible({
     timeout: 15_000,
   });
-  // No se ofrece un alta que no cambiaría nada...
-  await expect(
-    page.getByRole("button", { name: "Add to Flashcards" }),
-  ).toHaveCount(0);
-  // ...y no se abre el panel, así que tampoco se piden mazos.
-  expect(state.deckListCalls).toBe(0);
+  // V3.86.0: el alta YA NO se esconde por estar rastreada. Antes esta palabra se
+  // quedaba con una sola salida (estudiar el mazo automático), sin poder
+  // archivarla en un mazo propio.
+  await page.getByRole("button", { name: "Add to Flashcards" }).click();
+  await expect(page.getByText(/only the card and its decks are saved/)).toBeVisible(
+    { timeout: 15_000 },
+  );
+  // Perezoso: los mazos se piden al ABRIR el panel, no al buscar.
+  expect(state.deckListCalls).toBe(1);
 
-  // La salida sigue existiendo: estudiar.
-  await page.getByRole("button", { name: "Study in Flashcards" }).click();
+  await page.getByRole("checkbox", { name: "Mi mazo" }).check();
+  await page.getByRole("button", { name: "Add and start learning" }).click();
+  await expect(page.getByText(/Saved as a card in “Mi mazo”/)).toBeVisible({
+    timeout: 15_000,
+  });
+  // La ficha sí entra…
+  expect(state.cardPosts).toHaveLength(1);
+  expect(state.cardPosts[0]).toMatchObject({ front: "coffee", back: "café" });
+  // …y el léxico NO se re-da de alta: eso duplicaría el aprendizaje.
+  expect(state.itemPosts).toHaveLength(0);
+  expect(state.lexiconWords).toHaveLength(0);
+
+  // La salida a estudiar sigue existiendo y abre ESE mazo. Se pulsa la del panel
+  // de éxito (`role="status"`): la tarjeta del resultado también ofrece estudiar,
+  // porque la palabra ya estaba en el diccionario.
+  await page
+    .getByRole("status")
+    .getByRole("button", { name: "Study in Flashcards" })
+    .click();
   await expect(
     page.getByRole("tab", { name: "Flashcards", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("heading", { name: "Mi mazo", level: 2 }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("café", { exact: true })).toBeVisible();
+});
 
-  // Y no ha habido ningún POST de alta.
-  expect(state.itemPosts).toHaveLength(0);
+test("V3.86.0: sin equivalente, el panel pide el reverso a mano y la ficha entra con él", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const state = await installBridgeMocks(page, NO_EQUIVALENT_ENTRY);
+  await ensureProfile(page);
+  await page.goto("/#/diccionario");
+
+  await lookup(page, "quintessential");
+  await page.getByRole("button", { name: "Add to Flashcards" }).click();
+
+  // Ni se inventa un reverso ni se deja sin salida: se pide.
+  await expect(page.getByText(/No equivalent was found/)).toBeVisible({
+    timeout: 15_000,
+  });
+  const confirm = page.getByRole("button", { name: "Add and start learning" });
+  // Con el reverso vacío el alta NO se puede confirmar…
+  await page.getByRole("checkbox", { name: "Mi mazo" }).check();
+  await expect(confirm).toBeDisabled();
+
+  // …y con el reverso escrito, sí.
+  await page.getByLabel("Back of the card").fill("por excelencia");
+  await confirm.click();
+  await expect(page.getByText(/Saved as a card in “Mi mazo”/)).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(state.cardPosts).toHaveLength(1);
+  expect(state.cardPosts[0]).toMatchObject({
+    front: "quintessential",
+    back: "por excelencia",
+    deck_ids: [7],
+  });
+});
+
+test("V3.86.0: «lima» ofrece los significados y el nombre propio no se preselecciona", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const state = await installBridgeMocks(page, POLYSEMIC_ENTRY);
+  await ensureProfile(page);
+  await page.goto("/#/diccionario");
+
+  // ES→EN: el caso reportado («lima» → la capital del Perú).
+  await page.getByRole("tab", { name: "Look up", exact: true }).click();
+  await page.getByRole("button", { name: "Spanish → English" }).click();
+  await page.getByLabel("Search the dictionary").fill("lima");
+  await page.getByRole("button", { name: "Look up" }).click();
+  await expect(page.getByRole("heading", { name: "lima" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // Los tres candidatos están a la vista y el de defecto es el de HERRAMIENTA.
+  const file = page.getByRole("radio", { name: "Meaning: file · noun" });
+  const proper = page.getByRole("radio", { name: "Meaning: Lima · noun" });
+  await expect(file).toBeVisible();
+  await expect(file).toBeChecked();
+  await expect(proper).not.toBeChecked();
+  await expect(page.getByText("Proper noun")).toBeVisible();
+
+  // Elegir el nombre propio es posible, pero es una decisión EXPLÍCITA del
+  // alumno: el significado elegido manda en el alta.
+  await proper.check();
+  await expect(proper).toBeChecked();
+  await page.getByRole("button", { name: "Add to Flashcards" }).click();
+  await page.getByRole("checkbox", { name: "Mi mazo" }).check();
+  await page.getByRole("button", { name: "Add and start learning" }).click();
+  await expect(page.getByText("Lima is now learning.")).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(state.cardPosts).toHaveLength(1);
+  expect(state.cardPosts[0]).toMatchObject({ front: "Lima", back: "lima" });
+  expect(state.itemPosts).toHaveLength(1);
+  expect(state.itemPosts[0]).toMatchObject({
+    word: "Lima",
+    translation: "lima",
+  });
+});
+
+test("V3.86.0: una ficha nace en TODOS los mazos marcados con su recordatorio", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const state = await installBridgeMocks(page, EN_ENTRY);
+  await ensureProfile(page);
+  await page.goto("/#/diccionario");
+
+  await lookup(page, "nebula");
+  await page.getByRole("button", { name: "Add to Flashcards" }).click();
+
+  // Los DOS mazos marcados a la vez: el que ya existe…
+  await page.getByRole("checkbox", { name: "Mi mazo" }).check();
+  // …y un segundo mazo creado en el propio panel, que queda marcado solo.
+  await page.getByRole("button", { name: "New deck" }).click();
+  await page.getByLabel("New deck name").fill("Verbos");
+  await page.getByRole("button", { name: "Create deck" }).click();
+  await expect(page.getByRole("checkbox", { name: "Verbos" })).toBeChecked({
+    timeout: 15_000,
+  });
+  await page.getByLabel("Reminder (optional)").fill("nebulosa = nube");
+  await page.getByRole("button", { name: "Add and start learning" }).click();
+  await expect(page.getByText(/Saved as a card in/)).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // UNA sola escritura con la ficha y sus dos mazos, más su recordatorio.
+  expect(state.cardPosts).toHaveLength(1);
+  expect(state.cardPosts[0]).toMatchObject({
+    front: "nebula",
+    back: "nebulosa",
+    mnemonic: "nebulosa = nube",
+    deck_ids: [7, 8],
+  });
+  // Y la clave del cambio: la MISMA ficha es la que sirven los DOS mazos.
+  expect(state.cardsByDeck[7]?.map((c) => c.front)).toEqual(["nebula"]);
+  expect(state.cardsByDeck[8]?.map((c) => c.front)).toEqual(["nebula"]);
 });

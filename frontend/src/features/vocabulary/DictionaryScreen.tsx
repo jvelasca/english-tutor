@@ -4,6 +4,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
 import { useTabList } from "../../hooks/useTabList";
 import { cn } from "../../lib/utils";
+import { takePendingStudyFocus } from "../../utils/studyFocus";
 import { DictionaryLookup } from "./DictionaryLookup";
 import { FlashcardsScreen, type FlashcardsTab } from "./FlashcardsScreen";
 
@@ -71,7 +72,16 @@ const NO_FOCUS: StudyFocus = {
 export function DictionaryScreen({ userId }: { userId: string | null }) {
   const { t } = useI18n();
   const { view, setView } = useDictionaryView(userId);
-  const [focus, setFocus] = useState<StudyFocus>(NO_FOCUS);
+  /**
+   * V3.86.0: el salto desde el diccionario INCRUSTADO (APRENDER → Vocabulario)
+   * cruza de pantalla y deja aquí el mazo elegido. Se consume en el montaje, una
+   * sola vez: es un recado de un clic, no una preferencia. `nonce` a 1 para que
+   * Flashcards lo aplique como un encargo nuevo.
+   */
+  const [focus, setFocus] = useState<StudyFocus>(() => {
+    const pending = takePendingStudyFocus();
+    return pending ? { deckId: pending.deckId, nonce: 1 } : NO_FOCUS;
+  });
   /**
    * Sub-pestaña REAL de Flashcards. `view` solo guarda la proyección
    * (`"personal"` = léxico, `"flashcards"` = estudio), así que «Mazos»,

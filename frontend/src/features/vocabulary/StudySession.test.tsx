@@ -42,6 +42,7 @@ function card(overrides: Partial<FlashcardStudyItem> = {}): FlashcardStudyItem {
     front: "airport",
     back: "aeropuerto",
     definition: "",
+    mnemonic: "",
     is_new: true,
     state: "new",
     due_at: "",

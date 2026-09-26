@@ -45,6 +45,10 @@ CARD_TYPE_FLASHCARD = "flashcard"
 CARDS_BULK_MAX = 200
 MAX_CARD_FRONT = 400
 MAX_CARD_BACK = 2000
+#: V3.86.0: tope del recordatorio (mnemónico). Es una frase corta, no un texto.
+MAX_CARD_MNEMONIC = 400
+#: V3.86.0: tope de mazos a los que se puede asociar una ficha de una vez.
+MAX_CARD_DECKS = 30
 
 AUTO_DECK_NAME = "My dictionary"
 
@@ -121,6 +125,9 @@ async def _manual_cards(user_id: str, deck_id: int) -> list[dict]:
                 "card_id": key,
                 "front": row["front"],
                 "back": row["back"],
+                # V3.86.0: el recordatorio viaja con la ficha hasta el reverso de
+                # la sesión; el léxico no lo tiene (vive en la ficha manual).
+                "mnemonic": row.get("mnemonic") or "",
                 "definition": "",
                 "card": card,
             }
@@ -147,6 +154,7 @@ async def _deck_entries(user_id: str, deck_id: int) -> list[dict]:
                 "card_id": str(card.get("target_id") or ""),
                 "front": str(card.get("target_id") or ""),
                 "back": "",
+                "mnemonic": "",
                 "definition": "",
                 "card": card,
             }
@@ -247,6 +255,7 @@ async def list_decks(user_id: str) -> dict:
 
     rows = await run_in_threadpool(flashcards_repo.list_decks, user_id)
     counts = await run_in_threadpool(flashcards_repo.count_cards, user_id)
+    shared = await run_in_threadpool(flashcards_repo.shared_cards_by_deck, user_id)
     decks = []
     for row in rows:
         deck_id = int(row["id"])
@@ -273,6 +282,9 @@ async def list_decks(user_id: str) -> dict:
             )
         )
         deck["card_count"] = counts.get(deck_id, 0)
+        # V3.86.0: cuántas de esas fichas sobrevivirán al borrar el mazo por
+        # estar también en otro. Es lo que hace honesto el aviso de borrado.
+        deck["shared_count"] = shared.get(deck_id, 0)
         decks.append(deck)
     decks.sort(key=lambda d: d["name"].casefold())
     return {
@@ -374,26 +386,54 @@ async def update_deck(
     }
 
 
-async def delete_deck(user_id: str, deck_id: int) -> bool:
-    """Borra un mazo manual. Antes limpia las cartas FSRS de sus tarjetas."""
+async def delete_deck(user_id: str, deck_id: int) -> dict | None:
+    """Borra un mazo manual conservando las fichas COMPARTIDAS (V3.86.0).
+
+    Borra primero las cartas FSRS de las fichas que quedan HUÉRFANAS (las que
+    solo vivían en este mazo) y devuelve `{"deleted_count", "shared_count"}`; la
+    ficha compartida sobrevive y solo pierde la pertenencia. Antes se borraba
+    todo lo que apuntara al mazo, que con la tabla puente destruiría fichas de
+    otros mazos.
+    """
     if deck_id == flashcards_repo.AUTO_DECK_ID:
-        return False
-    rows = await run_in_threadpool(flashcards_repo.list_cards, user_id, deck_id)
-    for row in rows:
+        return None
+    # La lista de huérfanas se recolecta ANTES de borrar (el repo la devuelve en
+    # la misma transacción), para no dejar cartas FSRS de fichas ya inexistentes.
+    result = await run_in_threadpool(flashcards_repo.delete_deck, user_id, deck_id)
+    if result is None:
+        return None
+    for card_id in result["deleted_card_ids"]:
         await run_in_threadpool(
-            academy_repo.delete_fsrs_card, user_id, CARD_TYPE_FLASHCARD, str(row["id"])
+            academy_repo.delete_fsrs_card, user_id, CARD_TYPE_FLASHCARD, str(card_id)
         )
-    return await run_in_threadpool(flashcards_repo.delete_deck, user_id, deck_id)
+    return {
+        "deleted_count": len(result["deleted_card_ids"]),
+        "shared_count": int(result["shared"]),
+    }
 
 
 async def list_cards(user_id: str, deck_id: int) -> list[dict]:
-    """Tarjetas de un mazo manual con su estado FSRS (navegador de tarjetas)."""
+    """Tarjetas de un mazo manual con su estado FSRS y sus mazos (V3.86.0)."""
     rows = await run_in_threadpool(flashcards_repo.list_cards, user_id, deck_id)
+    return await _cards_out(user_id, rows)
+
+
+async def list_all_cards(user_id: str) -> list[dict]:
+    """Todas las fichas manuales del alumno, con sus mazos (V3.86.0)."""
+    rows = await run_in_threadpool(flashcards_repo.list_all_cards, user_id)
+    return await _cards_out(user_id, rows)
+
+
+async def _cards_out(user_id: str, rows: list[dict]) -> list[dict]:
+    """Fichas con estado FSRS y el conjunto de mazos a los que pertenecen."""
     if not rows:
         return []
     ids = [str(r["id"]) for r in rows]
     scheduled = await run_in_threadpool(
         academy_repo.fsrs_cards_by_ids, user_id, CARD_TYPE_FLASHCARD, ids
+    )
+    memberships = await run_in_threadpool(
+        flashcards_repo.deck_ids_for_cards, user_id, [r["id"] for r in rows]
     )
     out = []
     for row in rows:
@@ -402,8 +442,10 @@ async def list_cards(user_id: str, deck_id: int) -> list[dict]:
             {
                 "id": int(row["id"]),
                 "deck_id": int(row["deck_id"]),
+                "deck_ids": memberships.get(int(row["id"]), []),
                 "front": row["front"],
                 "back": row["back"],
+                "mnemonic": row.get("mnemonic") or "",
                 "state": str(card.get("state") or "new"),
                 "reps": int(card.get("reps") or 0),
                 "due_at": str(card.get("due_at") or ""),
@@ -413,16 +455,47 @@ async def list_cards(user_id: str, deck_id: int) -> list[dict]:
     return out
 
 
+def _clean_deck_ids(deck_ids: list[int] | None, deck_id: int | None) -> list[int]:
+    """Unifica el contrato nuevo (`deck_ids`) y el viejo (`deck_id`)."""
+    if deck_ids:
+        return [int(d) for d in deck_ids][:MAX_CARD_DECKS]
+    if deck_id is not None:
+        return [int(deck_id)]
+    return []
+
+
 async def create_card(
-    user_id: str, deck_id: int, *, front: str, back: str
+    user_id: str,
+    deck_id: int | None = None,
+    *,
+    front: str,
+    back: str = "",
+    mnemonic: str = "",
+    deck_ids: list[int] | None = None,
 ) -> dict | None:
-    if deck_id == flashcards_repo.AUTO_DECK_ID:
-        # El mazo automático no admite tarjetas escritas a mano: es el léxico, y
-        # el léxico lo puebla la app. Añadir a mano es lo que hacen las listas.
+    """Crea una ficha en uno o varios mazos manuales (V3.86.0).
+
+    Acepta el contrato viejo (`deck_id`) y el nuevo (`deck_ids`). Nunca en el
+    mazo automático (es el léxico y no admite notas a mano) ni sin mazo: una
+    ficha sin mazo no existe.
+    """
+    targets = _clean_deck_ids(deck_ids, deck_id)
+    if not targets or flashcards_repo.AUTO_DECK_ID in targets:
         return None
-    return await run_in_threadpool(
-        partial(flashcards_repo.create_card, user_id, deck_id, front=front, back=back)
+    row = await run_in_threadpool(
+        partial(
+            flashcards_repo.create_card,
+            user_id,
+            front=front,
+            back=back[:MAX_CARD_BACK],
+            mnemonic=mnemonic[:MAX_CARD_MNEMONIC],
+            deck_ids=targets,
+        )
     )
+    if row is None:
+        return None
+    out = await _cards_out(user_id, [row])
+    return out[0] if out else None
 
 
 async def add_cards_bulk(
@@ -433,7 +506,8 @@ async def add_cards_bulk(
     Una entrada por línea, `anverso,reverso` (coma o tabulador), con el MISMO
     parser que el pegado de palabras del léxico (`retention.parse_bulk_lines`):
     el alumno pega lo mismo en las dos pantallas, así que la sintaxis tiene que
-    ser la misma o la app le obligaría a recordar dos formatos.
+    ser la misma o la app le obligaría a recordar dos formatos. V3.86.0 admite un
+    tercer campo OPCIONAL con el **recordatorio** (`anverso,reverso,recordatorio`).
 
     `None` si el mazo no es del usuario o es el automático (que no admite
     tarjetas escritas a mano, igual que `create_card`). Devuelve
@@ -447,7 +521,10 @@ async def add_cards_bulk(
 
     cards: list[dict] = []
     seen: set[str] = set()
-    for left, right in retention_domain.parse_bulk_lines(text):
+    for parts in retention_domain.parse_bulk_fields(text, max_fields=3):
+        left = parts[0] if parts else ""
+        right = parts[1] if len(parts) > 1 else ""
+        mnemonic = parts[2] if len(parts) > 2 else ""
         # El anverso se colapsa como en `create_card` (espacios internos), y el
         # deduplicado es por esa forma: pegar dos veces la misma línea no debe
         # crear dos tarjetas que el alumno no puede distinguir.
@@ -455,7 +532,13 @@ async def add_cards_bulk(
         if not front or front.casefold() in seen:
             continue
         seen.add(front.casefold())
-        cards.append({"front": front, "back": right[:MAX_CARD_BACK]})
+        cards.append(
+            {
+                "front": front,
+                "back": right[:MAX_CARD_BACK],
+                "mnemonic": mnemonic[:MAX_CARD_MNEMONIC],
+            }
+        )
         if len(cards) >= CARDS_BULK_MAX:
             break
 
@@ -473,24 +556,115 @@ async def add_cards_bulk(
 
 
 async def update_card(
-    user_id: str, deck_id: int, card_id: int, *, front: str, back: str
+    user_id: str,
+    card_id: int,
+    *,
+    front: str | None = None,
+    back: str | None = None,
+    mnemonic: str | None = None,
 ) -> dict | None:
-    """Edita una tarjeta. Comprueba que sea del mazo que el cliente declara."""
-    row = await run_in_threadpool(flashcards_repo.get_card, user_id, card_id)
-    if row is None or int(row["deck_id"]) != int(deck_id):
-        return None
-    return await run_in_threadpool(
+    """Edita anverso/reverso/recordatorio de una ficha (V3.86.0, parcial).
+
+    Un parámetro `None` significa «no lo cambies»: así editar SOLO el recordatorio
+    (o borrarlo con `""`) no obliga a reenviar el anverso. El id de ficha es
+    global del usuario (IDOR: se busca por `user_id`), ya no cuelga de un mazo.
+    """
+    if front is not None:
+        front = " ".join(front.split())[:MAX_CARD_FRONT]
+        if not front:
+            return None
+    if back is not None:
+        back = back[:MAX_CARD_BACK]
+    if mnemonic is not None:
+        mnemonic = mnemonic[:MAX_CARD_MNEMONIC]
+    row = await run_in_threadpool(
         partial(
-            flashcards_repo.update_card, user_id, card_id, front=front, back=back
+            flashcards_repo.update_card,
+            user_id,
+            card_id,
+            front=front,
+            back=back,
+            mnemonic=mnemonic,
         )
     )
+    if row is None:
+        return None
+    out = await _cards_out(user_id, [row])
+    return out[0] if out else None
 
 
-async def delete_card(user_id: str, deck_id: int, card_id: int) -> bool:
-    """Borra la tarjeta y su carta FSRS, en ese orden y con la carta devuelta."""
+async def set_card_decks(
+    user_id: str, card_id: int, deck_ids: list[int]
+) -> dict | None:
+    """Reemplaza los mazos de una ficha (V3.86.0). `None` si algo no es suyo."""
+    if not deck_ids:
+        return None
+    owned = await run_in_threadpool(
+        flashcards_repo.set_card_decks,
+        user_id,
+        card_id,
+        [int(d) for d in deck_ids][:MAX_CARD_DECKS],
+    )
+    if owned is None:
+        return None
     row = await run_in_threadpool(flashcards_repo.get_card, user_id, card_id)
-    if row is None or int(row["deck_id"]) != int(deck_id):
-        return False
+    if row is None:
+        return None
+    out = await _cards_out(user_id, [row])
+    return out[0] if out else None
+
+
+async def add_card_to_deck(
+    user_id: str, card_id: int, deck_id: int
+) -> dict | None:
+    """Añade una pertenencia sin tocar las demás (V3.86.0)."""
+    if await run_in_threadpool(
+        flashcards_repo.add_card_to_deck, user_id, card_id, deck_id
+    ) is None:
+        return None
+    row = await run_in_threadpool(flashcards_repo.get_card, user_id, card_id)
+    if row is None:
+        return None
+    out = await _cards_out(user_id, [row])
+    return out[0] if out else None
+
+
+async def remove_card_from_deck(
+    user_id: str, card_id: int, deck_id: int
+) -> dict | None:
+    """Quita una pertenencia. Si era la ÚLTIMA, la ficha se borra (V3.86.0).
+
+    Una ficha sin mazo no existe en este modelo (el FK `deck_id` exige un mazo
+    real), así que quitar la última pertenencia equivale a borrar la ficha; se
+    devuelve `{"deleted": True, "card_id": id}` para que la UI lo diga.
+    """
+    if await run_in_threadpool(
+        flashcards_repo.get_card, user_id, card_id
+    ) is None:
+        return None
+    remaining = await run_in_threadpool(
+        flashcards_repo.remove_card_from_deck, user_id, card_id, deck_id
+    )
+    if remaining is None:
+        return None
+    if not remaining:
+        await delete_card(user_id, card_id)
+        return {"deleted": True, "card_id": int(card_id), "deck_ids": []}
+    row = await run_in_threadpool(flashcards_repo.get_card, user_id, card_id)
+    if row is None:
+        return None
+    out = await _cards_out(user_id, [row])
+    return out[0] if out else None
+
+
+async def card_belongs_to_deck(user_id: str, card_id: int, deck_id: int) -> bool:
+    """Membresía de una ficha en un mazo (para los envoltorios legacy)."""
+    decks = await run_in_threadpool(flashcards_repo.decks_for_card, user_id, card_id)
+    return int(deck_id) in decks
+
+
+async def delete_card(user_id: str, card_id: int) -> bool:
+    """Borra la tarjeta y su carta FSRS, en ese orden y con la carta devuelta."""
     deleted = await run_in_threadpool(flashcards_repo.delete_card, user_id, card_id)
     if deleted is None:
         return False
@@ -560,6 +734,9 @@ async def deck_queue(
                 "front": entry["front"],
                 "back": entry["back"],
                 "definition": entry.get("definition") or "",
+                # V3.86.0: recordatorio de la ficha manual ("" en el léxico). La
+                # sesión lo pinta en el reverso; no altera el planificador.
+                "mnemonic": entry.get("mnemonic") or "",
                 # `is_new` sale del ledger (`_split`), no de `reps`: ver el
                 # comentario de `_split` para por qué no son lo mismo.
                 "is_new": bool(entry["is_new"]),
@@ -667,15 +844,22 @@ async def review_card(
             "reps": out["reps"],
         }
     elif card_type == CARD_TYPE_FLASHCARD:
-        # IDOR: la tarjeta se busca POR USUARIO. Además se comprueba que
-        # pertenezca al mazo que el cliente dice, para que la revisión no
-        # contamine el ledger de otro mazo (de donde salen los límites diarios).
+        # IDOR: la tarjeta se busca POR USUARIO. Además se comprueba que la ficha
+        # PERTENEZCA al mazo que el cliente dice (con la tabla puente ya no basta
+        # con que sea su `deck_id` principal), para que la revisión no contamine
+        # el ledger de otro mazo.
         row = await run_in_threadpool(flashcards_repo.get_card, user_id, int(card_id))
-        if row is None or int(row["deck_id"]) != int(deck_id):
+        if row is None or not await card_belongs_to_deck(
+            user_id, int(card_id), int(deck_id)
+        ):
             return None
         resolved = await _review_manual(user_id, int(card_id), grade)
         if resolved is None:
             return None
+        # El ledger apunta al mazo DESDE EL QUE se estudió, no al principal: los
+        # límites diarios son por mazo y una ficha compartida debe contar donde
+        # se repasó.
+        resolved["deck_id"] = int(deck_id)
     else:
         return None
 

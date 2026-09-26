@@ -139,9 +139,15 @@ def test_parse_reverse_content_extracts_senses_and_derives_top_pos():
 
 
 def test_prompts_declare_senses_and_version_is_bumped():
-    assert dictionary_content.GENERATOR_VERSION == "1.4.0"
+    assert dictionary_content.GENERATOR_VERSION == "1.5.0"
     assert "senses" in dictionary_content._SYSTEM_PROMPT
     assert "senses" in dictionary_content._REVERSE_SYSTEM_PROMPT
+    # V3.86.0: el contrato gana `meanings` (significados elegibles) y la regla
+    # dura de que un nombre propio nunca es el significado por defecto.
+    assert "meanings" in dictionary_content._SYSTEM_PROMPT
+    assert "meanings" in dictionary_content._REVERSE_SYSTEM_PROMPT
+    assert "proper_noun" in dictionary_content._SYSTEM_PROMPT
+    assert "proper_noun" in dictionary_content._REVERSE_SYSTEM_PROMPT
 
 
 # --- Persistencia y migración ------------------------------------------------

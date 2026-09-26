@@ -24,6 +24,10 @@ const mocks = vi.hoisted(() => ({
   getDrillRecallPrompt: vi.fn(),
   getDrillSentenceContext: vi.fn(),
   getDrillTransferContext: vi.fn(),
+  // V3.85.1 (C1): los peldaños reconductivos puntúan sin micrófono y su
+  // veredicto debe mover la sesión (antes la dejaban clavada).
+  submitDrillRecognitionAttempt: vi.fn(),
+  submitDrillRecallAttempt: vi.fn(),
   submitDrillWriteAttempt: vi.fn(),
   markDrillStarted: vi.fn(),
   markDrillAbandoned: vi.fn(),
@@ -37,6 +41,8 @@ vi.mock("../../api/vocabulary", () => ({
   getDrillRecallPrompt: mocks.getDrillRecallPrompt,
   getDrillSentenceContext: mocks.getDrillSentenceContext,
   getDrillTransferContext: mocks.getDrillTransferContext,
+  submitDrillRecognitionAttempt: mocks.submitDrillRecognitionAttempt,
+  submitDrillRecallAttempt: mocks.submitDrillRecallAttempt,
   // V3.39: el paso Write es el que produce sin micrófono, así que es el que
   // permite encadenar en un test sin simular audio.
   submitDrillWriteAttempt: mocks.submitDrillWriteAttempt,
@@ -388,5 +394,119 @@ describe("ReviewToday · contratos incompletos (V3.77.2)", () => {
     expect(
       await screen.findByText(/Could not load the review queue/),
     ).toBeTruthy();
+  });
+});
+
+describe("ReviewToday · peldaños reconductivos y accesibilidad (V3.85.1)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  // C1 (P0 de la auditoría AY): antes la sesión avanzaba SOLO con `onProduced`,
+  // que Recognition/Recall nunca disparan; un ítem servido en uno de esos
+  // peldaños quedaba clavado sin ofrecer «Siguiente palabra».
+  it("un ítem servido como recognition avanza al dar veredicto y encadena (C1)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 2,
+        items: [
+          dueWord("river", { activity: "recognition", decision_id: "d-river" }),
+          dueWord("apple", { activity: "recognition", decision_id: "d-apple" }),
+        ],
+      }),
+    );
+    mocks.getDrillRecognitionQuestion.mockResolvedValue({
+      word: "river",
+      available: true,
+      question_id: "q1",
+      options: ["río", "mar"],
+    });
+    mocks.submitDrillRecognitionAttempt.mockResolvedValue({
+      word: "river",
+      correct: true,
+      correct_index: 0,
+      selected_index: 0,
+    });
+
+    renderHarness();
+
+    await screen.findByText("1 of 2");
+    // Sin veredicto todavía no hay avance.
+    expect(screen.queryByRole("button", { name: "Next word" })).toBeNull();
+
+    fireEvent.click(await screen.findByRole("button", { name: "río" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    // El veredicto (sin producción) ofrece avanzar y la cola encadena.
+    expect(
+      await screen.findByRole("button", { name: "Next word" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next word" }));
+    await waitFor(() => expect(screen.getByText("2 of 2")).toBeTruthy());
+  });
+
+  it("un ítem servido como recall avanza al dar veredicto (C1)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({
+        due_count: 1,
+        items: [
+          dueWord("river", {
+            activity: "recall",
+            reason: "no_recall_evidence",
+          }),
+        ],
+      }),
+    );
+    mocks.getDrillRecallPrompt.mockResolvedValue({
+      word: "river",
+      available: true,
+      cue: "río",
+      cue_kind: "translation",
+    });
+    mocks.submitDrillRecallAttempt.mockResolvedValue({
+      word: "river",
+      correct: true,
+      expected: "river",
+      delayed: false,
+      recall_days: 1,
+      error_type: "correct",
+    });
+
+    renderHarness();
+
+    fireEvent.change(await screen.findByLabelText("Type the word"), {
+      target: { value: "river" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    // Última palabra de la cola: el CTA es «Terminar».
+    expect(await screen.findByRole("button", { name: "Finish" })).toBeTruthy();
+  });
+
+  it("el contador es región viva y el foco viaja al CTA (a11y)", async () => {
+    mocks.getReviewQueue.mockResolvedValue(
+      queue({ due_count: 2, items: [dueWord("river"), dueWord("apple")] }),
+    );
+    mocks.submitDrillWriteAttempt.mockResolvedValue({
+      word: "river",
+      passed: true,
+      used_word: true,
+      word_count: 6,
+      min_words: 4,
+    });
+
+    renderHarness();
+
+    const progress = await screen.findByText("1 of 2");
+    expect(progress.getAttribute("role")).toBe("status");
+    expect(progress.getAttribute("aria-live")).toBe("polite");
+    expect(progress.getAttribute("aria-atomic")).toBe("true");
+
+    await writeAndSend("I sat by the river last summer.");
+
+    const next = await screen.findByRole("button", { name: "Next word" });
+    // El foco se mueve al CTA: el usuario de teclado no tabula por todo el drill.
+    await waitFor(() => expect(document.activeElement).toBe(next));
   });
 });

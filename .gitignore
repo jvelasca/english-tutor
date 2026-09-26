@@ -10,6 +10,9 @@ frontend/capture/
 __pycache__/
 *.pyc
 .pytest_cache/
+# V3.86.0: caché de ruff. No se versiona y, sin esta regla, aparecía como no
+# rastreada y podía colarse en un `git add -A` de release.
+.ruff_cache/
 .env
 .DS_Store
 backend/models/

@@ -112,7 +112,11 @@ def test_manual_deck_crud(monkeypatch, tmp_path):
         deleted = client.delete(
             f"/api/vocabulary/decks/{deck_id}", params={"user_id": a}
         )
-        assert deleted.status_code == 204
+        # V3.86.0: el borrado devuelve los CONTADORES (fichas borradas vs.
+        # conservadas por estar compartidas) para que la UI pueda avisar; ya no
+        # es un 204 opaco.
+        assert deleted.status_code == 200, deleted.text
+        assert deleted.json() == {"deleted_count": 0, "shared_count": 0}
         assert flashcards_repo.get_deck(a, deck_id) is None
 
 
@@ -240,12 +244,11 @@ def test_delete_deck_removes_its_fsrs_cards(monkeypatch, tmp_path):
             params={"user_id": a},
             json={"card_type": "flashcard", "card_id": str(card_id), "grade": 4},
         )
-        assert (
-            client.delete(
-                f"/api/vocabulary/decks/{deck_id}", params={"user_id": a}
-            ).status_code
-            == 204
+        deleted = client.delete(
+            f"/api/vocabulary/decks/{deck_id}", params={"user_id": a}
         )
+        assert deleted.status_code == 200, deleted.text
+        assert deleted.json() == {"deleted_count": 1, "shared_count": 0}
     assert academy_repo.get_fsrs_card(a, "flashcard", str(card_id)) is None
     assert _count("flashcard_cards", "user_id = ?", (a,)) == 0
 

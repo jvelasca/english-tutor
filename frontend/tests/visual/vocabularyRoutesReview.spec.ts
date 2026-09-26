@@ -142,6 +142,46 @@ const LEXICON_EMPTY = {
   items: [],
 };
 
+/**
+ * V3.86.0: palabra YA rastreada. Es la que se quedaba SIN NINGUNA SALIDA en el
+ * diccionario incrustado de APRENDER → Vocabulario: como el panel no hospeda la
+ * sesión de estudio, «Estudiar en Flashcards» no existía y la única acción
+ * ofrecida (el alta) perdía sentido.
+ */
+const TRACKED_LOOKUP = {
+  word: "coffee",
+  kind: "word",
+  cefr: "A1",
+  definition_source: "llm",
+  pos: "noun",
+  definition: "A hot drink made from roasted coffee beans.",
+  translation: "café",
+  direction: "en-es",
+  alternatives: [],
+  meanings: [],
+  example: null,
+  usage: {
+    tracked: true,
+    surface: {
+      status: "learning",
+      mastery: 0.4,
+      recall: 0.6,
+      next_review_days: 2,
+      production_count: 1,
+      exposure_count: 3,
+      production_channels: ["chat"],
+      competence: {
+        recognition: true,
+        production: false,
+        transfer: false,
+        retention: false,
+      },
+      last_activity_at: "2026-09-20T10:00:00Z",
+    },
+    unit: null,
+  },
+};
+
 async function installMocks(page: import("@playwright/test").Page) {
   await page.route("**/api/vocabulary/routes/stats*", (route) =>
     route.fulfill({
@@ -183,6 +223,14 @@ async function installMocks(page: import("@playwright/test").Page) {
   await page.route("**/api/vocabulary/lexicon*", (route) =>
     route.fulfill({ json: LEXICON_EMPTY }),
   );
+  // V3.86.0: la consulta del diccionario incrustado (misma respuesta que la
+  // pantalla dedicada) más los ajustes, de donde sale la dirección.
+  await page.route("**/api/vocabulary/dictionary*", (route) =>
+    route.fulfill({ json: TRACKED_LOOKUP }),
+  );
+  await page.route("**/api/settings*", (route) =>
+    route.fulfill({ json: { settings: {} } }),
+  );
   await page.route("**/api/voices*", (route) =>
     route.fulfill({
       json: {
@@ -193,6 +241,33 @@ async function installMocks(page: import("@playwright/test").Page) {
       },
     }),
   );
+  // V3.85.1 (D4): destino del CTA «Repasar hoy» del panel incrustado — la
+  // superficie central (Flashcards → Estudiar) necesita su cola y sus mazos.
+  await page.route("**/api/learning/review*", (route) =>
+    route.fulfill({
+      json: { due_count: 0, items: [], fsrs_version: "test", units: [] },
+    }),
+  );
+  await page.route(/\/api\/vocabulary\/decks(\/.*)?$/, (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === "/api/vocabulary/decks") {
+      return route.fulfill({
+        json: { auto_deck_id: 0, decks: [], fsrs_version: "test" },
+      });
+    }
+    return route.fulfill({
+      json: {
+        deck: { id: 0, name: "", is_auto: true },
+        items: [],
+        due_count: 0,
+        new_count: 0,
+        reviewed_today: 0,
+        new_today: 0,
+        limits: { new_remaining: 0, review_remaining: 0 },
+        fsrs_version: "test",
+      },
+    });
+  });
 }
 
 test("capturar Vocabulary: página única MC + feedback + diccionario (mock)", async ({
@@ -289,4 +364,73 @@ test("capturar Vocabulary: página única MC + feedback + diccionario (mock)", a
 
   await page.waitForTimeout(600);
   await page.screenshot({ path: shot("vocabulary-dictionary"), fullPage: true });
+});
+
+test("V3.85.1: el panel APRENDER → Vocabulario recupera el acceso al repaso (D4)", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Solo desktop");
+
+  await page.goto("/");
+  await ensureProfile(page);
+  await installMocks(page);
+  await page.goto("/#/aprender/vocabulario");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "My dictionary" }).click();
+  await expect(page.getByText("Personal dictionary").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // V3.85.0 retiró el drill de repaso del panel: este CTA lo devuelve SIN
+  // duplicar la sesión — transporta a la superficie central del diccionario.
+  const cta = page.getByRole("button", { name: "Review today" });
+  await expect(cta).toBeVisible();
+  await cta.click();
+
+  await expect(page).toHaveURL(/#\/diccionario/);
+  await expect(
+    page.getByRole("tab", { name: "Flashcards", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  // El destino es la sub-pestaña de estudio, donde vive «Repasar hoy».
+  await expect(
+    page.getByRole("tab", { name: "Study", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+});
+
+test("V3.86.0: el diccionario incrustado da salida a una palabra ya rastreada", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Solo desktop");
+
+  await page.goto("/");
+  await ensureProfile(page);
+  await installMocks(page);
+  await page.goto("/#/aprender/vocabulario");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // El panel solo ofrecía inventario y consulta. La consulta de una palabra ya
+  // rastreada se quedaba sin NINGUNA acción: el alta no cambiaría nada y la
+  // sesión de estudio no cabe en el panel. Ahora tiene salida.
+  await page.getByRole("button", { name: "Consult" }).click();
+  await page.getByLabel("Search the dictionary").fill("coffee");
+  await page.getByRole("button", { name: "Look up" }).click();
+  await expect(page.getByText(/Already in your dictionary/)).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // La salida cruza de pantalla (el panel no hospeda el estudio): persiste la
+  // vista y navega a la superficie central, en Flashcards → Estudiar.
+  await page.getByRole("button", { name: "Study in Flashcards" }).click();
+  await expect(page).toHaveURL(/#\/diccionario/);
+  await expect(
+    page.getByRole("tab", { name: "Flashcards", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("tab", { name: "Study", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
 });

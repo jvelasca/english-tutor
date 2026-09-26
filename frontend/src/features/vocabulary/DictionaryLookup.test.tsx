@@ -923,19 +923,21 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     is_auto: false,
   };
 
-  it("añade la palabra como aprendizaje y como tarjeta de un mazo, y ofrece estudiar ese mazo", async () => {
+  it("añade la palabra como aprendizaje y como tarjeta en los mazos marcados (V3.86.0)", async () => {
     const onOpenFlashcards = vi.fn();
     const fn = routeFetch([
       { url: "/api/vocabulary/dictionary", data: NEBULA },
       // OJO al orden: `routeFetch` casa por `includes`, así que la ruta de las
       // tarjetas (más específica) va ANTES que la de la lista de mazos.
       {
-        url: "/api/vocabulary/decks/7/cards",
+        url: "/api/vocabulary/cards",
         data: {
           id: 11,
           deck_id: 7,
+          deck_ids: [7],
           front: "nebula",
           back: "",
+          mnemonic: "",
           state: "new",
           reps: 0,
           due_at: "",
@@ -972,12 +974,18 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(
       screen.getByText(/The word always joins your study flow/),
     ).toBeTruthy();
-    // Solo se ofrecen mazos MANUALES: el automático no es un destino.
-    const select = await screen.findByRole("combobox");
-    expect(screen.getByRole("option", { name: "Mi mazo" })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: "auto" })).toBeNull();
+    // Solo se ofrecen mazos MANUALES, y como casillas (la ficha puede nacer en
+    // varios a la vez): el automático no es un destino.
+    expect(await screen.findByLabelText("Mi mazo")).toBeTruthy();
+    expect(screen.queryByLabelText("auto")).toBeNull();
+    // V3.86.0: sin equivalente la consulta no se queda sin salida — se pide el
+    // reverso a mano para que la tarjeta sirva.
+    expect(screen.getByText(/No equivalent was found/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Back of the card"), {
+      target: { value: "nebulosa" },
+    });
 
-    fireEvent.change(select, { target: { value: "7" } });
+    fireEvent.click(screen.getByLabelText("Mi mazo"));
     fireEvent.click(
       screen.getByRole("button", { name: "Add and start learning" }),
     );
@@ -999,14 +1007,17 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
       collection_id: null,
     });
 
-    // 2) La tarjeta del mazo manual, con anverso y reverso.
+    // 2) La tarjeta manual: UNA escritura que la crea en TODOS los mazos
+    //    marcados (tabla puente), con su recordatorio.
     const cardCall = fn.mock.calls.find((call) =>
-      String(call[0]).includes("/api/vocabulary/decks/7/cards"),
+      String(call[0]).includes("/api/vocabulary/cards"),
     );
     expect(cardCall).toBeTruthy();
     expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
       front: "nebula",
-      back: "",
+      back: "nebulosa",
+      mnemonic: "",
+      deck_ids: [7],
     });
 
     // Éxito honesto: «ya está en aprendizaje» + dónde se guardó + salida a
@@ -1016,7 +1027,7 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(onOpenFlashcards).toHaveBeenCalledWith(7);
   });
 
-  it("permite crear un mazo desde el propio panel y lo deja seleccionado", async () => {
+  it("permite crear un mazo desde el propio panel y lo deja marcado (V3.86.0)", async () => {
     const onOpenFlashcards = vi.fn();
     // La misma URL responde distinto según sea el GET (lista) o el POST (alta):
     // se cuentan las llamadas porque `routeFetch` casa por URL, no por método.
@@ -1053,17 +1064,17 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
       await screen.findByRole("button", { name: "Add to Flashcards" }),
     );
 
-    const select = await screen.findByRole("combobox");
-    fireEvent.change(select, { target: { value: "__new__" } });
-
+    fireEvent.click(screen.getByRole("button", { name: "New deck" }));
     fireEvent.change(screen.getByLabelText("New deck name"), {
       target: { value: "Verbos" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create deck" }));
 
-    // El mazo recién creado queda seleccionado: no hay que volver a elegirlo.
+    // El mazo recién creado queda marcado: no hay que volver a elegirlo.
     await waitFor(() =>
-      expect((select as HTMLSelectElement).value).toBe("7"),
+      expect(
+        (screen.getByLabelText("Verbos") as HTMLInputElement).checked,
+      ).toBe(true),
     );
     const createCall = fn.mock.calls.find(
       (call) =>
@@ -1075,11 +1086,22 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     });
   });
 
-  it("una palabra ya rastreada no se re-da de alta: declara el vínculo y ofrece estudiar", async () => {
-    // COFFEE ya está en el léxico (`usage.tracked`): ofrecer «Añadir» sería
-    // prometer un cambio que no ocurriría (ni duplicar la palabra).
+  it("una palabra ya rastreada ya no se queda sin salida: añade la ficha y ofrece estudiar (V3.86.0)", async () => {
+    // COFFEE ya está en el léxico (`usage.tracked`). Antes el alta se escondía y
+    // solo quedaba estudiar; ahora se puede crear la ficha sin reescribir el
+    // léxico, y el panel lo declara.
     const onOpenFlashcards = vi.fn();
-    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    routeFetch([
+      { url: "/api/vocabulary/dictionary", data: COFFEE },
+      {
+        url: "/api/vocabulary/decks",
+        data: {
+          decks: [AUTO_DECK, MANUAL_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
+      },
+    ]);
     renderPanel(
       <DictionaryLookup userId="u1" onOpenFlashcards={onOpenFlashcards} />,
     );
@@ -1088,15 +1110,213 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(
       await screen.findByText(/Already in your dictionary/),
     ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to Flashcards" }));
     expect(
-      screen.queryByRole("button", { name: "Add to Flashcards" }),
-    ).toBeNull();
+      await screen.findByText(/only the card and its decks are saved/),
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
     expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
   });
 
-  it("V3.84.1: si falla la tarjeta del mazo, declara el estado PARCIAL y reintenta solo la tarjeta", async () => {
+  // V3.86.0: «lima → la capital del Perú» deja de ser una trampa. La consulta ES→EN
+  // trae los significados candidatos y el alumno elige: el nombre propio va
+  // marcado y NUNCA por defecto.
+  const LIMA = {
+    word: "lima",
+    kind: "word",
+    cefr: "A1",
+    definition_source: "llm",
+    pos: "noun",
+    definition: "A tool with a rough surface used for smoothing.",
+    translation: "file",
+    direction: "es-en",
+    alternatives: [],
+    meanings: [
+      {
+        term: "file",
+        pos: "noun",
+        gloss: "Herramienta con superficie rugosa.",
+        domain: "tools",
+        proper_noun: false,
+      },
+      {
+        term: "lime",
+        pos: "noun",
+        gloss: "Cítrico verde.",
+        domain: "food",
+        proper_noun: false,
+      },
+      {
+        term: "Lima",
+        pos: "noun",
+        gloss: "Capital del Perú.",
+        domain: "geography",
+        proper_noun: true,
+      },
+    ],
+    example: null,
+    usage: { tracked: false, surface: null, unit: null },
+  };
+
+  it("V3.86.0: elige el significado y el elegido manda en la práctica y en el alta", async () => {
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: LIMA },
+      {
+        url: "/api/vocabulary/cards",
+        data: {
+          id: 21,
+          deck_id: 7,
+          deck_ids: [7],
+          front: "Lima",
+          back: "lima",
+          mnemonic: "",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "2026-09-25T10:00:00Z",
+        },
+      },
+      {
+        url: "/api/vocabulary/decks",
+        data: {
+          decks: [AUTO_DECK, MANUAL_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
+      },
+      {
+        url: "/api/vocabulary/items",
+        data: {
+          added: ["Lima"],
+          item: { word: "Lima", translation: "lima", definition: "" },
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Spanish → English" }));
+    fillAndSubmit("lima");
+
+    // El defecto es el primer significado que NO es nombre propio, aunque el
+    // nombre propio venga el último (y estaría disponible a un clic).
+    const fileRadio = (await screen.findByRole("radio", {
+      name: "Meaning: file · noun",
+    })) as HTMLInputElement;
+    const properRadio = screen.getByRole("radio", {
+      name: "Meaning: Lima · noun",
+    }) as HTMLInputElement;
+    expect(fileRadio.checked).toBe(true);
+    expect(properRadio.checked).toBe(false);
+    // El nombre propio se marca, no se disimula.
+    expect(screen.getByText("Proper noun")).toBeTruthy();
+
+    // Elegir «Lima» cambia el equivalente de la tarjeta…
+    fireEvent.click(properRadio);
+    expect(
+      (screen.getByRole("radio", { name: "Meaning: Lima · noun" }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+
+    // …y el alta: la ficha y el léxico se crean con el significado ELEGIDO, no
+    // con el de por defecto.
+    fireEvent.click(screen.getByRole("button", { name: "Add to Flashcards" }));
+    fireEvent.click(await screen.findByLabelText("Mi mazo"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add and start learning" }),
+    );
+    expect(await screen.findByText("Lima is now learning.")).toBeTruthy();
+
+    const cardCall = fn.mock.calls.find((call) =>
+      String(call[0]).includes("/api/vocabulary/cards"),
+    );
+    expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
+      front: "Lima",
+      back: "lima",
+      mnemonic: "",
+      deck_ids: [7],
+    });
+    const addCall = fn.mock.calls.find((call) =>
+      String(call[0]).includes("/api/vocabulary/items"),
+    );
+    expect(JSON.parse(String(addCall?.[1]?.body))).toEqual({
+      word: "Lima",
+      translation: "lima",
+      collection_id: null,
+    });
+  });
+
+  it("V3.86.0: el recordatorio viaja en la ficha y los mazos marcados van juntos", async () => {
+    const EXTRA_DECK = { ...MANUAL_DECK, id: 8, name: "Cocina", slug: "cocina" };
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: COFFEE },
+      {
+        url: "/api/vocabulary/cards",
+        data: {
+          id: 31,
+          deck_id: 7,
+          deck_ids: [7, 8],
+          front: "coffee",
+          back: "café",
+          mnemonic: "café con leche",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "2026-09-25T10:00:00Z",
+        },
+      },
+      {
+        url: "/api/vocabulary/decks",
+        data: {
+          decks: [AUTO_DECK, MANUAL_DECK, EXTRA_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    // COFFEE ya está rastreada: no se reescribe el léxico, solo la ficha.
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to Flashcards" }),
+    );
+    fireEvent.click(await screen.findByLabelText("Mi mazo"));
+    fireEvent.click(screen.getByLabelText("Cocina"));
+    fireEvent.change(screen.getByLabelText("Reminder (optional)"), {
+      target: { value: "  café con leche  " },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add and start learning" }),
+    );
+
+    const cardCall = await waitFor(() => {
+      const call = fn.mock.calls.find((c) =>
+        String(c[0]).includes("/api/vocabulary/cards"),
+      );
+      expect(call).toBeTruthy();
+      return call;
+    });
+    // El recordatorio se recorta y los DOS mazos viajan en una sola escritura.
+    expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
+      front: "coffee",
+      back: "café",
+      mnemonic: "café con leche",
+      deck_ids: [7, 8],
+    });
+    // Palabra rastreada: el léxico NO se vuelve a dar de alta.
+    expect(
+      fn.mock.calls.filter((call) =>
+        String(call[0]).includes("/api/vocabulary/items"),
+      ),
+    ).toHaveLength(0);
+    // El éxito nombra los dos mazos y abre el principal en el estudio.
+    expect(await screen.findByText(/Saved as a card in/)).toBeTruthy();
+    expect(screen.getByText(/“Mi mazo, Cocina”/)).toBeTruthy();
+  });
+
+  it("V3.84.1/V3.86.0: si falla la tarjeta, declara el estado PARCIAL y reintenta solo la tarjeta", async () => {
     const onOpenFlashcards = vi.fn();
     // La PRIMERA llamada de la tarjeta falla y la segunda entra: es justo el
     // reintento que ofrece el panel. El alta del léxico nunca falla.
@@ -1104,7 +1324,7 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     const fn = routeFetch([
       { url: "/api/vocabulary/dictionary", data: NEBULA },
       {
-        url: "/api/vocabulary/decks/7/cards",
+        url: "/api/vocabulary/cards",
         error: () => {
           cardCalls += 1;
           return cardCalls === 1 ? { status: 500, detail: "boom" } : null;
@@ -1112,8 +1332,10 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
         data: {
           id: 11,
           deck_id: 7,
+          deck_ids: [7],
           front: "nebula",
           back: "",
+          mnemonic: "",
           state: "new",
           reps: 0,
           due_at: "",
@@ -1142,8 +1364,10 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Add to Flashcards" }),
     );
-    const select = await screen.findByRole("combobox");
-    fireEvent.change(select, { target: { value: "7" } });
+    fireEvent.click(await screen.findByLabelText("Mi mazo"));
+    fireEvent.change(screen.getByLabelText("Back of the card"), {
+      target: { value: "nebulosa" },
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Add and start learning" }),
     );
@@ -1183,7 +1407,7 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     ).toHaveLength(1);
   });
 
-  it("V3.84.1: un nombre de mazo duplicado se declara y NO oculta el selector", async () => {
+  it("V3.84.1/V3.86.0: un nombre de mazo duplicado se declara y NO oculta los mazos", async () => {
     // La llamada 1 es el GET de la lista (al abrir el panel) y la 2 el POST de
     // creación: solo la creación falla, con el código que manda el backend.
     let deckCalls = 0;
@@ -1198,7 +1422,7 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
             : null;
         },
         data: {
-          decks: [AUTO_DECK],
+          decks: [AUTO_DECK, MANUAL_DECK],
           auto_deck_id: 0,
           fsrs_version: "test",
         },
@@ -1210,8 +1434,8 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Add to Flashcards" }),
     );
-    const select = await screen.findByRole("combobox");
-    fireEvent.change(select, { target: { value: "__new__" } });
+    expect(await screen.findByLabelText("Mi mazo")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "New deck" }));
     fireEvent.change(screen.getByLabelText("New deck name"), {
       target: { value: "Verbos" },
     });
@@ -1220,9 +1444,9 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(
       await screen.findByText("You already have a deck with that name. Pick another one."),
     ).toBeTruthy();
-    // El fallo de creación NO es un fallo de carga: el selector sigue visible y
+    // El fallo de creación NO es un fallo de carga: los mazos siguen visibles y
     // no se pinta el mensaje de «no se pudieron cargar tus mazos».
-    expect(screen.getByRole("combobox")).toBeTruthy();
+    expect(screen.getByLabelText("Mi mazo")).toBeTruthy();
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
   });
 });

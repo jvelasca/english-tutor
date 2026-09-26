@@ -73,10 +73,77 @@ def _encode_senses(senses: object) -> str:
     return json.dumps(cleaned, ensure_ascii=False, separators=(",", ":"))
 
 
+def _decode_meanings(raw: object) -> list[dict]:
+    """Significados elegibles desde el JSON persistido (`[]` si vacío/corrupto).
+
+    V3.86.0. Tolerante por el mismo motivo que `_decode_senses`: una fila
+    ilegible no debe romper la consulta; la UI degrada a un único significado
+    sintetizado desde `translation`/`english`.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return []
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    meanings: list[dict] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        term = str(item.get("term") or "").strip()
+        if not term:
+            continue
+        meanings.append(
+            {
+                "term": term,
+                "pos": str(item.get("pos") or "").strip(),
+                "gloss": str(item.get("gloss") or "").strip(),
+                "domain": str(item.get("domain") or "").strip(),
+                "proper_noun": bool(item.get("proper_noun")),
+            }
+        )
+    return meanings
+
+
+def _encode_meanings(meanings: object) -> str:
+    """Serializa los significados elegibles a JSON compacto (V3.86.0).
+
+    `""` cuando no hay. Descarta entradas sin `term`; nunca lanza. Acepta una
+    cadena JSON ya serializada y la conserva.
+    """
+    if not meanings:
+        return ""
+    if isinstance(meanings, str):
+        return meanings.strip()
+    cleaned: list[dict] = []
+    for item in meanings if isinstance(meanings, (list, tuple)) else ():
+        if not isinstance(item, dict):
+            continue
+        term = str(item.get("term") or "").strip()
+        if not term:
+            continue
+        cleaned.append(
+            {
+                "term": term,
+                "pos": str(item.get("pos") or "").strip(),
+                "gloss": str(item.get("gloss") or "").strip(),
+                "domain": str(item.get("domain") or "").strip(),
+                "proper_noun": bool(item.get("proper_noun")),
+            }
+        )
+    if not cleaned:
+        return ""
+    return json.dumps(cleaned, ensure_ascii=False, separators=(",", ":"))
+
+
 def _entry_dict(row: object) -> dict:
-    """Fila de caché con los sentidos ya decodificados (V3.44)."""
+    """Fila de caché con sentidos y significados ya decodificados (V3.44/V3.86)."""
     entry = dict(row)  # type: ignore[arg-type]
     entry["senses"] = _decode_senses(entry.get("senses_json"))
+    entry["meanings"] = _decode_meanings(entry.get("meanings_json"))
     return entry
 
 
@@ -91,7 +158,7 @@ def get_entry(word: str) -> dict | None:
     with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT word, pos, definition, translation, situation, senses_json, "
-            "generator_version, created_at, updated_at "
+            "meanings_json, generator_version, created_at, updated_at "
             "FROM dictionary_entries WHERE word = ?",
             (word,),
         ).fetchone()
@@ -106,6 +173,7 @@ def save_entry(
     translation: str = "",
     situation: str = "",
     senses: object = None,
+    meanings: object = None,
     generator_version: str = "",
 ) -> bool:
     """Inserta o sobrescribe la entrada de diccionario de `word` (V3.30.1).
@@ -124,20 +192,25 @@ def save_entry(
     V3.44: `senses` (`[{pos, gloss}]`) se serializa en `senses_json` (JSON
     compacto). Es contenido, no evidencia: permite que el scoring semántico
     deje de depender de la `pos` global.
+
+    V3.86.0: `meanings` (`[{term, pos, gloss, domain, proper_noun}]`) se
+    serializa en `meanings_json`: son los significados ELEGIBLES que la UI
+    ofrece para desambiguar una palabra polisémica.
     """
     with closing(_conn()) as conn, conn:
         now = _now()
         cursor = conn.execute(
             "INSERT INTO dictionary_entries "
             "(word, pos, definition, translation, situation, senses_json, "
-            "generator_version, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "meanings_json, generator_version, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(word) DO UPDATE SET "
             "pos = excluded.pos, "
             "definition = excluded.definition, "
             "translation = excluded.translation, "
             "situation = excluded.situation, "
             "senses_json = excluded.senses_json, "
+            "meanings_json = excluded.meanings_json, "
             "generator_version = excluded.generator_version, "
             "updated_at = excluded.updated_at",
             (
@@ -147,6 +220,7 @@ def save_entry(
                 translation,
                 situation,
                 _encode_senses(senses),
+                _encode_meanings(meanings),
                 generator_version,
                 now,
                 now,
@@ -157,7 +231,7 @@ def save_entry(
 
 _ENTRY_COLUMNS = (
     "word, pos, definition, translation, situation, senses_json, "
-    "generator_version, created_at, updated_at"
+    "meanings_json, generator_version, created_at, updated_at"
 )
 
 
@@ -187,7 +261,7 @@ def list_entries() -> list[dict]:
 
 _REVERSE_COLUMNS = (
     "word, english, pos, definition, situation, senses_json, "
-    "generator_version, created_at, updated_at"
+    "meanings_json, generator_version, created_at, updated_at"
 )
 
 
@@ -215,6 +289,7 @@ def save_reverse_entry(
     definition: str = "",
     situation: str = "",
     senses: object = None,
+    meanings: object = None,
     generator_version: str = "",
 ) -> bool:
     """Inserta o sobrescribe la entrada ES→EN de `word` (V3.39).
@@ -223,20 +298,23 @@ def save_reverse_entry(
     para la primera generación como para regenerar contenido obsoleto. Devuelve
     True si hubo escritura. Contenido GLOBAL (sin `user_id`). V3.44: `senses`
     se persiste en `senses_json` (misma política que la dirección directa).
+    V3.86.0: `meanings` (equivalentes ingleses elegibles) se persiste en
+    `meanings_json`.
     """
     with closing(_conn()) as conn, conn:
         now = _now()
         cursor = conn.execute(
             "INSERT INTO dictionary_reverse_entries "
             "(word, english, pos, definition, situation, senses_json, "
-            "generator_version, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "meanings_json, generator_version, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(word) DO UPDATE SET "
             "english = excluded.english, "
             "pos = excluded.pos, "
             "definition = excluded.definition, "
             "situation = excluded.situation, "
             "senses_json = excluded.senses_json, "
+            "meanings_json = excluded.meanings_json, "
             "generator_version = excluded.generator_version, "
             "updated_at = excluded.updated_at",
             (
@@ -246,6 +324,7 @@ def save_reverse_entry(
                 definition,
                 situation,
                 _encode_senses(senses),
+                _encode_meanings(meanings),
                 generator_version,
                 now,
                 now,

@@ -84,8 +84,12 @@ const CARDS = {
     {
       id: 11,
       deck_id: 5,
+      /* V3.86.0: la ficha puede vivir en varios mazos y llevar recordatorio; la
+         pestaña «Tarjetas» los muestra como etiquetas. */
+      deck_ids: [5],
       front: "break a leg",
       back: "mucha suerte",
+      mnemonic: "suerte en el escenario",
       state: "new",
       reps: 0,
       due_at: "",
@@ -167,6 +171,13 @@ async function installFlashcardMocks(page: Page) {
     }
     if (/^\/api\/vocabulary\/decks\/[^/]+\/queue$/.test(pathname)) {
       return route.fulfill({ json: QUEUE });
+    }
+    // V3.86.0: la pestaña «Tarjetas» es FICHA-PRIMERO (`GET
+    // /api/vocabulary/cards`), sin mazo forzado: la ficha viene con sus mazos
+    // (`deck_ids`) y su recordatorio. El envoltorio legacy se conserva porque
+    // sigue existiendo en el contrato (deprecado).
+    if (pathname === "/api/vocabulary/cards" && method === "GET") {
+      return route.fulfill({ json: { cards: CARDS.cards } });
     }
     if (/^\/api\/vocabulary\/decks\/[^/]+\/cards$/.test(pathname)) {
       return route.fulfill({ json: CARDS });
@@ -275,6 +286,11 @@ test("smoke de Flashcards: cinco vistas y una sesión (3 breakpoints)", async ({
     "flashcards-tab-cards",
   );
   await expect(page.getByText("break a leg")).toBeVisible({ timeout: 15_000 });
+  // V3.86.0: la ficha muestra su MAZO como etiqueta y su RECORDATORIO, que es lo
+  // que la release añade a esta pestaña (antes había una ficha por mazo forzado).
+  const cardRow = page.locator("li", { hasText: "break a leg" });
+  await expect(cardRow).toContainText("Idioms");
+  await expect(cardRow).toContainText("suerte en el escenario");
   await page.waitForTimeout(400);
   await page.screenshot({ path: shot("flashcards-cards"), fullPage: true });
 

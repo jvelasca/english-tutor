@@ -171,9 +171,14 @@ test("smoke del diccionario: dos modos, buscador y borrado (3 breakpoints)", asy
   // que «Practicar esta palabra» se cortaba en pantallas estrechas sin que el
   // scroll horizontal creciera. Se mide que cada acción cabe DENTRO del
   // contenedor que recorta. En este fixture la palabra ya está en el léxico, así
-  // que se ven las dos acciones más el audio: el mismo número de controles que
-  // el caso de alta.
-  for (const name of ["Study in Flashcards", "Practice this word"]) {
+  // que se ven las tres acciones más el audio. V3.86.0: el alta sumó un TERCER
+  // control (ya no se esconde por estar rastreada), que es justo donde la fila
+  // volvería a cortarse en pantallas estrechas: se mide también.
+  for (const name of [
+    "Study in Flashcards",
+    "Practice this word",
+    "Add to Flashcards",
+  ]) {
     const action = page.getByRole("button", { name, exact: true });
     await expect(action).toBeVisible();
     await expectInsideClippingAncestor(action, name);

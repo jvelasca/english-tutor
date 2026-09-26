@@ -446,6 +446,25 @@ class DictionarySenseOut(BaseModel):
     gloss: str = ""
 
 
+class DictionaryMeaningOut(BaseModel):
+    """Significado ELEGIBLE de una unidad léxica (V3.86.0).
+
+    Contenido generado por el modelo local (o curado desde los packs) y cacheado
+    (`dictionary_entries` / `dictionary_reverse_entries`). A diferencia de
+    `DictionarySenseOut` (que separa por CATEGORÍA gramatical), un significado es
+    una ACEPCIÓN: en EN→ES su `term` es la traducción al español de esa acepción
+    y en ES→EN es el equivalente INGLÉS. `proper_noun` marca los nombres propios,
+    que nunca son el significado por defecto. Es lo que permite elegir «file»
+    (herramienta) en lugar de «Lima» (capital) al buscar «lima».
+    """
+
+    term: str
+    pos: str = ""
+    gloss: str = ""
+    domain: str = ""
+    proper_noun: bool = False
+
+
 class DictionaryEntryOut(BaseModel):
     """Entrada del diccionario de consulta (V3.30).
 
@@ -474,6 +493,12 @@ class DictionaryEntryOut(BaseModel):
     # aditivo que explica la adecuación semántica; `[]` si el generador no los
     # dio (el scoring degrada a `unknown`, que nunca bloquea).
     senses: list[DictionarySenseOut] = Field(default_factory=list)
+    # V3.86.0 (diccionario polisémico): significados ELEGIBLES de la unidad. En
+    # EN→ES cada `term` es una traducción al español; en ES→EN, un equivalente
+    # inglés. El primero es el significado por defecto (nunca un nombre propio) y
+    # la UI permite elegir otro. Contenido aditivo: `[]` solo si el modelo no dio
+    # nada y no hubo candidato curado.
+    meanings: list[DictionaryMeaningOut] = Field(default_factory=list)
     example: DictionaryExampleOut | None = None
     usage: DictionaryUsageOut
 
@@ -1105,6 +1130,9 @@ class FlashcardDeckOut(BaseModel):
     new_per_day: int = 0
     review_per_day: int = 0
     card_count: int = 0
+    #: V3.86.0: de las `card_count`, cuántas están TAMBIÉN en otro mazo. El alta
+    #: lo usa para decir cuántas se conservarán al borrar el mazo.
+    shared_count: int = 0
     due_count: int = 0
     new_count: int = 0
     reviewed_today: int = 0
@@ -1126,9 +1154,14 @@ class FlashcardDeckIn(BaseModel):
 
 class FlashcardCardOut(BaseModel):
     id: int
+    #: V3.86.0: `deck_id` sigue siendo el «mazo principal» (columna deprecada);
+    #: `deck_ids` es la pertenencia REAL (tabla puente, 1..N mazos).
     deck_id: int
+    deck_ids: list[int] = Field(default_factory=list)
     front: str
     back: str = ""
+    #: V3.86.0: recordatorio (mnemónico) personal de la ficha. "" si no tiene.
+    mnemonic: str = ""
     state: str = "new"
     reps: int = 0
     due_at: str = ""
@@ -1140,8 +1173,44 @@ class FlashcardCardsOut(BaseModel):
 
 
 class FlashcardCardIn(BaseModel):
+    """Alta de una ficha (V3.86.0: pertenece a uno o varios mazos).
+
+    `deck_ids` es el contrato nuevo (1..N mazos); `deck_id` se acepta por
+    retrocompatibilidad y el dominio lo trata como un conjunto de un elemento.
+    """
+
     front: str = Field(min_length=1, max_length=400)
     back: str = Field(default="", max_length=2000)
+    mnemonic: str = Field(default="", max_length=400)
+    deck_ids: list[int] = Field(default_factory=list)
+    deck_id: int | None = None
+
+
+class FlashcardCardPatchIn(BaseModel):
+    """Edición PARCIAL de una ficha (V3.86.0).
+
+    Un campo ausente (`None`) no se toca: así se puede editar solo el
+    recordatorio (o borrarlo con `""`) sin reenviar el anverso. `deck_ids`, si
+    viene, reemplaza el conjunto de mazos y no puede quedar vacío.
+    """
+
+    front: str | None = Field(default=None, min_length=1, max_length=400)
+    back: str | None = Field(default=None, max_length=2000)
+    mnemonic: str | None = Field(default=None, max_length=400)
+    deck_ids: list[int] | None = None
+
+
+class FlashcardDeckMembershipIn(BaseModel):
+    """Añade/quita una ficha de un mazo (endpoints de pertenencia)."""
+
+    deck_id: int
+
+
+class FlashcardDeckDeleteOut(BaseModel):
+    """Resultado de borrar un mazo (V3.86.0): qué fichas se fueron y cuáles no."""
+
+    deleted_count: int = 0
+    shared_count: int = 0
 
 
 class FlashcardCardsBulkIn(BaseModel):
@@ -1168,6 +1237,9 @@ class FlashcardStudyItemOut(BaseModel):
     front: str
     back: str = ""
     definition: str = ""
+    #: V3.86.0: recordatorio de la ficha manual ("" en el léxico). La sesión lo
+    #: pinta en el reverso.
+    mnemonic: str = ""
     is_new: bool = False
     state: str = "new"
     due_at: str = ""

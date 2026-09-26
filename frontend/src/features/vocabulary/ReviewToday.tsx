@@ -18,7 +18,7 @@
  * forma esperada (la sirve el peldaño correspondiente al puntuar) y no declara
  * dominio. Sin backend nuevo: mismo `GET /api/learning/review`.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { WhyThisActivity } from "../../components/WhyThisActivity";
@@ -158,16 +158,29 @@ interface ReviewSessionProps {
 /**
  * Sesión de repaso ENCADENADA: una palabra detrás de otra.
  *
- * No auto-avanza al superar el peldaño: `WordDrill` dispara `onProduced` en
- * cuanto el intento pasa, y desmontarlo en ese instante ocultaría el feedback de
- * lo que el alumno acaba de escribir. Se deja el drill montado y se ofrece
- * «Siguiente palabra», que es además cuando el repaso deja de parecer un
- * formulario y pasa a ser algo que se maneja.
+ * No auto-avanza al superar el peldaño: `WordDrill` declara el veredicto y
+ * desmontarlo en ese instante ocultaría el feedback de lo que el alumno acaba de
+ * escribir. Se deja el drill montado y se ofrece «Siguiente palabra», que es
+ * además cuando el repaso deja de parecer un formulario y pasa a ser algo que se
+ * maneja.
+ *
+ * V3.85.1 (C1): el avance depende del **veredicto del peldaño**
+ * (`onStepCompleted`), NO de `produced`. Antes solo avanzaba `onProduced`, que
+ * los peldaños reconductivos (Recognition, Recall) nunca disparan: cuando el
+ * planner servía uno de ellos como actividad inicial, la sesión se quedaba
+ * clavada en ese ítem sin ofrecer «Siguiente palabra» (hallazgo C1 de la
+ * auditoría AY). Completar el peldaño avanza; producir evidencia sigue siendo
+ * otra cosa.
  */
 export function ReviewSession({ userId, items, onExit }: ReviewSessionProps) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
-  const [produced, setProduced] = useState(false);
+  // V3.85.1 (C1): veredicto recibido del peldaño (apruebe o falle). Es la
+  // puerta del avance; `produced` ya no lo gobierna.
+  const [completed, setCompleted] = useState(false);
+  // V3.85.1 (a11y): al aparecer el CTA el foco viaja a él, de modo que el
+  // usuario de teclado no tenga que tabular por todo el drill para seguir.
+  const nextRef = useRef<HTMLButtonElement | null>(null);
 
   const current: ReviewQueueItem | undefined = items[index];
 
@@ -178,8 +191,13 @@ export function ReviewSession({ userId, items, onExit }: ReviewSessionProps) {
 
   // Cada palabra arranca sin el «siguiente» de la anterior.
   useEffect(() => {
-    setProduced(false);
+    setCompleted(false);
   }, [index]);
+
+  // V3.85.1 (a11y): al ofrecerse «Siguiente palabra»/«Terminar», el foco va ahí.
+  useEffect(() => {
+    if (completed) nextRef.current?.focus();
+  }, [completed]);
 
   if (!current) return null;
 
@@ -192,7 +210,15 @@ export function ReviewSession({ userId, items, onExit }: ReviewSessionProps) {
           tarjeta era justo el ruido que esta release retira. */}
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold">{t("dictionary.review.title")}</h2>
-        <span className="text-xs tabular-nums text-muted-foreground">
+        {/* V3.85.1 (a11y): el contador no es solo visual — se anuncia como
+            región viva al cambiar de palabra (auditoría AY, accesibilidad de
+            la sesión). */}
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="text-xs tabular-nums text-muted-foreground"
+        >
           {t("dictionary.review.sessionProgress")
             .replace("{index}", String(index + 1))
             .replace("{total}", String(items.length))}
@@ -235,13 +261,17 @@ export function ReviewSession({ userId, items, onExit }: ReviewSessionProps) {
         // lo devuelve en cada GET/POST del peldaño y declara el ciclo de vida
         // (`started`/`abandoned`).
         decisionId={current.decision_id}
-        onProduced={() => setProduced(true)}
+        // V3.85.1 (C1): el veredicto mueve la sesión; `onProduced` (evidencia
+        // productiva) ya no la gobierna.
+        onStepCompleted={() => setCompleted(true)}
+        onProduced={() => {}}
         onClose={onExit}
       />
 
-      {produced ? (
+      {completed ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            ref={nextRef}
             type="button"
             size="sm"
             onClick={() => setIndex((n) => n + 1)}

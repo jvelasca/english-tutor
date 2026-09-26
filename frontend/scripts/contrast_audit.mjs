@@ -630,8 +630,34 @@ const enforcedFails = enforced.filter((r) => r.ratio < r.min);
 const reportedFails = reported.filter((r) => r.ratio < r.min);
 const guardFails = guards.filter((g) => !g.ok);
 
+/* --------------------------- sello de la release -------------------------- */
+
+/**
+ * V3.85.1 (G3): el artefacto versionado tiene que IDENTIFICAR la release que lo
+ * generó. Antes el campo `audit` estaba en duro ("V3.75.8-rampa-niveles-
+ * direccion") y el `contrast-report.json` de una release posterior seguía
+ * declarando la antigua: la auditoría AY no pudo dar por demostrada la cifra
+ * para los textos nuevos. Se deriva de `frontend/package.json`, que es la
+ * fuente de versión del frontend (misma que valida
+ * `scripts/check_release_consistency.py` sobre `backend/config.py`).
+ */
+function releaseVersion() {
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(ROOT, "frontend", "package.json"), "utf8"),
+    );
+    return typeof pkg.version === "string" ? pkg.version : "desconocida";
+  } catch {
+    return "desconocida";
+  }
+}
+
+const VERSION = releaseVersion();
+const AUDIT_ID = `V${VERSION}-contraste-wcag`;
+
 const payload = {
-  audit: "V3.75.8-rampa-niveles-direccion",
+  audit: AUDIT_ID,
+  version: VERSION,
   standard: "WCAG 2.2 AA (1.4.3 texto 4.5:1 · 1.4.11 UI 3:1)",
   enforced_failures: enforcedFails.length + guardFails.length,
   reported_failures: reportedFails.length,
@@ -640,9 +666,13 @@ const payload = {
 };
 
 const md = [];
-md.push("# Informe de contraste WCAG (cierre GUI pre-V4.0 · rampa de niveles V3.75.4 · dirección del diccionario V3.75.8)");
+md.push(
+  `# Informe de contraste WCAG — release ${VERSION} (cierre GUI pre-V4.0 · rampa de niveles V3.75.4 · dirección del diccionario V3.75.8)`,
+);
 md.push("");
-md.push("> Generado por `node frontend/scripts/contrast_audit.mjs`.");
+md.push(
+  `> Generado por \`node frontend/scripts/contrast_audit.mjs\` para la release **${VERSION}** (\`audit: ${AUDIT_ID}\`).`,
+);
 md.push("");
 md.push(
   `- Pares que BLOQUEAN (tipografía base + texto de acento + rampa de niveles + dirección + guardas): **${enforcedFails.length + guardFails.length} fallos** de ${enforced.length + guards.length}.`,

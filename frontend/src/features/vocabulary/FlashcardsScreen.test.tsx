@@ -35,11 +35,12 @@ vi.mock("../../api/vocabulary", () => ({
   deleteFlashcardDeck: vi.fn(),
   getFlashcardQueue: vi.fn(),
   reviewFlashcard: vi.fn(),
-  listFlashcardCards: vi.fn(),
-  createFlashcard: vi.fn(),
+  // V3.86.0: la pestaña Fichas es ficha-primero (una ficha vive en N mazos).
+  listVocabularyCards: vi.fn(),
+  createVocabularyCard: vi.fn(),
+  updateVocabularyCard: vi.fn(),
+  deleteVocabularyCard: vi.fn(),
   addFlashcardsBulk: vi.fn(),
-  updateFlashcard: vi.fn(),
-  deleteFlashcard: vi.fn(),
   getFlashcardStats: vi.fn(),
   listVocabCollections: vi.fn(),
   enrollVocabCollection: vi.fn(),
@@ -56,20 +57,21 @@ vi.mock("../../components/ItemReplayButton", () => ({
 }));
 
 import {
-  createFlashcard,
   createFlashcardDeck,
   addFlashcardsBulk,
-  deleteFlashcard,
+  createVocabularyCard,
   deleteFlashcardDeck,
+  deleteVocabularyCard,
   enrollVocabCollection,
   getDrillCandidates,
   getFlashcardQueue,
   getFlashcardStats,
   getLexicon,
-  listFlashcardCards,
   listFlashcardDecks,
   listVocabCollections,
+  listVocabularyCards,
   reviewFlashcard,
+  updateVocabularyCard,
 } from "../../api/vocabulary";
 import { getReviewQueue } from "../../api/learning";
 
@@ -81,6 +83,7 @@ const AUTO: FlashcardDeck = {
   new_per_day: 10,
   review_per_day: 50,
   card_count: 7,
+  shared_count: 0,
   due_count: 2,
   new_count: 3,
   reviewed_today: 0,
@@ -94,6 +97,7 @@ const MANUAL: FlashcardDeck = {
   new_per_day: 10,
   review_per_day: 50,
   card_count: 1,
+  shared_count: 0,
   due_count: 1,
   new_count: 0,
   reviewed_today: 0,
@@ -109,6 +113,7 @@ function queue(overrides: Partial<FlashcardQueue> = {}): FlashcardQueue {
         front: "airport",
         back: "aeropuerto",
         definition: "",
+        mnemonic: "",
         is_new: true,
         state: "new",
         due_at: "",
@@ -154,14 +159,15 @@ describe("FlashcardsScreen", () => {
       retrievability: 1,
       reps: 1,
     } as never);
-    vi.mocked(listFlashcardCards).mockResolvedValue({
-      deck_id: 5,
+    vi.mocked(listVocabularyCards).mockResolvedValue({
       cards: [
         {
           id: 11,
           deck_id: 5,
+          deck_ids: [5],
           front: "break a leg",
           back: "mucha suerte",
+          mnemonic: "",
           state: "new",
           reps: 0,
           due_at: "",
@@ -381,12 +387,12 @@ describe("FlashcardsScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() =>
-      expect(deleteFlashcard).toHaveBeenCalledWith("u1", 5, 11),
+      expect(deleteVocabularyCard).toHaveBeenCalledWith("u1", 11),
     );
   });
 
-  it("añadir una tarjeta exige anverso y lo envía con el dorso", async () => {
-    vi.mocked(createFlashcard).mockResolvedValue({} as never);
+  it("añadir una tarjeta exige anverso y lo envía con el dorso y el mazo", async () => {
+    vi.mocked(createVocabularyCard).mockResolvedValue({} as never);
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
     await screen.findByText("break a leg");
@@ -400,11 +406,100 @@ describe("FlashcardsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(createFlashcard).toHaveBeenCalledWith("u1", 5, {
+      expect(createVocabularyCard).toHaveBeenCalledWith("u1", {
         front: "on the fly",
         back: "sobre la marcha",
+        mnemonic: "",
+        deckIds: [5],
       }),
     );
+  });
+
+  // --- V3.86.0: una ficha, varios mazos y un recordatorio -------------------
+
+  it("la ficha muestra sus mazos y guarda el recordatorio con casillas (V3.86.0)", async () => {
+    const SECOND: FlashcardDeck = {
+      ...MANUAL,
+      id: 6,
+      name: "Travel",
+      card_count: 0,
+    };
+    vi.mocked(listFlashcardDecks).mockResolvedValue({
+      auto_deck_id: 0,
+      decks: [AUTO, MANUAL, SECOND],
+      fsrs_version: "test",
+    });
+    vi.mocked(listVocabularyCards).mockResolvedValue({
+      cards: [
+        {
+          id: 11,
+          deck_id: 5,
+          deck_ids: [5],
+          front: "break a leg",
+          back: "mucha suerte",
+          mnemonic: "",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "",
+        },
+      ],
+    } as never);
+    vi.mocked(updateVocabularyCard).mockResolvedValue({} as never);
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
+    await screen.findByText("break a leg");
+    // Los mazos de la ficha se ven como etiquetas (el navegador ya no la
+    // encasilla en uno solo).
+    expect(screen.getAllByText("Idioms").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const editor = screen.getByLabelText("Reminder").closest("form") as HTMLElement;
+    fireEvent.change(within(editor).getByLabelText("Reminder"), {
+      target: { value: "leg = pierna" },
+    });
+    // Se marca un SEGUNDO mazo: la ficha pasa a vivir en los dos.
+    fireEvent.click(within(editor).getByLabelText("Travel"));
+    fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(updateVocabularyCard).toHaveBeenCalledWith("u1", 11, {
+        front: "break a leg",
+        back: "mucha suerte",
+        mnemonic: "leg = pierna",
+        deckIds: [5, 6],
+      }),
+    );
+  });
+
+  it("el borrado de un mazo avisa de las fichas compartidas (V3.86.0)", async () => {
+    const SHARED: FlashcardDeck = {
+      ...MANUAL,
+      card_count: 4,
+      shared_count: 3,
+    };
+    vi.mocked(listFlashcardDecks).mockResolvedValue({
+      auto_deck_id: 0,
+      decks: [AUTO, SHARED],
+      fsrs_version: "test",
+    });
+    vi.mocked(deleteFlashcardDeck).mockResolvedValue({
+      deleted_count: 1,
+      shared_count: 3,
+    });
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
+    expect(await screen.findByText("3 also in other decks")).toBeTruthy();
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    // El aviso dice cuántas se borran y cuántas se conservan.
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringContaining("3 will be kept"),
+    );
+    confirmSpy.mockRestore();
   });
 
   it("las estadísticas muestran repasos, acierto y previsión", async () => {
@@ -439,6 +534,10 @@ describe("FlashcardsScreen", () => {
   it("el salto con un mazo del diccionario abre ESE mazo (V3.84.0)", async () => {
     // El alta del diccionario puede guardar la palabra en un mazo manual: al
     // pulsar «Estudiar en Flashcards» se abre ese mazo, no el automático.
+    // V3.86.0: la cola que se sirve es LA DEL MAZO (así arranca su sesión).
+    vi.mocked(getFlashcardQueue).mockResolvedValue(
+      queue({ deck: MANUAL }),
+    );
     renderScreen({ focusDeckId: 5, focusNonce: 1 });
 
     await waitFor(() =>
@@ -447,6 +546,21 @@ describe("FlashcardsScreen", () => {
       }),
     );
     expect(await screen.findByText("airport")).toBeTruthy();
+  });
+
+  it("una cola del mazo anterior que llega tarde no se come el arranque del mazo pedido (V3.86.0)", async () => {
+    // El foco pide el mazo 5, pero la carga del mazo automático (que aún estaba
+    // seleccionado) seguía en vuelo. Cuando esa cola vieja resuelve, NO debe
+    // gastar el encargo: el alumno terminaría en el panel aunque su mazo tenga
+    // tarjetas, que es justo el fallo que destapó «una palabra ya rastreada».
+    vi.mocked(getFlashcardQueue).mockImplementation(async (_userId, deckId) =>
+      deckId === 5 ? queue({ deck: MANUAL }) : queue(),
+    );
+    renderScreen({ focusDeckId: 5, focusNonce: 1 });
+
+    // La sesión arranca con la cola del mazo PEDIDO (y la nombra).
+    expect(await screen.findByText("airport")).toBeTruthy();
+    expect(screen.getAllByText("Idioms").length).toBeGreaterThan(0);
   });
 
   it("la ruta genérica se acota a un pack o lista con el filtro (V3.84.0)", async () => {
@@ -508,7 +622,7 @@ describe("FlashcardsScreen", () => {
       decks: [AUTO, MANUAL, created],
       fsrs_version: "test",
     });
-    vi.mocked(listFlashcardCards).mockResolvedValue({ deck_id: 9, cards: [] } as never);
+    vi.mocked(listVocabularyCards).mockResolvedValue({ cards: [] } as never);
 
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
@@ -522,7 +636,9 @@ describe("FlashcardsScreen", () => {
         "Deck selected. Write the front and the back below; the card will be ready to study immediately.",
       ),
     ).toBeTruthy();
-    await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 9));
+    await waitFor(() =>
+      expect(listVocabularyCards).toHaveBeenCalledWith("u1", { deckId: 9 }),
+    );
     expect(document.activeElement).toBe(
       screen.getByPlaceholderText("What you see first…"),
     );
@@ -537,7 +653,7 @@ describe("FlashcardsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add cards" }));
 
     await waitFor(() =>
-      expect(listFlashcardCards).toHaveBeenCalledWith("u1", 5),
+      expect(listVocabularyCards).toHaveBeenCalledWith("u1", { deckId: 5 }),
     );
     expect(
       screen.getByRole("tab", { name: "Cards" }).getAttribute("aria-selected"),
@@ -562,7 +678,9 @@ describe("FlashcardsScreen", () => {
     expect(screen.queryByRole("button", { name: /Study cards/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Add cards" }));
-    await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 5));
+    await waitFor(() =>
+      expect(listVocabularyCards).toHaveBeenCalledWith("u1", { deckId: 5 }),
+    );
   });
 
   it("el mazo automático vacío manda al diccionario en vez de ofrecer botones inertes", async () => {
@@ -591,17 +709,19 @@ describe("FlashcardsScreen", () => {
       decks: [AUTO, MANUAL, SECOND],
       fsrs_version: "test",
     });
-    vi.mocked(listFlashcardCards).mockResolvedValue({ deck_id: 6, cards: [] } as never);
+    vi.mocked(listVocabularyCards).mockResolvedValue({ cards: [] } as never);
     vi.mocked(getFlashcardQueue).mockResolvedValue(
       queue({ deck: { ...SECOND, card_count: 0 }, items: [] }),
     );
 
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
-    fireEvent.change(await screen.findByLabelText("Deck"), {
+    fireEvent.change(await screen.findByLabelText("Filter by deck"), {
       target: { value: "6" },
     });
-    await waitFor(() => expect(listFlashcardCards).toHaveBeenCalledWith("u1", 6));
+    await waitFor(() =>
+      expect(listVocabularyCards).toHaveBeenCalledWith("u1", { deckId: 6 }),
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Study" }));
     await waitFor(() =>

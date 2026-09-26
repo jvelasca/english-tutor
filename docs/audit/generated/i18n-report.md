@@ -5,9 +5,9 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1774,
- "literal_uses": 1261,
- "referenced_keys": 1458,
+ "defined": 1797,
+ "literal_uses": 1282,
+ "referenced_keys": 1481,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",

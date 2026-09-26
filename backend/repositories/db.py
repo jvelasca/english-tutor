@@ -313,6 +313,18 @@ def init_db() -> None:
                 "ALTER TABLE dictionary_entries ADD COLUMN "
                 "senses_json TEXT NOT NULL DEFAULT ''"
             )
+        # V3.86.0 (diccionario polisémico): significados ELEGIBLES de la palabra,
+        # cada uno con su término, categoría, glosa, ámbito y marca de nombre
+        # propio (`[{term, pos, gloss, domain, proper_noun}]`, JSON). Columna
+        # aditiva (NULL → ''). El bump de `GENERATOR_VERSION` a 1.5.0 invalida el
+        # contenido previo (que no traía significados) y lo regenera una sola vez;
+        # es lo que retira la fila envenenada de «lima» (nombre propio como
+        # equivalente de un nombre común).
+        if "meanings_json" not in dict_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_entries ADD COLUMN "
+                "meanings_json TEXT NOT NULL DEFAULT ''"
+            )
         # V3.31: el contenido sin versión (creado antes de V3.30.1) se etiqueta
         # con la marca LEGACY `1.0.0`, deliberadamente DISTINTA de la
         # `GENERATOR_VERSION` actual del prompt/parseador. El dominio solo
@@ -363,6 +375,15 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE dictionary_reverse_entries ADD COLUMN "
                 "senses_json TEXT NOT NULL DEFAULT ''"
+            )
+        # V3.86.0: misma columna de significados elegibles que la tabla directa,
+        # en la caché ES→EN. Los significados de esta dirección son los
+        # EQUIVALENTES INGLESES del término español (con su nombre propio
+        # marcado), no traducciones al español.
+        if "meanings_json" not in reverse_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_reverse_entries ADD COLUMN "
+                "meanings_json TEXT NOT NULL DEFAULT ''"
             )
         conn.execute(
             """
@@ -1986,6 +2007,7 @@ def init_db() -> None:
                 deck_id INTEGER NOT NULL,
                 front TEXT NOT NULL,
                 back TEXT NOT NULL DEFAULT '',
+                mnemonic TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id),
@@ -1993,6 +2015,55 @@ def init_db() -> None:
             )
             """
         )
+        # V3.86.0 (fichas en varios mazos): recordatorio «loco» de la ficha
+        # (mnemónico personal, editable y borrable). Columna aditiva (NULL → ''),
+        # misma política que el resto: una BD anterior se abre sin migrar nada y
+        # sus fichas quedan sin recordatorio.
+        card_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(flashcard_cards)")
+        }
+        if "mnemonic" not in card_cols:
+            conn.execute(
+                "ALTER TABLE flashcard_cards ADD COLUMN "
+                "mnemonic TEXT NOT NULL DEFAULT ''"
+            )
+        # V3.86.0: pertenencia N:M ficha ↔ mazo. Hasta V3.85.1 una ficha vivía en
+        # UN mazo por el FK `flashcard_cards.deck_id`; esa columna se conserva
+        # DEPRECADA como «mazo principal» (un único escritor en el dominio) para
+        # que el esquema viejo siga abriendo, y la pertenencia real pasa a esta
+        # tabla puente. `ON DELETE CASCADE` en la ficha: borrar una ficha no deja
+        # pertenencias huérfanas.
+        deck_cards_existed = (
+            conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+                "AND name = 'flashcard_deck_cards'"
+            ).fetchone()
+            is not None
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS flashcard_deck_cards (
+                card_id INTEGER NOT NULL,
+                deck_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (card_id, deck_id),
+                FOREIGN KEY (card_id)
+                    REFERENCES flashcard_cards(id) ON DELETE CASCADE,
+                FOREIGN KEY (deck_id) REFERENCES flashcard_decks(id)
+            )
+            """
+        )
+        # Backfill SOLO la primera vez que nace la tabla: cada ficha existente
+        # entra en su `deck_id` actual como mazo principal. Repetirlo en cada
+        # arranque resucitaría una pertenencia que el alumno quitó a propósito
+        # (el `deck_id` deprecado seguiría apuntando ahí), así que la condición
+        # `deck_cards_existed` es la que evita el candado silencioso.
+        if not deck_cards_existed:
+            conn.execute(
+                "INSERT OR IGNORE INTO flashcard_deck_cards "
+                "(card_id, deck_id, created_at) "
+                "SELECT id, deck_id, created_at FROM flashcard_cards"
+            )
         # Ledger append-only de cada calificación. Es lo que hace EXACTOS los
         # límites diarios y las estadísticas: contar «cartas distintas con
         # `last_review_at` de hoy» no distingue nuevas de repaso y no cuenta las
@@ -2021,6 +2092,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_flashcard_reviews_user "
             "ON flashcard_reviews(user_id, created_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flashcard_deck_cards_deck "
+            "ON flashcard_deck_cards(deck_id)"
         )
 
         # V3.77: solicitudes de perfil. Son **estado del producto**, no un aviso

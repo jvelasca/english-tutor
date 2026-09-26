@@ -247,3 +247,28 @@ el rótulo viejo «Start session» y ahora pulsan «Study cards (N)».
   `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION`, `LISTENING_BANK_VERSION`, evaluaciones y el
   número o la definición de los gates. **No hay una sola línea de lógica de backend.**
 - **Punto de entrada al detalle:** `docs/audit/PARKED.md §V3.85.0` y `docs/RELEVO.md`.
+
+---
+
+## Errata posterior a la publicación (V3.85.1)
+
+> **Un tag publicado no se recrea.** Estas dos correcciones se **declaran** aquí, por la
+> auditoría externa `AY` (`agentes/auditoria-total-externa-v385.md`, §6-D2 y §6-D3), en vez
+> de reescribir el texto original del tag `v3.85.0`. El texto de arriba se conserva como se
+> publicó; lo que sigue es la fe de errata.
+
+**E1 (§6-D2) — el resumen no se llama `ReviewTodayCard`.** El §3 de estas notas describe el
+resumen como **`ReviewTodayCard`** y **no existe ningún componente con ese nombre**: el
+resumen se renderiza **en línea dentro de `StudyTab`** (`FlashcardsScreen.tsx`) y el estado
+vive en el hook `useReviewToday`. Es un error de nombre en documentación, no un fichero que
+falte. Nombre correcto: el **bloque de resumen de `ReviewToday`** (hook `useReviewToday` +
+render en `StudyTab`).
+
+**E2 (§6-D3) — el límite de presentación de la cola pasó de 20 a 50, y no se dijo.** Este
+texto cuenta que la lista era «de hasta 20 filas», pero **no declara** que la sesión nueva
+sirve **hasta 50** ítems: `useReviewToday` llama con `REVIEW_LIMIT = 50` (`REVIEW_QUEUE_MAX_LIMIT`)
+donde `ReviewQueueSection` (retirada) llamaba sin límite y aplicaba
+`REVIEW_QUEUE_DEFAULT_LIMIT = 20` (`backend/domain/review.py:41`). Como el endpoint devuelve
+`due_count = len(served_items)`, **el N del botón y la longitud de la sesión pueden pasar de
+20 a 50**. Es un cambio **visible de producto** que estas notas no declaraban: queda declarado
+aquí y **fijado como decisión de UX en `release-notes-v3.85.1.md`**.

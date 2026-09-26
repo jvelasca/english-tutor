@@ -195,6 +195,15 @@ export interface WordDrillProps {
   word: string;
   onProduced: () => void;
   onClose: () => void;
+  /** V3.85.1 (C1): el peldaño ha dado VEREDICTO (apruebe o falle).
+   *
+   * Se separa de `onProduced` a propósito: completar un peldaño reconductivo
+   * (Recognition, Recall) avanza la sesión encadenada, pero NO acredita
+   * producción —`onProduced` sigue reservado a los peldaños que sí producen
+   * (sentence/write/transfer) y solo cuando el intento pasa—. Sin esta señal,
+   * «Repasar hoy» se queda clavado en el ítem cuando el planner sirve
+   * recognition o recall (V3.85.1, hallazgo C1 de la auditoría AY). */
+  onStepCompleted?: () => void;
   /** V3.35: peldaño inicial de la escalera. Por defecto Recognition (V3.33.1);
    * la cola de repaso abre en la actividad recomendada por hueco. */
   initialStep?: DrillStep;
@@ -244,6 +253,7 @@ export function WordDrill({
   word,
   onProduced,
   onClose,
+  onStepCompleted,
   initialStep = "recognition",
   decisionId,
 }: WordDrillProps) {
@@ -303,6 +313,10 @@ export function WordDrill({
   // V3.68 (P1-02): `started` se declara UNA vez por peldaño servido (el GET ya
   // lo marcó `served`), no en cada cambio de estado del render.
   const startedDeclaredRef = useRef(false);
+  // V3.85.1 (C1): el veredicto del peldaño se declara UNA vez por montaje de
+  // palabra (se reinicia con `initialStep`/`word`), para no avisar dos veces de
+  // un mismo intento si el alumno reintenta el mismo peldaño.
+  const stepCompletedRef = useRef(false);
   // V3.21 (V20-13): cronómetro visible + auto-stop a 120 s (máximo del backend).
   const recordingSession = useRecordingSession(recording, {
     onAutoStop: () => {
@@ -312,6 +326,19 @@ export function WordDrill({
       }
     },
   });
+
+  /** V3.85.1 (C1): declara que el peldaño actual dio veredicto (apruebe o falle).
+   *
+   * Es la señal de AVANCE de la sesión encadenada, deliberadamente separada de
+   * `onProduced`: un acierto de Recognition/Recall es señal léxica, no
+   * producción, y por eso no puede fabricar evidencia productiva —pero sí debe
+   * dejar seguir—. Idempotente por montaje: si el alumno reintenta el mismo
+   * peldaño, el veredicto no se declara dos veces. */
+  const declareStepCompleted = useCallback(() => {
+    if (stepCompletedRef.current) return;
+    stepCompletedRef.current = true;
+    onStepCompleted?.();
+  }, [onStepCompleted]);
 
   /** Carga la frase de contexto del paso Sentence (determinista en servidor). */
   const loadSentence = useCallback(() => {
@@ -405,6 +432,8 @@ export function WordDrill({
   // de palabra o de peldaño inicial.
   useEffect(() => {
     setStep(initialStep);
+    // V3.85.1 (C1): cada palabra/peldaño inicial arranca su propio veredicto.
+    stepCompletedRef.current = false;
     setSentence(null);
     setSentenceError(null);
     setResult(null);
@@ -532,6 +561,8 @@ export function WordDrill({
         decisionId,
       );
       setRecognitionOutcome(outcome);
+      // V3.85.1 (C1): el veredicto avanza la sesión aunque NO sea producción.
+      declareStepCompleted();
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));
     } finally {
@@ -557,6 +588,9 @@ export function WordDrill({
         decisionId,
       );
       setRecallOutcome(outcome);
+      // V3.85.1 (C1): recuperación por texto: señal léxica, no producción; el
+      // veredicto basta para seguir con la palabra.
+      declareStepCompleted();
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));
     } finally {
@@ -580,6 +614,7 @@ export function WordDrill({
         decisionId,
       );
       setWriteOutcome(outcome);
+      declareStepCompleted();
       if (outcome.passed) onProduced();
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));
@@ -610,6 +645,7 @@ export function WordDrill({
         decisionId,
       );
       setTransferOutcome(outcome);
+      declareStepCompleted();
       if (outcome.passed) onProduced();
     } catch (e) {
       setError(t("dictionary.drill.error").concat((e as Error).message));
@@ -656,6 +692,7 @@ export function WordDrill({
             decisionId,
           );
           setResult(attempt);
+          declareStepCompleted();
           if (attempt.passed) onProduced();
         } catch (e) {
           setError(t("dictionary.drill.error").concat((e as Error).message));

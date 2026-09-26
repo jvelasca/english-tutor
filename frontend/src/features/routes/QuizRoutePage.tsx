@@ -33,6 +33,7 @@ import {
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
 import { toPanelView } from "../../utils/dictionaryView";
+import { setPendingStudyFocus } from "../../utils/studyFocus";
 import { useSelectedRoute } from "../../hooks/useSelectedRoute";
 import {
   resolveRouteLevel,
@@ -55,6 +56,7 @@ import type { LearnActivity } from "../../router/learnHub";
 import type { NextBestActivity } from "../../types/api";
 import type { Section } from "../../utils/sections";
 import { cn } from "../../lib/utils";
+import { navigateTo } from "../../router/hash";
 import { AssessmentLadder } from "../assessment/AssessmentLadder";
 import { SpeakingAssessment } from "../speaking/SpeakingAssessment";
 import {
@@ -98,7 +100,19 @@ export interface RouteDictionaryConfig {
   ctaKey: string;
   /** Clave del hint del diccionario, p. ej. `vocRoutes.dictionaryHint`. */
   hintKey: string;
-  View: ComponentType<{ userId: string | null }>;
+  View: ComponentType<{
+    userId: string | null;
+    /** V3.86.0: solo lo usa `DictionaryLookup` (ver `allowFlashcardsJump`). */
+    onOpenFlashcards?: (deckId?: number) => void;
+  }>;
+  /**
+   * V3.86.0: la vista admite «Estudiar en Flashcards». Solo lo declara el
+   * diccionario de CONSULTA de Vocabulary: allí una palabra ya rastreada se
+   * quedaba sin ninguna acción que dar, porque el panel no hospeda la sesión.
+   * El salto no duplica la sesión: persiste la vista y navega a `#/diccionario`
+   * con el mazo elegido (recado de un solo uso, `utils/studyFocus`).
+   */
+  allowFlashcardsJump?: boolean;
 }
 
 /**
@@ -176,6 +190,11 @@ export interface RouteQuizConfig {
       `dictionary` y `dictionaryLookup`, la vista de diccionario muestra un
       conmutador entre «Diccionario personal» y «Consultar». */
   dictionaryLookup?: RouteDictionaryConfig;
+  /** V3.85.1 (D4): CTA para volver a la superficie central de repaso desde el
+      panel incrustado. El panel NO duplica la sesión: la proyecta a
+      Flashcards → Estudiar (mismo destino que la vista persistida), para que
+      APRENDER → Vocabulario no se quede sin puerta al repaso. */
+  reviewCta?: { ctaKey: string; hintKey: string };
   /** Escena de práctica personalizada (read-aloud, chat guiado…). Sin ella, la
       página usa la escena de quiz MC / producción controlada. */
   scene?: ComponentType<LearnSceneProps>;
@@ -509,6 +528,24 @@ export function QuizRoutePage({
           <span className="text-xs text-muted-foreground">
             {t(dictCfg.hintKey)}
           </span>
+          {/* V3.85.1 (D4): el panel incrustado recupera el acceso al repaso sin
+              duplicar la sesión — un solo CTA que proyecta la vista persistida
+              de Flashcards y lleva a la superficie central del diccionario. */}
+          {view.kind === "dictionary" && config.reviewCta && (
+            <Button
+              type="button"
+              size="sm"
+              title={t(config.reviewCta.hintKey)}
+              onClick={() => {
+                persistDictionaryView("flashcards");
+                navigateTo("/diccionario");
+              }}
+              className="ml-auto min-h-9 shrink-0 gap-1 px-3 text-xs font-semibold"
+            >
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+              {t(config.reviewCta.ctaKey)}
+            </Button>
+          )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {showSwitcher && (
@@ -553,7 +590,21 @@ export function QuizRoutePage({
               </div>
             </div>
           )}
-          <DictView userId={userId} />
+          <DictView
+            userId={userId}
+            onOpenFlashcards={
+              dictCfg.allowFlashcardsJump
+                ? (deckId?: number) => {
+                    /* V3.86.0: el mazo elegido viaja con el salto y la vista
+                       queda persistida como «flashcards», igual que hace el CTA
+                       de repaso de esta misma página. */
+                    setPendingStudyFocus(deckId);
+                    persistDictionaryView("flashcards");
+                    navigateTo("/diccionario");
+                  }
+                : undefined
+            }
+          />
         </div>
       </div>
     );

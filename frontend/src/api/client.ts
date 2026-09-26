@@ -91,7 +91,23 @@ async function request<T>(
       retryAfterSeconds: _retryAfter(res),
     });
   }
-  return (await res.json()) as T;
+  return (await readJson<T>(res)) as T;
+}
+
+/**
+ * Cuerpo JSON de una respuesta OK, tolerante a los `204 No Content` (V3.86.0).
+ *
+ * Los endpoints de borrado responden 204 sin cuerpo: `res.json()` lanzaría un
+ * `SyntaxError` que la UI leería como «falló el borrado» cuando en realidad se
+ * aplicó. Un cuerpo vacío se resuelve como `undefined` y el llamante tipa `void`.
+ */
+async function readJson<T>(res: Response): Promise<T | undefined> {
+  if (res.status === 204) return undefined;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

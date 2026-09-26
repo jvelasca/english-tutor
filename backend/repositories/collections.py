@@ -290,6 +290,27 @@ def words_in_collection(user_id: str, collection_id: int) -> set[str]:
     return {str(r["word"]) for r in rows}
 
 
+def list_pack_items() -> list[dict]:
+    """Ítems del CATÁLOGO global (packs temáticos), para la inversa curada.
+
+    V3.86.0: el diccionario ES→EN necesita los pares curados
+    (`word` inglés ↔ `translation` español) de los packs para proponer el
+    equivalente correcto sin depender de la caché ni del modelo («lima» →
+    «file», «tornillo» → «screw»). Solo catálogo global (`user_id = ''`): las
+    listas del alumno son contenido suyo, no autoridad léxica.
+    """
+    ensure_theme_packs_seeded()
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT i.word, i.translation, i.pos "
+            "FROM vocab_collection_items i "
+            "JOIN vocab_collections c ON c.id = i.collection_id "
+            "WHERE c.user_id = '' AND i.translation != '' "
+            "ORDER BY i.word, i.id"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def translation_for_word(word: str, collection_id: int | None = None) -> str:
     """Traducción del catálogo de colección o cadena vacía."""
     w = word.strip().lower()

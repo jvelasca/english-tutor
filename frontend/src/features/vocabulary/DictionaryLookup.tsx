@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
@@ -18,14 +18,15 @@ import { ApiError } from "../../api/client";
 import { normalizeDictionaryEntry } from "../../api/normalize";
 import {
   addVocabularyItem,
-  createFlashcard,
   createFlashcardDeck,
+  createVocabularyCard,
   listFlashcardDecks,
   lookupDictionaryWord,
 } from "../../api/vocabulary";
 import type {
   DictionaryDirection,
   DictionaryEntry,
+  DictionaryMeaning,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
   FlashcardDeck,
@@ -58,16 +59,15 @@ const STATUS_TONE: Record<LexicalStatus, string> = {
 
 const MAX_QUERY_LENGTH = 80;
 
-/** Valor centinela del selector de mazo: «crear uno nuevo» (V3.84.0). */
-const NEW_DECK_OPTION = "__new__";
-
-/** Destino de la tarjeta manual del alta (V3.84.1): lo que queda por guardar si
- *  la SEGUNDA escritura falla, para poder reintentarla sin repetir el alta. */
+/** Destino de la tarjeta manual del alta (V3.84.1/V3.86.0): lo que queda por
+ *  guardar si la SEGUNDA escritura falla, para poder reintentarla sin repetir el
+ *  alta. V3.86.0: la tarjeta nace en N mazos a la vez (n: m real). */
 interface DeckCardTarget {
-  id: number;
-  name: string;
+  deckIds: number[];
+  deckName: string;
   front: string;
   back: string;
+  mnemonic: string;
 }
 
 /** V3.84.1: el nombre de mazo ya existe para este alumno —el backend lo
@@ -136,6 +136,10 @@ export function DictionaryLookup({
   // tarjeta. La escalera vive debajo de la tarjeta de resultado. V3.39: en
   // ES→EN se practica siempre el EQUIVALENTE INGLÉS, nunca el término español.
   const [practiceWord, setPracticeWord] = useState<string | null>(null);
+  // V3.86.0: significado ELEGIDO dentro de `entry.meanings`. `-1` = el defecto
+  // (primer significado que NO es nombre propio). Se resetea en cada consulta
+  // para que elegir «Lima (capital)» no se arrastre a la palabra siguiente.
+  const [meaningIndex, setMeaningIndex] = useState(-1);
   const [addStatus, setAddStatus] = useState<
     "idle" | "ok" | "partial" | "error"
   >("idle");
@@ -147,17 +151,19 @@ export function DictionaryLookup({
     useState<DeckCreateError>(null);
   // V3.83.0: el panel de alta. V3.84.0: el destino es un MAZO manual (no una
   // lista): `decks` es `null` mientras no se ha pedido (carga perezosa al abrir
-  // el panel, para no pagar una consulta en cada búsqueda). `selectedDeck` es el
-  // id del mazo donde guardar la tarjeta ADEMÁS de dejarla en aprendizaje;
-  // vacío = solo aprendizaje.
+  // el panel, para no pagar una consulta en cada búsqueda).
+  // V3.86.0: `selectedDecks` es un CONJUNTO: la ficha nace en todos a la vez, y
+  // vacío significa «solo léxico, sin mazo» (ya no hay supresión por `tracked`).
   const [addOpen, setAddOpen] = useState(false);
   const [decks, setDecks] = useState<FlashcardDeck[] | null>(null);
   const [deckError, setDeckError] = useState(false);
-  const [selectedDeck, setSelectedDeck] = useState("");
-  // Nombre del mazo donde se guardó de verdad (para declararlo y para abrirlo).
-  const [savedDeck, setSavedDeck] = useState<{ id: number; name: string } | null>(
-    null,
-  );
+  const [selectedDecks, setSelectedDecks] = useState<number[]>([]);
+  const [addMnemonic, setAddMnemonic] = useState("");
+  const [addBack, setAddBack] = useState("");
+  // Nombres de los mazos donde se guardó de verdad (para declararlo y abrirlos).
+  const [savedDecks, setSavedDecks] = useState<
+    { id: number; name: string }[]
+  >([]);
   // V3.84.1: la tarjeta que quedó pendiente cuando el léxico ya entró y el mazo
   // falló. Es lo que declara el estado PARCIAL y lo que reintenta el botón: sin
   // esto la UI diría «error» sobre una operación que ya está a medias.
@@ -182,10 +188,11 @@ export function DictionaryLookup({
     setLastQuery(word);
     setLastDirection(dir);
     setPracticeWord(null);
+    setMeaningIndex(-1);
     setAddStatus("idle");
     setAddOpen(false);
-    setSelectedDeck("");
-    setSavedDeck(null);
+    setSelectedDecks([]);
+    setSavedDecks([]);
     setPendingDeck(null);
     setDeckCreateError(null);
     try {
@@ -201,26 +208,38 @@ export function DictionaryLookup({
 
   /** Abre el panel y, la primera vez, carga los mazos manuales del alumno.
    *  El mazo automático (id 0) no se ofrece: es una vista del léxico, no un
-   *  destino; y los packs temáticos tampoco, porque son contenido curado. */
+   *  destino; y los packs temáticos tampoco, porque son contenido curado.
+   *  V3.86.0: un fallo de red NO cierra el panel ni esconde el selector —el
+   *  alumno puede seguir añadiendo solo al léxico—; se ofrece reintentar. */
   async function openAddPanel() {
     setAddOpen(true);
     setAddStatus("idle");
-    if (!userId || decks !== null || deckError) return;
+    setSavedDecks([]);
+    setPendingDeck(null);
+    setDeckCreateError(null);
+    if (!userId || decks !== null) return;
+    await loadDecks();
+  }
+
+  /** Carga (o reintenta cargar) los mazos manuales del panel de alta. */
+  async function loadDecks() {
+    if (!userId) return;
+    setDeckError(false);
     try {
       const data = await listFlashcardDecks(userId);
       const all = Array.isArray(data?.decks) ? data.decks : [];
       setDecks(all.filter((d) => !d.is_auto));
     } catch {
       setDeckError(true);
-      setDecks([]);
+      setDecks(null);
     }
   }
 
   function closeAddPanel() {
     setAddOpen(false);
     setAddStatus("idle");
-    setSelectedDeck("");
-    setSavedDeck(null);
+    setSelectedDecks([]);
+    setSavedDecks([]);
     setPendingDeck(null);
     setDeckCreateError(null);
   }
@@ -245,7 +264,10 @@ export function DictionaryLookup({
     try {
       const created = await createFlashcardDeck(userId, { name });
       setDecks((current) => [...(current ?? []), created]);
-      setSelectedDeck(String(created.id));
+      setSelectedDecks((current) =>
+        current.includes(created.id) ? current : [...current, created.id],
+      );
+      setDeckError(false);
     } catch (err) {
       const detail = err instanceof ApiError ? err.detail : "";
       setDeckCreateError(detail === "DECK_NAME_TAKEN" ? "duplicate" : "generic");
@@ -255,15 +277,23 @@ export function DictionaryLookup({
   }
 
   /** V3.84.1: SEGUNDA escritura del alta, aislada para poder reintentarla sola.
-   *  Devuelve si la tarjeta entró de verdad; nunca lanza. */
+   *  Devuelve si la tarjeta entró de verdad; nunca lanza. V3.86.0: una sola
+   *  llamada crea la ficha en TODOS los mazos marcados (tabla puente). */
   async function saveDeckCard(target: DeckCardTarget): Promise<boolean> {
     if (!userId) return false;
     try {
-      await createFlashcard(userId, target.id, {
+      await createVocabularyCard(userId, {
         front: target.front,
         back: target.back,
+        mnemonic: target.mnemonic,
+        deckIds: target.deckIds,
       });
-      setSavedDeck({ id: target.id, name: target.name });
+      setSavedDecks(
+        target.deckIds.map((id) => ({
+          id,
+          name: decks?.find((d) => d.id === id)?.name ?? target.deckName,
+        })),
+      );
       return true;
     } catch {
       return false;
@@ -284,43 +314,56 @@ export function DictionaryLookup({
     }
     setPendingDeck(null);
     setAddStatus("ok");
-    setSelectedDeck("");
+    setSelectedDecks([]);
   }
 
-  async function handleAddToFlashcards() {
-    if (!userId || !practiceTerm || adding) return;
+  /**
+   * Alta del diccionario (V3.83.0; V3.86.0: sin supresión por `tracked`).
+   *
+   * El panel decide el conjunto de mazos, el recordatorio y —si no hay
+   * equivalente— el reverso escrito a mano. La palabra SIEMPRE entra en el
+   * léxico (estado `learning`, con su carta FSRS) **salvo** que ya estuviera
+   * rastreada: entonces no se reescribe y solo se guarda la ficha.
+   */
+  async function handleAddToFlashcards(payload: {
+    deckIds: number[];
+    mnemonic: string;
+    back: string;
+  }) {
+    if (!userId || !cardFront || adding) return;
     setAdding(true);
     setAddStatus("idle");
-    setSavedDeck(null);
+    setSavedDecks([]);
     setPendingDeck(null);
-    const translation =
-      entry?.direction === "en-es" ? entry.translation ?? "" : entry?.word ?? "";
-    const term = practiceTerm;
-    // 1) El alta que ya existía: léxico + carta FSRS + estado `learning`.
-    //    Si ESTA falla, no se escribió nada: error simple, sin estado parcial.
-    try {
-      await addVocabularyItem(userId, term, { translation });
-    } catch {
-      setAddStatus("error");
-      setAdding(false);
-      return;
+    const term = cardFront;
+    const back = payload.back.trim() || cardBack;
+    // 1) El alta del léxico + carta FSRS + estado `learning`. Si la palabra ya
+    //    está rastreada, NO se reescribe: solo se añade la ficha a sus mazos.
+    if (!tracked) {
+      const translation =
+        entry?.direction === "en-es" ? equivalent : entry?.word ?? "";
+      try {
+        await addVocabularyItem(userId, term, { translation });
+      } catch {
+        setAddStatus("error");
+        setAdding(false);
+        return;
+      }
+      // El alta deja la palabra en el léxico: se refresca en silencio para que
+      // la marca de uso lo refleje sin desmontar la tarjeta.
+      void refreshEntry(lastQuery, lastDirection);
     }
-    // El alta ya deja la palabra en el léxico (estado `learning`): se refresca
-    // en silencio para que la marca de uso lo refleje sin desmontar la tarjeta.
-    void refreshEntry(lastQuery, lastDirection);
-    // 2) V3.84.0: además, si el alumno eligió un mazo manual, se guarda la
-    //    tarjeta con anverso/reverso. Son DOS escrituras y así se declara.
-    //    V3.84.1: si esta segunda falla, el aprendizaje YA está hecho; se
-    //    declara el estado PARCIAL y se ofrece reintentar solo la tarjeta, en
-    //    vez de pintar un «error» que miente sobre lo que sí se guardó.
-    if (selectedDeck) {
-      const deckId = Number(selectedDeck);
-      const deckName = decks?.find((d) => d.id === deckId)?.name ?? term;
+    // 2) La tarjeta manual: una sola escritura crea la ficha en TODOS los mazos
+    //    marcados (V3.86.0, tabla puente). Si falla, el aprendizaje YA está
+    //    hecho: se declara el estado PARCIAL y se ofrece reintentar solo esto.
+    if (payload.deckIds.length > 0) {
       const target: DeckCardTarget = {
-        id: deckId,
-        name: deckName,
+        deckIds: payload.deckIds,
+        deckName:
+          decks?.find((d) => d.id === payload.deckIds[0])?.name ?? term,
         front: term,
-        back: translation,
+        back,
+        mnemonic: payload.mnemonic.trim(),
       };
       const saved = await saveDeckCard(target);
       setAdding(false);
@@ -332,7 +375,9 @@ export function DictionaryLookup({
     }
     setAdding(false);
     setAddStatus("ok");
-    setSelectedDeck("");
+    setSelectedDecks([]);
+    setAddMnemonic("");
+    setAddBack("");
   }
 
   // V3.32: tras producir la palabra en el drill, refresca la entrada en silencio
@@ -359,20 +404,68 @@ export function DictionaryLookup({
     setNetworkError(false);
     setAddOpen(false);
     setAddStatus("idle");
-    setSelectedDeck("");
-    setSavedDeck(null);
+    setSelectedDecks([]);
+    setSavedDecks([]);
     setPendingDeck(null);
     setDeckCreateError(null);
+    setMeaningIndex(-1);
+    setAddMnemonic("");
+    setAddBack("");
   }
 
-  const practiceTerm = entry
-    ? entry.direction === "es-en"
-      ? entry.translation
+  // ---------------------------------------------------------------------------
+  // V3.86.0: el SIGNIFICADO elegido manda sobre todo lo demás.
+  //
+  // `entry.meanings` trae los candidatos y el `translation` sigue siendo el del
+  // significado por defecto (primer no-nombre-propio), así que el índice -1 se
+  // resuelve a ese mismo. Un nombre propio NUNCA es el defecto: «lima» ofrece
+  // «file (herramienta)» primero y «Lima (capital)» el último, marcado.
+  // ---------------------------------------------------------------------------
+  const meanings = entry?.meanings ?? [];
+  const defaultMeaningIndex = useMemo(() => {
+    const idx = meanings.findIndex((m) => !m.proper_noun);
+    return idx >= 0 ? idx : 0;
+  }, [meanings]);
+  const activeMeaningIndex =
+    meaningIndex >= 0 && meaningIndex < meanings.length
+      ? meaningIndex
+      : defaultMeaningIndex;
+  const chosenMeaning: DictionaryMeaning | null =
+    meanings.length > 0 ? meanings[activeMeaningIndex] ?? null : null;
+  /** Equivalente mostrado: el significado elegido o, si no hay, el de siempre. */
+  const equivalent = chosenMeaning?.term ?? entry?.translation ?? "";
+
+  const isReverse = entry?.direction === "es-en";
+  // Cara de la ficha: en ES→EN es el equivalente inglés elegido (o el término
+  // buscado si la consulta no encontró equivalente, para poder escribir el
+  // reverso a mano); en EN→ES es la palabra inglesa consultada.
+  const cardFront = entry
+    ? isReverse
+      ? equivalent || entry.word
       : entry.word
     : null;
-  // V3.83.0: `tracked` significa que la palabra YA está en el léxico del alumno
-  // (y por tanto en PERSONAL y en el mazo automático). En ese caso no se ofrece
-  // un alta que no cambiaría nada: se ofrece estudiar.
+  // Reverso de la ficha: en EN→ES el equivalente español; en ES→EN el término
+  // español buscado. Vacío = hay que escribirlo (no se inventa nada).
+  const cardBack = entry
+    ? isReverse
+      ? equivalent
+        ? entry.word
+        : ""
+      : equivalent
+    : "";
+  /** El reverso se pide a mano cuando la consulta no dio equivalente. */
+  const manualBack = Boolean(entry) && cardBack === "";
+
+  // V3.32: práctica oral sobre el INGLÉS. Sin equivalente inglés (ES→EN) no hay
+  // nada que practicar.
+  const practiceTerm = entry
+    ? isReverse
+      ? equivalent || null
+      : entry.word
+    : null;
+  // V3.83.0: `tracked` significa que la palabra YA está en el léxico del alumno.
+  // V3.86.0: eso ya NO esconde el alta: la ficha manual se puede crear igual, y
+  // el panel lo declara («solo se guardan la tarjeta y sus mazos»).
   const tracked = Boolean(entry?.usage.tracked);
 
   // V3.75.8: color de la dirección ACTIVA (la del conmutador). El resultado usa
@@ -391,14 +484,17 @@ export function DictionaryLookup({
     setQuery("");
     setEntry(null);
     setPracticeWord(null);
+    setMeaningIndex(-1);
     setInvalidError(false);
     setNetworkError(false);
     setAddStatus("idle");
     setAddOpen(false);
-    setSelectedDeck("");
-    setSavedDeck(null);
+    setSelectedDecks([]);
+    setSavedDecks([]);
     setPendingDeck(null);
     setDeckCreateError(null);
+    setAddMnemonic("");
+    setAddBack("");
     setLastQuery("");
   }
 
@@ -620,27 +716,56 @@ export function DictionaryLookup({
             onPractice={practiceTerm ? () => setPracticeWord(practiceTerm) : undefined}
             tracked={tracked}
             addOpen={addOpen}
-            onToggleAdd={practiceTerm && !tracked ? toggleAddPanel : undefined}
+            meanings={meanings}
+            meaningIndex={activeMeaningIndex}
+            onPickMeaning={(index) => {
+              setMeaningIndex(index);
+              // Cambiar de significado invalida la práctica anterior: era de
+              // OTRO significado (p. ej. se practicaba «Lima» y ahora «file»).
+              setPracticeWord(null);
+            }}
+            equivalent={equivalent}
+            // V3.86.0: el alta ya NO se esconde por `tracked`; solo hace falta un
+            // anverso con el que crear la ficha.
+            onToggleAdd={cardFront ? toggleAddPanel : undefined}
             onOpenFlashcards={onOpenFlashcards}
             addPanel={
-              addOpen && practiceTerm ? (
+              addOpen && cardFront ? (
                 <AddToFlashcardsPanel
-                  term={practiceTerm}
+                  term={cardFront}
+                  back={cardBack}
+                  manualBack={manualBack}
+                  backDraft={addBack}
+                  onBackDraft={setAddBack}
+                  mnemonic={addMnemonic}
+                  onMnemonic={setAddMnemonic}
+                  tracked={tracked}
                   decks={decks}
                   deckError={deckError}
                   deckCreateError={deckCreateError}
-                  selectedDeck={selectedDeck}
-                  onSelectDeck={(id) => {
-                    setSelectedDeck(id);
+                  selectedDecks={selectedDecks}
+                  onToggleDeck={(id) => {
+                    setSelectedDecks((current) =>
+                      current.includes(id)
+                        ? current.filter((x) => x !== id)
+                        : [...current, id],
+                    );
                     setDeckCreateError(null);
                   }}
+                  onRetryDecks={() => void loadDecks()}
                   creatingDeck={creatingDeck}
                   onCreateDeck={(name) => void handleCreateDeck(name)}
-                  savedDeck={savedDeck}
+                  savedDecks={savedDecks}
                   pendingDeck={pendingDeck}
                   adding={adding}
                   status={addStatus}
-                  onConfirm={() => void handleAddToFlashcards()}
+                  onConfirm={(payload) =>
+                    void handleAddToFlashcards({
+                      deckIds: selectedDecks,
+                      mnemonic: payload.mnemonic,
+                      back: payload.back,
+                    })
+                  }
                   onRetryDeck={() => void handleRetryDeckCard()}
                   onClose={closeAddPanel}
                   onOpenFlashcards={onOpenFlashcards}
@@ -681,24 +806,30 @@ export function DictionaryLookup({
  * V3.83.0: panel de alta del diccionario a Flashcards.
  * V3.84.0: el destino es un **mazo manual**, no una lista, y se puede crear el
  * mazo sin salir del panel.
- *
- * Declara **qué** significa añadir (la palabra entra en el proceso de estudio
- * con estado `learning` y su carta FSRS, así que aparecerá en PERSONAL y en el
- * mazo automático «Mi diccionario») y, además, permite guardarla como tarjeta
- * en un mazo manual. Son dos destinos distintos y el panel los declara: la
- * palabra SIEMPRE queda en aprendizaje, y SOLO si se elige mazo se crea además
- * una tarjeta allí. El éxito deja la salida natural: estudiar en Flashcards.
+ * V3.86.0: el mazo deja de ser UNA elección. Se marcan los que se quieran (o
+ * ninguno) y una sola escritura crea la ficha en todos a la vez. Además caben el
+ * **recordatorio** (mnemónico) y el **reverso escrito a mano** cuando la consulta
+ * no encontró equivalente. Un fallo de red al cargar los mazos no cierra el
+ * panel: se puede seguir añadiendo al léxico y se ofrece «Reintentar».
  */
 function AddToFlashcardsPanel({
   term,
+  back,
+  manualBack,
+  backDraft,
+  onBackDraft,
+  mnemonic,
+  onMnemonic,
+  tracked,
   decks,
   deckError,
   deckCreateError,
-  selectedDeck,
-  onSelectDeck,
+  selectedDecks,
+  onToggleDeck,
+  onRetryDecks,
   creatingDeck,
   onCreateDeck,
-  savedDeck,
+  savedDecks,
   pendingDeck,
   adding,
   status,
@@ -708,25 +839,35 @@ function AddToFlashcardsPanel({
   onOpenFlashcards,
 }: {
   term: string;
+  /** Reverso resuelto (equivalente). Vacío = hay que escribirlo. */
+  back: string;
+  /** `true` cuando no hay equivalente y el reverso lo pone el alumno. */
+  manualBack: boolean;
+  backDraft: string;
+  onBackDraft: (value: string) => void;
+  mnemonic: string;
+  onMnemonic: (value: string) => void;
+  tracked: boolean;
   decks: FlashcardDeck[] | null;
   deckError: boolean;
   deckCreateError: DeckCreateError;
-  selectedDeck: string;
-  onSelectDeck: (id: string) => void;
+  selectedDecks: number[];
+  onToggleDeck: (id: number) => void;
+  onRetryDecks: () => void;
   creatingDeck: boolean;
   onCreateDeck: (name: string) => void;
-  savedDeck: { id: number; name: string } | null;
+  savedDecks: { id: number; name: string }[];
   pendingDeck: DeckCardTarget | null;
   adding: boolean;
   status: "idle" | "ok" | "partial" | "error";
-  onConfirm: () => void;
+  onConfirm: (payload: { mnemonic: string; back: string }) => void;
   onRetryDeck: () => void;
   onClose: () => void;
   onOpenFlashcards?: (deckId?: number) => void;
 }) {
   const { t } = useI18n();
   const [newName, setNewName] = useState("");
-  const creating = selectedDeck === NEW_DECK_OPTION;
+  const [creating, setCreating] = useState(false);
 
   // V3.84.1: el alta entró en el aprendizaje, pero la tarjeta del mazo no. Se
   // declara el estado real (no un «error» genérico) y se ofrece reintentar SOLO
@@ -743,7 +884,7 @@ function AddToFlashcardsPanel({
           <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
           {t("dictionary.lookup.addPartial")
             .replace("{word}", term)
-            .replace("{deck}", pendingDeck?.name ?? "")}
+            .replace("{deck}", pendingDeck?.deckName ?? "")}
         </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t("dictionary.lookup.addPartialHint")}
@@ -793,11 +934,11 @@ function AddToFlashcardsPanel({
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t("dictionary.lookup.addLearning")}
         </p>
-        {savedDeck ? (
+        {savedDecks.length > 0 ? (
           <p className="text-xs leading-relaxed text-success">
             {t("dictionary.lookup.addOkDeck").replace(
               "{deck}",
-              savedDeck.name,
+              savedDecks.map((d) => d.name).join(", "),
             )}
           </p>
         ) : null}
@@ -805,7 +946,7 @@ function AddToFlashcardsPanel({
           <Button
             type="button"
             size="sm"
-            onClick={() => onOpenFlashcards(savedDeck?.id)}
+            onClick={() => onOpenFlashcards(savedDecks[0]?.id)}
             className="gap-1.5"
           >
             <Layers className="size-3.5" aria-hidden="true" />
@@ -823,35 +964,80 @@ function AddToFlashcardsPanel({
       className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-3"
     >
       <p className="text-xs leading-relaxed text-muted-foreground">
-        {t("dictionary.lookup.addHint")}
+        {tracked
+          ? t("dictionary.lookup.addTrackedNote")
+          : t("dictionary.lookup.addHint")}
       </p>
 
-      {deckError ? (
-        <p className="text-[11px] text-muted-foreground">
-          {t("dictionary.lookup.addDeckError")}
-        </p>
-      ) : (
-        <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Layers className="size-3.5" aria-hidden="true" />
-            {t("dictionary.lookup.addDeckLabel")}
+      {/* V3.86.0: el reverso escrito a mano solo aparece cuando la consulta no
+          trajo equivalente: sin él la tarjeta no tendría nada que recordar. El
+          aviso va FUERA del `label`: dentro, se sumaría al nombre accesible del
+          campo y el lector de pantalla leería dos frases como etiqueta. */}
+      {manualBack ? (
+        <div className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+            <span>{t("dictionary.lookup.addBackLabel")}</span>
+            <input
+              value={backDraft}
+              onChange={(e) => onBackDraft(e.target.value)}
+              maxLength={2000}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <span className="text-[11px] text-muted-foreground">
+            {t("dictionary.lookup.addBackHint")}
           </span>
-          <select
-            value={selectedDeck}
-            onChange={(e) => onSelectDeck(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+        </div>
+      ) : null}
+
+      {deckError ? (
+        <div className="flex flex-col items-start gap-1">
+          <p className="text-[11px] text-muted-foreground">
+            {t("dictionary.lookup.addDeckError")}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onRetryDecks}
+            className="gap-1.5"
           >
-            <option value="">{t("dictionary.lookup.addDeckNone")}</option>
-            {(decks ?? []).map((deck) => (
-              <option key={deck.id} value={deck.id}>
-                {deck.name}
-              </option>
-            ))}
-            <option value={NEW_DECK_OPTION}>
-              {t("dictionary.lookup.addDeckNew")}
-            </option>
-          </select>
-        </label>
+            <RefreshCw className="size-3.5" aria-hidden="true" />
+            {t("dictionary.lookup.addRetryDecks")}
+          </Button>
+        </div>
+      ) : (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            <Layers className="size-3.5" aria-hidden="true" />
+            {t("dictionary.lookup.addDecksLabel")}
+          </legend>
+          {(decks ?? []).length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              {t("dictionary.lookup.addNoDeck")}
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {(decks ?? []).map((deck) => (
+                <li key={deck.id}>
+                  <label className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium">
+                    <input
+                      type="checkbox"
+                      checked={selectedDecks.includes(deck.id)}
+                      onChange={() => onToggleDeck(deck.id)}
+                    />
+                    {deck.name}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selectedDecks.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              {t("dictionary.lookup.addNoDeck")}
+            </p>
+          ) : null}
+        </fieldset>
       )}
 
       {creating ? (
@@ -868,6 +1054,7 @@ function AddToFlashcardsPanel({
                 e.preventDefault();
                 onCreateDeck(newName.trim());
                 setNewName("");
+                setCreating(false);
               }
             }}
           />
@@ -879,6 +1066,7 @@ function AddToFlashcardsPanel({
             onClick={() => {
               onCreateDeck(newName.trim());
               setNewName("");
+              setCreating(false);
             }}
           >
             {creatingDeck
@@ -886,7 +1074,29 @@ function AddToFlashcardsPanel({
               : t("dictionary.lookup.addDeckCreate")}
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="w-fit gap-1.5"
+          onClick={() => setCreating(true)}
+        >
+          <Plus className="size-3.5" aria-hidden="true" />
+          {t("dictionary.lookup.addDeckNewInline")}
+        </Button>
+      )}
+
+      <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+        <span>{t("dictionary.lookup.addMnemonicLabel")}</span>
+        <input
+          value={mnemonic}
+          onChange={(e) => onMnemonic(e.target.value)}
+          placeholder={t("dictionary.lookup.addMnemonicPlaceholder")}
+          maxLength={400}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+        />
+      </label>
 
       {deckCreateError ? (
         <p className="text-[11px] text-destructive" role="alert">
@@ -900,8 +1110,8 @@ function AddToFlashcardsPanel({
         <Button
           type="button"
           size="sm"
-          disabled={adding || creating}
-          onClick={onConfirm}
+          disabled={adding || (manualBack && !backDraft.trim())}
+          onClick={() => onConfirm({ mnemonic, back: manualBack ? backDraft : back })}
           className="gap-1.5"
         >
           <Plus className="size-3.5" aria-hidden="true" />
@@ -1099,18 +1309,29 @@ function ResultCard({
   addOpen = false,
   onToggleAdd,
   onOpenFlashcards,
+  meanings = [],
+  meaningIndex = 0,
+  onPickMeaning,
+  equivalent = "",
   addPanel,
 }: {
   entry: DictionaryEntry;
   userId: string | null;
   onPractice?: () => void;
-  /** La palabra ya está en el léxico: no se ofrece alta, se ofrece estudiar. */
+  /** V3.83.0/V3.86.0: la palabra ya está en el léxico. Ya NO esconde el alta:
+   *  el panel declara que solo se guardan la tarjeta y sus mazos. */
   tracked?: boolean;
   /** V3.83.0: el panel de alta está abierto (cambia el rótulo del botón). */
   addOpen?: boolean;
   onToggleAdd?: () => void;
   /** V3.84.0: mazo con el que abrir el estudio (si se archivó en uno manual). */
   onOpenFlashcards?: (deckId?: number) => void;
+  /** V3.86.0: significados elegibles de la unidad. */
+  meanings?: DictionaryMeaning[];
+  meaningIndex?: number;
+  onPickMeaning?: (index: number) => void;
+  /** V3.86.0: equivalente del significado elegido (si no hay, `translation`). */
+  equivalent?: string;
   /** Panel de alta, ya construido por el contenedor (null si está cerrado). */
   addPanel?: ReactNode;
 }) {
@@ -1122,10 +1343,15 @@ function ResultCard({
     (entry.usage.unit as DictionarySurfaceUsage | DictionaryUnitUsage | null);
   // V3.39: en ES→EN la palabra de cabecera es el término español y el
   // equivalente inglés llega en `translation`; el audio, el drill y la marca de
-  // uso son siempre del INGLÉS.
+  // uso son siempre del INGLÉS. V3.86.0: manda el significado ELEGIDO.
   const isReverse = entry.direction === "es-en";
-  const audioText = isReverse ? entry.translation ?? "" : entry.word;
+  const shownEquivalent = equivalent || entry.translation || "";
+  const audioText = isReverse ? shownEquivalent : entry.word;
   const alternatives = entry.alternatives ?? [];
+  // Con significados elegibles, la lista de «alternativas» es la misma
+  // información otra vez: se pinta el selector y se calla la lista.
+  const showAlternatives = alternatives.length > 0 && meanings.length <= 1;
+  const chosen = meanings.length > 0 ? meanings[meaningIndex] ?? null : null;
 
   // V3.75.8: la tarjeta se tiñe del color de SU dirección —barra superior, marca
   // de sentido y bloque del equivalente—, así que un resultado dice de un
@@ -1239,6 +1465,89 @@ function ResultCard({
 
         {addPanel}
 
+        {/* V3.86.0: SELECTOR DE SIGNIFICADO. Los nombres propios van marcados y
+            nunca son el defecto: «lima» ofrece «file (herramienta)» antes que
+            «Lima (capital del Perú)». Elegir uno manda sobre el término de
+            práctica, el audio, el bloque del equivalente y el alta. */}
+        {meanings.length > 0 ? (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="flex flex-col gap-0.5">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Languages className="size-3.5" aria-hidden="true" />
+                {t("dictionary.lookup.meanings")}
+              </span>
+              <span className="text-[11px] font-normal text-muted-foreground">
+                {t("dictionary.lookup.meaningPick")}
+              </span>
+            </legend>
+            <ul className="flex flex-col gap-1.5">
+              {meanings.map((meaning, index) => {
+                const selected = index === meaningIndex;
+                const label = `${meaning.term}${
+                  meaning.pos ? ` · ${meaning.pos}` : ""
+                }`;
+                return (
+                  <li key={`${meaning.term}-${meaning.pos}-${index}`}>
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 transition-colors",
+                        selected
+                          ? "border-primary/50 bg-primary/5"
+                          : "border-border hover:border-primary/30",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="dictionary-meaning"
+                        className="mt-1"
+                        checked={selected}
+                        aria-label={`${t("dictionary.lookup.meaningAria")}: ${label}`}
+                        onChange={() => onPickMeaning?.(index)}
+                      />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className="text-sm font-semibold"
+                            lang={isReverse ? "en" : "es"}
+                          >
+                            {meaning.term}
+                          </span>
+                          {meaning.pos ? (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] font-semibold uppercase"
+                            >
+                              {meaning.pos}
+                            </Badge>
+                          ) : null}
+                          {meaning.domain ? (
+                            <span className="text-[11px] text-muted-foreground">
+                              {meaning.domain}
+                            </span>
+                          ) : null}
+                          {meaning.proper_noun ? (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-muted-foreground"
+                            >
+                              {t("dictionary.lookup.meaningProperNoun")}
+                            </Badge>
+                          ) : null}
+                        </span>
+                        {meaning.gloss ? (
+                          <span className="text-[11px] leading-relaxed text-muted-foreground">
+                            {meaning.gloss}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </fieldset>
+        ) : null}
+
         {entry.definition_source === "llm" ? (
           <div className="flex flex-col gap-4">
             {entry.definition && (
@@ -1251,7 +1560,7 @@ function ResultCard({
                 </p>
               </div>
             )}
-            {entry.translation && (
+            {shownEquivalent ? (
               /* El equivalente es la respuesta de la consulta: se destaca en el
                  color de la dirección, con el rótulo también en esa tinta. */
               <div
@@ -1276,11 +1585,22 @@ function ResultCard({
                   className="text-lg font-semibold leading-snug"
                   lang={isReverse ? "en" : "es"}
                 >
-                  {entry.translation}
+                  {shownEquivalent}
                 </p>
+                {chosen?.gloss ? (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {chosen.gloss}
+                  </p>
+                ) : null}
               </div>
+            ) : (
+              /* V3.86.0: sin equivalente no se finge nada: se dice y el alta
+                 ofrece escribir el reverso a mano. */
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {t("dictionary.lookup.addBackHint")}
+              </p>
             )}
-            {alternatives.length > 0 && (
+            {showAlternatives ? (
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("dictionary.lookup.alternativesLabel")}
@@ -1289,7 +1609,7 @@ function ResultCard({
                   {alternatives.join(" · ")}
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
           <p

@@ -24,6 +24,7 @@ import type {
   CefrBucket,
   DictionaryEntry,
   DictionaryExample,
+  DictionaryMeaning,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
   DrillCandidates,
@@ -32,6 +33,7 @@ import type {
   FlashcardCards,
   FlashcardDayCount,
   FlashcardDeck,
+  FlashcardDeckDeleteResult,
   FlashcardDecks,
   FlashcardLimits,
   FlashcardQueue,
@@ -330,6 +332,7 @@ function normalizeFlashcardDeck(raw: Raw): FlashcardDeck {
     new_per_day: asNumber(raw.new_per_day),
     review_per_day: asNumber(raw.review_per_day),
     card_count: asNumber(raw.card_count),
+    shared_count: asNumber(raw.shared_count),
     due_count: asNumber(raw.due_count),
     new_count: asNumber(raw.new_count),
     reviewed_today: asNumber(raw.reviewed_today),
@@ -350,12 +353,24 @@ export function normalizeDeckList(raw: unknown): FlashcardDecks {
 }
 
 function normalizeFlashcardCard(raw: Raw): FlashcardCard {
+  // V3.86.0: la pertenencia REAL. Si el backend no la manda (rows viejas), se
+  // degrada al «mazo principal», que es la única información que había.
+  const deckIds = asArray<unknown>(raw.deck_ids)
+    .map((v) => asNumber(v, -1))
+    .filter((n) => n >= 0);
   return {
     ...(raw as unknown as FlashcardCard),
     id: asNumber(raw.id),
     deck_id: asNumber(raw.deck_id),
+    deck_ids:
+      deckIds.length > 0
+        ? deckIds
+        : raw.deck_id != null
+          ? [asNumber(raw.deck_id)]
+          : [],
     front: asString(raw.front),
     back: asString(raw.back),
+    mnemonic: asString(raw.mnemonic),
     state: asString(raw.state, "new"),
     reps: asNumber(raw.reps),
     due_at: asString(raw.due_at),
@@ -372,6 +387,18 @@ export function normalizeFlashcardList(raw: unknown): FlashcardCards {
   };
 }
 
+/** `DELETE /api/vocabulary/decks/{id}` (V3.86.0): cuántas fichas se fueron y
+ * cuántas se conservaron por estar compartidas con otro mazo. */
+export function normalizeFlashcardDeckDelete(
+  raw: unknown,
+): FlashcardDeckDeleteResult {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    deleted_count: asNumber(data.deleted_count),
+    shared_count: asNumber(data.shared_count),
+  };
+}
+
 function normalizeStudyItem(raw: Raw): FlashcardStudyItem {
   return {
     ...(raw as unknown as FlashcardStudyItem),
@@ -380,6 +407,8 @@ function normalizeStudyItem(raw: Raw): FlashcardStudyItem {
     front: asString(raw.front),
     back: asString(raw.back),
     definition: asString(raw.definition),
+    // V3.86.0: recordatorio de la ficha manual, si lo tiene.
+    mnemonic: asString(raw.mnemonic),
     is_new: asBoolean(raw.is_new),
     state: asString(raw.state, "new"),
     due_at: asString(raw.due_at),
@@ -480,7 +509,19 @@ function normalizeUnitUsage(raw: Raw): DictionaryUnitUsage {
 }
 
 /** `POST /api/vocabulary/dictionary`: la tarjeta de resultado lee `usage.*` y
- *  `pos[0]`; `usage` siempre sale como objeto y `alternatives` como array. */
+ *  `pos[0]`; `usage` siempre sale como objeto y `alternatives` como array.
+ *  V3.86.0: `meanings` se normaliza como array de significados elegibles
+ *  (`[]` si falta o no es array), de modo que la UI nunca pinta `undefined`. */
+export function normalizeDictionaryMeaning(raw: Raw): DictionaryMeaning {
+  return {
+    term: asString(raw.term),
+    pos: asString(raw.pos),
+    gloss: asString(raw.gloss),
+    domain: asString(raw.domain),
+    proper_noun: asBoolean(raw.proper_noun),
+  };
+}
+
 export function normalizeDictionaryEntry(raw: unknown): DictionaryEntry {
   const data = isRecord(raw) ? raw : {};
   const usage = asRecordOrNull(data.usage) ?? {};
@@ -499,6 +540,12 @@ export function normalizeDictionaryEntry(raw: unknown): DictionaryEntry {
     translation: asNullableString(data.translation),
     direction,
     alternatives: asStringArray(data.alternatives),
+    meanings: Array.isArray(data.meanings)
+      ? data.meanings
+          .filter((item): item is Raw => isRecord(item))
+          .map(normalizeDictionaryMeaning)
+          .filter((item) => item.term.length > 0)
+      : [],
     example: example ? normalizeDictionaryExample(example) : null,
     usage: {
       tracked: asBoolean(usage.tracked),

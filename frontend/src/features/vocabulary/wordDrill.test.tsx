@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getDrillTransferContext: vi.fn(),
   markDrillStarted: vi.fn(),
   markDrillAbandoned: vi.fn(),
+  submitDrillRecognitionAttempt: vi.fn(),
   submitDrillRecallAttempt: vi.fn(),
   submitDrillWriteAttempt: vi.fn(),
   submitDrillTransferAttempt: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("../../api/vocabulary", () => ({
   // V3.68 (P1-02): el ciclo de vida del provenance.
   markDrillStarted: mocks.markDrillStarted,
   markDrillAbandoned: mocks.markDrillAbandoned,
-  submitDrillRecognitionAttempt: vi.fn(),
+  submitDrillRecognitionAttempt: mocks.submitDrillRecognitionAttempt,
   submitDrillRecallAttempt: mocks.submitDrillRecallAttempt,
   submitDrillSentenceAttempt: vi.fn(),
   submitDrillWriteAttempt: mocks.submitDrillWriteAttempt,
@@ -45,6 +46,8 @@ function renderDrill(
   onProduced: () => void = () => {},
   // `null` = drill sin decisión (abierto desde el diccionario).
   decisionId: string | null = DECISION,
+  // V3.85.1 (C1): veredicto del peldaño (apruebe o falle), separado de onProduced.
+  onStepCompleted: () => void = () => {},
 ) {
   return render(
     <I18nProvider lang="en" setLang={() => {}}>
@@ -54,6 +57,7 @@ function renderDrill(
         initialStep={initialStep}
         decisionId={decisionId ?? undefined}
         onProduced={onProduced}
+        onStepCompleted={onStepCompleted}
         onClose={() => {}}
       />
     </I18nProvider>,
@@ -573,5 +577,114 @@ describe("WordDrill ciclo de vida del provenance (V3.68, P1-02)", () => {
     unmount();
     expect(mocks.markDrillStarted).not.toHaveBeenCalled();
     expect(mocks.markDrillAbandoned).not.toHaveBeenCalled();
+  });
+});
+
+describe("WordDrill veredicto del peldaño (V3.85.1, C1)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("Recognition declara el veredicto sin fabricar evidencia productiva", async () => {
+    const onProduced = vi.fn();
+    const onStepCompleted = vi.fn();
+    mocks.getDrillRecognitionQuestion.mockResolvedValue({
+      word: "river",
+      available: true,
+      question_id: "q1",
+      options: ["río", "mar"],
+    });
+    mocks.submitDrillRecognitionAttempt.mockResolvedValue({
+      word: "river",
+      correct: true,
+      correct_index: 0,
+      selected_index: 0,
+    });
+    renderDrill("recognition", onProduced, DECISION, onStepCompleted);
+
+    fireEvent.click(await screen.findByRole("button", { name: "río" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    // El acierto reconductivo deja avanzar la sesión...
+    await waitFor(() => expect(onStepCompleted).toHaveBeenCalledTimes(1));
+    // ...pero NO se declara como producción (su acierto es señal, no evidencia).
+    expect(onProduced).not.toHaveBeenCalled();
+  });
+
+  it("un fallo de Recognition también da veredicto y deja avanzar", async () => {
+    const onProduced = vi.fn();
+    const onStepCompleted = vi.fn();
+    mocks.getDrillRecognitionQuestion.mockResolvedValue({
+      word: "river",
+      available: true,
+      question_id: "q1",
+      options: ["río", "mar"],
+    });
+    mocks.submitDrillRecognitionAttempt.mockResolvedValue({
+      word: "river",
+      correct: false,
+      correct_index: 0,
+      selected_index: 1,
+    });
+    renderDrill("recognition", onProduced, DECISION, onStepCompleted);
+
+    fireEvent.click(await screen.findByRole("button", { name: "mar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+
+    await waitFor(() => expect(onStepCompleted).toHaveBeenCalledTimes(1));
+    expect(onProduced).not.toHaveBeenCalled();
+  });
+
+  it("Recall declara el veredicto sin fabricar evidencia productiva", async () => {
+    const onProduced = vi.fn();
+    const onStepCompleted = vi.fn();
+    mocks.getDrillRecallPrompt.mockResolvedValue({
+      word: "river",
+      available: true,
+      cue: "río",
+      cue_kind: "translation",
+    });
+    mocks.submitDrillRecallAttempt.mockResolvedValue({
+      word: "river",
+      correct: true,
+      expected: "river",
+      delayed: false,
+      recall_days: 1,
+      error_type: "correct",
+    });
+    renderDrill("recall", onProduced, DECISION, onStepCompleted);
+
+    fireEvent.change(await screen.findByLabelText("Type the word"), {
+      target: { value: "river" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    await waitFor(() => expect(onStepCompleted).toHaveBeenCalledTimes(1));
+    expect(onProduced).not.toHaveBeenCalled();
+  });
+
+  it("Write fallido da veredicto (avanza) sin acreditar producción", async () => {
+    const onProduced = vi.fn();
+    const onStepCompleted = vi.fn();
+    mocks.submitDrillWriteAttempt.mockResolvedValue({
+      word: "river",
+      text: "river",
+      used_word: true,
+      word_count: 1,
+      passed: false,
+      error_type: "too_short",
+    });
+    renderDrill("write", onProduced, DECISION, onStepCompleted);
+
+    fireEvent.change(await screen.findByLabelText("Your sentence"), {
+      target: { value: "river" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check sentence" }));
+
+    expect(await screen.findByText(/write a longer sentence/)).toBeTruthy();
+    // El veredicto (aunque sea fallo) deja seguir; la producción no se acredita.
+    expect(onStepCompleted).toHaveBeenCalledTimes(1);
+    expect(onProduced).not.toHaveBeenCalled();
   });
 });

@@ -1008,14 +1008,26 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.decks.rename": { en: "Rename", es: "Renombrar" },
   "flashcards.decks.delete": { en: "Delete", es: "Borrar" },
   "flashcards.decks.deleteConfirm": {
-    en: "Delete “{name}” and its {n} cards? This cannot be undone.",
-    es: "¿Borrar «{name}» y sus {n} tarjetas? No se puede deshacer.",
+    en: "Delete “{name}” and its {n} cards? Cards that are also in another deck are kept there.",
+    es: "¿Borrar «{name}» y sus {n} tarjetas? Las que también estén en otro mazo se conservan allí.",
   },
   "flashcards.decks.empty": {
     en: "No manual decks yet. Create one for anything the app does not know about.",
     es: "Aún no hay mazos manuales. Crea uno para lo que la app no conoce.",
   },
   "flashcards.decks.cards": { en: "{n} cards", es: "{n} tarjetas" },
+  "flashcards.decks.shared": {
+    en: "{n} also in other decks",
+    es: "{n} también en otros mazos",
+  },
+  "flashcards.decks.deleteConfirmShared": {
+    en: "Delete “{name}”? {n} cards will be removed and {kept} will be kept because they are also in another deck.",
+    es: "¿Borrar «{name}»? Se borrarán {n} tarjetas y se conservarán {kept} por estar también en otro mazo.",
+  },
+  "flashcards.decks.deletedKept": {
+    en: "{deleted} cards deleted, {kept} kept in other decks.",
+    es: "{deleted} tarjetas borradas, {kept} conservadas en otros mazos.",
+  },
   "flashcards.decks.due": { en: "{n} due", es: "{n} pendientes" },
   "flashcards.decks.limitsNew": { en: "New / day", es: "Nuevas / día" },
   "flashcards.decks.limitsReview": { en: "Reviews / day", es: "Repasos / día" },
@@ -1088,8 +1100,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Sin estudiar todavía",
   },
   "flashcards.cards.pickDeck": {
-    en: "Pick a manual deck to see and edit its cards.",
-    es: "Elige un mazo manual para ver y editar sus tarjetas.",
+    en: "You have no manual deck yet. Create one to keep cards in it.",
+    es: "Todavía no tienes ningún mazo manual. Crea uno para guardar tarjetas.",
   },
   // V3.80.0: el mazo recién creado se abre aquí con el anverso enfocado; esta
   // línea es la respuesta a «creo un mazo y no sé cómo añadir palabras».
@@ -1108,12 +1120,12 @@ const STRINGS: Record<string, Entry> = {
     es: "Pegar una lista",
   },
   "flashcards.cards.bulkHint": {
-    en: "One card per line, front,back (comma or tab). Lines starting with # are ignored. Same format as the word lists.",
-    es: "Una tarjeta por línea, anverso,reverso (coma o tabulador). Las líneas que empiezan por # se ignoran. Mismo formato que las listas de palabras.",
+    en: "One card per line, front,back,reminder (comma or tab; the reminder is optional). Lines starting with # are ignored. Same format as the word lists.",
+    es: "Una tarjeta por línea, anverso,reverso,recordatorio (coma o tabulador; el recordatorio es opcional). Las líneas que empiezan por # se ignoran. Mismo formato que las listas de palabras.",
   },
   "flashcards.cards.bulkPlaceholder": {
-    en: "break a leg,mucha suerte\ntake off,despegar",
-    es: "break a leg,mucha suerte\ntake off,despegar",
+    en: "break a leg,mucha suerte\ntake off,despegar,quitarse de encima",
+    es: "break a leg,mucha suerte\ntake off,despegar,quitarse de encima",
   },
   "flashcards.cards.bulkAdd": {
     en: "Add all",
@@ -1130,6 +1142,28 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.cards.stateNew": { en: "New", es: "Nueva" },
   "flashcards.cards.stateLearning": { en: "Learning", es: "Aprendiendo" },
   "flashcards.cards.stateReview": { en: "Review", es: "Repaso" },
+  // V3.86.0: la ficha es de TODOS sus mazos, no de uno. Se muestran como
+  // etiquetas y se editan con casillas; el navegador deja de forzar un mazo.
+  "flashcards.cards.decksLabel": { en: "Decks", es: "Mazos" },
+  "flashcards.cards.noDecks": {
+    en: "In no deck",
+    es: "Sin mazo",
+  },
+  "flashcards.cards.allDecks": { en: "All decks", es: "Todos los mazos" },
+  "flashcards.cards.noDeckSelected": {
+    en: "Check at least one deck.",
+    es: "Marca al menos un mazo.",
+  },
+  "flashcards.cards.deckFilter": { en: "Filter by deck", es: "Filtrar por mazo" },
+  "flashcards.cards.mnemonic": { en: "Reminder", es: "Recordatorio" },
+  "flashcards.cards.mnemonicPlaceholder": {
+    en: "A hook to remember it (optional)",
+    es: "Una pista para recordarla (opcional)",
+  },
+  "flashcards.cards.mnemonicClear": {
+    en: "Clear reminder",
+    es: "Borrar recordatorio",
+  },
   // Estadísticas.
   "flashcards.stats.title": { en: "Statistics", es: "Estadísticas" },
   "flashcards.stats.today": { en: "Reviewed today", es: "Repasadas hoy" },
@@ -1238,6 +1272,18 @@ const STRINGS: Record<string, Entry> = {
   // palabra al PROCESO DE ESTUDIO. El alta crea léxico + carta FSRS (estado
   // `learning`), así que la palabra aparece también en PERSONAL y en el mazo
   // automático «Mi diccionario»: es el mismo vocabulario, no una copia.
+  // V3.86.0: significados elegibles. El nombre propio se marca y NUNCA se
+  // preselecciona (el defecto es el primer significado común).
+  "dictionary.lookup.meanings": { en: "Meanings", es: "Significados" },
+  "dictionary.lookup.meaningPick": {
+    en: "Pick the meaning you want to study.",
+    es: "Elige el significado que quieres estudiar.",
+  },
+  "dictionary.lookup.meaningAria": { en: "Meaning", es: "Significado" },
+  "dictionary.lookup.meaningProperNoun": {
+    en: "Proper noun",
+    es: "Nombre propio",
+  },
   "dictionary.lookup.addCta": {
     en: "Add to Flashcards",
     es: "Añadir a Flashcards",
@@ -1258,17 +1304,43 @@ const STRINGS: Record<string, Entry> = {
     en: "The word always joins your study flow: it stays in learning, shows up in Personal and in the auto deck, and repeats with spaced review. You can also save it as a card in a manual deck.",
     es: "La palabra entra siempre en tu proceso de estudio: queda en aprendizaje, aparece en Personal y en el mazo automático, y se repasa con repetición espaciada. Además puedes guardarla como tarjeta en un mazo manual.",
   },
-  "dictionary.lookup.addDeckLabel": {
-    en: "Also save it as a card in a deck (optional)",
-    es: "Guardar también como tarjeta en un mazo (opcional)",
+  // V3.86.0: el mazo deja de ser UNA elección: se marcan los que se quieran y la
+  // ficha nace en todos a la vez. Sin ninguno marcado, solo entra el léxico.
+  "dictionary.lookup.addDecksLabel": {
+    en: "Decks (check one or more)",
+    es: "Mazos (marca uno o varios)",
   },
-  "dictionary.lookup.addDeckNone": {
-    en: "No deck — just keep it learning",
-    es: "Ningún mazo — solo dejarla en aprendizaje",
+  "dictionary.lookup.addNoDeck": {
+    en: "No deck checked: the word only enters your dictionary.",
+    es: "Sin ningún mazo marcado: la palabra solo entra en tu diccionario.",
   },
-  "dictionary.lookup.addDeckNew": {
-    en: "Create a new deck…",
-    es: "Crear un mazo nuevo…",
+  "dictionary.lookup.addMnemonicLabel": {
+    en: "Reminder (optional)",
+    es: "Recordatorio (opcional)",
+  },
+  "dictionary.lookup.addMnemonicPlaceholder": {
+    en: "A hook to remember it",
+    es: "Una pista para recordarla",
+  },
+  "dictionary.lookup.addBackLabel": {
+    en: "Back of the card",
+    es: "Reverso de la tarjeta",
+  },
+  "dictionary.lookup.addBackHint": {
+    en: "No equivalent was found. Write the back yourself so the card is still useful.",
+    es: "No se encontró equivalente. Escribe tú el reverso para que la tarjeta sirva igualmente.",
+  },
+  "dictionary.lookup.addRetryDecks": {
+    en: "Retry",
+    es: "Reintentar",
+  },
+  "dictionary.lookup.addTrackedNote": {
+    en: "It is already in your dictionary, so only the card and its decks are saved.",
+    es: "Ya está en tu diccionario, así que solo se guardan la tarjeta y sus mazos.",
+  },
+  "dictionary.lookup.addDeckNewInline": {
+    en: "New deck",
+    es: "Nuevo mazo",
   },
   "dictionary.lookup.addDeckCreate": {
     en: "Create deck",
@@ -4578,6 +4650,13 @@ const STRINGS: Record<string, Entry> = {
   "vocRoutes.dictionaryLookupHint": {
     en: "Look up any word: definition, translation and how you've used it.",
     es: "Consulta cualquier palabra: definición, traducción y cómo la has usado.",
+  },
+  // V3.85.1 (D4): puerta al repaso desde el panel incrustado. Un solo CTA que
+  // lleva a la superficie central (Flashcards → Estudiar), sin duplicar sesión.
+  "vocRoutes.reviewCta": { en: "Review today", es: "Repasar hoy" },
+  "vocRoutes.reviewHint": {
+    en: "Opens the central review session in Flashcards → Study.",
+    es: "Abre la sesión de repaso central en Flashcards → Estudiar.",
   },
   "vocRoutes.levelStates.failed": {
     en: "Missed ({count})",

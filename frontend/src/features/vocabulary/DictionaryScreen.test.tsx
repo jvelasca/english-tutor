@@ -17,6 +17,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { getSettings, saveSettings } from "../../api/settings";
 import { I18nProvider } from "../../hooks/useI18n";
 import { DICTIONARY_VIEW_STORAGE_KEY } from "../../utils/dictionaryView";
+import { setPendingStudyFocus } from "../../utils/studyFocus";
 import { DictionaryScreen } from "./DictionaryScreen";
 
 vi.mock("./LexiconInventory", () => ({
@@ -34,12 +35,17 @@ vi.mock("./FlashcardsScreen", () => ({
   FlashcardsScreen: ({
     tab,
     onTabChange,
+    focusDeckId,
+    focusNonce,
   }: {
     tab?: string;
     onTabChange?: (next: string) => void;
+    focusDeckId?: number | null;
+    focusNonce?: number;
   }) => (
     <div>
       <div>{`flashcards-view:${tab ?? "uncontrolled"}`}</div>
+      <div>{`flashcards-focus:${focusDeckId ?? "none"}:${focusNonce ?? 0}`}</div>
       <button type="button" onClick={() => onTabChange?.("study")}>
         goto-study
       </button>
@@ -193,6 +199,34 @@ describe("DictionaryScreen · V3.85.0 dos pestañas y proyección", () => {
       "personal",
     );
     expect(saveSettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("el salto del diccionario incrustado abre Flashcards en el mazo pedido (V3.86.0)", () => {
+    // APRENDER → Vocabulario es otra pantalla: el panel no hospeda la sesión, así
+    // que «Estudiar en Flashcards» deja un recado y navega. El mazo elegido tiene
+    // que llegar: si se perdiera, el alumno aterrizaría en el mazo automático y
+    // creería que su tarjeta no entró.
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "flashcards");
+    setPendingStudyFocus(7);
+
+    renderScreen();
+
+    expect(screen.getByText("flashcards-view:study")).toBeTruthy();
+    expect(screen.getByText("flashcards-focus:7:1")).toBeTruthy();
+  });
+
+  it("el recado del salto es de UN solo uso y sin mazo pide el automático (V3.86.0)", () => {
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "flashcards");
+    setPendingStudyFocus();
+
+    const first = renderScreen();
+    // `null` = el mazo automático, a propósito (una palabra ya rastreada vive
+    // allí). Y se consume: no queda vivo para una visita posterior.
+    expect(screen.getByText("flashcards-focus:none:1")).toBeTruthy();
+    first.unmount();
+
+    renderScreen();
+    expect(screen.getByText("flashcards-focus:none:0")).toBeTruthy();
   });
 
   // --- V3.80.1: los modos son pestañas ARIA reales ---------------------------

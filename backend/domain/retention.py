@@ -33,6 +33,32 @@ def _normalize_word(raw: str) -> str | None:
     return text
 
 
+def parse_bulk_fields(text: str, *, max_fields: int = 2) -> list[list[str]]:
+    """Parte un pegado en campos por línea, sin opinar sobre ellos (V3.86.0).
+
+    Generaliza `parse_bulk_lines`: una entrada por línea, `#` comenta y las
+    líneas vacías se ignoran. El separador es el primer tabulador o, si no hay,
+    la primera coma; se parten como mucho `max_fields` campos (el último conserva
+    las comas sobrantes, para que un reverso con comas no se destroce). Devuelve
+    listas de 1..`max_fields` cadenas ya recortadas. Con `max_fields=2` el
+    resultado es idéntico al de `parse_bulk_lines`.
+    """
+    fields: list[list[str]] = []
+    limit = max(1, int(max_fields))
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "\t" in line:
+            parts = line.split("\t", limit - 1) if limit > 1 else [line]
+        elif "," in line:
+            parts = line.split(",", limit - 1) if limit > 1 else [line]
+        else:
+            parts = [line]
+        fields.append([part.strip() for part in parts])
+    return fields
+
+
 def parse_bulk_lines(text: str) -> list[tuple[str, str]]:
     """Parte un pegado en pares `(izquierda, derecha)`, sin opinar sobre ellos.
 
@@ -50,18 +76,14 @@ def parse_bulk_lines(text: str) -> list[tuple[str, str]]:
     una tarjeta admite una frase entera («break a leg»). Por eso esta función
     solo parte y cada llamante valida y acota lo suyo. Teniendo dos parsers, la
     sintaxis de pegado acabaría divergiendo entre las dos pantallas.
+
+    V3.86.0: se apoya en `parse_bulk_fields` (una sola implementación del corte);
+    el alta masiva de FICHAS usa la variante de tres campos para el recordatorio.
     """
     pairs: list[tuple[str, str]] = []
-    for line in (text or "").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "\t" in line:
-            left, right = line.split("\t", 1)
-        elif "," in line:
-            left, right = line.split(",", 1)
-        else:
-            left, right = line, ""
+    for parts in parse_bulk_fields(text, max_fields=2):
+        left = parts[0] if parts else ""
+        right = parts[1] if len(parts) > 1 else ""
         pairs.append((left.strip(), right.strip()))
     return pairs
 

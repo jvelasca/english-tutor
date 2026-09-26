@@ -101,6 +101,17 @@ def test_parse_returns_valid_content():
         # V3.44: el contrato de contenido gana `senses` ([] si el modelo no los
         # da, sin invalidar definición/traducción).
         "senses": [],
+        # V3.86.0: significados elegibles. Sin lista del modelo se sintetiza uno
+        # desde `translation`, para que la UI siempre tenga una opción.
+        "meanings": [
+            {
+                "term": "gato",
+                "pos": "noun",
+                "gloss": "",
+                "domain": "",
+                "proper_noun": False,
+            }
+        ],
     }
 
 

@@ -136,3 +136,49 @@ def match_translation(term: str, entries: list[dict]) -> list[str]:
             best[key] = (english, score)
     ordered = sorted(best.values(), key=lambda item: (-item[1], item[0].lower()))
     return [english for english, _ in ordered]
+
+
+def _pack_term_score(translation: str, term: str) -> int:
+    """Mejor puntuación de `term` contra los segmentos de una traducción curada."""
+    score = -1
+    for segment in _gloss_segments(translation or ""):
+        score = max(score, _segment_score(segment, term))
+    return score
+
+
+def match_pack_translation(term: str, items: list[dict]) -> list[dict]:
+    """Equivalentes INGLESES curados del término español `term` (V3.86.0).
+
+    Autoridad determinista y GRATIS (sin latencia del modelo) sobre el catálogo
+    global de packs: `items` son filas de `vocab_collection_items` con `word`
+    (inglés), `translation` (español) y `pos`. Es lo que hace que «tornillo» dé
+    «screw» y «lima» dé «file» aunque la caché no tenga la entrada o el modelo
+    devuelva un nombre propio.
+
+    Devuelve `[{word, pos}]` ordenados por calidad de coincidencia (exacta antes
+    que parcial) y, a igualdad, alfabéticamente (determinista). Sin duplicados:
+    un mismo equivalente que coincide por varios packs aparece una sola vez con
+    su mejor puntuación. Un término vacío o sin coincidencias devuelve [].
+    """
+    normalized = normalize_term(term)
+    if not normalized:
+        return []
+    best: dict[str, tuple[dict, int]] = {}
+    for item in items or []:
+        english = (item.get("word") or "").strip()
+        if not english:
+            continue
+        score = _pack_term_score(item.get("translation") or "", normalized)
+        if score < 0:
+            continue
+        key = english.lower()
+        current = best.get(key)
+        if current is None or score > current[1]:
+            best[key] = (
+                {"word": english, "pos": str(item.get("pos") or "").strip().lower()},
+                score,
+            )
+    ordered = sorted(
+        best.values(), key=lambda item: (-item[1], item[0]["word"].lower())
+    )
+    return [entry for entry, _ in ordered]

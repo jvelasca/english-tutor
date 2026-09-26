@@ -23,10 +23,13 @@ from schemas.vocabulary import (
     DrillCandidatesOut,
     FlashcardCardIn,
     FlashcardCardOut,
+    FlashcardCardPatchIn,
     FlashcardCardsBulkIn,
     FlashcardCardsBulkOut,
     FlashcardCardsOut,
+    FlashcardDeckDeleteOut,
     FlashcardDeckIn,
+    FlashcardDeckMembershipIn,
     FlashcardDeckOut,
     FlashcardDecksOut,
     FlashcardQueueOut,
@@ -887,12 +890,22 @@ async def update_flashcard_deck(
     return result
 
 
-@router.delete("/api/vocabulary/decks/{deck_id}", status_code=204)
+@router.delete(
+    "/api/vocabulary/decks/{deck_id}", response_model=FlashcardDeckDeleteOut
+)
 async def delete_flashcard_deck(
     deck_id: int, user: dict = Depends(current_user)
-) -> None:
-    if not await flashcards_service.delete_deck(user["id"], deck_id):
+) -> dict:
+    """Borra un mazo manual (V3.86.0).
+
+    Devuelve cuántas fichas se borraron (`deleted_count`) y cuántas se
+    conservaron por estar también en otro mazo (`shared_count`), para que la UI
+    pueda avisar antes/después con datos reales. El mazo automático no se borra.
+    """
+    result = await flashcards_service.delete_deck(user["id"], deck_id)
+    if result is None:
         raise HTTPException(status_code=404, detail="Mazo no encontrado")
+    return result
 
 
 @router.get(
@@ -936,11 +949,12 @@ async def flashcard_review(
 async def add_flashcard_cards_bulk(
     deck_id: int, body: FlashcardCardsBulkIn, user: dict = Depends(current_user)
 ) -> dict:
-    """Pega una lista de tarjetas: una por línea, `anverso,reverso` (V3.80.0).
+    """Pega una lista de tarjetas: una por línea, `anverso,reverso[,recordatorio]`.
 
     Mismo parser que el pegado de palabras del léxico, para que el alumno solo
     tenga que aprenderse una sintaxis. Sin efectos FSRS: las tarjetas nacen
-    «nuevas» y se programan al calificarlas, como las creadas de una en una."""
+    «nuevas» y se programan al calificarlas, como las creadas de una en una.
+    """
     result = await flashcards_service.add_cards_bulk(
         user["id"], deck_id, text=body.text
     )
@@ -951,12 +965,140 @@ async def add_flashcard_cards_bulk(
     return result
 
 
+# --- V3.86.0: endpoints FICHA-PRIMERO (el id de ficha es global del usuario) ---
+#
+# El contrato nuevo desacopla la ficha de su mazo: una ficha se identifica por
+# `card_id` y su pertenencia a mazos (1..N) se lee/escribe aparte. Los endpoints
+# `.../decks/{deck_id}/cards...` de V3.78–V3.85.1 quedan como ENVOLTORIOS finos
+# (deprecados) para no romper clientes, pero ya no son la fuente de verdad.
+
+
+@router.get("/api/vocabulary/cards", response_model=FlashcardCardsOut)
+async def list_vocabulary_cards(
+    deck_id: int | None = Query(None),
+    user: dict = Depends(current_user),
+) -> dict:
+    """Todas las fichas del alumno (o las de un mazo, si se filtra).
+
+    Card-first: sin `deck_id` devuelve el conjunto completo, cada ficha con sus
+    mazos (`deck_ids`) y su recordatorio. Es lo que necesita la pestaña Fichas,
+    que ya no obliga a elegir un mazo.
+    """
+    if deck_id is None:
+        cards = await flashcards_service.list_all_cards(user["id"])
+    else:
+        cards = await flashcards_service.list_cards(user["id"], deck_id)
+    return {"cards": cards}
+
+
+@router.post("/api/vocabulary/cards", response_model=FlashcardCardOut)
+async def create_vocabulary_card(
+    body: FlashcardCardIn, user: dict = Depends(current_user)
+) -> dict:
+    """Crea una ficha en uno o varios mazos (`deck_ids`; `deck_id` legacy)."""
+    result = await flashcards_service.create_card(
+        user["id"],
+        front=body.front,
+        back=body.back,
+        mnemonic=body.mnemonic,
+        deck_ids=body.deck_ids or None,
+        deck_id=body.deck_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Elige al menos un mazo válido (el automático no admite fichas)",
+        )
+    return result
+
+
+@router.patch(
+    "/api/vocabulary/cards/{card_id}", response_model=FlashcardCardOut
+)
+async def update_vocabulary_card(
+    card_id: int,
+    body: FlashcardCardPatchIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Edita anverso/reverso/recordatorio y/o reemplaza los mazos de la ficha.
+
+    Parcial: un campo ausente no se toca (editar solo el recordatorio no obliga a
+    reenviar el anverso). Si llega `deck_ids`, el conjunto no puede quedar vacío.
+    """
+    result = await flashcards_service.update_card(
+        user["id"],
+        card_id,
+        front=body.front,
+        back=body.back,
+        mnemonic=body.mnemonic,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+    if body.deck_ids is not None:
+        updated = await flashcards_service.set_card_decks(
+            user["id"], card_id, body.deck_ids
+        )
+        if updated is None:
+            raise HTTPException(
+                status_code=400, detail="La ficha debe pertenecer a algún mazo"
+            )
+        result = updated
+    return result
+
+
+@router.delete("/api/vocabulary/cards/{card_id}", status_code=204)
+async def delete_vocabulary_card(
+    card_id: int, user: dict = Depends(current_user)
+) -> None:
+    if not await flashcards_service.delete_card(user["id"], card_id):
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+
+
+@router.post(
+    "/api/vocabulary/cards/{card_id}/decks", response_model=FlashcardCardOut
+)
+async def add_vocabulary_card_to_deck(
+    card_id: int,
+    body: FlashcardDeckMembershipIn,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Añade la ficha a un mazo sin tocar sus otras pertenencias."""
+    result = await flashcards_service.add_card_to_deck(
+        user["id"], card_id, body.deck_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Ficha o mazo no encontrado")
+    return result
+
+
+@router.delete(
+    "/api/vocabulary/cards/{card_id}/decks/{deck_id}", status_code=204
+)
+async def remove_vocabulary_card_from_deck(
+    card_id: int, deck_id: int, user: dict = Depends(current_user)
+) -> None:
+    """Quita la ficha de un mazo. Si era su última pertenencia, la ficha se borra.
+
+    204 siempre que la operación se aplicara: la UI refresca la lista y ve si la
+    ficha sigue (seguía en otro mazo) o desaparece (era la última).
+    """
+    result = await flashcards_service.remove_card_from_deck(
+        user["id"], card_id, deck_id
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Ficha o mazo no encontrado")
+
+
+# --- Envoltorios LEGACY de V3.78–V3.85.1 (deprecados) ------------------------
+
+
 @router.get(
     "/api/vocabulary/decks/{deck_id}/cards", response_model=FlashcardCardsOut
 )
 async def list_flashcard_cards(
     deck_id: int, user: dict = Depends(current_user)
 ) -> dict:
+    """DEPRECADO (V3.86.0): usa `GET /api/vocabulary/cards?deck_id=`."""
     cards = await flashcards_service.list_cards(user["id"], deck_id)
     return {"cards": cards}
 
@@ -967,21 +1109,18 @@ async def list_flashcard_cards(
 async def create_flashcard_card(
     deck_id: int, body: FlashcardCardIn, user: dict = Depends(current_user)
 ) -> dict:
+    """DEPRECADO (V3.86.0): usa `POST /api/vocabulary/cards` con `deck_ids`."""
     result = await flashcards_service.create_card(
-        user["id"], deck_id, front=body.front, back=body.back
+        user["id"],
+        deck_id,
+        front=body.front,
+        back=body.back,
+        mnemonic=body.mnemonic,
+        deck_ids=body.deck_ids or None,
     )
     if result is None:
         raise HTTPException(status_code=400, detail="No se pudo crear la tarjeta")
-    return {
-        "id": int(result["id"]),
-        "deck_id": int(result["deck_id"]),
-        "front": result["front"],
-        "back": result["back"],
-        "state": "new",
-        "reps": 0,
-        "due_at": "",
-        "created_at": result["created_at"],
-    }
+    return result
 
 
 @router.patch(
@@ -991,21 +1130,37 @@ async def create_flashcard_card(
 async def update_flashcard_card(
     deck_id: int,
     card_id: int,
-    body: FlashcardCardIn,
+    body: FlashcardCardPatchIn,
     user: dict = Depends(current_user),
 ) -> dict:
+    """DEPRECADO (V3.86.0): usa `PATCH /api/vocabulary/cards/{card_id}`.
+
+    Conserva la comprobación de que la ficha PERTENEZCA al mazo declarado, para
+    no cambiar la semántica de los clientes antiguos.
+    """
+    if not await flashcards_service.card_belongs_to_deck(
+        user["id"], card_id, deck_id
+    ):
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
     result = await flashcards_service.update_card(
-        user["id"], deck_id, card_id, front=body.front, back=body.back
+        user["id"],
+        card_id,
+        front=body.front,
+        back=body.back,
+        mnemonic=body.mnemonic,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
-    return {
-        "id": int(result["id"]),
-        "deck_id": int(result["deck_id"]),
-        "front": result["front"],
-        "back": result["back"],
-        "created_at": result["created_at"],
-    }
+    if body.deck_ids is not None:
+        updated = await flashcards_service.set_card_decks(
+            user["id"], card_id, body.deck_ids
+        )
+        if updated is None:
+            raise HTTPException(
+                status_code=400, detail="La ficha debe pertenecer a algún mazo"
+            )
+        result = updated
+    return result
 
 
 @router.delete(
@@ -1014,7 +1169,12 @@ async def update_flashcard_card(
 async def delete_flashcard_card(
     deck_id: int, card_id: int, user: dict = Depends(current_user)
 ) -> None:
-    if not await flashcards_service.delete_card(user["id"], deck_id, card_id):
+    """DEPRECADO (V3.86.0): usa `DELETE /api/vocabulary/cards/{card_id}`."""
+    if not await flashcards_service.card_belongs_to_deck(
+        user["id"], card_id, deck_id
+    ):
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+    if not await flashcards_service.delete_card(user["id"], card_id):
         raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
 
 

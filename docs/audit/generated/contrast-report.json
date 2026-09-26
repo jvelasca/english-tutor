@@ -1,5 +1,6 @@
 {
- "audit": "V3.75.8-rampa-niveles-direccion",
+ "audit": "V3.86.0-contraste-wcag",
+ "version": "3.86.0",
  "standard": "WCAG 2.2 AA (1.4.3 texto 4.5:1 · 1.4.11 UI 3:1)",
  "enforced_failures": 0,
  "reported_failures": 17,

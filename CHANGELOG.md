@@ -4,6 +4,151 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.86.0] — 2026-09-26
+
+**El diccionario deja de servir UN solo significado por palabra, el alta en mazo deja de
+atascarse aunque la palabra ya esté rastreada, y una ficha puede vivir en VARIOS mazos con su
+recordatorio.** Release de **PRODUCTO (minor)** **CON backend y frontend**, **CON migración de BD
+aditiva e idempotente**, **CON endpoints nuevos** (ficha-primero) y **CON bump de
+`GENERATOR_VERSION` (`1.4.0 → 1.5.0`)**; `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue
+`1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los
+**ocho**, todos en `pending`— y `validation-evidence.json` sigue sin existir. Es la **fase 1 de 2**:
+el estudio configurable queda fuera y documentado.
+
+**El defecto reportado, y era de datos: «lima» era la capital del Perú.** La caché guardaba **una
+sola** traducción por palabra (clave única `word`) y `senses_json` separaba por **categoría
+gramatical**, no por **significado**; el prompt pedía *«the most common English equivalent»*, **no
+prohibía nombres propios** y recibía **solo la palabra, sin contexto**, mientras el parseo aceptaba
+cualquier texto no vacío. Un `lima → Lima` se guardaba bajo `word="lima"` y se servía **a todos**.
+Y **la traducción curada correcta ya existía** en los packs del currículum, pero la búsqueda **no la
+consultaba**.
+
+**Lo que cambia. (A) Significados elegibles.** Ambos prompts devuelven además
+`meanings: [{term, pos, gloss, domain, proper_noun}]` con la regla dura de que **nunca** un nombre
+propio es el equivalente de un nombre común (si existe, va **el último** y marcado); nuevo
+`normalize_meanings` (tope 6, dedupe por término + `pos`) y **el defecto es el primer significado no
+nombre propio**. Columna aditiva `meanings_json` en **las dos** tablas de caché, con degradación a
+`senses` + `translation` en filas antiguas, y **`senses` intacto**. `GENERATOR_VERSION` sube a
+**`1.5.0`**: la fila envenenada de `lima` **deja de servirse** y se regenera **al consultarla**
+(perezoso, declarado). Y `match_pack_translation` da **autoridad determinista y gratis** leyendo
+`vocab_collection_items`: `tornillo → screw` y `lima → file` son correctos, instantáneos y sin
+modelo. En la UI, un **selector de significado** con el término, `pos`, ámbito y glosa; los nombres
+propios van **marcados y nunca preseleccionados**, y lo elegido manda en la práctica, el audio y el
+alta. **(B) El alta deja de atascarse.** Se retira la supresión por `usage.tracked` (el panel está
+**siempre** disponible y, si la palabra ya está en el léxico, **no reescribe el léxico**: solo crea
+la ficha y sus mazos); un `deckError` **ya no esconde el selector** y ofrece **«Reintentar»**; los
+mazos son **casillas** (la ficha nace en **todos** los marcados, en una sola escritura); hay
+**recordatorio** opcional en el panel; `translation: null` pide el **reverso a mano** en vez de no
+ofrecer nada; y el CTA de estudio viaja **siempre** con el mazo elegido. **(C) Fichas en varios
+mazos.** Migración **aditiva e idempotente**: tabla puente `flashcard_deck_cards`
+(`PK(card_id, deck_id)`, `ON DELETE CASCADE` en la ficha, índice por `deck_id`), columna
+`flashcard_cards.mnemonic` y **backfill solo la primera vez que nace la tabla** (repetirlo
+resucitaría una pertenencia que el alumno quitó a propósito). API **ficha-primero**
+(`GET/POST /api/vocabulary/cards`, `PATCH/DELETE /api/vocabulary/cards/{id}`,
+`POST/DELETE /api/vocabulary/cards/{id}/decks[/{deck_id}]`) con parcheo **parcial de verdad** y
+`set_card_decks` en una transacción; el mismo anverso **se reutiliza** en lugar de duplicarse; y
+`delete_deck` **conserva** las fichas que siguen en otro mazo (repuntando la columna deprecada
+`deck_id` a `MIN(dc.deck_id)` para satisfacer el FK), borra las huérfanas **con sus cartas FSRS** y
+**dice cuántas se borran y cuántas se conservan**. `deck_queue` devuelve cada ficha **una sola vez**
+y `StudySession` muestra el recordatorio en el **reverso** sin tocar la máquina de estudio. Las
+rutas legacy `/decks/{id}/cards...` quedan como **envoltorios finos deprecados**. **(D) Salida del
+diccionario incrustado.** El panel de APRENDER → Vocabulario no hospeda la sesión, así que una
+palabra ya rastreada se quedaba **sin ninguna acción**: ahora la vista de consulta declara
+`allowFlashcardsJump` y el salto **persiste la vista**, navega a `#/diccionario` y **transporta el
+mazo elegido** en un recado de un solo uso (`utils/studyFocus`). **(E) Un fallo real que destapó la
+sonda.** `StudyTab` arrancaba la sesión en cuanto la cola cargaba **sin comprobar de qué mazo era**:
+al llegar del diccionario con un mazo manual, la carga del mazo automático (aún seleccionado) podía
+resolverse después del foco, gastar el encargo con una cola ajena y dejar al alumno **en el panel,
+sin sesión**, aunque su mazo tuviera tarjetas. El arranque ahora exige `queue.deck.id === deck`.
+
+**Verificación:** `tsc --noEmit` limpio · `vitest run` **1055/1055** (109 ficheros) · `pytest`
+backend **3157/3157** · `ruff` limpio en el alcance del proyecto (backend y lanzador) · i18n `--strict` **1797** cadenas con **0 huérfanas / 0 usadas sin definir /
+0 duplicadas** · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes**
+(`audit: V3.86.0-contraste-wcag`) · `npm run build` correcto · `check_release_consistency` OK en los
+**6 orígenes** (`3.86.0`) · **barrido Playwright completo (26 ficheros): 116 passed · 0 failed · 34 skipped** (150 en total).
+
+**Esta release ABSORBE a `v3.85.1`.** Esa versión se redactó y se verificó, pero **nunca se
+etiquetó**: el `HEAD` público seguía en `v3.85.0` y el trabajo quedó en el árbol de trabajo. Así que
+**`v3.85.1` no existe como tag**, su delta va **incluido íntegro** aquí y el rango
+`v3.85.0..v3.86.0` tiene **un solo commit de release**. `release-notes-v3.85.1.md` lleva una errata
+en cabecera. Este tag incorpora además `docs/audit/AY-AUDITORIA-TOTAL-V385.md` (el informe `AY`, que
+seguía sin commitear).
+
+**Honestidad.** (i) El **recordatorio no llega al mazo automático**: vive en la ficha manual y el
+mazo automático es una vista del léxico. (ii) La **corrección de la caché de `lima` es perezosa**:
+el bump invalida y la regeneración ocurre al consultar. (iii) **`flashcard_cards.deck_id` sigue
+existiendo, deprecada y con un solo escritor**: retirarla exige una ventana de reconstrucción de
+tabla. (iv) **No hay transacción entre léxico y ficha** (dos escrituras con estado parcial
+declarado y reintento, decisión de V3.84.1 que se mantiene). (v) **La fase 2 no está**: elegir mazos
+al estudiar, dirección ES↔EN, escribir la respuesta y ayudas de sílabas. (vi) Los **nombres propios
+se pueden elegir**, pero solo de forma **explícita**. (vii) Los 8 gates siguen `pending` y
+`validation-evidence.json` no existe. (viii) **`ruff check .` desde la RAÍZ sigue reportando 1
+hallazgo preexistente y ajeno** (`scripts/purge_virtual_testers.py:198`, `DTZ005`, idéntico al del
+tag `v3.85.1`); el alcance del proyecto (backend y lanzador) pasa limpio. Ver
+`release-notes-v3.86.0.md`.
+
+## [3.85.1] — 2026-09-26
+
+> **ERRATA (declarada el 2026-09-26): esta versión NO se publicó como tag.** Su trabajo se quedó
+> en el árbol de trabajo sin commitear y `v3.85.1` no existe en el repositorio (el `HEAD` público
+> siguió en `v3.85.0`). **Su contenido va incluido íntegro en `3.86.0`**, cuyo tag lo absorbe.
+> La entrada se conserva como registro de lo que se hizo, con la errata en
+> `release-notes-v3.85.1.md`.
+
+**La sesión de repaso deja de atascarse, el panel APRENDER → Vocabulario recupera el repaso y
+el informe de contraste vuelve a identificar la release. Cierra el P0 de la auditoría externa
+`AY`.** Release de **PRODUCTO (patch)** **SOLO FRONTEND**: **SIN migración de BD, SIN endpoints
+nuevos y SIN cambio de contrato de API**; **SIN bump** de `GENERATOR_VERSION` /
+`DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de
+las evaluaciones. **No se añade ni se retira gate** —siguen los **ocho**, todos en `pending`—.
+
+**El P0 (C1): la sesión se quedaba clavada.** `ReviewSession` gobernaba el avance con `produced`,
+que solo se pone a `true` cuando `WordDrill` dispara `onProduced`; y `onProduced` se dispara
+**solo** en `sentence`, `write` y `transfer`. Si el planner servía `recognition` o `recall` como
+actividad inicial, **«Siguiente palabra» no aparecía nunca**: el alumno quedaba encerrado en ese
+ítem y la única salida era cerrar el drill, que **aborta la sesión entera**. El E2E de `v3.85.0`
+no lo descubría porque servía todos los ítems como `activity: "write"`.
+
+**El arreglo no es que Recognition y Recall mientan.** Se separan dos señales que estaban
+confundidas: **`stepCompleted`** (`onStepCompleted`, nuevo) es el **veredicto** del peldaño
+—apruebe o falle— y es la puerta del avance; **`produced`** (`onProduced`, sin cambios) sigue
+reservado a los peldaños que **acreditan producción** y solo cuando el intento pasa. Completar un
+peldaño reconductivo avanza la sesión sin fabricar evidencia productiva.
+
+**Accesibilidad de la sesión.** El contador `1 of 2` pasa a **región viva** (`role="status"` +
+`aria-live="polite"` + `aria-atomic="true"`), y el foco **viaja al CTA** («Siguiente
+palabra»/«Terminar») al aparecer: el usuario de teclado ya no tabula por todo el drill.
+
+**D4: el panel APRENDER → Vocabulario recupera el repaso**, con **un solo CTA** que proyecta la
+vista persistida (`"flashcards"`) y navega a la superficie central (Flashcards → Estudiar) en vez
+de duplicar la sesión.
+
+**G3: el artefacto de contraste identifica la release.** `contrast_audit.mjs` deriva `audit` y
+`version` de `frontend/package.json` (antes declaraba `V3.75.8-rampa-niveles-direccion` en duro),
+y `docs/audit/generated/contrast-report.{json,md}` se regeneran.
+
+**Semántica fijada (C2).** «Repasar hoy» **trabaja competencia; NO consume vencimiento FSRS**: una
+palabra puede seguir vencida y volver a ofrecerse, y eso no es un bucle. **D3:** el límite de la
+cola pasó **de 20 a 50** en `v3.85.0` sin decirlo; queda declarado y con decisión de UX escrita
+(hasta 50 ítems con un clic por ítem y sin reanudación: la segmentación de la sesión queda
+aparcada). **D2:** la errata del `ReviewTodayCard` inexistente queda declarada en
+`release-notes-v3.85.0.md` (el tag no se recrea).
+
+**Verificación:** `tsc --noEmit` limpio · `vitest run` **1048/1048** (109 ficheros) · `ruff`
+limpio en el alcance del proyecto (backend y lanzador) · `pytest` backend **3141/3141** · i18n
+`--strict` **1776** cadenas con **0 huérfanas / 0 usadas sin definir / 0 duplicadas** · contraste
+`--strict` **480 pares + 6 guardas / 0 bloqueantes** · `npm run build` correcto ·
+`validation_gate.py auto --require-dist` **10/10** (8 gates) · **barrido Playwright completo
+(26 ficheros): 106 passed · 0 failed** · `check_release_consistency` OK en los **6 orígenes**
+(`3.85.1`).
+
+**Honestidad.** (i) **No hay motor de sesión nuevo.** (ii) El avance ya no exige producir, pero
+tampoco certifica nada: la evidencia productiva sigue siendo de los peldaños que producen.
+(iii) El contador puede reaparecer tras una sesión completa (semántica declarada). (iv) **El techo
+de 50 sigue sin resolverse.** (v) El panel incrustado tiene **CTA, no sesión**. (vi) `ruff check .` **desde la raíz** sigue
+reportando **1 hallazgo preexistente y ajeno** (`scripts/purge_virtual_testers.py:198`, `DTZ005`),
+idéntico al del tag `v3.85.0`. Ver `release-notes-v3.85.1.md`.
+
 ## [3.85.0] — 2026-09-26
 
 **DICCIONARIO en dos pestañas y «Repasar hoy» accionable: el inventario pasa a sub-pestaña de

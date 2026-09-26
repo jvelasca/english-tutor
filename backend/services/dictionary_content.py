@@ -71,7 +71,14 @@ logger = logging.getLogger(__name__)
 # `pos` GLOBAL como sustituto de sentido. El contenido cacheado con 1.3.0 no los
 # tiene, así que se regenera una sola vez al primer lookup (misma política de
 # invalidación lazy, sin migración de datos).
-GENERATOR_VERSION = "1.4.0"
+#
+# V3.86.0: bump 1.4.0 -> 1.5.0. El contrato de contenido gana `meanings`, los
+# significados ELEGIBLES que la UI ofrece para desambiguar una palabra
+# polisémica, con marca de nombre propio. Es lo que retira la fila envenenada de
+# «lima» (un nombre propio servido como equivalente de un nombre común) y lo que
+# permite elegir «file» en lugar de «Lima». El contenido con 1.4.0 se regenera
+# una sola vez al primer lookup (misma invalidación lazy).
+GENERATOR_VERSION = "1.5.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
@@ -94,6 +101,15 @@ SITUATION_BLANK = situation_service.SITUATION_BLANK
 # glosa se acota para que sea una ETIQUETA de sentido, no una definición.
 MAX_SENSES = 4
 MAX_GLOSS_CHARS = 120
+
+# V3.86.0 (diccionario polisémico): significados elegibles. Cada significado es
+# `{"term": <equivalente en el otro idioma>, "pos", "gloss", "domain",
+# "proper_noun"}`. El tope es más alto que el de `senses` porque una palabra
+# polisémica real (banco, lima, hoja) tiene más acepciones que categorías
+# gramaticales, pero sigue acotado para no convertir la ficha en un listado.
+MAX_MEANINGS = 6
+MAX_MEANING_TERM_CHARS = 120
+MAX_DOMAIN_CHARS = 40
 
 # Categorías gramaticales aceptadas del `pos` devuelto por el modelo. Cualquier
 # otro valor se normaliza a "" (la UI no muestra POS inventado).
@@ -129,7 +145,17 @@ _SYSTEM_PROMPT = (
     "headword can take, at most 4, ordered with the most common sense first; "
     'each object has "pos" (same list as above) and "gloss" (a very short '
     "sense label in SIMPLE English, at most 60 characters, for example "
-    '{"pos":"noun","gloss":"an arrangement to do something"}). '
+    '{"pos":"noun","gloss":"an arrangement to do something"}), '
+    '"meanings" (a JSON array with ONE object per DIFFERENT meaning of the '
+    "headword, at most 6, ordered with the most common meaning first; each "
+    'object has "term" (the Spanish translation for THAT meaning), "pos" '
+    "(same list as above), \"gloss\" (a very short English label, at most 60 "
+    'characters), "domain" (a very short area label in English, for example '
+    '"tools", "geography", "botany", "finance", or "" if unclear) and '
+    '"proper_noun" (true ONLY if that meaning is a proper noun: a place, a '
+    "person or a brand name). RULES: a proper noun must NEVER be the only "
+    "translation of a common noun; if the headword also names a place or a "
+    "person, put that meaning LAST with \"proper_noun\": true. "
     "Do not add any text outside the JSON object."
 )
 
@@ -137,6 +163,8 @@ _SYSTEM_PROMPT = (
 # equivalente inglés principal (`english`) más su definición simple y un
 # enunciado situacional EN INGLÉS con hueco (el peldaño `situation` sirve
 # siempre la palabra inglesa, también cuando la búsqueda fue en español).
+# V3.86.0: añade `meanings`, los EQUIVALENTES INGLESES elegibles del término
+# español (con nombre propio marcado y enviado al final).
 _REVERSE_SYSTEM_PROMPT = (
     "You are a learner-friendly bilingual dictionary inside a local "
     "language-learning app. For the given Spanish word or phrase, reply with "
@@ -154,7 +182,17 @@ _REVERSE_SYSTEM_PROMPT = (
     '"senses" (a JSON array with ONE object per DIFFERENT part of speech the '
     "English equivalent can take, at most 4, ordered with the most common "
     'sense first; each object has "pos" (same list as above) and "gloss" (a '
-    "very short sense label in SIMPLE English, at most 60 characters). "
+    "very short sense label in SIMPLE English, at most 60 characters), "
+    '"meanings" (a JSON array with ONE object per DIFFERENT English '
+    "equivalent of the Spanish headword, at most 6, ordered with the most "
+    'common meaning first; each object has "term" (the English equivalent '
+    'for THAT meaning), "pos", "gloss" (a very short English label, at most '
+    '60 characters), "domain" (a very short area label in English, for '
+    'example "tools", "geography", "botany", "finance", or "" if unclear) '
+    'and "proper_noun" (true ONLY if that equivalent is a proper noun: a '
+    "place, a person or a brand name). RULES: a proper noun must NEVER be "
+    "the only equivalent of a common noun; if the Spanish word also names a "
+    "place or a person, put that meaning LAST with \"proper_noun\": true. "
     "Do not add any text outside the JSON object."
 )
 
@@ -254,6 +292,92 @@ def normalize_senses(raw: object) -> list[dict]:
     return senses
 
 
+def normalize_meanings(raw: object) -> list[dict]:
+    """Significados elegibles de la unidad, normalizados y deterministas (V3.86.0).
+
+    Acepta la lista cruda del modelo y devuelve una lista NUEVA de
+    `{"term", "pos", "gloss", "domain", "proper_noun"}`:
+
+    - descarta los elementos que no son objetos o sin `term`;
+    - normaliza `pos` a la taxonomía canónica ("" si no lo es: nunca se inventa);
+    - colapsa y recorta `term`/`gloss`/`domain`;
+    - deduplica por `(term normalizado, pos)` conservando el primer orden de
+      entrada;
+    - **reordena los nombres propios al final** (regla dura: un nombre propio
+      nunca puede ser el significado por defecto si hay uno común);
+    - limita a `MAX_MEANINGS`.
+
+    Es contenido OPCIONAL: una entrada inválida se descarta sin invalidar el
+    resto. Nunca lanza.
+    """
+    if not isinstance(raw, list):
+        return []
+    meanings: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        term = " ".join(str(item.get("term") or "").split())
+        term = term[:MAX_MEANING_TERM_CHARS].strip()
+        if not term:
+            continue
+        pos = str(item.get("pos") or "").strip().lower()
+        if pos not in _VALID_POS:
+            pos = ""
+        gloss = " ".join(str(item.get("gloss") or "").split())
+        gloss = gloss[:MAX_GLOSS_CHARS].strip()
+        domain = " ".join(str(item.get("domain") or "").split())
+        domain = domain[:MAX_DOMAIN_CHARS].strip()
+        # Dedupe por TÉRMINO (sin distinguir mayúsculas): en `meanings` el término
+        # ES el significado, así que dos apariciones del mismo equivalente son la
+        # misma acepción aunque declaren `pos` distinto. Conserva la primera, que
+        # es la que trae la mejor metadata (ámbito/glosa).
+        key = term.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        meanings.append(
+            {
+                "term": term,
+                "pos": pos,
+                "gloss": gloss,
+                "domain": domain,
+                "proper_noun": bool(item.get("proper_noun")),
+            }
+        )
+    # Regla dura (V3.86.0): un nombre propio jamás representa el significado por
+    # defecto de una palabra común; va al final conservando su orden relativo.
+    # Estable y determinista (no depende del orden de llegada más que para el
+    # empate dentro de cada grupo).
+    common = [m for m in meanings if not m["proper_noun"]]
+    proper = [m for m in meanings if m["proper_noun"]]
+    return (common + proper)[:MAX_MEANINGS]
+
+
+def default_meaning_term(meanings: object, fallback: str = "") -> str:
+    """Término del significado por defecto: primer NO nombre propio (V3.86.0).
+
+    `normalize_meanings` ya deja los nombres propios al final, así que basta con
+    el primer elemento; se recorre por claridad y por si una lista llega sin
+    normalizar. Sin significados válidos devuelve `fallback` (el equivalente que
+    el modelo declaró en `translation`/`english`).
+    """
+    for item in meanings if isinstance(meanings, (list, tuple)) else ():
+        if not isinstance(item, dict):
+            continue
+        if item.get("proper_noun"):
+            continue
+        term = str(item.get("term") or "").strip()
+        if term:
+            return term
+    for item in meanings if isinstance(meanings, (list, tuple)) else ():
+        if isinstance(item, dict):
+            term = str(item.get("term") or "").strip()
+            if term:
+                return term
+    return fallback
+
+
 def parse_content(raw: str, *, word: str = "") -> dict:
     """Parsea y valida la respuesta del modelo → `{pos, definition, translation,
     situation}`.
@@ -291,15 +415,38 @@ def parse_content(raw: str, *, word: str = "") -> dict:
     if len(definition) > MAX_DEFINITION_CHARS:
         raise ContentUnavailableError("La definición supera el límite de longitud")
     senses = normalize_senses(obj.get("senses"))
+    # V3.86.0: significados elegibles. Si el modelo no los dio, se sintetiza uno
+    # desde `translation` para que la UI siempre tenga al menos una opción
+    # seleccionable (degradación honesta, sin inventar acepciones). En ese caso
+    # `translation` conserva su valor declarado (y su límite de longitud); el
+    # término del significado por defecto solo manda cuando el modelo SÍ declaró
+    # significados, que es donde puede colarse un nombre propio.
+    declared = normalize_meanings(obj.get("meanings"))
+    fallback_pos = senses[0]["pos"] if senses else (pos if pos in _VALID_POS else "")
+    meanings = declared or normalize_meanings(
+        [
+            {
+                "term": translation,
+                "pos": fallback_pos,
+            }
+        ]
+    )
+    default_term = (
+        default_meaning_term(declared, translation) if declared else translation
+    )
     return {
         # V3.44: una sola fuente de verdad para el `pos` superior: el primer
         # sentido válido; sin sentidos se conserva el `pos` del modelo si es
         # canónico (retrocompatible con el contrato 1.3.0).
         "pos": senses[0]["pos"] if senses else (pos if pos in _VALID_POS else ""),
         "definition": definition,
-        "translation": translation[:MAX_TRANSLATION_CHARS],
+        # V3.86.0: `translation` es el término del significado POR DEFECTO (el
+        # primer no nombre propio) cuando el modelo declaró significados: es la
+        # regla que impide servir «Lima» como traducción de «lima».
+        "translation": default_term[:MAX_TRANSLATION_CHARS],
         "situation": _situation_from(obj.get("situation"), word),
         "senses": senses,
+        "meanings": meanings,
     }
 
 
@@ -362,12 +509,33 @@ def parse_reverse_content(raw: str, *, word: str = "") -> dict:
         raise ContentUnavailableError("La definición supera el límite de longitud")
     pos = str(obj.get("pos") or "").strip().lower()
     senses = normalize_senses(obj.get("senses"))
+    # V3.86.0: significados elegibles en la dirección inversa. El `term` de cada
+    # significado es un EQUIVALENTE INGLÉS del término español; los nombres
+    # propios van al final. Sin lista del modelo se sintetiza uno desde `english`
+    # (que entonces conserva su valor y su límite de longitud).
+    declared = normalize_meanings(obj.get("meanings"))
+    fallback_pos = senses[0]["pos"] if senses else (pos if pos in _VALID_POS else "")
+    meanings = declared or normalize_meanings(
+        [
+            {
+                "term": english,
+                "pos": fallback_pos,
+            }
+        ]
+    )
+    default_term = (
+        default_meaning_term(declared, english) if declared else english
+    )
     return {
-        "english": english,
+        # V3.86.0: `english` es el equivalente del significado por defecto (el
+        # primer no nombre propio). Es la regla que evita servir «Lima» (capital)
+        # como equivalente de «lima» (herramienta).
+        "english": default_term[:MAX_ENGLISH_CHARS],
         "pos": senses[0]["pos"] if senses else (pos if pos in _VALID_POS else ""),
         "definition": definition,
         "situation": _situation_from(obj.get("situation"), english),
         "senses": senses,
+        "meanings": meanings,
     }
 
 
