@@ -254,7 +254,10 @@ git grep -n "deck_id INTEGER NOT NULL" v3.86.0 -- backend/repositories/db.py
 | `git ls-remote --tags origin 'refs/tags/v3.86.0*'` | `v3.86.0` presente, **anotado** (`^{}` → `929c684`) |
 | `git ls-remote --tags origin 'refs/tags/v3.85.1*'` | **sin salida** (no existe) |
 | `git cat-file -t v3.86.0` | `tag` |
+| GitHub Release | `v3.86.0` publicado (no *draft*, no *prerelease*) con las notas de `release-notes-v3.86.0.md`: https://github.com/jvelasca/english-tutor/releases/tag/v3.86.0 — creado **después** de este documento, tras el run `36256446832` |
+| Releases **ausentes** | `v3.84.0`, `v3.84.1` y `v3.85.0` tienen **tag pero NO Release** (el último era `v3.83.1`): un auditor no debe confundir «no hay Release» con «no hay release» |
 | CI en `929c684` (`v3.86.0`) | `success` — run `36256446832`, **12/12 jobs en verde** (`Backend`, `Frontend`, `Playwright E2E`, `Launcher` ×2, `Launcher Windows`, `Release consistency`, `Validation gate`, `Beta V3.0 gate`, `Content validation`, `Dependency audit`, `Product origin` ×2) |
+| CI en `2d9a76e` (este documento) | `success` — run `36258053263` |
 | `main` vs `origin/main` | al día en el momento de entregar este documento (solo por delante el commit documental de este encargo) |
 | Última versión declarada en `README.md` | `v3.86.0` |
 | `docs/audit/validation-evidence.json` | **sigue sin existir** (§6-D2) |
