@@ -49,6 +49,7 @@ from services import (
     planner,
     semantics,
     student_state,
+    study_config,
     task_semantics,
 )
 from services.curriculum import CEFR_ORDER
@@ -560,6 +561,7 @@ def recommend_review_activity(
     empirical_success: object = None,
     task_empirical_success: object = None,
     target_empirical_success: object = None,
+    allowed_activities: tuple[str, ...] | None = None,
 ) -> dict:
     """Actividad de repaso recomendada para un ítem léxico vencido (V3.35).
 
@@ -605,12 +607,20 @@ def recommend_review_activity(
     Devuelve `{activity, reason}` con `activity` en `REVIEW_ACTIVITIES`.
     """
     matrix = competence if competence is not None else item_competence_matrix(row)
+
+    def _recommend(activity: str, reason: str) -> dict:
+        """Aplica el filtro de modo (V3.87.0) sin perder la razón pedagógica."""
+        return {
+            "activity": study_config.fallback_activity(activity, allowed_activities),
+            "reason": reason,
+        }
+
     if exposure_count(row) <= 0:
-        return {"activity": "recognition", "reason": "weak_recognition"}
+        return _recommend("recognition", "weak_recognition")
     if not matrix.get("cued_recall"):
-        return {"activity": "recall", "reason": "no_recall_evidence"}
+        return _recommend("recall", "no_recall_evidence")
     if matrix.get("production_gap"):
-        return {"activity": "sentence", "reason": "production_gap"}
+        return _recommend("sentence", "production_gap")
     planned = planner.select_task_by_elv(
         matrix,
         evidence,
@@ -622,12 +632,13 @@ def recommend_review_activity(
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
         target_empirical_success=target_empirical_success,
+        allowed_activities=allowed_activities,
     )
     if planned["activity"]:
-        return {"activity": planned["activity"], "reason": planned["reason"]}
+        return _recommend(planned["activity"], planned["reason"])
     if evidence is not None and is_automatic(evidence):
-        return {"activity": "recall", "reason": "automatic_maintenance"}
-    return {"activity": "recall", "reason": "maintenance"}
+        return _recommend("recall", "automatic_maintenance")
+    return _recommend("recall", "maintenance")
 
 
 def _task_empirical_by_activity(
@@ -704,6 +715,7 @@ def review_queue_item(
     unit_surfaces: list[str] | None = None,
     learner_state: dict | None = None,
     projection: dict | None = None,
+    allowed_activities: tuple[str, ...] | None = None,
 ) -> dict:
     """Ítem de la cola de repaso lexica (V3.35), pura y determinista.
 
@@ -842,6 +854,7 @@ def review_queue_item(
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
         target_empirical_success=target_empirical_success,
+        allowed_activities=allowed_activities,
     )
     last = card.get("last_review_at") or card.get("last_evidence_at") or ""
     elapsed = _days_between(last, now) if last else 0.0
@@ -866,6 +879,7 @@ def review_queue_item(
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
         target_empirical_success=target_empirical_success,
+        allowed_activities=allowed_activities,
     )
     # V3.68 (P1-01): la DEFINICIÓN de la tarea servida se calcula UNA vez, ya con
     # la tarea elegida, y es la MISMA para el provenance y para la INSTANCIA.
@@ -1003,6 +1017,7 @@ def _task_decision(
     empirical_success: object = None,
     task_empirical_success: object = None,
     target_empirical_success: object = None,
+    allowed_activities: tuple[str, ...] | None = None,
 ) -> tuple[dict, dict | None]:
     """Decisión de tarea expuesta en la cola (V3.39 → V3.64, puro).
 
@@ -1029,6 +1044,7 @@ def _task_decision(
         empirical_success=empirical_success,
         task_empirical_success=task_empirical_success,
         target_empirical_success=target_empirical_success,
+        allowed_activities=allowed_activities,
     )
     decision = None
     if isinstance(planned.get("decision"), dict):
@@ -1036,8 +1052,14 @@ def _task_decision(
         task = {key: value for key, value in planned.items() if key != "decision"}
     else:
         task = planned
-    if task["activity"]:
+    if task["activity"] and (
+        not allowed_activities or task["activity"] in allowed_activities
+    ):
         return task, decision
+    # V3.87.0: el argmax pudo devolver la tarea de la CASCADA (sin candidatas del
+    # modo). Si esa actividad no es admisible, se sirve la recomendación YA
+    # filtrada; el bloque `decision` se descarta en ese caso porque explicaría una
+    # tarea que no es la servida (con la tarea vacía, se conserva como antes).
     activity = recommendation.get("activity") or ""
     return (
         {
@@ -1046,7 +1068,7 @@ def _task_decision(
             "reason": recommendation.get("reason") or "",
             "support_level": planner.ACTIVITY_SUPPORT_LEVEL.get(activity, ""),
         },
-        decision,
+        decision if not task["activity"] else None,
     )
 
 

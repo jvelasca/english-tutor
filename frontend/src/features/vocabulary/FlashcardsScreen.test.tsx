@@ -56,6 +56,11 @@ vi.mock("../../components/ItemReplayButton", () => ({
   ItemReplayButton: () => <button type="button">audio</button>,
 }));
 
+vi.mock("../../api/study", () => ({
+  getStudyConfig: vi.fn(),
+  saveStudyConfig: vi.fn(),
+}));
+
 import {
   createFlashcardDeck,
   addFlashcardsBulk,
@@ -74,6 +79,17 @@ import {
   updateVocabularyCard,
 } from "../../api/vocabulary";
 import { getReviewQueue } from "../../api/learning";
+import { getStudyConfig, saveStudyConfig } from "../../api/study";
+import type { StudyConfig } from "../../types/api";
+
+/** Configuración de estudio por defecto de las pruebas (V3.87.0). */
+const DEFAULT_STUDY_CONFIG: StudyConfig = {
+  direction: "en-es",
+  mode: "recognition",
+  hints: "off",
+  difficulty: "auto",
+  configured: false,
+};
 
 const AUTO: FlashcardDeck = {
   id: 0,
@@ -114,6 +130,9 @@ function queue(overrides: Partial<FlashcardQueue> = {}): FlashcardQueue {
         back: "aeropuerto",
         definition: "",
         mnemonic: "",
+        prompt: "",
+        answer: "",
+        hint: "",
         is_new: true,
         state: "new",
         due_at: "",
@@ -149,6 +168,11 @@ describe("FlashcardsScreen", () => {
       fsrs_version: "test",
     });
     vi.mocked(getFlashcardQueue).mockResolvedValue(queue());
+    vi.mocked(getStudyConfig).mockResolvedValue(DEFAULT_STUDY_CONFIG);
+    vi.mocked(saveStudyConfig).mockResolvedValue({
+      ...DEFAULT_STUDY_CONFIG,
+      configured: true,
+    });
     vi.mocked(reviewFlashcard).mockResolvedValue({
       card_id: "airport",
       card_type: "lexicon",
@@ -839,5 +863,20 @@ describe("FlashcardsScreen", () => {
         collectionId: 3,
       }),
     );
+  });
+
+  // --- V3.87.0: configuración de estudio ------------------------------------
+
+  it("el panel de estudio guarda el modo y recarga la cola", async () => {
+    renderScreen();
+    const mode = (await screen.findByLabelText("Mode")) as HTMLSelectElement;
+    fireEvent.change(mode, { target: { value: "production" } });
+
+    await waitFor(() =>
+      expect(saveStudyConfig).toHaveBeenCalledWith("u1", { mode: "production" }),
+    );
+    // Guardar reconstruye la cola con la preferencia nueva; la sesión en curso no
+    // se reescribe por detrás.
+    await waitFor(() => expect(getFlashcardQueue).toHaveBeenCalledTimes(2));
   });
 });

@@ -12,6 +12,7 @@ from schemas.pronunciation import (
     PronunciationBreakdown,
 )
 from schemas.pronunciation import Level as PronunciationLevel
+from schemas.study import StudyConfigOut
 
 # V3.39: tope de la frase escrita a mano en la actividad `write` del drill.
 MAX_WRITE_CHARS = 600
@@ -1240,6 +1241,15 @@ class FlashcardStudyItemOut(BaseModel):
     #: V3.86.0: recordatorio de la ficha manual ("" en el léxico). La sesión lo
     #: pinta en el reverso.
     mnemonic: str = ""
+    #: V3.87.0: cara PREGUNTADA y cara RESPUESTA según la dirección del alumno.
+    #: `front`/`back` se conservan (la identidad de la ficha no cambia); la
+    #: sesión pinta `prompt`/`answer`, que en EN→ES coinciden con ellos y en
+    #: ES→EN se intercambian.
+    prompt: str = ""
+    answer: str = ""
+    #: V3.87.0: ayuda que se puede ofrecer ANTES de voltear ("" = ninguna).
+    #: Nunca lleva la respuesta: definición de diccionario y/o recordatorio.
+    hint: str = ""
     is_new: bool = False
     state: str = "new"
     due_at: str = ""
@@ -1256,6 +1266,9 @@ class FlashcardQueueOut(BaseModel):
     new_today: int = 0
     limits: FlashcardLimitsOut
     fsrs_version: str = ""
+    #: V3.87.0: configuración con la que se ha construido la cola, para que la
+    #: sesión sepa cómo pintar (dirección, modo, ayudas) sin otra llamada.
+    study_config: StudyConfigOut | None = None
 
 
 class FlashcardReviewIn(BaseModel):

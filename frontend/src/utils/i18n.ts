@@ -945,6 +945,69 @@ const STRINGS: Record<string, Entry> = {
   },
   "flashcards.study.newCard": { en: "New", es: "Nueva" },
   "flashcards.study.reviewCard": { en: "Review", es: "Repaso" },
+  // V3.87.0 · FASE 2: configuración de estudio. El panel guarda la preferencia
+  // en el perfil y la sesión/cola la aplican.
+  "flashcards.study.configTitle": {
+    en: "Study settings",
+    es: "Configuración de estudio",
+  },
+  "flashcards.study.direction": { en: "Direction", es: "Dirección" },
+  "flashcards.study.directionEnEs": { en: "EN → ES", es: "EN → ES" },
+  "flashcards.study.directionEsEn": { en: "ES → EN", es: "ES → EN" },
+  "flashcards.study.mode": { en: "Mode", es: "Modo" },
+  "flashcards.study.modeRecognition": {
+    en: "Recognition (flip)",
+    es: "Reconocimiento (voltear)",
+  },
+  "flashcards.study.modeProduction": {
+    en: "Production (write)",
+    es: "Producción (escribir)",
+  },
+  "flashcards.study.modeMixed": { en: "Mixed", es: "Mixto" },
+  "flashcards.study.hints": { en: "Hints", es: "Ayudas" },
+  "flashcards.study.hintsOff": { en: "None", es: "Ninguna" },
+  "flashcards.study.hintsDefinition": {
+    en: "Definition",
+    es: "Definición",
+  },
+  "flashcards.study.hintsMnemonic": {
+    en: "Reminder",
+    es: "Recordatorio",
+  },
+  "flashcards.study.hintsAll": {
+    en: "Definition + reminder",
+    es: "Definición + recordatorio",
+  },
+  "flashcards.study.difficulty": { en: "Load", es: "Carga" },
+  "flashcards.study.difficultyGentle": { en: "Gentle", es: "Suave" },
+  "flashcards.study.difficultyAuto": {
+    en: "Automatic",
+    es: "Automática",
+  },
+  "flashcards.study.difficultyIntensive": {
+    en: "Intensive",
+    es: "Intensiva",
+  },
+  "flashcards.study.configHint": {
+    en: "Saved to your profile. The study session and the review queue both use it.",
+    es: "Se guarda en tu perfil. La sesión de estudio y la cola de repaso la usan.",
+  },
+  "flashcards.study.hintLabel": { en: "Hint", es: "Pista" },
+  "flashcards.study.productionPrompt": {
+    en: "Write the answer, then check it.",
+    es: "Escribe la respuesta y compruébala.",
+  },
+  "flashcards.study.productionLabel": {
+    en: "Your answer",
+    es: "Tu respuesta",
+  },
+  "flashcards.study.check": { en: "Check", es: "Comprobar" },
+  "flashcards.study.productionCorrect": { en: "Correct.", es: "Correcto." },
+  "flashcards.study.productionWrong": {
+    en: "Not quite — here is the answer.",
+    es: "No era eso — esta es la respuesta.",
+  },
+  "flashcards.study.continue": { en: "Continue", es: "Continuar" },
   "flashcards.study.pendingToday": {
     en: "{n} cards due",
     es: "{n} tarjetas pendientes",

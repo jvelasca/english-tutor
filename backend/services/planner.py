@@ -785,7 +785,12 @@ def select_task(
     return {"skill": "", "activity": "", "reason": "", "support_level": ""}
 
 
-def task_candidates(matrix: dict | None, evidence: dict | None) -> list[dict]:
+def task_candidates(
+    matrix: dict | None,
+    evidence: dict | None,
+    *,
+    allowed_activities: tuple[str, ...] | None = None,
+) -> list[dict]:
     """Tareas ADMISIBLES hoy, en orden canónico (V3.57, pura y determinista).
 
     Es el conjunto sobre el que V3.57 hace el argmax: las MISMAS razones que la
@@ -801,6 +806,12 @@ def task_candidates(matrix: dict | None, evidence: dict | None) -> list[dict]:
     Sin directriz devuelve `[]` (la escalera de V3.35 decide). Nunca lanza: una
     candidata por modalidad (sin duplicados) y `support_level` declarado por la
     actividad, de modo que el argmax devuelva el mismo contrato que `select_task`.
+
+    V3.87.0: `allowed_activities` (opcional) restringe el conjunto al modo de
+    estudio elegido por el alumno. **Fallback declarado**: si el filtro deja el
+    conjunto VACÍO (p. ej. modo producción sobre un ítem sin ningún hueco de
+    producción), se sirve el conjunto completo antes que dejar la sesión sin
+    tarea; el filtro no puede convertir una cola en una cola vacía.
     """
     mx = matrix if isinstance(matrix, dict) else {}
     try:
@@ -824,6 +835,14 @@ def task_candidates(matrix: dict | None, evidence: dict | None) -> list[dict]:
                     _add(skill, "skill_gap")
         if transfer_gap(evidence):
             _add(TRANSFER_SKILL, "transfer_gap")
+        if allowed_activities:
+            kept = [
+                candidate
+                for candidate in candidates
+                if (candidate.get("activity") or "") in allowed_activities
+            ]
+            if kept:  # fallback: un filtro vacío no vacía la sesión
+                candidates = kept
         return candidates
     except Exception:  # noqa: BLE001 — el planner nunca rompe la cola
         return []
@@ -841,6 +860,7 @@ def select_task_by_elv(
     empirical_success: object = None,
     task_empirical_success: object = None,
     target_empirical_success: object = None,
+    allowed_activities: tuple[str, ...] | None = None,
 ) -> dict:
     """Tarea ÓPTIMA por argmax de ELV entre las candidatas admisibles (V3.57).
 
@@ -899,7 +919,9 @@ def select_task_by_elv(
             select_task(matrix, evidence, signals),
             _cascade_decision(matrix, evidence, signals, skill_values, drivers),
         )
-    candidates = task_candidates(matrix, evidence)
+    candidates = task_candidates(
+        matrix, evidence, allowed_activities=allowed_activities
+    )
     if not candidates:
         return _attach_decision(
             select_task(matrix, evidence, signals),

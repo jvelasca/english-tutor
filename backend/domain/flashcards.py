@@ -32,11 +32,13 @@ from functools import partial
 from starlette.concurrency import run_in_threadpool
 
 from domain import retention as retention_domain
+from domain import study_config as study_config_domain
 from repositories import academy as academy_repo
 from repositories import collections as collections_repo
 from repositories import flashcards as flashcards_repo
 from repositories import learning as learning_repo
 from services import fsrs
+from services import study_config as study_config_service
 
 #: Tope de la cola de una sesión (defensivo: una sesión no es un atracón).
 QUEUE_MAX = 100
@@ -68,6 +70,55 @@ def _today_prefix() -> str:
     pero toda la BD guarda ISO UTC, así que el «hoy» del ledger es el mismo
     «hoy» que el del scheduler y no hay dos calendarios en juego."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+#: V3.87.0: ventana de adelanto del modo `intensive`. Los repasos que vencen
+#: dentro de este plazo se sirven ya, SIN tocar su calendario (el `due_at` no se
+#: reescribe: solo se presenta antes la oportunidad de repasarlos).
+INTENSIVE_HORIZON_HOURS = 24
+
+
+def _faces(entry: dict, config: dict | None) -> tuple[str, str, str]:
+    """`(prompt, answer, hint)` de una entrada según dirección y ayudas (V3.87.0).
+
+    La dirección es PRESENTACIÓN: `front`/`back` siguen siendo la identidad de la
+    ficha; lo que cambia es qué cara se pregunta. El `hint` es lo que se puede
+    enseñar ANTES de voltear y nunca incluye la respuesta: definición de
+    diccionario y/o recordatorio personal, según lo pedido.
+    """
+    front = str(entry.get("front") or "")
+    back = str(entry.get("back") or "")
+    if (config or {}).get("direction") == "es-en":
+        # ES→EN: se pregunta la traducción y se responde la palabra inglesa. Si
+        # el léxico aún no tiene cara B, se cae al inglés para no dejar el prompt
+        # vacío (mejor una tarjeta en el sentido contrario que una en blanco).
+        prompt, answer = (back or front), front
+    else:
+        prompt, answer = front, back
+    hint_parts: list[str] = []
+    if study_config_service.hints_definition(config):
+        definition = str(entry.get("definition") or "")
+        if definition:
+            hint_parts.append(definition)
+    if study_config_service.hints_mnemonic(config):
+        mnemonic = str(entry.get("mnemonic") or "")
+        if mnemonic:
+            hint_parts.append(mnemonic)
+    return prompt, answer, "\n".join(hint_parts)
+
+
+def _difficulty_new_cap(new_per_day: int, difficulty: str) -> int:
+    """Techo de nuevas según la carga pedida (V3.87.0).
+
+    `gentle` reduce a la mitad (sin bajar de una si el mazo admite nuevas) para
+    que «suave» signifique algo; `intensive` no amplía el techo de nuevas (lo que
+    amplía es la ventana de repasos, en `deck_queue`), porque el tope de nuevas
+    protege del atracón que el propio alumno configuró.
+    """
+    if difficulty == "gentle" and new_per_day > 0:
+        return max(1, new_per_day // 2)
+    return new_per_day
+
 
 
 def _auto_deck() -> dict:
@@ -208,8 +259,14 @@ def _split(
 
 async def _due_entries(
     user_id: str, deck_id: int, *, collection_id: int | None = None
-) -> tuple[list[dict], list[dict], set[tuple[str, str]]]:
-    """Devuelve `(vencidas, nuevas, ya estudiadas)`, filtrado por colección."""
+) -> tuple[list[dict], list[dict], list[dict], set[tuple[str, str]]]:
+    """Devuelve `(vencidas, próximas 24 h, nuevas, ya estudiadas)`.
+
+    Las «próximas» son repasos YA estudiados que aún no vencen pero vencen dentro
+    de `INTENSIVE_HORIZON_HOURS`; solo las consume el modo `intensive`. Se separan
+    de las vencidas para que el modo normal (`auto`) siga sirviendo exactamente lo
+    mismo que antes de V3.87.0.
+    """
     cards = await _deck_entries(user_id, deck_id)
     studied = await run_in_threadpool(flashcards_repo.studied_cards, user_id)
     if collection_id is not None and deck_id == flashcards_repo.AUTO_DECK_ID:
@@ -218,9 +275,19 @@ async def _due_entries(
         )
         cards = [c for c in cards if c["card_id"] in allowed]
     reviews, fresh = _split(cards, studied)
-    now_iso = _now()
-    due = [c for c in reviews if fsrs.is_due(c["card"], now=now_iso)]
-    return due, fresh, studied
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    horizon = (now + timedelta(hours=INTENSIVE_HORIZON_HOURS)).isoformat()
+    due: list[dict] = []
+    upcoming: list[dict] = []
+    for entry in reviews:
+        if fsrs.is_due(entry["card"], now=now_iso):
+            due.append(entry)
+            continue
+        due_at = str((entry["card"] or {}).get("due_at") or "")
+        if due_at and due_at <= horizon:
+            upcoming.append(entry)
+    return due, upcoming, fresh, studied
 
 
 async def list_decks(user_id: str) -> dict:
@@ -758,11 +825,22 @@ async def deck_queue(
     state = await run_in_threadpool(
         flashcards_repo.day_state, user_id, _today_prefix(), deck_id
     )
-    due, fresh, _studied = await _due_entries(
+    due, upcoming, fresh, _studied = await _due_entries(
         user_id, deck_id, collection_id=collection_id
     )
 
-    new_remaining = max(0, new_per_day - state["new"])
+    # V3.87.0: la configuración de estudio matiza la sesión. `intensive` ensancha
+    # la ventana (repasos que vencen en 24 h) SIN reescribir ningún `due_at`;
+    # `gentle` recorta el techo de nuevas. `auto` (el defecto) no toca nada: la
+    # cola de un alumno sin configurar es EXACTAMENTE la de V3.86.1.
+    study = await study_config_domain.get_study_config(user_id)
+    config = study["config"]
+    difficulty = config.get("difficulty") or "auto"
+    if difficulty == "intensive":
+        due = due + upcoming
+    effective_new_per_day = _difficulty_new_cap(new_per_day, difficulty)
+
+    new_remaining = max(0, effective_new_per_day - state["new"])
     review_remaining = max(0, review_per_day - state["reviews"])
     taken_reviews = [{**c, "is_new": False} for c in due[:review_remaining]]
     taken_new = [
@@ -777,6 +855,7 @@ async def deck_queue(
         entry = await _with_face(entry, user_id)
         card = entry["card"] or {}
         explained = fsrs.explain(card, now=now_iso)
+        prompt, answer, hint = _faces(entry, config)
         items.append(
             {
                 "card_type": entry["card_type"],
@@ -787,6 +866,11 @@ async def deck_queue(
                 # V3.86.0: recordatorio de la ficha manual ("" en el léxico). La
                 # sesión lo pinta en el reverso; no altera el planificador.
                 "mnemonic": entry.get("mnemonic") or "",
+                # V3.87.0: cara preguntada/respuesta según la dirección y ayuda
+                # previa al volteo. Aditivo: `front`/`back` (la identidad) siguen.
+                "prompt": prompt,
+                "answer": answer,
+                "hint": hint,
                 # `is_new` sale del ledger (`_split`), no de `reps`: ver el
                 # comentario de `_split` para por qué no son lo mismo.
                 "is_new": bool(entry["is_new"]),
@@ -806,12 +890,15 @@ async def deck_queue(
         "reviewed_today": state["reviews"],
         "new_today": state["new"],
         "limits": {
-            "new_per_day": new_per_day,
+            "new_per_day": effective_new_per_day,
             "review_per_day": review_per_day,
             "new_remaining": new_remaining,
             "review_remaining": review_remaining,
         },
         "fsrs_version": fsrs.FSRS_VERSION,
+        # La sesión conoce así la dirección/modo/ayudas con los que se construyó
+        # la cola, en la misma respuesta y sin una segunda llamada.
+        "study_config": {**config, "configured": bool(study["configured"])},
     }
 
 

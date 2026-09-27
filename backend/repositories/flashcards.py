@@ -17,6 +17,7 @@ Dos ideas que conviene tener presentes al leerlo:
 """
 from __future__ import annotations
 
+import sqlite3
 from contextlib import closing
 
 from repositories.db import _conn, _now, front_key
@@ -106,6 +107,33 @@ def _find_card_by_front(conn, user_id: str, front: str) -> dict | None:
         (user_id, needle),
     ).fetchone()
     return _card_row(row) if row is not None else None
+
+
+def _identity_conflict_id(conn, user_id: str, key: str, card_id: int) -> int | None:
+    """Id de OTRA ficha del alumno con ese `front_key`, o `None` (V3.86.1).
+
+    Es la lectura del conflicto que comparte el `SELECT` preventivo y el rescate
+    del `IntegrityError`: en los dos casos la pregunta es la misma —«¿de quién es
+    ya ese anverso?»— y la respuesta tiene que salir de la misma consulta.
+    """
+    row = conn.execute(
+        "SELECT id FROM flashcard_cards "
+        "WHERE user_id = ? AND front_key = ? AND id <> ?",
+        (user_id, key, int(card_id)),
+    ).fetchone()
+    return int(row["id"]) if row is not None else None
+
+
+def _is_identity_conflict(exc: sqlite3.IntegrityError) -> bool:
+    """¿El `IntegrityError` viene del índice de identidad del anverso?
+
+    SQLite no nombra el índice en el mensaje (`UNIQUE constraint failed:
+    flashcard_cards.user_id, flashcard_cards.front_key`), así que se reconoce por
+    la columna: `front_key` es la única restricción UNIQUE de `flashcard_cards`
+    además de la clave primaria.
+    """
+    message = str(exc).lower()
+    return "unique" in message and "front_key" in message
 
 
 def _card_cols(alias: str = "") -> str:
@@ -569,10 +597,13 @@ def create_cards(
     creadas para que la pantalla pueda decir cuántas entraron de verdad y no
     cuántas se intentaron.
 
-    No deduplica: eso es política de producto y vive en el dominio (junto con el
-    tope). Aquí solo se escribe lo que llega, y se ignoran las entradas sin
-    anverso. V3.86.0: cada ficha entra también en la tabla puente y acepta
-    `mnemonic`.
+    Respeta la identidad fuerte (V3.86.1): un anverso ya existente del alumno
+    —mismo `front_key` (`casefold()` + espacios colapsados) e `UNIQUE (user_id,
+    front_key)` en la BD— NO se duplica. Se reutiliza la ficha, se completan sus
+    campos no vacíos (`back`/`mnemonic`) y se le añade la pertenencia a este
+    mazo. `added` (lo que devuelve el dominio) sigue contando lo que entró al
+    mazo, que es lo que la UI promete; se ignoran las entradas sin anverso.
+    V3.86.0: cada ficha entra también en la tabla puente y acepta `mnemonic`.
     """
     if get_deck(user_id, deck_id) is None:
         return []
@@ -683,18 +714,36 @@ def update_card(
         # conflicto para que la UI pueda decir «ya tienes una ficha con ese
         # anverso» en vez de reventar.
         if new_key != front_key(current["front"]):
-            clash = conn.execute(
-                "SELECT id FROM flashcard_cards "
-                "WHERE user_id = ? AND front_key = ? AND id <> ?",
-                (user_id, new_key, int(card_id)),
-            ).fetchone()
-            if clash is not None:
-                raise CardFrontConflictError(int(clash["id"]))
-        conn.execute(
-            "UPDATE flashcard_cards SET front = ?, front_key = ?, back = ?, "
-            "mnemonic = ?, updated_at = ? WHERE user_id = ? AND id = ?",
-            (new_front, new_key, new_back, new_mnemonic, now, user_id, int(card_id)),
-        )
+            clash_id = _identity_conflict_id(conn, user_id, new_key, card_id)
+            if clash_id is not None:
+                raise CardFrontConflictError(clash_id)
+        try:
+            conn.execute(
+                "UPDATE flashcard_cards SET front = ?, front_key = ?, back = ?, "
+                "mnemonic = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                (
+                    new_front,
+                    new_key,
+                    new_back,
+                    new_mnemonic,
+                    now,
+                    user_id,
+                    int(card_id),
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            # V3.86.1 (hardening): carrera excepcional entre el SELECT de
+            # conflicto y este UPDATE (otra petición creó o renombró una ficha
+            # hacia el mismo anverso). La BD NO permite la corrupción —el índice
+            # único la aborta—, pero el `IntegrityError` crudo no debe llegar a
+            # la API: se traduce a la MISMA señal declarada (`409
+            # CARD_FRONT_TAKEN`) que el caso no concurrente.
+            if not _is_identity_conflict(exc):
+                raise
+            clash_id = _identity_conflict_id(conn, user_id, new_key, card_id)
+            if clash_id is None:
+                raise
+            raise CardFrontConflictError(clash_id) from None
     return get_card(user_id, card_id)
 
 
@@ -733,13 +782,9 @@ def update_card_with_decks(
             return None
         new_key = front_key(new_front)
         if new_key != front_key(current["front"]):
-            clash = conn.execute(
-                "SELECT id FROM flashcard_cards "
-                "WHERE user_id = ? AND front_key = ? AND id <> ?",
-                (user_id, new_key, int(card_id)),
-            ).fetchone()
-            if clash is not None:
-                raise CardFrontConflictError(int(clash["id"]))
+            clash_id = _identity_conflict_id(conn, user_id, new_key, card_id)
+            if clash_id is not None:
+                raise CardFrontConflictError(clash_id)
         owned: list[int] | None = None
         if deck_ids is not None:
             owned = _owned_deck_ids_in(conn, user_id, deck_ids)
@@ -752,11 +797,30 @@ def update_card_with_decks(
             current["mnemonic"] if mnemonic is None else (mnemonic or "").strip()
         )
         now = _now()
-        conn.execute(
-            "UPDATE flashcard_cards SET front = ?, front_key = ?, back = ?, "
-            "mnemonic = ?, updated_at = ? WHERE user_id = ? AND id = ?",
-            (new_front, new_key, new_back, new_mnemonic, now, user_id, int(card_id)),
-        )
+        try:
+            conn.execute(
+                "UPDATE flashcard_cards SET front = ?, front_key = ?, back = ?, "
+                "mnemonic = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                (
+                    new_front,
+                    new_key,
+                    new_back,
+                    new_mnemonic,
+                    now,
+                    user_id,
+                    int(card_id),
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            # V3.86.1 (hardening): misma traducción que en `update_card` —una
+            # carrera contra el índice de identidad se declara `409`, no se
+            # escapa como `IntegrityError`.
+            if not _is_identity_conflict(exc):
+                raise
+            clash_id = _identity_conflict_id(conn, user_id, new_key, card_id)
+            if clash_id is None:
+                raise
+            raise CardFrontConflictError(clash_id) from None
         if owned:
             conn.execute(
                 "DELETE FROM flashcard_deck_cards WHERE card_id = ?", (int(card_id),)

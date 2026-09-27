@@ -36,6 +36,7 @@ import {
   Layers,
   Plus,
   RefreshCw,
+  Settings2,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -63,10 +64,12 @@ import type {
   FlashcardQueue,
   FlashcardStats,
   FlashcardStudyItem,
+  StudyConfig,
   VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { useTabList } from "../../hooks/useTabList";
+import { getStudyConfig, saveStudyConfig } from "../../api/study";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -416,6 +419,115 @@ function DeckLabel({ deck }: { deck: FlashcardDeck }) {
 
 // --- Estudiar ---------------------------------------------------------------
 
+/** Defectos del panel cuando la cola aún no ha traído su `study_config`. */
+const STUDY_CONFIG_FALLBACK: StudyConfig = {
+  direction: "en-es",
+  mode: "recognition",
+  hints: "off",
+  difficulty: "auto",
+  configured: false,
+};
+
+/**
+ * Panel de configuración de estudio (V3.87.0 · FASE 2, incremento 1).
+ *
+ * Cuatro decisiones, no un panel de control: en qué dirección se pregunta
+ * (EN↔ES), si se reconoce o se produce, qué ayuda se ve antes de voltear y
+ * cuánta carga entra. Cada cambio se guarda en el perfil y recarga la cola; la
+ * sesión en curso no se reescribe por detrás.
+ */
+function StudyConfigPanel({
+  config,
+  onChange,
+}: {
+  config: StudyConfig | null;
+  onChange: (patch: Partial<Omit<StudyConfig, "configured">>) => void;
+}) {
+  const { t } = useI18n();
+  const value = config ?? STUDY_CONFIG_FALLBACK;
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
+      <span className="flex items-center gap-1.5 text-xs font-semibold">
+        <Settings2 className="size-3.5 text-primary" aria-hidden="true" />
+        {t("flashcards.study.configTitle")}
+      </span>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+          {t("flashcards.study.direction")}
+          <select
+            value={value.direction}
+            onChange={(e) =>
+              onChange({ direction: e.target.value as StudyConfig["direction"] })
+            }
+            className={cn(INPUT, "w-full")}
+          >
+            <option value="en-es">{t("flashcards.study.directionEnEs")}</option>
+            <option value="es-en">{t("flashcards.study.directionEsEn")}</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+          {t("flashcards.study.mode")}
+          <select
+            value={value.mode}
+            onChange={(e) =>
+              onChange({ mode: e.target.value as StudyConfig["mode"] })
+            }
+            className={cn(INPUT, "w-full")}
+          >
+            <option value="recognition">
+              {t("flashcards.study.modeRecognition")}
+            </option>
+            <option value="production">
+              {t("flashcards.study.modeProduction")}
+            </option>
+            <option value="mixed">{t("flashcards.study.modeMixed")}</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+          {t("flashcards.study.hints")}
+          <select
+            value={value.hints}
+            onChange={(e) =>
+              onChange({ hints: e.target.value as StudyConfig["hints"] })
+            }
+            className={cn(INPUT, "w-full")}
+          >
+            <option value="off">{t("flashcards.study.hintsOff")}</option>
+            <option value="definition">
+              {t("flashcards.study.hintsDefinition")}
+            </option>
+            <option value="mnemonic">
+              {t("flashcards.study.hintsMnemonic")}
+            </option>
+            <option value="all">{t("flashcards.study.hintsAll")}</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+          {t("flashcards.study.difficulty")}
+          <select
+            value={value.difficulty}
+            onChange={(e) =>
+              onChange({
+                difficulty: e.target.value as StudyConfig["difficulty"],
+              })
+            }
+            className={cn(INPUT, "w-full")}
+          >
+            <option value="gentle">{t("flashcards.study.difficultyGentle")}</option>
+            <option value="auto">{t("flashcards.study.difficultyAuto")}</option>
+            <option value="intensive">
+              {t("flashcards.study.difficultyIntensive")}
+            </option>
+          </select>
+        </label>
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        {t("flashcards.study.configHint")}
+      </p>
+    </div>
+  );
+}
+
 function StudyTab({
   userId,
   decks,
@@ -494,6 +606,30 @@ function StudyTab({
   const deck = deckId ?? 0;
   const isAuto = deck === (decks?.auto_deck_id ?? 0);
 
+  // V3.87.0: configuración de estudio vigente (dirección/modo/ayudas/carga). La
+  // cola la trae ya normalizada; se refleja aquí para pintar el panel.
+  const [studyConfig, setStudyConfig] = useState<StudyConfig | null>(null);
+  useEffect(() => {
+    if (queue?.study_config) {
+      setStudyConfig(queue.study_config);
+      return;
+    }
+    // Sin cola (aún cargando o error) el panel igualmente muestra la preferencia
+    // guardada; si esa petición falla, el panel cae a los defectos.
+    let alive = true;
+    void (async () => {
+      try {
+        const config = await getStudyConfig(userId);
+        if (alive) setStudyConfig(config);
+      } catch {
+        /* defectos */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [queue?.study_config, userId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
@@ -515,6 +651,23 @@ function StudyTab({
   useEffect(() => {
     void load();
   }, [load, reloadNonce]);
+
+  /**
+   * V3.87.0: guarda un cambio del panel y RECARGA la cola. La sesión en curso no
+   * se reescribe a medias: la configuración nueva entra en la PRÓXIMA cola, que
+   * es lo que evita que una tarjeta ya visible cambie de cara por detrás.
+   */
+  const changeStudyConfig = useCallback(
+    async (patch: Partial<Omit<StudyConfig, "configured">>) => {
+      try {
+        setStudyConfig(await saveStudyConfig(userId, patch));
+        await load();
+      } catch {
+        setError(true);
+      }
+    },
+    [userId, load],
+  );
 
   const items = queue?.items ?? [];
 
@@ -564,6 +717,7 @@ function StudyTab({
         userId={userId}
         items={queue.items}
         deckName={deckName}
+        studyConfig={queue.study_config}
         onGrade={handleGrade}
         onRestart={async () => {
           // La sesión NO se reinicia sobre la cola vieja: se pide una nueva y,
@@ -676,6 +830,13 @@ function StudyTab({
           </p>
         ) : null}
       </div>
+
+      {/* V3.87.0: configuración de estudio. Cada cambio se guarda y recarga la
+          cola (ver `changeStudyConfig`). */}
+      <StudyConfigPanel
+        config={studyConfig}
+        onChange={(patch) => void changeStudyConfig(patch)}
+      />
 
       {/* V3.85.0: DOS acciones, una por superficie, cada una rotulada y con su
           recuento. Antes había un solo botón («Iniciar sesión») y el repaso

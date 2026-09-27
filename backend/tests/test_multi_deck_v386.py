@@ -21,6 +21,7 @@ from __future__ import annotations
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
 from fastapi.testclient import TestClient
 
 from main import app
@@ -578,3 +579,65 @@ def test_init_db_repairs_a_card_without_membership(monkeypatch, tmp_path):
     db.init_db()
     assert flashcards_repo.cards_without_deck() == 0
     assert _count("flashcard_deck_cards", "card_id = ?", (card["id"],)) == 1
+
+
+# --- V3.87.0: el índice de identidad también bajo carrera --------------------
+
+
+def _force_identity_race(monkeypatch):
+    """Simula la ventana SELECT→UPDATE: la comprobación previa NO ve el choque.
+
+    Devuelve un dict con el contador de llamadas para poder afirmar que el rescate
+    del `IntegrityError` se usó de verdad (y no el camino feliz).
+    """
+    real = flashcards_repo._identity_conflict_id
+    calls = {"n": 0}
+
+    def racing(conn, user_id, key, card_id):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real(conn, user_id, key, card_id)
+
+    monkeypatch.setattr(flashcards_repo, "_identity_conflict_id", racing)
+    return calls
+
+
+def test_identity_race_in_patch_is_declared_as_a_conflict(monkeypatch, tmp_path):
+    """Una carrera contra el índice único sale como 409, no como IntegrityError."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck = _make_deck(client, a, "Casa")
+        _create_card(client, a, front="house", deck_ids=[deck])
+        home = _create_card(client, a, front="home", deck_ids=[deck]).json()
+
+        calls = _force_identity_race(monkeypatch)
+        res = client.patch(
+            f"/api/vocabulary/cards/{home['id']}",
+            params={"user_id": a},
+            json={"front": "HOUSE"},  # → choca con «house» ya existente
+        )
+        assert res.status_code == 409, res.text
+        assert res.json()["detail"] == "CARD_FRONT_TAKEN"
+        assert calls["n"] >= 2, "el rescate del IntegrityError no se llegó a usar"
+
+        # El anverso NO cambió y no hay gemela: la transacción se deshizo entera.
+        after = client.get("/api/vocabulary/cards", params={"user_id": a}).json()[
+            "cards"
+        ]
+        assert {c["front"] for c in after} == {"house", "home"}
+        assert _count("flashcard_cards", "user_id = ?", (a,)) == 2
+
+
+def test_identity_race_in_update_card_repo_raises_the_typed_conflict(
+    monkeypatch, tmp_path
+):
+    """El repositorio traduce la carrera a `CardFrontConflictError` (no la escapa)."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck = _make_deck(client, a, "Casa")
+        _create_card(client, a, front="house", deck_ids=[deck])
+        home = _create_card(client, a, front="home", deck_ids=[deck]).json()
+
+    calls = _force_identity_race(monkeypatch)
+    with pytest.raises(flashcards_repo.CardFrontConflictError):
+        flashcards_repo.update_card(a, int(home["id"]), front="HOUSE")
+    assert calls["n"] >= 2

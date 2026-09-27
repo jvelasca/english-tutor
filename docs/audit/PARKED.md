@@ -2492,6 +2492,65 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.87.0 — FASE 2 (incremento 1): Estudio configurable · 2026-09-27
+
+> Release **DE PRODUCTO** (minor) **CON backend y frontend**, **SIN migración de BD**, **CON dos
+> endpoints nuevos** (`GET`/`PUT /api/study/config`) y **CON un cambio de contrato aditivo** en la
+> cola de flashcards (`prompt`/`answer`/`hint` + `study_config`; `front`/`back` se conservan).
+> Detalle en `release-notes-v3.87.0.md`. Construye el **incremento 1 de la FASE 2** y cierra las
+> **dos deudas P2** que V3.86.1 dejó vivas.
+
+### Cerrado en V3.87.0 (deja de ser deuda)
+
+- **P2 — Docstring desactualizado de `create_cards()`.** Deja de describir una «política de
+  producto» que no existía: ahora documenta la identidad fuerte real (`UNIQUE(user_id, front_key)`),
+  la reutilización de la ficha existente, el completado de `back`/`mnemonic` y la pertenencia al
+  mazo. `[DOCUMENTACIÓN]`
+- **P2 — Carrera de identidad en `update_card`.** `update_card` y `update_card_with_decks` envuelven
+  el `UPDATE` en `try/except sqlite3.IntegrityError`: una colisión del índice
+  `idx_flashcard_cards_identity` (dos ediciones concurrentes al mismo anverso) se convierte en
+  `CardFrontConflictError` y el router la traduce al ya existente **`409 CARD_FRONT_TAKEN`** en vez
+  de dejar escapar un error crudo. `[DATOS]`
+- **FASE 2 · incremento 1 — Estudio configurable.** `services/study_config.py` (constantes +
+  normalización tolerante) y `domain/study_config.py` (persistencia **JSON bajo la clave
+  `study_config`** de la tabla `settings`, con **merge + normalización**). Cuatro dimensiones:
+  `direction` (`en-es`/`es-en`), `mode` (`recognition`/`production`/`mixed`), `hints`
+  (`off`/`definition`/`mnemonic`/`all`) y `difficulty` (`gentle`/`auto`/`intensive`). `deck_queue`
+  publica `prompt`/`answer` por dirección, `hint` antes del volteo y `study_config`; la dificultad
+  ajusta el embudo (techo de nuevas / inclusión de repasos a ≤ 24 h) **sin tocar el `schedule` de
+  FSRS**. En el frontend, `production` añade campo de texto con **comparación tolerante** y
+  **autocalificación FSRS**, y el `lang` sigue la dirección. `[PRODUCTO]`
+- **FASE 2 · Planner 3.0 respeta el modo.** `mode` filtra el **conjunto admisible de actividades**
+  (`production` → `sentence`/`write`/`transfer`; `recognition` → `recognition`/`recall`; `mixed` →
+  sin filtro) **antes del argmax**, sin tocar `support_level`/`difficulty` ni la semántica de
+  `task_key`/procedencia/evidencia. `[ARQUITECTURA]` `[PRODUCTO]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **El calendario FSRS por dirección no existe, y es a propósito.** Hay **una carta por ítem**,
+  compartida por ambas direcciones; lo que cambia es la cara presentada. Quien quiera progresos
+  separados por dirección necesita una decisión de producto y una migración nuevas. `[PRODUCTO]`
+- **El modo *listening* queda fuera.** Es un subsistema aparte y no entra en este incremento.
+  `[PRODUCTO]`
+- **El Planner 3.0 solo filtra actividades.** El `mode` no altera `support_level` ni la dificultad
+  del planner, ni la selección adaptativa más allá del filtro. `[ARQUITECTURA]`
+- **No hay overrides por mazo.** La configuración es **per-usuario**: no se puede estudiar un mazo
+  en producción y otro en reconocimiento a la vez. `[PRODUCTO]`
+- **El spec de Playwright de la superficie nueva NO se añadió** (el plan lo marcaba como
+  **opcional**): la cobertura de dirección/ayudas/producción vive en **Vitest**, y el **barrido
+  completo** se ejecutó igualmente para descartar regresiones visuales (**118 passed · 0 failed ·
+  32 skipped**, el mismo recuento que V3.86.1). `[VALIDACIÓN]`
+- **El fallback del planner es deliberadamente permisivo.** Si el filtro de actividades deja el
+  conjunto **vacío** (p. ej. `production` sin contenido de producción), se cae al conjunto **sin
+  filtrar** para no dejar la sesión sin ítems: el modo es una **preferencia**, no una garantía
+  dura. `[PRODUCTO]`
+- **`deck_id` sigue existiendo** como proyección legacy (declarado en V3.86.1); este incremento no
+  lo toca. `[DATOS]`
+- **El ancla de certificación sigue en `v3.83.1`** y la cola de auditoría sigue atrasada (`AV`,
+  `AW`, `AX` y el informe `AZ` de este arco esperan dictamen). `[AUDITORÍA]`
+- **Todo lo declarado abierto en V3.86.1 y anteriores sigue abierto** salvo lo que esta release
+  cierra de forma explícita arriba.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a

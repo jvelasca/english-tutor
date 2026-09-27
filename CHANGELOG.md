@@ -4,6 +4,77 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.87.0] — 2026-09-27
+
+**El alumno deja de estudiar como el programa decide y pasa a decidir cómo estudia: dirección
+EN↔ES, reconocimiento o producción, ayudas antes del volteo y dificultad; la elección se recuerda
+por usuario y el Planner 3.0 la respeta.** Release de **PRODUCTO (minor)** **CON backend y
+frontend**, **SIN migración de BD** —la configuración vive como **JSON bajo la clave `study_config`**
+de la tabla `settings`, que ya existía y admite solo `str`—, **CON dos endpoints nuevos**
+(`GET`/`PUT /api/study/config`) y **CON un cambio de contrato ADITIVO**: la cola de flashcards
+publica `prompt`/`answer`/`hint` y `study_config`, mientras `front`/`back` se conservan para no
+romper a ningún consumidor. **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION`
+(`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones. **No se
+añade ni se retira gate** —siguen los **ocho**, todos en `pending`— y `validation-evidence.json`
+sigue sin existir. Es el **incremento 1 de la FASE 2** —la que V3.86.0 declaró fuera y V3.86.1 dejó
+preparada— y cierra de paso las **dos deudas P2** que aquel patch dejó vivas.
+
+**La decisión que evita una migración: dirección = presentación, no calendario.** Se mantiene **una
+sola carta FSRS por ítem** compartida por ambas direcciones: **no se toca `fsrs_cards` ni su clave
+`(user_id, target_type, target_id)`**. Lo que cambia es la **cara que se pinta**. En `en-es`,
+`prompt = front` y `answer = back` (o la traducción hidratada). En `es-en`, `prompt = back` o la
+traducción y `answer = front`; para el léxico se **fuerza la hidratación de la cara** aunque `back`
+no esté vacío, porque si no el anverso en español sería una cadena vacía. Elegir dirección **no
+duplica el calendario de repaso ni reinicia el progreso**: el mismo historial, otra pregunta.
+
+**El modelo, y su tolerancia.** `backend/services/study_config.py` es **puro**: fija el catálogo —
+`direction` (`en-es`/`es-en`), `mode` (`recognition`/`production`/`mixed`), `hints`
+(`off`/`definition`/`mnemonic`/`all`) y `difficulty` (`gentle`/`auto`/`intensive`)— y normaliza.
+`backend/domain/study_config.py` persiste con **merge + normalización** sobre `settings_repo`
+(`run_in_threadpool`). El `PUT /api/study/config` es **parcial de verdad**: lo que no se envía se
+conserva y un valor fuera del catálogo **cae al valor por defecto** en vez de romper la sesión. Los
+schemas (`StudyConfigOut`/`StudyConfigUpdate`) validan con `Literal` y el router exige
+`Depends(current_user)`.
+
+**La sesión.** `deck_queue` lee el config y modela los ítems de forma **aditiva**: `prompt`/`answer`
+por dirección, `hint` antes del volteo (definición, recordatorio o ambos según `hints`) y
+`study_config` en la respuesta. La **dificultad** ajusta el embudo **sin tocar el `schedule` de
+FSRS**: `gentle` no adelanta y **reduce a la mitad el techo de nuevas**; `auto` es el comportamiento
+de siempre; `intensive` **incluye los repasos que vencen en ≤ 24 h**. En el frontend, `production`
+añade un **campo de texto antes del volteo** con **comparación tolerante** (`casefold` + espacios
+colapsados) y **autocalificación FSRS** —acierto → `Good`, fallo → `Again`—, mostrando **siempre**
+la respuesta correcta; el `lang` de los textos sigue la dirección.
+
+**El Planner 3.0 solo filtra actividades.** `mode` restringe el **conjunto admisible** —`production`
+→ `sentence`/`write`/`transfer`; `recognition` → `recognition`/`recall`; `mixed` → sin filtro—
+**antes del argmax**; `support_level`/`difficulty` quedan intactos, así que `task_key`, la
+procedencia y la evidencia **no cambian de semántica**. Con **fallback documentado**: si el filtro
+deja el conjunto **vacío** (p. ej. `production` sin contenido de producción), se cae al conjunto
+**sin filtrar** para no dejar la sesión sin ítems. El modo es una **preferencia**, no una garantía
+dura.
+
+**Las dos deudas P2 de V3.86.1, cerradas.** El docstring de `create_cards()` deja de describir una
+«política de producto» que el código no implementaba y pasa a documentar la identidad fuerte real
+(`UNIQUE(user_id, front_key)`, reutilización de la ficha existente, completado de `back`/`mnemonic`
+y pertenencia al mazo). Y `update_card`/`update_card_with_decks` envuelven el `UPDATE` en
+`try/except sqlite3.IntegrityError`: una **colisión del índice `idx_flashcard_cards_identity`** (dos
+ediciones concurrentes al mismo anverso, donde antes podía escapar un error crudo) se convierte en
+`CardFrontConflictError`, que el router traduce al ya existente **`409 CARD_FRONT_TAKEN`**.
+
+**Lo que NO trae, declarado.** El **calendario FSRS por dirección** (una carta por ítem, a
+propósito); el modo ***listening*** (subsistema aparte); el **override de apoyo/dificultad del
+planner**; los **overrides por mazo** (la configuración es **per-usuario**: no se puede estudiar un
+mazo en producción y otro en reconocimiento a la vez); y cualquier cambio de **selección adaptativa**
+más allá del filtro. `deck_id` sigue vivo como **proyección legacy** (declarado en V3.86.1).
+
+**Pruebas.** Backend: `test_study_config_v387.py` (**nuevo**) —normalización y límites, valores por
+defecto, `PUT` parcial con merge, persistencia, cola con dirección/modo/ayudas/dificultad y filtro
+de actividades del planner **con su fallback**— y casos nuevos en `test_multi_deck_v386.py` para la
+carrera de identidad en `update_card` y en el `PATCH`. Frontend: Vitest de dirección, ayudas,
+autocalificación de producción y panel de configuración.
+
+Ver `release-notes-v3.87.0.md`.
+
 ## [3.86.1] — 2026-09-26
 
 **La identidad de una ficha deja de depender solo del código: la garantiza la BD, el `PATCH` deja

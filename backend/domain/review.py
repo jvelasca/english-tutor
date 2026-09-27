@@ -27,11 +27,13 @@ from starlette.concurrency import run_in_threadpool
 from domain import academy as academy_service
 from domain import decision as decision_domain
 from domain import learner_state as learner_state_domain
+from domain import study_config as study_config_domain
 from repositories import decision_records as decision_records_repo
 from repositories import dictionary as dictionary_repo
 from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
 from services import fsrs, lexicon, recall
+from services import study_config as study_config_service
 from services.evidence import empty_summary as empty_evidence
 from services.example_sentences import example_for_many
 
@@ -215,6 +217,15 @@ async def get_review_queue(
         level=learner_state.get("practice_level") or "",
         now=now_iso,
     )
+    # V3.87.0: el modo de estudio del alumno filtra las actividades admisibles.
+    # Se aplica SOLO si el alumno GUARDÓ su configuración: el defecto no puede
+    # cambiar la cola de quien nunca pidió nada (no-regresión declarada).
+    study = await study_config_domain.get_study_config(user_id)
+    allowed_activities = (
+        study_config_service.allowed_activities(study["config"])
+        if study["configured"]
+        else None
+    )
     # V3.38.1: primera pasada SIN disponibilidad de contenido. La PRIORIDAD no
     # depende del cue recomendado, así que basta para el ranking global; así el
     # coste de resolver el cue (que consulta el corpus por palabra, P2 de V3.38)
@@ -237,6 +248,7 @@ async def get_review_queue(
             ),
             learner_state=learner_state,
             projection=projection,
+            allowed_activities=allowed_activities,
         )
         for row, card in candidates
     ]
@@ -269,6 +281,7 @@ async def get_review_queue(
                 ),
                 learner_state=learner_state,
                 projection=projection,
+                allowed_activities=allowed_activities,
             )
         )
     # V3.66 (Decision Provenance): registro append-only de CADA decisión servida.

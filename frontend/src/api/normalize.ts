@@ -47,6 +47,11 @@ import type {
   ReviewActivity,
   ReviewQueue,
   ReviewQueueItem,
+  StudyConfig,
+  StudyDifficulty,
+  StudyDirection,
+  StudyHints,
+  StudyMode,
   VocabBulkAddResult,
   VocabCollection,
   VocabCollections,
@@ -409,11 +414,48 @@ function normalizeStudyItem(raw: Raw): FlashcardStudyItem {
     definition: asString(raw.definition),
     // V3.86.0: recordatorio de la ficha manual, si lo tiene.
     mnemonic: asString(raw.mnemonic),
+    // V3.87.0: caras según dirección y ayuda previa al volteo. Si el backend es
+    // anterior (campos ausentes), `prompt` cae a `front` para no dejar la
+    // tarjeta en blanco.
+    prompt: asString(raw.prompt) || asString(raw.front),
+    answer: asString(raw.answer),
+    hint: asString(raw.hint),
     is_new: asBoolean(raw.is_new),
     state: asString(raw.state, "new"),
     due_at: asString(raw.due_at),
     reps: asNumber(raw.reps),
     retrievability: asNumber(raw.retrievability),
+  };
+}
+
+const STUDY_DIRECTIONS: readonly StudyDirection[] = ["en-es", "es-en"];
+const STUDY_MODES: readonly StudyMode[] = ["recognition", "production", "mixed"];
+const STUDY_HINTS: readonly StudyHints[] = ["off", "definition", "mnemonic", "all"];
+const STUDY_DIFFICULTIES: readonly StudyDifficulty[] = [
+  "gentle",
+  "auto",
+  "intensive",
+];
+
+function asOneOf<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
+}
+
+/** `GET/PUT /api/study/config` y el `study_config` de la cola (V3.87.0). */
+export function normalizeStudyConfig(raw: unknown): StudyConfig {
+  const data = isRecord(raw) ? raw : {};
+  return {
+    direction: asOneOf(data.direction, STUDY_DIRECTIONS, "en-es"),
+    mode: asOneOf(data.mode, STUDY_MODES, "recognition"),
+    hints: asOneOf(data.hints, STUDY_HINTS, "off"),
+    difficulty: asOneOf(data.difficulty, STUDY_DIFFICULTIES, "auto"),
+    configured: asBoolean(data.configured),
   };
 }
 
@@ -433,6 +475,7 @@ export function normalizeStudyQueue(raw: unknown): FlashcardQueue {
     new_today: asNumber(data.new_today),
     limits: normalizeFlashcardLimits(data.limits),
     fsrs_version: asString(data.fsrs_version),
+    study_config: normalizeStudyConfig(data.study_config),
   };
 }
 

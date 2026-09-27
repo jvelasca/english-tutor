@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { StudySession } from "./StudySession";
-import type { FlashcardStudyItem } from "../../types/api";
+import type { FlashcardStudyItem, StudyConfig } from "../../types/api";
 import { I18nProvider } from "../../hooks/useI18n";
 import { lookupDictionaryWord, setVocabularyTranslation } from "../../api/vocabulary";
 
@@ -43,11 +43,26 @@ function card(overrides: Partial<FlashcardStudyItem> = {}): FlashcardStudyItem {
     back: "aeropuerto",
     definition: "",
     mnemonic: "",
+    prompt: "",
+    answer: "",
+    hint: "",
     is_new: true,
     state: "new",
     due_at: "",
     reps: 0,
     retrievability: 1,
+    ...overrides,
+  };
+}
+
+/** Configuración de estudio para las pruebas (V3.87.0). */
+function config(overrides: Partial<StudyConfig> = {}): StudyConfig {
+  return {
+    direction: "en-es",
+    mode: "recognition",
+    hints: "off",
+    difficulty: "auto",
+    configured: true,
     ...overrides,
   };
 }
@@ -549,5 +564,100 @@ describe("StudySession", () => {
     expect(
       screen.getByText("100% of this session rated Good or Easy."),
     ).toBeTruthy();
+  });
+
+  // --- V3.87.0: configuración de estudio ------------------------------------
+
+  it("ES→EN pregunta la traducción y responde la palabra (con su `lang`)", () => {
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ prompt: "aeropuerto", answer: "airport" })]}
+        deckName="Deck"
+        studyConfig={config({ direction: "es-en" })}
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    // La dirección es presentación: el prompt es la cara española y la respuesta
+    // la inglesa, cada una con su `lang` declarado.
+    expect(screen.getByText("aeropuerto").getAttribute("lang")).toBe("es");
+    expect(screen.getByText("airport").getAttribute("lang")).toBe("en");
+  });
+
+  it("enseña la ayuda antes de voltear", () => {
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card({ hint: "lugar con aviones" })]}
+        deckName="Deck"
+        studyConfig={config({ hints: "all" })}
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    // Sin voltear ni pulsar nada: la pista ya está en la cara de la pregunta.
+    expect(screen.getByText("lugar con aviones")).toBeTruthy();
+  });
+
+  it("producción: comprobar la respuesta correcta autocalifica Good", async () => {
+    const onGrade = vi.fn().mockResolvedValue(undefined);
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        studyConfig={config({ mode: "production" })}
+        onGrade={onGrade}
+        onExit={() => {}}
+      />,
+    );
+    // En producción no hay volteo libre: se escribe y se comprueba.
+    fireEvent.change(screen.getByLabelText("Your answer"), {
+      target: { value: "  Aeropuerto " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect(screen.getByText("Correct.")).toBeTruthy();
+    // La respuesta correcta se enseña junto al veredicto.
+    expect(screen.getByText("aeropuerto")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(onGrade).toHaveBeenCalledTimes(1);
+    expect(onGrade.mock.calls[0][1]).toBe(3);
+  });
+
+  it("producción: comprobar una respuesta errónea autocalifica Again", async () => {
+    const onGrade = vi.fn().mockResolvedValue(undefined);
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        studyConfig={config({ mode: "production" })}
+        onGrade={onGrade}
+        onExit={() => {}}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Your answer"), {
+      target: { value: "avion" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect(screen.getByText("Not quite — here is the answer.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(onGrade).toHaveBeenCalledTimes(1);
+    expect(onGrade.mock.calls[0][1]).toBe(1);
+  });
+
+  it("sin configuración (o en reconocimiento) no hay campo de producción", () => {
+    renderSession(
+      <StudySession
+        userId="u1"
+        items={[card()]}
+        deckName="Deck"
+        onGrade={vi.fn()}
+        onExit={() => {}}
+      />,
+    );
+    expect(screen.queryByLabelText("Your answer")).toBeNull();
+    expect(screen.getByRole("button", { name: "Flip card" })).toBeTruthy();
   });
 });

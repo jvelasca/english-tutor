@@ -43,7 +43,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import type { FlashcardStudyItem } from "../../types/api";
+import type { FlashcardStudyItem, StudyConfig } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import {
   lookupDictionaryWord,
@@ -101,6 +101,11 @@ interface StudySessionProps {
   /** Vuelve al panel de entrada. El contenedor recarga la cola al hacerlo. */
   onExit: () => void;
   /**
+   * V3.87.0: cómo se construyó la cola (dirección, modo, ayudas). Opcional: sin
+   * ella la sesión se comporta EXACTAMENTE como V3.86.1 (EN→ES, volteo).
+   */
+  studyConfig?: StudyConfig | null;
+  /**
    * V3.78.0: volver a empezar con la cola RECARGADA. Es la «acción de
    * actualizar» que pidió V3.77.2: si la sesión acaba de terminar, lo útil no
    * es volver a mirar el mismo panel, es ver si queda algo y seguir. Si el
@@ -121,6 +126,7 @@ export function StudySession({
   onGrade,
   onExit,
   onRestart,
+  studyConfig,
 }: StudySessionProps) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
@@ -152,6 +158,12 @@ export function StudySession({
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // V3.87.0: producción (modo `production`). El alumno escribe la respuesta
+  // antes de voltear; al comprobar se muestra la correcta y se autocalifica el
+  // grado FSRS (acierto → Good, fallo → Again) sin dejar de enseñar la cara.
+  const [typed, setTyped] = useState("");
+  const [checked, setChecked] = useState(false);
+  const [matched, setMatched] = useState(false);
 
   /**
    * V3.80.1: candado contra la carrera generación ↔ edición.
@@ -215,6 +227,30 @@ export function StudySession({
   const isLexicon = current?.card_type === "lexicon";
   const canEdit = isLexicon;
 
+  // V3.87.0 — configuración de estudio. La dirección es PRESENTACIÓN: `front`/
+  // `back` siguen siendo la identidad de la ficha (y el lápiz sigue editando la
+  // traducción), pero se pregunta `prompt` y se responde `answer`.
+  const dirEsEn = studyConfig?.direction === "es-en";
+  const promptText = current?.prompt || current?.front || "";
+  // La ayuda solo se enseña si la config la pide y la tarjeta la trae.
+  const hint =
+    studyConfig && studyConfig.hints !== "off" ? (current?.hint ?? "") : "";
+  const production = studyConfig?.mode === "production";
+  // El `answer` del backend solo manda en ES→EN; en EN→ES la cara B puede
+  // hidratarse en vivo (léxico), así que la verdad es `back`/`face`.
+  const answerText = dirEsEn ? current?.answer || current?.front || "" : back;
+  // Sin respuesta no hay nada que comprobar: la producción degrada a volteo.
+  const productionActive = production && Boolean(answerText.trim());
+  const promptLang = isLexicon ? (dirEsEn ? "es" : "en") : undefined;
+  const answerLang = isLexicon ? (dirEsEn ? "en" : "es") : undefined;
+
+  /** Compara la respuesta escrita con la esperada (tolerante: caja y espacios). */
+  function sameAnswer(a: string, b: string): boolean {
+    const clean = (value: string) =>
+      value.trim().toLowerCase().replace(/\s+/g, " ");
+    return clean(a) === clean(b) && clean(a) !== "";
+  }
+
   /**
    * Pide el reverso al diccionario cuando la tarjeta viene sin él.
    *
@@ -276,6 +312,20 @@ export function StudySession({
     void hydrate(current, key);
   }
 
+  /** V3.87.0: comprueba la respuesta escrita y revela (modo producción). */
+  function check() {
+    if (!current || busy) return;
+    setMatched(sameAnswer(typed, answerText));
+    setChecked(true);
+    setFlipped(true);
+    void hydrate(current, key);
+  }
+
+  /** Autocalificación FSRS de producción: acierto → Good, fallo → Again. */
+  function continueProduction() {
+    void grade(matched ? 3 : 1);
+  }
+
   async function grade(g: number) {
     if (!current || busy) return;
     setBusy(true);
@@ -289,6 +339,10 @@ export function StudySession({
       setEditing(false);
       setSaveError(false);
       setDraft("");
+      // La producción es de ESTA tarjeta: al avanzar se limpia su intento.
+      setTyped("");
+      setChecked(false);
+      setMatched(false);
       // V3.77.2: la sesión NO se cierra recargando la cola. Se avanza el índice
       // para que `current` sea null y el resumen se pinte con el contador
       // intacto; si se recargara aquí, el contador se borraría y el alumno
@@ -306,7 +360,7 @@ export function StudySession({
   // mientras hay una calificación en vuelo, para no disparar dos grados de la
   // misma tarjeta.
   useEffect(() => {
-    if (!flipped || busy || editing) return;
+    if (!flipped || busy || editing || productionActive) return;
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (
@@ -327,7 +381,7 @@ export function StudySession({
     // `grade` se recrea en cada render: el efecto se re-suscribe, que es
     // barato y evita cerrar sobre un `current`/`busy` desfasado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flipped, busy, editing, current, key]);
+  }, [flipped, busy, editing, current, key, productionActive]);
 
   async function saveOwnBack() {
     if (!current || saving || !key) return;
@@ -432,7 +486,7 @@ export function StudySession({
     );
   }
 
-  const hasFace = Boolean(back || definition);
+  const hasFace = Boolean(answerText || definition);
   const progressPct =
     items.length > 0 ? Math.round(((index + 1) / items.length) * 100) : 0;
 
@@ -474,7 +528,14 @@ export function StudySession({
           instantáneo. */}
       <button
         type="button"
-        onClick={() => (flipped ? setFlipped(false) : reveal())}
+        onClick={() => {
+          // V3.87.0: en producción el volteo lo controla la comprobación; ver la
+          // respuesta sin haber escrito no es la actividad.
+          if (productionActive) return;
+          if (flipped) setFlipped(false);
+          else reveal();
+        }}
+        aria-disabled={productionActive}
         className="relative block w-full [perspective:1200px]"
         aria-label={t("flashcards.study.flip")}
       >
@@ -486,13 +547,26 @@ export function StudySession({
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-6 text-center [backface-visibility:hidden]">
             <span
               className="text-2xl font-bold tracking-tight break-words"
-              lang={isLexicon ? "en" : undefined}
+              lang={promptLang}
             >
-              {current.front}
+              {promptText}
             </span>
             {!flipped ? (
               <span className="text-xs text-muted-foreground">
-                {t("flashcards.study.tapReveal")}
+                {productionActive
+                  ? t("flashcards.study.productionPrompt")
+                  : t("flashcards.study.tapReveal")}
+              </span>
+            ) : null}
+            {/* V3.87.0: ayuda ANTES de voltear (definición y/o recordatorio).
+                Nunca es la respuesta: es lo que permite intentarlo. */}
+            {!flipped && hint ? (
+              <span
+                className="flex items-center gap-1 text-xs text-muted-foreground"
+                aria-label={t("flashcards.study.hintLabel")}
+              >
+                <Lightbulb className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="break-words">{hint}</span>
               </span>
             ) : null}
           </span>
@@ -506,12 +580,12 @@ export function StudySession({
                 {t("flashcards.study.generating")}
               </span>
             ) : null}
-            {!generating && back ? (
+            {!generating && answerText ? (
               <span
                 className="text-lg font-semibold break-words"
-                lang={isLexicon ? "es" : undefined}
+                lang={answerLang}
               >
-                {back}
+                {answerText}
               </span>
             ) : null}
             {!generating && definition ? (
@@ -628,7 +702,57 @@ export function StudySession({
         </p>
       ) : null}
 
-      {flipped ? (
+      {productionActive && !flipped ? (
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+            {t("flashcards.study.productionLabel")}
+            <input
+              type="text"
+              value={typed}
+              autoFocus
+              maxLength={500}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") check();
+              }}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+            />
+          </label>
+          <Button
+            type="button"
+            size="sm"
+            className="w-fit self-center"
+            disabled={busy}
+            onClick={check}
+          >
+            {t("flashcards.study.check")}
+          </Button>
+        </div>
+      ) : productionActive && checked ? (
+        <div className="flex flex-col items-center gap-2">
+          {/* Se enseña la cara correcta (arriba, ya volteada) junto al veredicto:
+              la autocalificación no debe ocultar qué era lo que había que decir. */}
+          <p
+            className={cn(
+              "text-sm font-medium",
+              matched ? "text-success" : "text-destructive",
+            )}
+          >
+            {matched
+              ? t("flashcards.study.productionCorrect")
+              : t("flashcards.study.productionWrong")}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={continueProduction}
+          >
+            {t("flashcards.study.continue")}
+          </Button>
+        </div>
+      ) : flipped ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {GRADES.map((g) => {
             const Icon = g.Icon;

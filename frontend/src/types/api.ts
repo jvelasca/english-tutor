@@ -1134,6 +1134,21 @@ export interface FlashcardBulkAddResult {
   count: number;
 }
 
+/** V3.87.0 · FASE 2: configuración de estudio del alumno (GET/PUT /api/study/config). */
+export type StudyDirection = "en-es" | "es-en";
+export type StudyMode = "recognition" | "production" | "mixed";
+export type StudyHints = "off" | "definition" | "mnemonic" | "all";
+export type StudyDifficulty = "gentle" | "auto" | "intensive";
+
+export interface StudyConfig {
+  direction: StudyDirection;
+  mode: StudyMode;
+  hints: StudyHints;
+  difficulty: StudyDifficulty;
+  /** `false` mientras el alumno no ha guardado nunca su configuración. */
+  configured: boolean;
+}
+
 export interface FlashcardStudyItem {
   card_type: FlashcardCardType;
   card_id: string;
@@ -1142,6 +1157,14 @@ export interface FlashcardStudyItem {
   definition: string;
   /** V3.86.0: recordatorio de la ficha manual ("" en el léxico). */
   mnemonic: string;
+  /**
+   * V3.87.0: cara PREGUNTADA y cara RESPUESTA según la dirección del alumno.
+   * `front`/`back` siguen siendo la identidad; en ES→EN se intercambian.
+   */
+  prompt: string;
+  answer: string;
+  /** V3.87.0: ayuda antes de voltear ("" = ninguna). Nunca es la respuesta. */
+  hint: string;
   is_new: boolean;
   state: string;
   due_at: string;
@@ -1158,6 +1181,8 @@ export interface FlashcardQueue {
   new_today: number;
   limits: FlashcardLimits;
   fsrs_version: string;
+  /** V3.87.0: cómo se construyó la cola (dirección, modo, ayudas). */
+  study_config?: StudyConfig | null;
 }
 
 export interface FlashcardReviewResult {
