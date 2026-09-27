@@ -2551,6 +2551,24 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 - **Todo lo declarado abierto en V3.86.1 y anteriores sigue abierto** salvo lo que esta release
   cierra de forma explícita arriba.
 
+### Estado de publicación (verificado el 2026-09-27)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.87.0` | **publicado** (`refs/tags/v3.87.0` en `origin`) → commit `17d063c` |
+| GitHub Release | https://github.com/jvelasca/english-tutor/releases/tag/v3.87.0 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `17d063c` | `success` — run `36304046908`, **12/12 jobs en verde** |
+| Orden tag/CI | el tag se empujó **junto con `main`**, es decir **antes** de que el CI terminara: el invariante «el tag se crea después del verde» que se cumplió en `v3.86.1` **no se repite aquí**, y se declara. El **anclaje no se rompe**: el run corrió sobre **exactamente** `17d063c` (su `headSha` coincide con el commit al que apunta el tag) y salió verde, así que la evidencia sigue siendo la del commit etiquetado; lo que difiere es **cuándo** se creó la etiqueta, no **qué** commit certifica |
+| `main` vs `origin/main` | al día en `17d063c` |
+| Encargo de auditoría de `v3.87.0` | **no existe** (`agentes/auditoria-total-externa-v387.md` no está) |
+| Prefijo de dos letras | **`AZ` agotado** con el encargo de `v3.86.0`, que dejó a su informe dictaminar la convención antes de emitir otro |
+
+**Aviso de anclaje:** hay tags **SIN Release** —`v3.84.0`, `v3.84.1` y `v3.85.0` entre los
+recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `v3.77.0`,
+`v3.77.1`, `v3.77.2`, `v3.78.0`, `v3.79.0` y `v3.81.0` antes—, así que «no hay Release» **no**
+significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. `v3.87.0`
+**sí** tiene Release, como `v3.86.0` y `v3.86.1`.
+
 ## Pendientes de acción humana (no aparcados, en curso)
 
 - Ejecutar la **matriz de dispositivos** en hardware (G) y volcar resultados a
