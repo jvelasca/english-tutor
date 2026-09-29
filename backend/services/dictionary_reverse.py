@@ -49,6 +49,12 @@ def fold(text: str) -> str:
     el filtrado de marcas la convierte en "a"; "ñ" también se descompone en
     "n" + virgulilla, así que se restaura explícitamente para no confundir
     "año" con "ano" ni "mañana" con "manana".
+
+    V3.91: esta función deja de ser solo del comparador. El índice FTS5 de la
+    caché guarda el texto YA plegado por ella (columna
+    `dictionary_entries.translation_fold`) y la consulta dirigida se pliega
+    igual, porque un índice que no plegara como el matcher escondería
+    candidatos que el matcher sí acepta.
     """
     lowered = (text or "").strip().lower().replace("ñ", "\u0000")
     decomposed = unicodedata.normalize("NFD", lowered)
@@ -56,6 +62,39 @@ def fold(text: str) -> str:
         ch for ch in decomposed if not unicodedata.combining(ch)
     )
     return without_marks.replace("\u0000", "ñ")
+
+
+# Tokenizador de las FRASES FTS5 (V3.91): letras y dígitos, con la eñe como
+# letra propia. Se aplica al término YA plegado, así que indexación y consulta
+# parten de la misma forma del texto.
+_FTS_TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def phrase_tokens(term: str) -> list[str]:
+    """Tokens FTS5 de un término, ya plegados: `["casa", "de", "campo"]` (V3.91).
+
+    Es la ÚNICA definición de «qué palabras forman el término»: la usan la frase
+    del índice y el filtro `LIKE` del repliegue, así que las dos vías de la
+    consulta no pueden acabar buscando cosas distintas. Solo letras y dígitos
+    (con la eñe como letra propia), de modo que un token no puede contener un
+    comodín de `LIKE` ni un operador de FTS5.
+    """
+    return _FTS_TOKEN.findall(fold(term))
+
+
+def phrase_query(term: str) -> str:
+    """Frase FTS5 de un término: `"casa" "de" "campo"` (V3.91, puro).
+
+    Devuelve la consulta que pide los tokens del término como secuencia
+    CONTIGUA, que es exactamente la condición que `_segment_score` exige para
+    dar una coincidencia de palabra completa. El matcher sigue siendo quien
+    puntúa: esto solo acota el conjunto que se le entrega.
+
+    Cada token va entre comillas dobles (nunca contiene comillas: el tokenizador
+    solo admite letras y dígitos), así que la cadena no puede inyectar operadores
+    de FTS5. Un término sin tokens (solo puntuación) devuelve "".
+    """
+    return " ".join(f'"{token}"' for token in phrase_tokens(term))
 
 
 def normalize_term(text: str) -> str:

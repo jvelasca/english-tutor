@@ -377,6 +377,10 @@ async def _available_recall_cues(words: list[str]) -> dict[str, set[str]]:
     `services.recall.resolve_recall_cue` necesita para no recomendar un peldaño
     sin contenido. Una sola lectura de la caché para todas las palabras.
 
+    V3.91: esa lectura es DIRIGIDA (`dictionary_repo.find_by_words`): pide por PK
+    las palabras de la lista en vez de volcar la tabla entera para buscar en
+    Python las filas que ya sabía nombrar.
+
     V3.39 (Fase 3C): los ejemplos del peldaño `cloze` se resuelven con UNA sola
     pasada al banco (`example_for_many`) en lugar de un lookup por palabra
     (P2 de la auditoría).
@@ -384,7 +388,7 @@ async def _available_recall_cues(words: list[str]) -> dict[str, set[str]]:
     unique = sorted({word for word in words if word})
     if not unique:
         return {}
-    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    entries = await run_in_threadpool(dictionary_repo.find_by_words, unique)
     examples = await run_in_threadpool(example_for_many, unique)
     available: dict[str, set[str]] = {}
     for word in unique:

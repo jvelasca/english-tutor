@@ -11,6 +11,15 @@ from datetime import datetime, timezone
 
 from config import DATA_DIR
 
+# `fold` es la plegadura de la CACHÉ del diccionario (minúsculas sin acentos, con
+# la eñe como letra distinta). Vive en el servicio PURO que la usa para comparar
+# (`services.dictionary_reverse.match_translation`) y el esquema la necesita para
+# la columna PLEGADA `dictionary_entries.translation_fold` y para su índice FTS5:
+# si el índice y el matcher no plegaran igual, el índice escondería candidatos.
+# Mismo criterio que `front_key`: la normalización que el esquema necesita se
+# importa, no se reimplementa.
+from services.dictionary_reverse import fold
+
 DB_PATH = DATA_DIR / "tutor.db"
 
 _log = logging.getLogger(__name__)
@@ -31,6 +40,19 @@ _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 # regeneran una vez al primer lookup (el criterio de parseo cambió en V3.30.1 y
 # no se puede distinguir por fila qué contenido se generó con el parser viejo).
 DICTIONARY_LEGACY_VERSION = "1.0.0"
+
+# V3.91 (búsqueda dirigida del diccionario): nombre del índice FTS5 de la caché
+# DIRECTA y de sus disparadores de sincronización. Son constantes y no literales
+# sueltos porque la migración, la sonda de arranque y el auto-reparado tienen que
+# hablar del MISMO objeto: un nombre divergente dejaría el índice huérfano.
+DICTIONARY_FTS_TABLE = "dictionary_entries_fts"
+
+# Sonda de FTS5 (`None` = sin sondear). El índice es OPCIONAL por diseño: FTS5
+# viene COMPILADO en SQLite, pero eso depende del build de Python que ejecute la
+# app (en el intérprete del producto está, verificado), así que la disponibilidad
+# se sondea UNA vez y se recuerda. Sin FTS5, la búsqueda dirigida se repliega a
+# `LIKE` sobre la columna plegada: degradación declarada, nunca error.
+_FTS5_AVAILABLE: bool | None = None
 
 
 def _now() -> str:
@@ -296,7 +318,12 @@ def init_db() -> None:
                 senses_json TEXT NOT NULL DEFAULT '',
                 generator_version TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL DEFAULT ''
+                updated_at TEXT NOT NULL DEFAULT '',
+                -- V3.91: `translation` plegada (minúsculas y sin acentos, con la
+                -- eñe como letra distinta). Es la columna por la que busca el
+                -- índice FTS5 y el repliegue `LIKE`; la plegadura es la MISMA que
+                -- la del matcher inverso (`services/dictionary_reverse.fold`).
+                translation_fold TEXT NOT NULL DEFAULT ''
             )
             """
         )
@@ -360,7 +387,7 @@ def init_db() -> None:
         # `dictionary_entries`) por dos razones:
         #   1. la PK de `dictionary_entries` es la palabra INGLESA, y una misma
         #      palabra española ("banco") puede tener varias traducciones;
-        #   2. `dictionary_repo.list_entries()` es el banco de distractores del
+        #   2. `dictionary_repo.distractor_pool()` es el banco de distractores del
         #      MCQ de Recognition (`services/dictionary_mcq.py`): meter términos
         #      españoles ahí contaminaría los significados candidatos.
         # `word` es el término ESPAÑOL normalizado (PK); `english` la traducción
@@ -403,6 +430,11 @@ def init_db() -> None:
                 "ALTER TABLE dictionary_reverse_entries ADD COLUMN "
                 "meanings_json TEXT NOT NULL DEFAULT ''"
             )
+        # V3.91: la caché DIRECTA pasa a tener búsqueda DIRIGIDA (columna plegada
+        # + índice FTS5 con repliegue a LIKE). La inversa ES→EN dejaba de ser
+        # O(N) en Python y pasa a ser una consulta acotada; ver
+        # `services/dictionary_reverse.py` y `repositories/dictionary.py`.
+        _migrate_dictionary_fts(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS grammar_errors (
@@ -2447,6 +2479,153 @@ def _migrate_certificates_table(conn: sqlite3.Connection) -> None:
         "FROM academy_certificates"
     )
     conn.execute("DROP TABLE academy_certificates")
+
+
+def fts5_available(conn: sqlite3.Connection | None = None) -> bool:
+    """¿Trae FTS5 el build de SQLite de este intérprete? (V3.91, sondeado UNA vez).
+
+    FTS5 **no** es una dependencia del proyecto: viene compilada dentro de SQLite,
+    pero un build de Python puede no traerla, y de eso depende que la búsqueda
+    dirigida del diccionario use índice o `LIKE`. La sonda crea y destruye una
+    tabla virtual dentro de un `SAVEPOINT` (el fallo no arrastra la transacción
+    que esté abierta) y el resultado se recuerda: la sonda se paga una vez por
+    proceso, no una vez por consulta.
+
+    La sonda es la MISMA que la migración usa para decidir si crea el índice, de
+    modo que no puede haber un estado en el que una diga que sí y la otra no.
+    """
+    global _FTS5_AVAILABLE
+    if _FTS5_AVAILABLE is not None:
+        return _FTS5_AVAILABLE
+    own = conn is None
+    probe = conn or _conn(foreign_keys=False)
+    probe.execute("SAVEPOINT fts5_probe")
+    try:
+        # `DROP` primero: si una ejecución anterior se quedó a medias, la tabla de
+        # sonda existiría y el `CREATE` fallaría por duplicado, y eso se
+        # confundiría con «este SQLite no trae FTS5».
+        probe.execute("DROP TABLE IF EXISTS _fts5_probe")
+        probe.execute("CREATE VIRTUAL TABLE _fts5_probe USING fts5(x)")
+        probe.execute("DROP TABLE _fts5_probe")
+        _FTS5_AVAILABLE = True
+    except sqlite3.OperationalError:
+        probe.execute("ROLLBACK TO fts5_probe")
+        _FTS5_AVAILABLE = False
+    finally:
+        probe.execute("RELEASE fts5_probe")
+        if own:
+            probe.close()
+    return _FTS5_AVAILABLE
+
+
+def _migrate_dictionary_fts(conn: sqlite3.Connection) -> None:
+    """Columna plegada e índice FTS5 de la caché directa (V3.91, aditivo).
+
+    Tres pasos, los tres idempotentes:
+
+    1. **Columna plegada** `dictionary_entries.translation_fold`: el texto por el
+       que se INDEXA y se CONSULTA. Se plegó aquí, una vez, para lo ya cacheado,
+       con la MISMA función con la que lo pliega `save_entry` y con la que compara
+       el matcher puro (`services.dictionary_reverse.fold`): si el índice y el
+       matcher no plegaran igual, el índice **escondería** candidatos que el
+       matcher acepta. La columna sirve también al repliegue `LIKE`, así que
+       existe aunque no haya FTS5.
+    2. **Tabla virtual FTS5 de contenido EXTERNO** (`content='dictionary_entries'`):
+       el índice no duplica el texto (los valores salen de la tabla real al leer),
+       y `tokenize` fija `remove_diacritics 0` para que la `ñ` siga siendo una
+       letra DISTINTA (`año` ≠ `ano`), que es la misma regla del matcher.
+    3. **Disparadores** de inserción, actualización y borrado: la sincronización la
+       garantiza la BD, no el código de una consulta concreta (`save_entry` vacía
+       y reescribe con `ON CONFLICT`, así que también pasa por aquí).
+
+    Y una guarda: si el índice y la tabla no cuadran (`count(*)` distinto) se
+    reconstruye (`'rebuild'`) y se registra. El caso real es la instalación que
+    estrena el índice con caché ya dentro; así el backfill no es un paso aparte
+    que alguien pueda olvidar.
+    """
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(dictionary_entries)")
+    }
+    if "translation_fold" not in columns:
+        conn.execute(
+            "ALTER TABLE dictionary_entries ADD COLUMN "
+            "translation_fold TEXT NOT NULL DEFAULT ''"
+        )
+        rows = conn.execute(
+            "SELECT word, translation FROM dictionary_entries"
+        ).fetchall()
+        conn.executemany(
+            "UPDATE dictionary_entries SET translation_fold = ? WHERE word = ?",
+            [(fold(row["translation"] or ""), row["word"]) for row in rows],
+        )
+    if not fts5_available(conn):
+        _log.warning(
+            "Diccionario: este build de SQLite no trae FTS5; la búsqueda dirigida "
+            "se repliega a LIKE sobre translation_fold (degradación declarada)"
+        )
+        return
+    created = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (DICTIONARY_FTS_TABLE,),
+    ).fetchone() is None
+    if created:
+        conn.execute(
+            f"""
+            CREATE VIRTUAL TABLE {DICTIONARY_FTS_TABLE} USING fts5(
+                translation_fold,
+                content='dictionary_entries',
+                content_rowid='rowid',
+                tokenize="unicode61 remove_diacritics 0"
+            )
+            """
+        )
+    conn.execute(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {DICTIONARY_FTS_TABLE}_insert
+        AFTER INSERT ON dictionary_entries BEGIN
+            INSERT INTO {DICTIONARY_FTS_TABLE}(rowid, translation_fold)
+            VALUES (new.rowid, new.translation_fold);
+        END
+        """
+    )
+    conn.execute(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {DICTIONARY_FTS_TABLE}_update
+        AFTER UPDATE ON dictionary_entries BEGIN
+            INSERT INTO {DICTIONARY_FTS_TABLE}(
+                {DICTIONARY_FTS_TABLE}, rowid, translation_fold
+            ) VALUES ('delete', old.rowid, old.translation_fold);
+            INSERT INTO {DICTIONARY_FTS_TABLE}(rowid, translation_fold)
+            VALUES (new.rowid, new.translation_fold);
+        END
+        """
+    )
+    conn.execute(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {DICTIONARY_FTS_TABLE}_delete
+        AFTER DELETE ON dictionary_entries BEGIN
+            INSERT INTO {DICTIONARY_FTS_TABLE}(
+                {DICTIONARY_FTS_TABLE}, rowid, translation_fold
+            ) VALUES ('delete', old.rowid, old.translation_fold);
+        END
+        """
+    )
+    indexed = conn.execute(
+        f"SELECT count(*) FROM {DICTIONARY_FTS_TABLE}"
+    ).fetchone()[0]
+    total = conn.execute("SELECT count(*) FROM dictionary_entries").fetchone()[0]
+    if created or indexed != total:
+        conn.execute(
+            f"INSERT INTO {DICTIONARY_FTS_TABLE}({DICTIONARY_FTS_TABLE}) "
+            "VALUES('rebuild')"
+        )
+        if not created:
+            _log.warning(
+                "Diccionario: el índice FTS5 no cuadraba (%d de %d filas); "
+                "reconstruido",
+                indexed,
+                total,
+            )
 
 
 def ping() -> bool:

@@ -1296,7 +1296,7 @@ async def get_recognition_question(user_id: str, word: str) -> dict:
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada no es válida")
-    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    entries = await run_in_threadpool(dictionary_repo.distractor_pool, normalized)
     question_id = secrets.token_urlsafe(8)
     built = dictionary_mcq.recognition_options_for(
         normalized, entries, seed=question_id
@@ -1331,7 +1331,7 @@ async def submit_recognition_attempt(
     normalized = _normalize_lookup_word(word)
     if not normalized:
         raise ValueError("La palabra buscada no es válida")
-    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    entries = await run_in_threadpool(dictionary_repo.distractor_pool, normalized)
     built = dictionary_mcq.recognition_options_for(
         normalized, entries, seed=question_id
     )
@@ -1392,7 +1392,7 @@ async def get_recall_prompt(
         raise ValueError("La palabra buscada no es válida")
     if cue is not None and cue not in recall.RECALL_CUES:
         raise ValueError("Peldaño de recall no válido")
-    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    entries = await run_in_threadpool(dictionary_repo.find_by_words, [normalized])
     if cue is None:
         built = recall.recall_prompt_for(normalized, entries)
         support_level = (
@@ -1484,7 +1484,7 @@ async def submit_recall_attempt(
         raise ValueError("La palabra buscada no es válida")
     if cue is not None and cue not in recall.RECALL_CUES:
         raise ValueError("Peldaño de recall no válido")
-    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    entries = await run_in_threadpool(dictionary_repo.find_by_words, [normalized])
     if cue is None:
         built = recall.recall_prompt_for(normalized, entries)
     else:
@@ -2313,7 +2313,9 @@ async def _lookup_dictionary_reverse(
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
-    entries = await run_in_threadpool(dictionary_repo.list_entries)
+    entries = await run_in_threadpool(
+        dictionary_repo.find_by_translation, normalized
+    )
     pack_items = await run_in_threadpool(collections_repo.list_pack_items)
     instant = dictionary_reverse.match_translation(normalized, entries)
     curated = dictionary_reverse.match_pack_translation(normalized, pack_items)
