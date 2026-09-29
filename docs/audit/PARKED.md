@@ -2565,7 +2565,7 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 - **Los ocho gates humanos siguen `pending`** y `validation-evidence.json` sigue sin existir.
   `[AUDITORÍA]`
 
-### Estado de publicación (a fecha de este commit)
+### Estado de publicación (verificado el 2026-09-29, tras el verde de CI)
 
 | Comprobación | Resultado |
 |---|---|
@@ -2577,7 +2577,12 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 | `contrast_audit.mjs --strict` | 480 pares + 6 guardas · **0 bloqueantes** |
 | Playwright en las rutas tocadas (**Home**) en los 3 breakpoints | **19 passed · 2 skipped** (`homeDailyPlan.spec.ts` nuevo) |
 | `check_release_consistency` | OK en los **6 orígenes** (`3.90.0`) |
-| Tag anotado `v3.90.0` / GitHub Release / CI | **pendientes** al escribir esta sección; se sellan tras el verde de CI (invariante de orden restablecido en V3.88.0) |
+| Tag anotado `v3.90.0` | **publicado** (`refs/tags/v3.90.0` en `origin`) → commit `a2c698c` |
+| GitHub Release | https://github.com/jvelasca/english-tutor/releases/tag/v3.90.0 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `a2c698c` | `success` — run `36565300443`, **12/12 jobs en verde** |
+| Orden tag/CI | el tag se creó **DESPUÉS** del verde: el invariante se mantiene |
+| `v3.89.0`, cerrada en esta misma sesión | tag anotado **publicado** → `e283dac` · Release **Latest** · CI `36563083080` **12/12** (V3.89 quedó escrita pero **sin etiquetar** al cerrar su propio commit; su tag se selló al comprobarse el verde, antes de iniciar V3.90) |
+| `main` vs `origin/main` | al día en `a2c698c` |
 
 ### Sigue abierto o aparcado (deuda declarada)
 
