@@ -11,10 +11,12 @@ import asyncio
 import json
 import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
 
 import config
 from domain import dictionary_warmup as warmup_service
+from domain import vocabulary as vocabulary_domain
 from main import app
 from repositories import db
 from repositories import dictionary as dictionary_repo
@@ -33,6 +35,23 @@ def _setup(monkeypatch, tmp_path):
     a = users_repo.create_user("A")["id"]
     b = users_repo.create_user("B")["id"]
     return a, b
+
+
+@pytest.fixture(autouse=True)
+def _clear_generation_state():
+    """Limpia el estado global de generación (vuelos, negative cache, cupos).
+
+    El precalentado comparte el camino de la consulta, así que comparte también
+    su estado global por proceso: sin esta limpieza, la cuota de palabras nuevas
+    (`10`/usuario/min, ventana deslizante de 60 s) que consume un test decide si
+    el siguiente puede generar. En una máquina sin modelo local los fallos son
+    instantáneos y la ventana NUNCA se desplaza, así que un test tardío se queda
+    sin cupo y cuenta `skipped` donde espera `prepared` (fue un fallo real en
+    CI). El resto de ficheros de diccionario limpian igual entre pruebas.
+    """
+    vocabulary_domain._clear_generation_state()
+    yield
+    vocabulary_domain._clear_generation_state()
 
 
 def _payload(word: str = "cat") -> str:
@@ -174,9 +193,37 @@ def test_limit_is_capped_by_the_server(monkeypatch, tmp_path):
     words = [f"w{i}" for i in range(config.DICTIONARY_WARMUP_MAX_WORDS + 5)]
     assert vocabulary_repo.record_words(a, words) is True
 
+    # El tope se prueba con el modelo stubeado: sin esto la pasada pediría
+    # `DICTIONARY_WARMUP_MAX_WORDS` generaciones REALES solo para comprobar una
+    # resta, y el test dependería de si hay modelo local y de lo que tarde.
+    _stub_fetcher(monkeypatch, _payload, [])
     out = _post_warmup(a, {"limit": 500})
 
     assert out["total"] == config.DICTIONARY_WARMUP_MAX_WORDS
+
+
+def test_a_long_sweep_skips_what_the_quota_does_not_cover(monkeypatch, tmp_path):
+    """La cuota es la PUERTA de una pasada, no un detalle de implementación.
+
+    Una pasada NO espera a que la cuota se rellene: con el modelo sano y la caché
+    fría, prepara solo las que dan cupo (`DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE`
+    por usuario y minuto) y declara el resto `skipped`. Esto fija la aritmética que
+    la copy de la UI debe contar —nombrar la cuota, no solo al modelo—; el tope de
+    la petición no la cambia, solo decide cuántas se intentan.
+    """
+    a, _b = _setup(monkeypatch, tmp_path)
+    quota = config.DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE
+    words = [f"w{i}" for i in range(quota + 5)]
+    assert vocabulary_repo.record_words(a, words) is True
+    _stub_fetcher(monkeypatch, _payload, [])
+
+    out = _run_warmup(a)
+
+    assert out["total"] == quota + 5
+    assert out["prepared"] == quota
+    assert out["skipped"] == 5
+    assert out["pending"] == 0
+    assert out["status"] == "done"
 
 
 def test_a_running_job_is_reused_instead_of_starting_a_second_sweep(

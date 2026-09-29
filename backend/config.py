@@ -30,11 +30,15 @@ DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/m
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
 # Precalentado del diccionario a petición del alumno (V3.88.0). El trabajo corre
-# en segundo plano y reutiliza las cuotas de arriba palabra a palabra, así que el
-# tope solo acota cuánto dura una pasada (y cuánta caché se puede generar de una
-# vez), no la puerta de generación. Con 10 palabras/min por usuario, un tope de
-# 60 cubre varios minutos de trabajo útil sin dejar el proceso ocupado para
-# siempre; las que no den cupo quedan como `skipped` y se pueden reintentar.
+# en segundo plano y reutiliza las cuotas de arriba palabra a palabra: la cuota es
+# la PUERTA (una palabra sin cupo no se genera) y este tope solo acota cuántas se
+# intentan en una pasada.
+#
+# Consecuencia que conviene decir en voz alta: una pasada NO espera a que la cuota
+# se rellene, así que con la caché fría y 10 palabras nuevas/min prepara ~10 de
+# las 60 y declara el resto `skipped` aunque el modelo esté sano. No es un fallo
+# —es progreso por tandas—, y por eso la copy de la UI nombra la cuota y no solo
+# al modelo. El tope acota cuánto queda ocupado el proceso por petición.
 DICTIONARY_WARMUP_MAX_WORDS = 60
 # Trabajos de precalentado retenidos en memoria por proceso (el más antiguo se
 # descarta). El resultado real vive en la caché `dictionary_entries`, así que

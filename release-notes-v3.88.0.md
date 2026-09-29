@@ -183,7 +183,7 @@ arquitectura interna de la inversa no escala** (el O(N)).
 
 | Comprobación | Resultado |
 |---|---|
-| `pytest` backend | **3202/3202** |
+| `pytest` backend | **3203/3203** |
 | `vitest run` | **1078/1078** (111 ficheros) |
 | `tsc --noEmit` | limpio |
 | `ruff check .` (backend y lanzador, cada uno con su `pyproject.toml`) | limpio |
@@ -193,6 +193,20 @@ arquitectura interna de la inversa no escala** (el O(N)).
 | `check_release_consistency.py` | OK en los **6 orígenes** (`3.88.0`) |
 | Playwright (diccionario, puente, responsive y flashcards) | **34 passed · 2 skipped** |
 | `scripts/dictionary_cache_report.py` | informe emitido (solo lectura) sobre la BD de uso |
+
+> **Lo que la CI cazó ANTES del tag.** El primer run (`36545123518`, commit `efe4d45`) puso **11 de
+> 12** jobs en verde y falló **uno**: `Backend (ruff + pytest)`, con
+> `test_dictionary_warmup_v388.py::test_the_owner_can_poll_the_job` → `assert 0 == 1`. No era un
+> fallo del producto sino de **aislamiento del test**: el precalentado comparte el estado global de
+> generación (cuota de **10 palabras nuevas/usuario/minuto**, ventana deslizante de 60 s) y a este
+> fichero le faltaba la fixture `autouse` que limpia ese estado —la que los otros cinco ficheros de
+> diccionario **sí** tienen—. Los tests anteriores del propio fichero consumían el cupo y el último
+> se quedaba sin él. Solo se manifiesta cuando la generación **falla al instante**: en local el
+> modelo responde en ~4 s y la ventana se desplaza sola; en CI no hay modelo y la ventana **nunca**
+> se desplaza. Se reprodujo en Windows con `OLLAMA_HOST` apuntando a un puerto muerto (mismo test,
+> misma línea, mismo `0 == 1`) y se cerró con la fixture **más** un test que **fija** la aritmética
+> real (`prepared == 10`, `skipped == 5`). De paso se corrigió `test_limit_is_capped_by_the_server`,
+> que pedía **60 generaciones reales** solo para comprobar una resta.
 
 ---
 
@@ -218,6 +232,13 @@ arquitectura interna de la inversa no escala** (el O(N)).
    por decisión explícita de no partirlo en dos commits ni re-sellar las versiones a `3.87.1`.
    `release-notes-v3.87.1.md` se conserva como nota de la etapa y su encabezado lo declara.
 8. **Los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`.
+9. **La copy del precalentado nombra la cuota, no solo al modelo.** Decía «no se pudieron preparar
+   (el modelo local puede estar ocupado)», y eso era **inexacto**: con el modelo sano y la caché
+   fría, una pasada de 60 prepara ~10 y salta ~50 **por la cuota de la propia app** (10 palabras
+   nuevas/usuario/minuto). Se midió, se fijó en test y se reescribió el texto para no culpar al
+   modelo de una decisión nuestra. Lo que **no** cambia: la pasada es de **una sola vuelta** —no
+   espera a que la cuota se rellene—, así que un léxico grande se termina de precalentar **a base de
+   relanzar**. Es la diferencia entre «ya está todo» y «se puede reintentar».
 
 ---
 

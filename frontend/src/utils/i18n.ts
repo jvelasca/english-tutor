@@ -1386,8 +1386,8 @@ const STRINGS: Record<string, Entry> = {
     es: "{done} de {total} revisadas",
   },
   "dictionary.warmup.done": {
-    en: "{prepared} words ready. {skipped} could not be prepared (the local model may be busy); try again later.",
-    es: "{prepared} palabras listas. {skipped} no se pudieron preparar (el modelo local puede estar ocupado); inténtalo más tarde.",
+    en: "{prepared} words ready. {skipped} were left for later: the app prepares a limited number of new words per minute, and the local model can also be busy. Run it again in a moment.",
+    es: "{prepared} palabras listas. {skipped} quedaron para después: la app prepara un número limitado de palabras nuevas por minuto y el modelo local también puede estar ocupado. Vuelve a lanzarlo en un momento.",
   },
   "dictionary.warmup.nothing": {
     en: "There is nothing to pre-load yet. Add words to your dictionary first.",
