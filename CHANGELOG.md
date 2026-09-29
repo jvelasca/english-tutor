@@ -4,6 +4,26 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.89.0] — 2026-09-29
+
+**En Listening, el fallo deja de ser una barrera: se registra, se explica y se puede continuar. Al fallar aparecen tres salidas explícitas —`Continuar`, `Repasar ahora` (una sola repetición inmediata) y `Repasar después`— y la frase queda en una cola de repaso propia, persistente y priorizada, en vez de en un bucle «hasta acertar».** Release de **PRODUCTO (minor)** **CON backend y frontend**, **CON migración de BD aditiva e idempotente** (nueva tabla `listening_review_queue` + columna `outcome` en `listening_attempts`), **CON dos endpoints nuevos** (`GET /api/listening/review-queue` y `POST /api/listening/review-queue/{question_id}/defer`) y un tercero de limpieza (`DELETE /api/listening/review-queue/{question_id}`). `GENERATOR_VERSION` (`1.6.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos en `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**.
+
+**El bucle no estaba donde parecía.** `submit_answer` solo puntuaba y persistía: el reintento de la misma pregunta vivía en el frontend y existía **una sola vez** en A1/A2, y el «hasta acertar» real era el **drill** de fallidos (en memoria y sin persistencia). Esta release cierra los dos.
+
+**Backend.**
+- Migración aditiva e idempotente en `repositories/db.py`: tabla `listening_review_queue` (`PK(user_id, question_id)`, `fail_count`, `next_review_at`, `priority`, `state`) e índice por usuario/estado/prioridad; columna `outcome` en `listening_attempts` (`correct_first` / `correct_retry` / `wrong` / `hint_used` / `solution_shown`).
+- Módulo **puro** `services/listening_review.py`: clasifica el desenlace (`outcome_for`), acota la repetición inmediata (`IMMEDIATE_RETRY_LIMIT = 1`) y programa la reapertura con espaciado propio (24 h → 72 h → 168 h → 336 h) y prioridad determinista (nº de fallos + recencia + peso pedagógico del skill). **No es FSRS**: el objeto es una frase, no una flashcard.
+- `domain/listening.py::submit_answer` clasifica el intento, **encola el fallo** y devuelve `outcome`, `queued_for_review` e `immediate_retry_available`; un acierto **resuelve** la entrada de la cola. El intento declara `attempt_number`/`hint_used`/`solution_shown` (hechos del cliente, no política: el tope lo fija el backend).
+- Repositorio (`enqueue_failure`, `list_queue`, `due_queue`, `mark_queue_reviewed`, `defer_queue_entry`, `queue_fail_counts`) y endpoints en `routers/listening.py`.
+
+**Frontend.**
+- `ListeningPractice.tsx`: el bloque de reintento forzado pasa a un panel con **tres acciones**; `microFlow.ts` gana `retriesRemain` y `skipAnswerStage` y **el fallo ya no fuerza la salida del ítem** —el alumno decide—; `listeningSession.ts::drillAnswered` **saca la frase del pool al responderla** (acierte o falle), así que la sesión de drill termina con pendientes en vez de repetir.
+- `ListeningLevelPanel.tsx` muestra «Repaso pendiente: N» por nivel con acción para repasar; `ListeningPractice.tsx` resume el total pendiente y cuántas vencen hoy. Cadenas nuevas en `utils/i18n.ts` (es/en) con `--strict` en verde.
+
+**Fuera de alcance, declarado.** Listening **no** entra en FSRS (la cola es de ejercicios, no de vocabulario); la cola es **por usuario**; la práctica de lo pendiente reutiliza la selección por nivel en modo `failed`.
+
+---
+
 ## [3.88.0] — 2026-09-29
 
 **La app deja de parecer colgada cuando el modelo local tarda, el diccionario deja de servir un significado único cuando la palabra tiene varios, y la caché del diccionario se puede precalentar y medir.** Release de **PRODUCTO (minor)** **CON backend y frontend**, **SIN migración de BD** (todo es aditivo: el precalentado reutiliza `dictionary_entries` y no crea tablas), **CON dos endpoints nuevos** (`POST /api/vocabulary/dictionary/warmup` → 202 + trabajo de fondo, y `GET /api/vocabulary/dictionary/warmup/{job_id}`) y **CON bump de `GENERATOR_VERSION` (`1.5.0 → 1.6.0`)**. `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos en `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. Incluye, además, el **estudio de viabilidad del diccionario offline** (`docs/DISENO-V388-DICCIONARIO-OFFLINE.md`), que **no implementa** el empaquetado y sí lo mide con datos.

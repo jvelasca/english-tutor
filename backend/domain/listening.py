@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
@@ -9,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from repositories import db
 from repositories import listening as listening_repo
 from repositories import settings as settings_repo
-from services import tts
+from services import listening_review, tts
 from services.audio_library import is_recorded, recorded_audio_path
 from services.auditory_profile import auditory_profile
 from services.curriculum import LISTENING_BANK_VERSION
@@ -309,11 +310,22 @@ async def submit_answer(
     stage: str = "",
     transcript_used: str = "",
     segments_replayed: int = 0,
+    attempt_number: int = 1,
+    hint_used: bool = False,
+    solution_shown: bool = False,
 ) -> dict | None:
     """Evalúa y persiste la respuesta. Devuelve None si la pregunta no existe.
 
     `layer` no llega por parámetro: es la fuente de verdad del backend y se deriva
     del skill del ítem (la capa del esquema de clientes es solo informativa).
+
+    V3.89 (Listening robusto): el fallo deja de ser un callejón. El intento se
+    clasifica con un `outcome` (acierto a la primera, acierto tras reintento,
+    fallo, fallo con pista o con solución mostrada) y, si es un fallo, la frase
+    **entra en la cola de repaso** (`listening_review_queue`). La respuesta
+    declara `outcome`, `queued_for_review` y `immediate_retry_available` para que
+    el cliente muestre las tres acciones (continuar / repasar ahora / repasar
+    después) sin improvisar política. Un acierto resuelve la entrada de la cola.
     """
     question = await _resolve_question(question_id)
     if question is None:
@@ -332,35 +344,89 @@ async def submit_answer(
         if not correct and task_type in ("cloze", "segmentation")
         else None
     )
+    outcome = listening_review.outcome_for(
+        correct,
+        attempt_number,
+        hint_used=hint_used,
+        solution_shown=solution_shown,
+    )
+    skill = question.get("skill", "")
     await run_in_threadpool(
         listening_repo.record_attempt,
         user_id,
         question_id,
         answer_index,
         correct,
-        question.get("skill", ""),
+        skill,
         difficulty,
         response_time_ms,
         replay_count,
         question.get("topic", ""),
         realized,
         task_type=task_type,
-        layer=skill_layer(question.get("skill", "")) or "",
+        layer=skill_layer(skill) or "",
         speed_used=speed_used,
         stage=stage,
         transcript_used=transcript_used,
         segments_replayed=segments_replayed,
         word_breakdown=word_breakdown,
+        outcome=outcome,
+    )
+    queued = await _sync_review_queue(
+        user_id, question_id, question, correct, skill, task_type
     )
     return {
         "question_id": question_id,
         "correct": correct,
         "correct_index": question["answer_index"],
         "level": question["level"],
-        "skill": question.get("skill", ""),
+        "skill": skill,
         "difficulty": difficulty,
         "realized_difficulty": realized,
+        # V3.89: contrato del fallo como evidencia (nunca como bloqueo).
+        "outcome": outcome,
+        "queued_for_review": queued,
+        "immediate_retry_available": (
+            not correct
+            and listening_review.can_retry_immediately(attempt_number)
+        ),
     }
+
+
+async def _sync_review_queue(
+    user_id: str,
+    question_id: str,
+    question: dict,
+    correct: bool,
+    skill: str,
+    task_type: str,
+) -> bool:
+    """Mantiene la cola de repaso coherente con el desenlace del intento.
+
+    Un fallo encola (incrementando `fail_count` si ya estaba); un acierto saca la
+    frase de la cola, porque acertarla es la forma natural de «repasarla». Se
+    ejecuta en el threadpool: el repositorio toca SQLite.
+    """
+    if correct:
+        await run_in_threadpool(
+            listening_repo.mark_queue_reviewed, user_id, question_id
+        )
+        return False
+    counts = await run_in_threadpool(listening_repo.queue_fail_counts, user_id)
+    fail_count = counts.get(question_id, 0) + 1
+    plan = listening_review.schedule(fail_count, skill=skill)
+    await run_in_threadpool(
+        listening_repo.enqueue_failure,
+        user_id,
+        question_id,
+        level=question.get("level", ""),
+        skill=skill,
+        task_type=task_type,
+        fail_count=plan["fail_count"],
+        next_review_at=plan["next_review_at"],
+        priority=plan["priority"],
+    )
+    return True
 
 
 async def submit_production(
@@ -574,3 +640,81 @@ async def get_audio(
     # la primera síntesis (cache miss); nunca rompe el flujo si el ASR no está.
     await run_in_threadpool(ensure_word_alignment, path, spoken_text(question))
     return data, None, voice
+
+
+# --- Cola de repaso de frases (V3.89, Listening robusto) ----------------------
+
+
+async def get_review_queue(user_id: str, only_due: bool = False) -> dict:
+    """Cola de repaso de frases falladas del usuario.
+
+    Devuelve `{pending, total, due, entries}`. `entries` viene ordenada por
+    prioridad (mayor primero) y declara, por frase, cuántas veces se falló y
+    cuándo toca repasarla. Con `only_due=True` solo se sirven las vencidas.
+    """
+    rows = await run_in_threadpool(listening_repo.list_queue, user_id)
+    now = listening_review.now_iso()
+    entries = [
+        {
+            "question_id": row["question_id"],
+            "level": row["level"],
+            "skill": row["skill"],
+            "task_type": row["task_type"],
+            "fail_count": int(row["fail_count"]),
+            "priority": float(row["priority"]),
+            "state": row["state"],
+            "next_review_at": row["next_review_at"],
+            "due": row["state"] == "pending" and row["next_review_at"] <= now,
+        }
+        for row in rows
+    ]
+    due = [e for e in entries if e["due"]]
+    served = due if only_due else entries
+    return {
+        "pending": len(entries),
+        "due": len(due),
+        "total": len(served),
+        "entries": served,
+    }
+
+
+async def defer_review(
+    user_id: str, question_id: str, hours: int = 24
+) -> dict | None:
+    """«Repasar después»: pospone la entrada en vez de ignorarla.
+
+    Devuelve la entrada actualizada, o None si la frase no estaba en la cola
+    (el router lo traduce a 404: no se puede posponer lo que no existe).
+    """
+    entry = await run_in_threadpool(
+        listening_repo.get_queue_entry, user_id, question_id
+    )
+    if entry is None:
+        return None
+    later = datetime.now(timezone.utc) + timedelta(hours=max(1, int(hours)))
+    await run_in_threadpool(
+        listening_repo.defer_queue_entry, user_id, question_id, later.isoformat()
+    )
+    updated = await run_in_threadpool(
+        listening_repo.get_queue_entry, user_id, question_id
+    )
+    if updated is None:  # pragma: no cover - la fila existe (se acaba de leer)
+        return None
+    return {
+        "question_id": updated["question_id"],
+        "level": updated["level"],
+        "skill": updated["skill"],
+        "task_type": updated["task_type"],
+        "fail_count": int(updated["fail_count"]),
+        "priority": float(updated["priority"]),
+        "state": updated["state"],
+        "next_review_at": updated["next_review_at"],
+        "due": False,
+    }
+
+
+async def mark_reviewed(user_id: str, question_id: str) -> bool:
+    """Saca una frase de la cola porque el alumno la repasó y la acertó."""
+    return await run_in_threadpool(
+        listening_repo.mark_queue_reviewed, user_id, question_id
+    )

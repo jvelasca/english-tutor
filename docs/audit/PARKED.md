@@ -2492,6 +2492,63 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.89.0 — Listening robusto: el fallo es evidencia, no barrera de navegación · 2026-09-29
+
+> Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
+> idempotente** (tabla `listening_review_queue` + columna `outcome` en `listening_attempts` +
+> índice por usuario), **CON tres endpoints nuevos** (`GET /api/listening/review-queue`,
+> `POST /api/listening/review-queue/{question_id}/defer`, `DELETE /api/listening/review-queue/{id}`)
+> y **SIN bump** de `GENERATOR_VERSION` (`1.6.0`) / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION`
+> sigue `1.3.1`) / `LISTENING_BANK_VERSION`. **Sin gates nuevos ni retirados** (siguen los ocho,
+> todos `pending`). Detalle en `release-notes-v3.89.0.md`.
+
+### Cerrado en V3.89.0 (deja de ser deuda)
+
+- **El «reintentar hasta acertar» de Listening.** El backend solo puntuaba; el bucle vivía en el
+  frontend (`microFlow.ts`) y el «hasta acertar» real era el **drill** de fallidos, en memoria y
+  **sin persistencia** (`listeningSession.ts`). Ahora el fallo **registra y explica**, y el alumno
+  elige entre **`Continuar`**, **`Repasar ahora`** (máximo **una** repetición inmediata) o
+  **`Repasar después`**; `skipAnswerStage` permite avanzar sin acertar y el drill suelta la frase
+  al responderla, así que **termina con pendientes**. `[UX]`
+- **El fallo no tenía memoria.** Nueva tabla `listening_review_queue` (por usuario y pregunta) con
+  `fail_count`, `last_failed_at`, `next_review_at`, `priority`, `state`, y columna `outcome`
+  (`correct_first` / `correct_retry` / `wrong` / `hint_used` / `solution_shown`) en
+  `listening_attempts`. Un acierto posterior **resuelve** la entrada; el intervalo de reapertura es
+  propio (**24 h → 72 h → 168 h → 336 h**), **no** FSRS. `[PRODUCTO]`
+- **La política se puede probar sin BD.** `services/listening_review.py` es un módulo **puro**
+  (clasificación del desenlace, tope de repetición inmediata y **prioridad determinista** = nº de
+  fallos + recencia + peso pedagógico del skill). `[MOTOR]`
+- **La cola se ve.** `ListeningLevelPanel` muestra «Repaso pendiente: N» con acción de repaso y
+  `ListeningPractice` resume el total pendiente y cuántas vencen hoy (i18n es/en, `--strict` verde).
+  `[UX]`
+
+### Abierto y medido a propósito (frontera declarada, no defecto)
+
+- **Listening NO entra en FSRS.** La cola es de **ejercicios/frases**, no de vocabulario; el puente
+  hacia FSRS como **evidencia de dificultad** es el objeto de V3.92 y **no** se adelanta aquí.
+  `[MOTOR]`
+- **La práctica de lo pendiente reutiliza la selección por nivel en modo `failed`.** No hay
+  navegador de cola propio (listado paginado, reordenar, filtrar por skill): la cola se **consume**
+  desde el panel, no se **gestiona**. `[UX]`
+- **La cola es por usuario** y se guarda en SQLite local, como el resto del progreso. `[PRODUCTO]`
+
+### Estado de publicación (a fecha de este commit)
+
+| Comprobación | Resultado |
+|---|---|
+| `ruff check .` (backend y launcher) | limpio |
+| `pytest` backend | **3231 passed** |
+| `vitest run` | **1081 passed** (111 ficheros) |
+| `tsc --noEmit` / `npm run build` | limpio / correcto |
+| `check_i18n_coverage.py --strict` | 0 huérfanas · 0 sin definir |
+| `contrast_audit.mjs --strict` | 480 pares + 6 guardas · **0 bloqueantes** |
+| `check_release_consistency` | OK en los **6 orígenes** (`3.89.0`) |
+| Tag anotado `v3.89.0` / GitHub Release / CI | **pendientes** en el momento de escribir esta sección; se sellan tras el verde de CI (invariante de orden de V3.88.0) |
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- Todo lo declarado abierto en V3.88.0 y anteriores sigue abierto.
+
 ## V3.88.0 — La espera se ve, los significados principales y el estudio del diccionario offline · 2026-09-29
 
 > Release **DE PRODUCTO** (minor) **CON backend y frontend**, **SIN migración de BD** (todo es

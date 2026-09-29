@@ -1594,6 +1594,10 @@ export interface ListeningSupportMetadata {
   stage?: string;
   transcriptUsed?: string;
   segmentsReplayed?: number;
+  // V3.89 (Listening robusto): desenlace pedagógico declarado por el cliente.
+  attemptNumber?: number;
+  hintUsed?: boolean;
+  solutionShown?: boolean;
 }
 
 export interface ListeningAnswerResponse {
@@ -1604,6 +1608,31 @@ export interface ListeningAnswerResponse {
   skill: string;
   difficulty: number;
   realized_difficulty: number;
+  // V3.89 (Listening robusto): el fallo es evidencia, no un bloqueo. `outcome`
+  // clasifica el intento; `queued_for_review` dice si la frase entró en la cola
+  // de repaso; `immediate_retry_available` indica si aún queda una repetición.
+  outcome?: string;
+  queued_for_review?: boolean;
+  immediate_retry_available?: boolean;
+}
+
+export interface ListeningReviewEntry {
+  question_id: string;
+  level: string;
+  skill: string;
+  task_type: string;
+  fail_count: number;
+  priority: number;
+  state: string;
+  next_review_at: string;
+  due: boolean;
+}
+
+export interface ListeningReviewQueue {
+  pending: number;
+  due: number;
+  total: number;
+  entries: ListeningReviewEntry[];
 }
 
 export interface ListeningProductionRequest {

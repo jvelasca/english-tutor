@@ -51,12 +51,14 @@ interface ListeningLevelPanelProps {
   extrasJob?: ListeningExtrasJob | null;
   /** Contador que fuerza a recargar el panel (tras terminar una generación). */
   refreshNonce?: number;
+  /** V3.89: frases de esta ruta pendientes en la cola de repaso (0 si ninguna). */
+  reviewPending?: number;
 }
 
 /**
  * Historial por frase de un nivel (control del alumno). Al desplegar el donut de
  * un nivel muestra sus frases agrupadas en falladas / dominadas / sin ver, cada
- * una con su altavoz TTS, y ofrece repetir las falladas hasta dominarlas,
+ * una con su altavoz TTS, y ofrece repasar las falladas (pasada acotada, V3.89),
  * repasar lo aprendido (solo dominadas) o practicar/repasar el nivel completo.
  * Cuando el banco oficial de la ruta está dominado ofrece añadir práctica extra
  * generada (IA local) para consolidar sin tocar la certificación. Solo lectura
@@ -74,6 +76,7 @@ export function ListeningLevelPanel({
   onAddExtras,
   extrasJob,
   refreshNonce,
+  reviewPending = 0,
 }: ListeningLevelPanelProps) {
   const { t } = useI18n();
   const [data, setData] = useState<ListeningLevelItems | null>(null);
@@ -182,6 +185,27 @@ export function ListeningLevelPanel({
           )
         )}
       </div>
+
+      {reviewPending > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+          <span className="font-medium text-warning">
+            {t("listening.review.pending").replace(
+              "{count}",
+              String(reviewPending),
+            )}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-8 gap-2"
+            disabled={failedIds.length === 0}
+            onClick={() => onDrillFailed(level, failedIds)}
+          >
+            {t("listening.review.open")}
+          </Button>
+        </div>
+      )}
 
       {data.completed && routeState === "functional" && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 text-xs">

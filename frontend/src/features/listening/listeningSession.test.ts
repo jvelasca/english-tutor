@@ -7,23 +7,23 @@ import {
 } from "./listeningSession";
 
 describe("listeningSession", () => {
-  it("drillAnswered elimina el id solo si la frase se acertó", () => {
+  it("drillAnswered saca la frase del pool al responderla (V3.89)", () => {
     const remaining = ["a", "b", "c"];
-    expect(drillAnswered(remaining, "b", true)).toEqual(["a", "c"]);
-    // Respuesta incorrecta: la frase sigue pendiente.
-    expect(drillAnswered(remaining, "b", false)).toEqual(["a", "b", "c"]);
+    // Acierte o falle, la frase ya se ha servido: no se repite en bucle.
+    expect(drillAnswered(remaining, "b")).toEqual(["a", "c"]);
+    expect(drillAnswered(remaining, "a")).toEqual(["b", "c"]);
     // Id que ya no está en el pool: no cambia nada.
-    expect(drillAnswered(remaining, "z", true)).toEqual(["a", "b", "c"]);
+    expect(drillAnswered(remaining, "z")).toEqual(["a", "b", "c"]);
   });
 
   it("drillAnswered no muta el array original", () => {
     const remaining = ["a", "b"];
-    const out = drillAnswered(remaining, "a", true);
+    const out = drillAnswered(remaining, "a");
     expect(out).not.toBe(remaining);
     expect(remaining).toEqual(["a", "b"]);
   });
 
-  it("drillDone cuenta las frases dominadas del drill", () => {
+  it("drillDone cuenta las frases respondidas del drill", () => {
     expect(drillDone({ mode: "drill", level: "A1", total: 5, remaining: ["a"] })).toBe(4);
     expect(drillDone({ mode: "drill", level: "A1", total: 5, remaining: [] })).toBe(5);
   });
@@ -61,5 +61,18 @@ describe("listeningSession", () => {
     expect(
       isSessionFinished({ mode: "drill", level: "A1", total: 2, remaining: ["a"] }),
     ).toBe(false);
+  });
+
+  it("el drill termina aunque se falle: el fallo va a la cola, no al bucle (V3.89)", () => {
+    let remaining = ["a", "b"];
+    // Ambas frases se fallan: aun así la sesión se cierra (no hay «hasta acertar»).
+    remaining = drillAnswered(remaining, "a");
+    expect(
+      isSessionFinished({ mode: "drill", level: "A1", total: 2, remaining }),
+    ).toBe(false);
+    remaining = drillAnswered(remaining, "b");
+    expect(
+      isSessionFinished({ mode: "drill", level: "A1", total: 2, remaining }),
+    ).toBe(true);
   });
 });

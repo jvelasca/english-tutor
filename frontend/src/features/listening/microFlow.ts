@@ -177,12 +177,16 @@ export function completeShadowing(state: MicroFlowState): MicroFlowState {
 /**
  * Resuelve la respuesta de la etapa actual (while2) y decide la transición.
  *
+ * V3.89 (Listening robusto): **el fallo no fuerza la salida ni el bucle.** Al
+ * fallar, la máquina se queda en `while2`, revela la transcripción cuando la
+ * política lo pide (o cuando ya no quedan reintentos, para que el ítem sea un
+ * momento de aprendizaje) y deja la decisión al alumno: continuar, repasar ahora
+ * (si `retriesRemain`) o repasar después. La etapa se cierra con
+ * `skipAnswerStage` cuando el alumno decide continuar, nunca por haber fallado.
+ *
  * - Correcta → avanza al siguiente paso (post), con su transcript inicial.
- * - Incorrecta y quedan reintentos (`max_attempts_per_stage`) → reintento en la
- *   misma etapa con `attemptCount+1`; si la política es `on_first_fail`, el
- *   reintento se hace con la transcripción ya visible (apoyo).
- * - Incorrecta y sin reintentos → avanza a post y revela la transcripción
- *   (en post se revisa el resultado con `transcript_used=full`).
+ * - Incorrecta → se queda en `while2` con `attemptCount+1` y el apoyo revelado
+ *   según política; el avance lo decide la UI.
  *
  * En etapas que no son de respuesta (while1/post) simplemente avanza.
  */
@@ -195,33 +199,59 @@ export function completeStageWithAnswer(
   if (state.stage !== "while2" || state.finished) {
     return advanceToNext(state, flow);
   }
-  const maxAttempts = policy.max_attempts_per_stage;
-  if (!correct) {
-    if (state.attemptCount + 1 < maxAttempts) {
-      // Reintento en la misma etapa. En `on_first_fail` (A1) el apoyo se
-      // muestra en el reintento: la tarea deja de ser "a ciegas".
-      const withSupport =
-        policy.revelation === "on_first_fail" &&
-        !state.revealed &&
-        state.transcript !== "full";
-      return {
-        ...state,
-        attemptCount: state.attemptCount + 1,
-        transcript: withSupport ? "full" : state.transcript,
-        revealed: withSupport || state.revealed,
-      };
-    }
-    // Sin reintentos: se cierra la fase de respuesta revelando el resultado.
-    const next = advanceToNext(state, flow);
-    return { ...next, transcript: "full", revealed: true };
+  if (correct) {
+    // Correcta: se avanza; la transcripción se podrá revelar en post.
+    return advanceToNext(state, flow);
   }
-  // Correcta: se avanza; la transcripción se podrá revelar en post.
-  return advanceToNext(state, flow);
+  // Fallo: NO se avanza por sí solo (el fallo es evidencia, no una barrera).
+  const noRetriesLeft =
+    state.attemptCount + 1 >= policy.max_attempts_per_stage;
+  const withSupport =
+    !state.revealed &&
+    state.transcript !== "full" &&
+    (policy.revelation === "on_first_fail" || noRetriesLeft);
+  return {
+    ...state,
+    attemptCount: state.attemptCount + 1,
+    transcript: withSupport ? "full" : state.transcript,
+    revealed: withSupport || state.revealed,
+  };
 }
 
 /** Reintento explícito solicitado por la UI cuando quedan intentos. */
 export function retryStage(state: MicroFlowState): MicroFlowState {
   return { ...state, attemptCount: state.attemptCount + 1 };
+}
+
+/**
+ * ¿Queda repetición inmediata en la etapa de respuesta? (V3.89)
+ *
+ * Espeja el tope del backend (`IMMEDIATE_RETRY_LIMIT = 1`): como máximo **una**
+ * repetición de la misma pregunta. A partir de ahí la frase va a la cola de
+ * repaso y la sesión continúa; el bucle «hasta acertar» es exactamente lo que
+ * V3.89 elimina.
+ */
+export function retriesRemain(
+  state: MicroFlowState,
+  policy: ListeningTranscriptPolicy,
+): boolean {
+  if (state.stage !== "while2" || state.finished) return false;
+  return state.attemptCount < policy.max_attempts_per_stage;
+}
+
+/**
+ * Cierra la etapa de respuesta SIN acertar (V3.89): el alumno decide continuar
+ * o repasar más tarde en vez de quedarse atrapado en la pregunta. Avanza al
+ * siguiente paso revelando la transcripción, igual que el camino «sin
+ * reintentos» de `completeStageWithAnswer`.
+ */
+export function skipAnswerStage(
+  state: MicroFlowState,
+  flow: ListeningFlowStep[],
+): MicroFlowState {
+  if (state.finished) return state;
+  const next = advanceToNext(state, flow);
+  return { ...next, transcript: "full", revealed: true };
 }
 
 /** True mientras el alumno está contestando la pregunta (etapa with2). */

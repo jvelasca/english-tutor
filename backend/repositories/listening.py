@@ -30,6 +30,7 @@ def record_attempt(
     shadowing_duration_ms: int | None = None,
     shadowing_speech_rate: float | None = None,
     word_breakdown: dict | None = None,
+    outcome: str = "",
 ) -> bool:
     """Persiste un intento de listening para un usuario existente.
 
@@ -51,6 +52,11 @@ def record_attempt(
     fallado → `{"target": <palabra diana>}`); se serializa a JSON en
     `word_breakdown_json`. Default `None` retrocompatible: los intentos sin
     breakdown (MCQ correcto, dictado acertado…) guardan `NULL`.
+
+    `outcome` (V3.89, Listening robusto) clasifica el DESENLACE pedagógico del
+    intento (`correct_first`/`correct_retry`/`wrong`/`hint_used`/`solution_shown`;
+    ver `services/listening_review.py`). Default `""` retrocompatible: los
+    llamadores que no lo declaran conservan el comportamiento anterior.
     """
     if get_user(user_id) is None:
         return False
@@ -61,8 +67,9 @@ def record_attempt(
             "response_time_ms, replay_count, topic, realized_difficulty, "
             "task_type, score, layer, speed_used, stage, transcript_used, "
             "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
-            "word_breakdown_json, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "word_breakdown_json, outcome, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+            "?, ?)",
             (
                 user_id,
                 question_id,
@@ -84,6 +91,7 @@ def record_attempt(
                 shadowing_duration_ms,
                 shadowing_speech_rate,
                 json.dumps(word_breakdown) if word_breakdown is not None else None,
+                outcome,
                 _now(),
             ),
         )
@@ -98,7 +106,7 @@ def list_attempts(user_id: str) -> list[dict]:
             "response_time_ms, replay_count, topic, realized_difficulty, "
             "task_type, score, layer, speed_used, stage, transcript_used, "
             "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
-            "word_breakdown_json, created_at "
+            "word_breakdown_json, outcome, created_at "
             "FROM listening_attempts WHERE user_id = ? ORDER BY id ASC",
             (user_id,),
         ).fetchall()
@@ -321,3 +329,165 @@ def finish_generation_job(job_id: str, added_ids: list[str], error: str = "") ->
             "WHERE id = ?",
             (status, json.dumps(added_ids), error, _now(), job_id),
         )
+
+
+# --- Cola de repaso de frases falladas (V3.89, Listening robusto) -------------
+# Objeto pedagógico separado de FSRS: aquí viven EJERCICIOS/FRASES que el alumno
+# no entendió al escucharlas, no vocabulario. La cola es persistente y por
+# usuario; `fail_count` es la evidencia de dificultad que ordena la prioridad.
+# El cálculo de `next_review_at`/`priority` vive en `services/listening_review.py`
+# (puro y testeable); aquí solo se persiste y se lee.
+
+_QUEUE_COLUMNS = (
+    "user_id, question_id, level, skill, task_type, fail_count, last_failed_at, "
+    "next_review_at, priority, state, created_at, updated_at"
+)
+
+
+def enqueue_failure(
+    user_id: str,
+    question_id: str,
+    *,
+    level: str = "",
+    skill: str = "",
+    task_type: str = "mcq",
+    fail_count: int = 1,
+    next_review_at: str,
+    priority: float,
+) -> bool:
+    """Inserta o actualiza la entrada de repaso de una frase fallada.
+
+    Upsert por `(user_id, question_id)`: la misma frase que vuelve a fallar
+    incrementa `fail_count` y recalcula `next_review_at`/`priority` (el
+    llamador los calcula con el módulo puro). Devuelve True si hubo escritura.
+
+    `state` se fuerza a `pending`: un fallo nuevo reabre la entrada aunque
+    estuviera `deferred` (el alumno volvió a fallarla, luego toca repasarla).
+    """
+    if get_user(user_id) is None:
+        return False
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO listening_review_queue "
+            "(user_id, question_id, level, skill, task_type, fail_count, "
+            "last_failed_at, next_review_at, priority, state, created_at, "
+            "updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?) "
+            "ON CONFLICT(user_id, question_id) DO UPDATE SET "
+            "level = excluded.level, "
+            "skill = excluded.skill, "
+            "task_type = excluded.task_type, "
+            "fail_count = excluded.fail_count, "
+            "last_failed_at = excluded.last_failed_at, "
+            "next_review_at = excluded.next_review_at, "
+            "priority = excluded.priority, "
+            "state = 'pending', "
+            "updated_at = excluded.updated_at",
+            (
+                user_id,
+                question_id,
+                level,
+                skill,
+                task_type,
+                max(1, int(fail_count)),
+                now,
+                next_review_at,
+                float(priority),
+                now,
+                now,
+            ),
+        )
+    return True
+
+
+def get_queue_entry(user_id: str, question_id: str) -> dict | None:
+    """Entrada de la cola para una frase, o None si no está encolada."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_QUEUE_COLUMNS} FROM listening_review_queue "
+            "WHERE user_id = ? AND question_id = ?",
+            (user_id, question_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_queue(user_id: str, state: str | None = "pending") -> list[dict]:
+    """Entradas de la cola del usuario, ordenadas por prioridad DESC.
+
+    `state=None` devuelve todas (auditoría); por defecto solo las `pending`.
+    Orden determinista: prioridad DESC y, a igualdad, la más antigua primero.
+    """
+    with closing(_conn()) as conn:
+        if state is None:
+            rows = conn.execute(
+                f"SELECT {_QUEUE_COLUMNS} FROM listening_review_queue "
+                "WHERE user_id = ? ORDER BY priority DESC, last_failed_at ASC",
+                (user_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT {_QUEUE_COLUMNS} FROM listening_review_queue "
+                "WHERE user_id = ? AND state = ? "
+                "ORDER BY priority DESC, last_failed_at ASC",
+                (user_id, state),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def due_queue(user_id: str, now: str) -> list[dict]:
+    """Entradas `pending` cuya `next_review_at` ya venció, por prioridad DESC.
+
+    `now` es una marca ISO-8601 comparable lexicográficamente (mismo formato que
+    `_now()`), de modo que la comparación es de cadenas y no necesita SQLite
+    que entienda fechas.
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            f"SELECT {_QUEUE_COLUMNS} FROM listening_review_queue "
+            "WHERE user_id = ? AND state = 'pending' AND next_review_at <= ? "
+            "ORDER BY priority DESC, last_failed_at ASC",
+            (user_id, now),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_queue_reviewed(user_id: str, question_id: str) -> bool:
+    """Marca una entrada como repasada (la resuelve y la saca de la cola)."""
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "DELETE FROM listening_review_queue "
+            "WHERE user_id = ? AND question_id = ?",
+            (user_id, question_id),
+        )
+        return cur.rowcount > 0
+
+
+def defer_queue_entry(user_id: str, question_id: str, next_review_at: str) -> bool:
+    """Pospone una entrada (`state='deferred'`) hasta `next_review_at`.
+
+    «Repasar después» no es ignorar: la entrada sigue viva y con nueva fecha.
+    """
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "UPDATE listening_review_queue "
+            "SET state = 'deferred', next_review_at = ?, updated_at = ? "
+            "WHERE user_id = ? AND question_id = ?",
+            (next_review_at, _now(), user_id, question_id),
+        )
+        return cur.rowcount > 0
+
+
+def queue_fail_counts(user_id: str) -> dict[str, int]:
+    """Mapa `question_id → fail_count` de las entradas en cola del usuario.
+
+    Sirve para no volver a fallar «desde cero»: la cola ya guarda cuántas veces
+    se falló la frase, así que un nuevo fallo incrementa sobre ese número.
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT question_id, fail_count FROM listening_review_queue "
+            "WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    return {r["question_id"]: int(r["fail_count"]) for r in rows}

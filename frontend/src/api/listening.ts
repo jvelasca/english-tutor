@@ -6,6 +6,8 @@ import type {
   ListeningLevelItems,
   ListeningProductionResult,
   ListeningQuestion,
+  ListeningReviewEntry,
+  ListeningReviewQueue,
   ListeningRouteExtras,
   ListeningStats,
   ListeningSupportMetadata,
@@ -74,10 +76,53 @@ export function submitListeningAnswer(
       ...(opts.segmentsReplayed !== undefined
         ? { segments_replayed: opts.segmentsReplayed }
         : {}),
+      // V3.89 (Listening robusto): desenlace del intento (hecho, no política).
+      ...(opts.attemptNumber !== undefined
+        ? { attempt_number: opts.attemptNumber }
+        : {}),
+      ...(opts.hintUsed !== undefined ? { hint_used: opts.hintUsed } : {}),
+      ...(opts.solutionShown !== undefined
+        ? { solution_shown: opts.solutionShown }
+        : {}),
     }),
     TIMEOUT_SUBMIT_MS,
     "submit answer",
   );
+}
+
+// --- Cola de repaso de frases (V3.89, Listening robusto) ---------------------
+// El fallo de comprensión auditiva se reabre más tarde con una cola propia (no
+// es FSRS: el objeto es una frase, no una flashcard). El alumno puede consultar
+// la cola y posponer una entrada («repasar después») en vez de ignorarla.
+
+export function getListeningReviewQueue(
+  _userId: string,
+  onlyDue = false,
+): Promise<ListeningReviewQueue> {
+  const query = onlyDue ? "?only_due=true" : "";
+  return withTimeout(
+    getJson<ListeningReviewQueue>(`/api/listening/review-queue${query}`),
+    TIMEOUT_READ_MS,
+    "review queue",
+  );
+}
+
+export function deferListeningReview(
+  _userId: string,
+  questionId: string,
+  hours = 24,
+): Promise<ListeningReviewEntry> {
+  return postJson<ListeningReviewEntry>(
+    `/api/listening/review-queue/${questionId}/defer`,
+    { hours },
+  );
+}
+
+export function resolveListeningReview(
+  _userId: string,
+  questionId: string,
+): Promise<void> {
+  return deleteJson<void>(`/api/listening/review-queue/${questionId}`);
 }
 
 export function getListeningStats(_userId: string): Promise<ListeningStats> {

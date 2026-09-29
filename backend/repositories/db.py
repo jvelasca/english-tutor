@@ -438,6 +438,31 @@ def init_db() -> None:
             )
             """
         )
+        # V3.89 (Listening robusto): cola de repaso de FRASES falladas, separada
+        # de FSRS por diseño. Un fallo de comprensión auditiva NO es una flashcard:
+        # es un ejercicio que se reabre más tarde. La PK compuesta garantiza una
+        # sola entrada por (usuario, frase) y `fail_count` es la evidencia de
+        # dificultad que alimenta la prioridad. Estado `pending`/`deferred`.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS listening_review_queue (
+                user_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                level TEXT NOT NULL DEFAULT '',
+                skill TEXT NOT NULL DEFAULT '',
+                task_type TEXT NOT NULL DEFAULT 'mcq',
+                fail_count INTEGER NOT NULL DEFAULT 1,
+                last_failed_at TEXT NOT NULL,
+                next_review_at TEXT NOT NULL,
+                priority REAL NOT NULL DEFAULT 0,
+                state TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, question_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS learning_profile (
@@ -1621,6 +1646,18 @@ def init_db() -> None:
                 "word_breakdown_json TEXT"
             )
 
+        # Migración idempotente V3.89 (Listening robusto): `outcome` describe el
+        # DESENLACE pedagógico del intento, no solo su acierto. Un `1`/`0` no
+        # distingue acertar a la primera de acertar tras un reintento, y esa
+        # diferencia es evidencia útil. Valores (ver `services/listening_review.py`):
+        # `correct_first`, `correct_retry`, `wrong`, `hint_used`, `solution_shown`.
+        # Aditiva con default '' para que los intentos legacy queden sin clasificar.
+        if "outcome" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN outcome TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "
             "ON messages(conversation_id, message_id)"
@@ -1651,6 +1688,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_listening_attempts_user_id "
             "ON listening_attempts(user_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_listening_review_queue_user "
+            "ON listening_review_queue(user_id, state, priority)"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "

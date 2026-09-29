@@ -19,6 +19,9 @@ from schemas.listening import (
     ListeningProductionRequest,
     ListeningProductionResult,
     ListeningQuestion,
+    ListeningReviewDeferRequest,
+    ListeningReviewEntry,
+    ListeningReviewQueue,
     ListeningRouteExtrasOut,
     ListeningStats,
 )
@@ -118,6 +121,9 @@ async def answer(
         body.stage,
         body.transcript_used,
         body.segments_replayed,
+        body.attempt_number,
+        body.hint_used,
+        body.solution_shown,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
@@ -127,6 +133,55 @@ async def answer(
         f"listening:{body.question_id}:{'ok' if result['correct'] else 'ko'}",
     )
     return result
+
+
+# --- Cola de repaso de frases (V3.89, Listening robusto) ----------------------
+# El fallo de comprensión auditiva se reabre más tarde con repetición espaciada
+# propia (NO es FSRS: el objeto es una frase, no una flashcard). El alumno puede
+# consultar la cola y posponer una entrada explícitamente («repasar después»).
+
+
+@router.get("/api/listening/review-queue", response_model=ListeningReviewQueue)
+async def review_queue(
+    only_due: bool = False,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Cola de repaso del alumno (por prioridad). `only_due` filtra las vencidas."""
+    return await listening_service.get_review_queue(user["id"], only_due=only_due)
+
+
+@router.post(
+    "/api/listening/review-queue/{question_id}/defer",
+    response_model=ListeningReviewEntry,
+)
+async def defer_review(
+    question_id: str,
+    body: ListeningReviewDeferRequest,
+    user: dict = Depends(current_user),
+) -> dict:
+    """«Repasar después»: pospone la frase en vez de ignorarla."""
+    entry = await listening_service.defer_review(user["id"], question_id, body.hours)
+    if entry is None:
+        raise HTTPException(
+            status_code=404, detail="La frase no está en la cola de repaso"
+        )
+    return entry
+
+
+@router.delete(
+    "/api/listening/review-queue/{question_id}", status_code=204
+)
+async def resolve_review(
+    question_id: str,
+    user: dict = Depends(current_user),
+) -> Response:
+    """Saca una frase de la cola porque se repasó y se acertó."""
+    removed = await listening_service.mark_reviewed(user["id"], question_id)
+    if not removed:
+        raise HTTPException(
+            status_code=404, detail="La frase no está en la cola de repaso"
+        )
+    return Response(status_code=204)
 
 
 @router.post("/api/listening/dictation", response_model=ListeningProductionResult)

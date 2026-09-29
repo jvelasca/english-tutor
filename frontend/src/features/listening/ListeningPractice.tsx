@@ -9,9 +9,11 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
+  ArrowRight,
   Check,
   ChevronDown,
   ChevronUp,
+  Clock,
   Flag,
   Loader2,
   Mic,
@@ -30,8 +32,10 @@ import {
   getListeningAudioUrl,
   getListeningDiagnostic,
   getListeningQuestion,
+  getListeningReviewQueue,
   getListeningStats,
   getRouteExtrasJob,
+  deferListeningReview,
   submitListeningAnswer,
   submitListeningDictation,
   submitListeningShadowing,
@@ -111,7 +115,9 @@ import {
   initialFlow,
   isProductionFlow,
   revealFull,
+  retriesRemain,
   scaleWordTimings,
+  skipAnswerStage,
   variantTimeScale,
   type FailedWordRef,
   type MicroFlowState,
@@ -287,6 +293,12 @@ export function ListeningPractice({
   const [speakingQuestion, setSpeakingQuestion] = useState(false);
   const [session, setSession] = useState<ListeningSession | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  // V3.89 (Listening robusto): frases pendientes de repaso (cola persistente del
+  // backend). Se muestra «Repaso pendiente: N» y da una salida a lo fallado que
+  // ya no se repite en bucle dentro de la sesión.
+  const [reviewPending, setReviewPending] = useState(0);
+  const [reviewDue, setReviewDue] = useState(0);
+  const [reviewByLevel, setReviewByLevel] = useState<Record<string, number>>({});
   // Micro-flujo por ítem (V3.27, V3.28 Listening Engine 4.0): estado de la
   // máquina de presentación. Se activa cuando la pregunta trae `flow` del
   // backend: rutas adaptativa, por nivel (`level`) y drill (`failed`). Solo el
@@ -439,7 +451,12 @@ export function ListeningPractice({
   const failedRefSlow = failedWordRefFor("slow");
 
   /** Metadatos de apoyo del intento (evidencia ampliada V3.27). Solo se envían
-   * en ítems servidos con `flow`; el resto conserva el envío anterior. */
+   * en ítems servidos con `flow`; el resto conserva el envío anterior.
+   *
+   * V3.89: añade `attemptNumber` (1 en el primer intento, 2 tras la repetición
+   * inmediata) para que el backend clasifique el desenlace (`correct_first` vs
+   * `correct_retry`) y acote la repetición. Es un HECHO que declara el cliente,
+   * no política: el tope lo fija el backend. */
   function supportOpts(): ListeningSupportMetadata | undefined {
     if (!question || !flowState) return undefined;
     return {
@@ -447,6 +464,7 @@ export function ListeningPractice({
       speedUsed: variant,
       stage: flowState.stage ?? undefined,
       transcriptUsed: flowState.transcript,
+      attemptNumber: flowState.attemptCount + 1,
     };
   }
 
@@ -615,18 +633,17 @@ export function ListeningPractice({
   }
 
   // Tras responder: avanza el progreso de la sesión (el contador solo avanza
-  // cuando se responde, no al saltar). En drill se elimina la frase del pool
-  // pendiente solo si se acertó.
-  function applySessionOutcome(questionId: string, correct: boolean) {
+  // cuando se responde, no al saltar). V3.89: en drill la frase sale del pool
+  // al responderla, acierte o falle — el fallo queda en la cola de repaso
+  // persistente y la sesión NO se bloquea repitiendo la misma frase.
+  function applySessionOutcome(questionId: string, _correct: boolean) {
     if (!session) return;
     if (session.mode === "drill") {
-      if (correct) {
-        setSession((s) =>
-          s && s.mode === "drill"
-            ? { ...s, remaining: drillAnswered(s.remaining, questionId, true) }
-            : s,
-        );
-      }
+      setSession((s) =>
+        s && s.mode === "drill"
+          ? { ...s, remaining: drillAnswered(s.remaining, questionId) }
+          : s,
+      );
       return;
     }
     // level y mastered (repaso de lo aprendido) rotan una vuelta completa.
@@ -635,6 +652,36 @@ export function ListeningPractice({
         ? { ...s, done: s.done + 1 }
         : s,
     );
+  }
+
+  // --- V3.89: el fallo es evidencia, no una barrera --------------------------
+  // Tras un fallo en la etapa de respuesta el alumno tiene TRES salidas:
+  // continuar (siempre), repasar ahora (si queda repetición inmediata) y repasar
+  // después (pospone la frase en la cola). Ninguna es «hasta que aciertes».
+
+  /** Continúa el flujo tras un fallo: avanza al post conservando el resultado
+   * para que el alumno vea la explicación (no se borra `result`). */
+  function continueAfterFailure() {
+    if (!flowState) {
+      void load();
+      return;
+    }
+    const next = skipAnswerStage(flowState, flowSteps);
+    setFlowState(next.finished ? null : next);
+    if (next.finished) void load();
+  }
+
+  /** «Repasar después»: pospone la frase en la cola y continúa la sesión. */
+  async function deferFailure() {
+    if (userId && question) {
+      try {
+        await deferListeningReview(userId, question.id);
+      } catch {
+        /* si no se puede posponer, la frase sigue pendiente igualmente */
+      }
+      void refreshReviewQueue();
+    }
+    continueAfterFailure();
   }
 
   // --- Práctica extra generada (V3.6) ----------------------------------------
@@ -734,6 +781,28 @@ export function ListeningPractice({
     }
   }
 
+  /** V3.89: refresca el contador de la cola de repaso de frases falladas.
+   *
+   * Es solo el aviso («Repaso pendiente: N»); la cola persistente y su orden por
+   * prioridad viven en el backend. Un fallo de red no rompe la sesión: el
+   * contador se queda como estaba. */
+  async function refreshReviewQueue() {
+    if (!userId) return;
+    try {
+      const queue = await getListeningReviewQueue(userId);
+      setReviewPending(queue.pending);
+      setReviewDue(queue.due);
+      const byLevel: Record<string, number> = {};
+      for (const entry of queue.entries) {
+        const key = entry.level || "";
+        byLevel[key] = (byLevel[key] ?? 0) + 1;
+      }
+      setReviewByLevel(byLevel);
+    } catch {
+      /* backend no disponible */
+    }
+  }
+
   // V3.48.1: al seleccionar (o hidratar) una ruta, se despliega su panel.
   useEffect(() => {
     if (selectedLevel) setExpandedLevel(selectedLevel);
@@ -742,6 +811,7 @@ export function ListeningPractice({
   useEffect(() => {
     void load();
     void refreshStats();
+    void refreshReviewQueue();
     // V3.52.1: al cambiar la ruta seleccionada se recarga la pregunta para
     // servirla del nivel elegido (antes solo se recargaba al cambiar de perfil,
     // así que seleccionar A2 no tenía efecto inmediato).
@@ -837,6 +907,8 @@ async function choose(index: number) {
     applySessionOutcome(question.id, res.correct);
     onAttempt();
     void refreshStats();
+    // V3.89: un fallo entra en la cola de repaso; refresca el contador visible.
+    if (!res.correct) void refreshReviewQueue();
   } catch (e) {
     // Fallo de red o timeout: se muestra el error y la opción de saltar a la
     // siguiente, para que la pantalla nunca se quede sin salida.
@@ -1071,6 +1143,28 @@ async function submitDictation() {
               </button>
             )}
           </div>
+
+          {!session && reviewPending > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+              <span className="font-medium text-warning">
+                {t("listening.review.pending").replace(
+                  "{count}",
+                  String(reviewPending),
+                )}
+              </span>
+              {reviewDue > 0 && (
+                <span className="text-muted-foreground">
+                  {t("listening.review.dueNow").replace(
+                    "{count}",
+                    String(reviewDue),
+                  )}
+                </span>
+              )}
+              <span className="text-muted-foreground">
+                · {t("listening.review.openPanel")}
+              </span>
+            </div>
+          )}
 
           {session && (
             <Card className="flex flex-row flex-wrap items-center justify-between gap-3 p-4">
@@ -1871,32 +1965,57 @@ async function submitDictation() {
             flowPolicy && (
               <Card className="gap-4 border-warning/30 p-5">
                 <p className="text-sm font-semibold text-foreground">
-                  {t("listening.flow.tryAgainTitle")}
+                  {t("listening.review.failTitle")}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("listening.flow.tryAgainAttempt")
-                    .replace("{current}", String(micro.attemptCount + 1))
-                    .replace("{total}", String(flowPolicy.max_attempts_per_stage))}
-                </p>
+                {retriesRemain(micro, flowPolicy) && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("listening.flow.tryAgainAttempt")
+                      .replace("{current}", String(micro.attemptCount + 1))
+                      .replace(
+                        "{total}",
+                        String(flowPolicy.max_attempts_per_stage),
+                      )}
+                  </p>
+                )}
                 {micro.transcript === "full" && (
                   <p className="text-sm text-muted-foreground">
                     {t("listening.flow.withTranscript")}
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
+                  {retriesRemain(micro, flowPolicy) && (
+                    <Button
+                      type="button"
+                      className="min-h-10 gap-2"
+                      onClick={retryQuestion}
+                    >
+                      <RefreshCw className="size-4" aria-hidden="true" />
+                      {t("listening.review.retryNow")}
+                    </Button>
+                  )}
                   <Button
                     type="button"
+                    variant={retriesRemain(micro, flowPolicy) ? "outline" : "default"}
                     className="min-h-10 gap-2"
-                    onClick={retryQuestion}
+                    onClick={continueAfterFailure}
                   >
-                    <RefreshCw className="size-4" aria-hidden="true" />
-                    {t("listening.flow.tryAgain")}
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                    {t("listening.flow.continue")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-10 gap-2"
+                    onClick={() => void deferFailure()}
+                  >
+                    <Clock className="size-4" aria-hidden="true" />
+                    {t("listening.review.retryLater")}
                   </Button>
                   {micro.transcript !== "full" &&
                     flowPolicy.allow_manual_reveal && (
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         className="min-h-10 gap-2"
                         onClick={showTranscriptNow}
                       >
@@ -2252,6 +2371,7 @@ async function submitDictation() {
                       }
                       extrasJob={extrasJobs[expandedLevel] ?? null}
                       refreshNonce={extrasNonce}
+                      reviewPending={reviewByLevel[expandedLevel] ?? 0}
                     />
                   </div>
                 )}

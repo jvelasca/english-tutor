@@ -3802,10 +3802,6 @@ const STRINGS: Record<string, Entry> = {
   // pasa a caption de la tarjeta de audio. V3.75.3 retira también la tarjeta
   // `while1` (`while1Title`/`while1Hint`/`listenDone` eliminadas): la señal de
   // «he escuchado» es pulsar PLAY y las opciones aparecen solas.
-  "listening.flow.tryAgainTitle": {
-    en: "Not quite — try again",
-    es: "Casi — inténtalo de nuevo",
-  },
   "listening.flow.tryAgainAttempt": {
     en: "Attempt {current} of {total}",
     es: "Intento {current} de {total}",
@@ -3814,9 +3810,35 @@ const STRINGS: Record<string, Entry> = {
     en: "You can look at the transcript for this attempt.",
     es: "Puedes consultar la transcripción en este intento.",
   },
-  "listening.flow.tryAgain": {
-    en: "Try again",
-    es: "Intentar de nuevo",
+  // V3.89 (Listening robusto): el fallo es evidencia, no un bloqueo. El alumno
+  // elige entre continuar, repasar ahora (una vez) o repasar después (cola).
+  "listening.review.failTitle": {
+    en: "Not quite — you can keep going",
+    es: "Casi — puedes continuar",
+  },
+  "listening.review.retryNow": {
+    en: "Review now",
+    es: "Repasar ahora",
+  },
+  "listening.review.retryLater": {
+    en: "Review later",
+    es: "Repasar después",
+  },
+  "listening.review.pending": {
+    en: "Pending review: {count}",
+    es: "Repaso pendiente: {count}",
+  },
+  "listening.review.open": {
+    en: "Review pending",
+    es: "Repasar pendientes",
+  },
+  "listening.review.dueNow": {
+    en: "{count} ready today",
+    es: "{count} listas hoy",
+  },
+  "listening.review.openPanel": {
+    en: "Open a level to review them",
+    es: "Abre un nivel para repasarlas",
   },
   "listening.flow.showTranscript": {
     en: "Show transcript",

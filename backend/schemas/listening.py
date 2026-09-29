@@ -93,6 +93,13 @@ class ListeningAnswerRequest(BaseModel):
     stage: str = ""
     transcript_used: str = ""
     segments_replayed: int = Field(default=0, ge=0)
+    # V3.89 (Listening robusto): desenlace pedagógico declarado por el cliente.
+    # `attempt_number` es 1 en el primer intento y 2 tras la repetición inmediata
+    # (hecho, no política: el tope lo fija el backend). `hint_used`/`solution_shown`
+    # distinguen un fallo limpio de un fallo asistido. Todos aditivos.
+    attempt_number: int = Field(default=1, ge=1)
+    hint_used: bool = False
+    solution_shown: bool = False
 
 
 class ListeningAnswerResponse(BaseModel):
@@ -103,6 +110,42 @@ class ListeningAnswerResponse(BaseModel):
     skill: str = ""
     difficulty: int = 1
     realized_difficulty: int = 1
+    # V3.89 (Listening robusto): el fallo es evidencia, no un bloqueo. `outcome`
+    # clasifica el intento; `queued_for_review` dice si la frase entró en la cola
+    # de repaso; `immediate_retry_available` indica si aún queda una repetición
+    # inmediata (como máximo una). El cliente muestra las tres acciones con esto.
+    outcome: str = ""
+    queued_for_review: bool = False
+    immediate_retry_available: bool = False
+
+
+class ListeningReviewEntry(BaseModel):
+    """Una frase en la cola de repaso de listening (V3.89)."""
+
+    question_id: str
+    level: str = ""
+    skill: str = ""
+    task_type: str = "mcq"
+    fail_count: int = 1
+    priority: float = 0.0
+    state: str = "pending"
+    next_review_at: str = ""
+    due: bool = False
+
+
+class ListeningReviewQueue(BaseModel):
+    """Cola de repaso del alumno: cuántas hay, cuántas vencen y cuáles."""
+
+    pending: int = 0
+    due: int = 0
+    total: int = 0
+    entries: list[ListeningReviewEntry] = Field(default_factory=list)
+
+
+class ListeningReviewDeferRequest(BaseModel):
+    """Cuerpo de «repasar después»: cuántas horas posponer (1..720)."""
+
+    hours: int = Field(default=24, ge=1, le=720)
 
 
 class ListeningProductionRequest(BaseModel):

@@ -20,8 +20,10 @@ import {
   isProductionFlow,
   revealFull,
   revealSentenceIndexes,
+  retriesRemain,
   retryStage,
   scaleWordTimings,
+  skipAnswerStage,
   timingsOf,
   variantTimeScale,
   wordTimingsOf,
@@ -165,21 +167,28 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
     expect(retry.revealed).toBe(true);
   });
 
-  it("fallo agotado en A1 (2º fallo) revela y pasa a post", () => {
+  it("fallo agotado en A1 (2º fallo) revela y deja decidir al alumno (V3.89)", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
     state = advanceToNext(state, receptiveFlow);
     const first = completeStageWithAnswer(state, false, A1_POLICY, receptiveFlow);
     const second = completeStageWithAnswer(first, false, A1_POLICY, receptiveFlow);
-    expect(second.stage).toBe("post");
+    // V3.89: el fallo NO abre el post por sí solo; se queda en while2 revelado y
+    // la salida (continuar / repasar después) la decide el alumno.
+    expect(second.stage).toBe("while2");
     expect(second.revealed).toBe(true);
     expect(second.transcript).toBe("full");
+    expect(second.attemptCount).toBe(2);
+    // Y solo se sale con `skipAnswerStage`.
+    const post = skipAnswerStage(second, receptiveFlow);
+    expect(post.stage).toBe("post");
+    expect(post.revealed).toBe(true);
   });
 
-  it("fallo en B2+ (sin reintentos) cierra la fase y revela", () => {
+  it("fallo en B2+ (sin reintentos) revela y se queda en la pregunta (V3.89)", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
     state = advanceToNext(state, receptiveFlow);
     const next = completeStageWithAnswer(state, false, B2_POLICY, receptiveFlow);
-    expect(next.stage).toBe("post");
+    expect(next.stage).toBe("while2");
     expect(next.revealed).toBe(true);
     expect(next.transcript).toBe("full");
   });
@@ -188,7 +197,35 @@ describe("microFlow: respuesta correcta/incorrecta en while2", () => {
     let state = initialFlow(question({ flow: receptiveFlow }));
     state = advanceToNext(state, receptiveFlow);
     const next = completeStageWithAnswer(state, false, B2_POLICY, receptiveFlow);
-    expect(next.stage).not.toBe("while2");
+    expect(retriesRemain(next, B2_POLICY)).toBe(false);
+  });
+
+  // V3.89 (Listening robusto): el fallo no atrapa al alumno. Puede continuar sin
+  // acertar y la sesión avanza; la repetición (máximo una) es una opción, no un bucle.
+  it("retriesRemain acota la repetición inmediata a la política del backend", () => {
+    let state = initialFlow(question({ flow: receptiveFlow }));
+    state = advanceToNext(state, receptiveFlow); // while2, attemptCount 0
+    expect(retriesRemain(state, A1_POLICY)).toBe(true);
+    // Tras el primer fallo en A1 queda EXACTAMENTE una repetición inmediata.
+    const once = completeStageWithAnswer(state, false, A1_POLICY, receptiveFlow);
+    expect(retriesRemain(once, A1_POLICY)).toBe(true);
+    // Tras consumirla, se acabó: a partir de aquí solo continuar o repasar después.
+    const twice = completeStageWithAnswer(once, false, A1_POLICY, receptiveFlow);
+    expect(retriesRemain(twice, A1_POLICY)).toBe(false);
+    // B2+ no ofrece ninguna repetición inmediata.
+    const b2 = completeStageWithAnswer(state, false, B2_POLICY, receptiveFlow);
+    expect(retriesRemain(b2, B2_POLICY)).toBe(false);
+  });
+
+  it("skipAnswerStage permite continuar tras un fallo sin acertar", () => {
+    let state = initialFlow(question({ flow: receptiveFlow }));
+    state = advanceToNext(state, receptiveFlow); // while2
+    expect(state.stage).toBe("while2");
+    const next = skipAnswerStage(state, receptiveFlow);
+    // Se avanza al post con la transcripción revelada, sin dejar la pregunta abierta.
+    expect(next.stage).toBe("post");
+    expect(next.revealed).toBe(true);
+    expect(next.transcript).toBe("full");
   });
 });
 
@@ -328,7 +365,7 @@ describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
     expect(next.attemptCount).toBe(0);
   });
 
-  it("segmentación: fallo sin reintentos en B2 cierra y revela en post", () => {
+  it("segmentación: fallo sin reintentos en B2 revela y deja decidir (V3.89)", () => {
     let state = initialFlow(question({ flow: derivedMcqFlow("segmentation") }));
     state = advanceToNext(state, derivedMcqFlow("segmentation")); // while2
     const next = completeStageWithAnswer(
@@ -337,9 +374,11 @@ describe("microFlow: tareas derivadas bottom-up en el flujo (Bloque F)", () => {
       B2_POLICY,
       derivedMcqFlow("segmentation"),
     );
-    expect(next.stage).toBe("post");
+    expect(next.stage).toBe("while2");
     expect(next.revealed).toBe(true);
     expect(next.transcript).toBe("full");
+    // El post se alcanza con la acción explícita de continuar.
+    expect(skipAnswerStage(next, derivedMcqFlow("segmentation")).stage).toBe("post");
   });
 
   it("dictado parcial derivado se sirve como tarea directa de producción", () => {

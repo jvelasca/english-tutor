@@ -4,8 +4,11 @@
  * Tres modos de sesión focalizada, todos sobre frases de una ruta concreta:
  * - `level`: rotación "toda la vuelta" de la ruta (el antiguo repaso), ahora
  *   disponible para cualquier nivel, no solo los completados.
- * - `drill`: repetición de las frases falladas (intentadas y nunca acertadas)
- *   hasta dominarlas todas; `remaining` son los ids aún por acertar.
+ * - `drill`: pasada ACOTADA sobre las frases falladas (intentadas y nunca
+ *   acertadas). V3.89: la frase sale del pool al responderla, acierte o falle —
+ *   ya no se repite «hasta acertar»—. Lo que no se acierte queda en la **cola
+ *   de repaso persistente del backend** (`listening_review_queue`), que sí lo
+ *   reabre más tarde con su propia prioridad.
  * - `mastered`: "repasar lo aprendido", rotación solo sobre las frases de la
  *   ruta ya acertadas (misma mecánica LRU que `level`, con menos candidatos);
  *   sirve para consolidar y re-exponer lo dominado (V3.6).
@@ -17,17 +20,21 @@ export type ListeningSession =
   | { mode: "drill"; level: string; total: number; remaining: string[] }
   | { mode: "mastered"; level: string; total: number; done: number };
 
-/** Frase fallada superada (acertada): se elimina del pool restante del drill. */
+/**
+ * Frase respondida en el drill: sale del pool restante (V3.89).
+ *
+ * Antes solo salía al acertar, y eso era el bucle «hasta acertar». Ahora la
+ * sesión avanza siempre y el fallo se registra en la cola de repaso, que es
+ * donde debe vivir la repetición (espaciada y priorizada), no en la sesión.
+ */
 export function drillAnswered(
   remaining: string[],
   questionId: string,
-  correct: boolean,
 ): string[] {
-  if (!correct) return remaining;
   return remaining.filter((id) => id !== questionId);
 }
 
-/** Frases del drill ya dominadas (progreso de la sesión). */
+/** Frases del drill ya respondidas (progreso de la sesión, V3.89). */
 export function drillDone(session: ListeningSession): number {
   return session.mode === "drill" ? session.total - session.remaining.length : 0;
 }
