@@ -1554,3 +1554,122 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
   });
 });
+
+describe("DictionaryLookup · V3.91 acepciones pintadas", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  // V3.91: la acepción (`senses_json`) deja de ser una etiqueta del scoring y
+  // pasa a ser la lista que desambigua la palabra: equivalente, categoría,
+  // glosa, ámbito, ejemplo con audio PROPIO, contexto, forma base y procedencia.
+  const BANK_SENSES = {
+    word: "bank",
+    kind: "word",
+    cefr: "A2",
+    definition_source: "llm",
+    pos: "noun",
+    definition: "The land alongside a river, or a place for money.",
+    translation: "banco",
+    direction: "en-es",
+    alternatives: [],
+    meanings: [],
+    senses: [
+      {
+        term: "banco",
+        pos: "noun",
+        gloss: "a place where you keep money",
+        domain: "finance",
+        proper_noun: false,
+        example: "She works at the bank on the corner.",
+        context: "money and finance",
+        lemma: "bank",
+        source: "model",
+      },
+      {
+        term: "orilla",
+        pos: "noun",
+        gloss: "the land alongside a river",
+        domain: "geography",
+        proper_noun: false,
+        example: "We sat on the bank of the river.",
+        context: "at a river",
+        lemma: "bank",
+        source: "lexicon",
+      },
+    ],
+    example: null,
+    usage: { tracked: false, surface: null, unit: null },
+  };
+
+  it("pinta cada acepción numerada con su ejemplo, contexto y audio propio", async () => {
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: BANK_SENSES }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("bank");
+    await screen.findByText("Senses");
+
+    // Numeradas y con su categoría y equivalente.
+    expect(screen.getByText("Sense 1")).toBeTruthy();
+    expect(screen.getByText("Sense 2")).toBeTruthy();
+    // «banco» sale también como equivalente de la tarjeta; «orilla» solo en su
+    // acepción: ambas formas están en la lista.
+    expect(screen.getAllByText("banco").length).toBeGreaterThan(1);
+    expect(screen.getByText("orilla")).toBeTruthy();
+
+    // Glosa, ámbito y etiqueta de contexto.
+    expect(screen.getByText("a place where you keep money")).toBeTruthy();
+    expect(screen.getByText("finance")).toBeTruthy();
+    expect(screen.getByText(/Context: money and finance/)).toBeTruthy();
+    expect(screen.getByText(/Context: at a river/)).toBeTruthy();
+
+    // El ejemplo con su altavoz PROPIO: 1 del encabezado + 2 de las acepciones.
+    expect(
+      screen.getByText("She works at the bank on the corner."),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: /^Repeat with accent A/ }).length,
+    ).toBe(3);
+
+    // La forma base verificada y la procedencia se declaran, sin fingir certeza.
+    expect(screen.getAllByText(/Base form:/).length).toBe(2);
+    expect(screen.getByText("From the model")).toBeTruthy();
+    expect(screen.getByText("From the offline lexicon")).toBeTruthy();
+  });
+
+  it("una acepción de la caché antigua (solo pos/gloss) se pinta sin huecos", async () => {
+    // Contrato ADITIVO: las respuestas anteriores al contrato no traen ejemplo,
+    // contexto, lema ni procedencia. La ficha los OMITE en vez de pintarlos
+    // vacíos o rellenarlos a ojo.
+    const LEGACY = {
+      ...BANK_SENSES,
+      senses: [{ pos: "noun", gloss: "un banco" }],
+    };
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: LEGACY }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("bank");
+    await screen.findByText("Senses");
+
+    expect(screen.getByText("Sense 1")).toBeTruthy();
+    expect(screen.getByText("un banco")).toBeTruthy();
+    expect(screen.queryByText("Example")).toBeNull();
+    expect(screen.queryByText(/^Context:/)).toBeNull();
+    expect(screen.queryByText(/Base form:/)).toBeNull();
+    // Solo queda el altavoz de la palabra de cabecera.
+    expect(
+      screen.getAllByRole("button", { name: /^Repeat with accent A/ }).length,
+    ).toBe(1);
+  });
+
+  it("sin acepciones la sección no se monta (no se pinta un encabezado vacío)", async () => {
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: COFFEE }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("coffee");
+    await screen.findByText("Definition");
+    expect(screen.queryByText("Senses")).toBeNull();
+  });
+});
+

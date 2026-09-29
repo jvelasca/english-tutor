@@ -13,6 +13,39 @@
   y ventana; fuera del motor V2.7–V2.12.
 - **Pre-A1 como producto** (decisión de catálogo, `BETA_V3.md` §4.1). Opcional.
 
+## Licencia del lexicón offline: empaquetar FreeDict eng-spa (V3.91 · 2026-09-29)
+
+> **Estado:** `pending` **decisión del gerente**. No es deuda técnica ni trabajo
+> empezado: es un gate explícito que V3.91 (`v391-offline`) **no cruza a
+> propósito**. Lo que sí se hizo en V3.91 —el índice FTS5 (fase 1) y el lote de
+> operador sobre el currículum (fase 2)— **no depende de esta decisión** y no
+> empaqueta ni un byte de terceros.
+
+- **Qué está decidido y hecho (fase 2, sin licencias).** El «diccionario
+  offline» se construye con el **modelo local** sobre el vocabulario que la app
+  declara: `scripts.dictionary_lexicon_batch` (reanudable, sin cuotas de API,
+  `source: "model"`). Medido en este equipo: universo de **1.041 palabras**
+  (1.268 entradas crudas → 10 descartes → 217 duplicados) y **8,7 s/palabra**
+  reales con `llama3.1:8b` y el contrato de acepción de 1.7.0 (3 palabras
+  preparadas en 26 s de lote sobre una BD temporal), así que la pasada completa
+  son **≈ 2 h 31 min** de CPU, una sola vez. `[M]`
+- **Qué queda aparcado (fase 3).** Empaquetar **FreeDict `eng-spa` 2025.11.23**
+  (64.258 entradas crudas → 35.935 simples, **24,52 MiB** con índice FTS5,
+  búsquedas a 0,034 ms) y **no** depender del modelo para las palabras que no
+  están en el currículum. `[M]` (medidas en `docs/DISENO-V388-DICCIONARIO-OFFLINE.md` §3.1 y §4).
+- **Por qué es una decisión del gerente y no del código.** La fuente es
+  **CC BY-SA 3.0**: atribución **y *ShareAlike* de la obra derivada**, con
+  pantalla de créditos y texto de licencia permanente. Empaquetarla **cambia la
+  naturaleza del producto**: deja de haber solo contenido propio. Ninguna
+  decisión técnica puede aceptar una obligación legal en nombre del gerente.
+- **Qué haría falta para desbloquearlo** (las tres, juntas): (i) aceptación
+  **escrita** de CC BY-SA 3.0 con *ShareAlike* sobre la obra derivada; (ii)
+  pantalla de créditos + texto de licencia y su traducción; (iii) asumir que la
+  dirección **ES→EN** seguiría pagando el modelo (el `spa-eng` de FreeDict tiene
+  4.502 entradas y está marcado `too small`), o un plan aparte para ella.
+- **Instrumento que ya existe para medir el antes/después**: `scripts/dictionary_cache_report.py`
+  (volumen y frescura por `generator_version`, y el % de filas con 2+ significados).
+
 ## Motor (parámetros / calibración con datos reales)
 
 - **FSRS por tipo de memoria**: `schedule()` es uniforme; auditoría E midió y
@@ -2491,6 +2524,85 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 `v3.77.1`, `v3.77.2`, `v3.78.0`, `v3.79.0` y `v3.81.0` antes—, así que «no hay Release» **no**
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
+
+## V3.91.0 — El diccionario pasa a motor de sentidos y la inversa deja de barrer la tabla · 2026-09-29
+
+> Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
+> idempotente** (columna plegada `translation_fold` en `dictionary_entries`, tabla virtual FTS5 de
+> contenido externo y tres disparadores), **SIN endpoints nuevos** y **SIN cambio de contrato
+> incompatible** (el contrato de acepción crece con campos **aditivos**), **CON bump de
+> `GENERATOR_VERSION` (`1.6.0 → 1.7.0`)** que invalida la caché de forma **perezosa**. `CURRICULUM_VERSION`
+> sigue `1.3.1` y `LISTENING_BANK_VERSION` no cambia. **SIN añadir ni retirar gate:** siguen los
+> **ocho**, todos `pending`, y `validation-evidence.json` sigue sin existir.
+
+### Cerrado en V3.91.0 (deja de ser deuda)
+
+- **El O(N) de la inversa ES→EN.** `list_entries()` volcaba la tabla entera y el matcher filtraba en
+  Python: **268 ms por consulta** medidos a tamaño de diccionario completo (192 ms de SQL + 76 ms de
+  bucle sobre 64.258 filas, `docs/DISENO-V388-DICCIONARIO-OFFLINE.md` §2.3). El path de producción
+  usa ahora **consultas dirigidas** —`find_by_translation` (frase FTS5, `bm25`, tope de 200 filas),
+  `find_by_words` (por PK, lotes de 400) y `distractor_pool` (orden por franjas del MCQ)— y
+  `list_entries()` **se conserva con su semántica intacta** como referencia de los tests, ya **sin
+  ningún consumidor de producción**.
+- **`senses_json` se persiste desde V3.44 y no se pintaba en ninguna pantalla.** Ahora el sentido es
+  **la unidad que la ficha pinta**: `SenseList` con acepciones numeradas, `pos`, ámbito, marca de
+  nombre propio, glosa, contexto, lema verificado, procedencia y **altavoz por acepción que suena el
+  EJEMPLO**.
+- **No existía índice alguno sobre la caché.** Columna plegada `translation_fold` + FTS5 de contenido
+  externo (`remove_diacritics 0`: la `ñ` sigue siendo letra distinta) + disparadores en la BD +
+  guarda de reconstrucción.
+- **El léxico offline estaba medido y sin implementar.** Fase 2 entregada: `services/dictionary_batch.py`
+  (**puro**) y `scripts.dictionary_lexicon_batch.py` (reanudable **sin fichero de estado**, best-effort
+  por palabra, `--limit`/`--max-seconds`/`--json`/`--words-file`; salidas 0/2/3).
+
+### Abierto y medido a propósito (frontera declarada, no defecto)
+
+- **Sin FTS5, el peor caso sigue siendo un barrido.** El repliegue `LIKE` **recorre** la tabla: la
+  degradación es real y se declara, no desaparece. La sonda es **la misma** que decide el índice, así
+  que no puede haber dos verdades sobre si FTS5 está disponible.
+- **`source: "lexicon"` es una procedencia que hoy no produce ningún camino de producción.** El batch
+  escribe `source: "model"`; la UI pinta la etiqueta cuando el valor es `lexicon` **o** `model`, así
+  que está lista pero **no se emite**.
+- **Cobertura del léxico = vocabulario declarado.** El batch cubre las **1.041** palabras del
+  currículum declarado (`objective.vocabulary` de los 6 niveles + packs; **1.268** entradas crudas →
+  **10** descartes → **217** duplicados). Una palabra fuera de ese universo **sigue pagando el modelo**
+  en la primera consulta.
+- **Coste medido de la pasada completa:** **8,7 s/palabra** con `llama3.1:8b` y el contrato 1.7.0
+  (3 palabras en **26 s** de lote sobre BD temporal) → **≈ 2 h 31 min** de CPU **una sola vez**.
+- **La generación de acepciones está orientada por prompt, NO garantizada por el modelo.** Los dos
+  prompts **piden** una acepción por significado y en el mismo orden que `meanings`; que el modelo lo
+  cumpla no está garantizado por construcción.
+
+### Estado de publicación
+
+| Puerta | Resultado |
+|---|---|
+| `ruff check .` (backend y lanzador) | limpio |
+| `pytest` backend | **3368/3368** |
+| `vitest run` | **1097/1097** (111 ficheros) |
+| `tsc --noEmit` / `npm run build` | limpios |
+| `check_i18n_coverage.py --strict` | **1864** cadenas · 0 huérfanas · 0 sin definir · 0 duplicadas |
+| `contrast_audit.mjs --strict` | 480 pares + 6 guardas · **0 bloqueantes** |
+| Playwright (Diccionario, 3 breakpoints) | **31 passed · 2 skipped** |
+| `validation_gate.py auto --require-dist` | **10/10** (8 gates) |
+| `check_release_consistency` | OK en los **6 orígenes** (`3.91.0`) |
+
+**Un rojo que se conserva a propósito.** El **primer** `pytest` completo de este árbol cayó **en un
+solo test** —`test_validation_gate_v373.py::test_las_comprobaciones_de_auto_no_fallan_en_este_arbol`—
+porque las versiones ya estaban en `3.91.0` y todavía **no** existían el encabezado del `CHANGELOG`
+ni la entrada de `PLAN.md`: era **la propia puerta de consistencia** señalando trabajo a medias. Se
+completaron los documentos y la suite se re-ejecutó en verde. **No se oculta el primer rojo:** es la
+prueba de que la puerta funciona.
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **Empaquetar FreeDict `eng-spa`** queda **aparcado** con su gate explícito en
+  `§Licencia del lexicón offline: empaquetar FreeDict eng-spa (V3.91 · 2026-09-29)` (arriba, en esta
+  misma página): es **CC BY-SA 3.0** con ***ShareAlike***, y aceptarlo **cambia la naturaleza del
+  producto**; el código está listo (`clean_term`/`map_pos` son su puerta de ingesta), así que **no es
+  deuda técnica**.
+- **Los ocho gates humanos siguen `pending`** y `docs/audit/validation-evidence.json` sigue sin
+  existir.
 
 ## V3.90.0 — El objetivo del día deja de ser solo minutos: unidades, mezcla nuevo/repaso y progreso visible · 2026-09-29
 

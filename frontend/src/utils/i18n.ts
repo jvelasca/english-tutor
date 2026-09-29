@@ -1356,6 +1356,27 @@ const STRINGS: Record<string, Entry> = {
     en: "Proper noun",
     es: "Nombre propio",
   },
+  // V3.91: la acepción deja de ser una etiqueta de scoring y se PINTA. La ficha
+  // lista las acepciones numeradas con su categoría, su glosa, su ámbito, su
+  // ejemplo (con audio propio) y su etiqueta de contexto; el lema verificado y
+  // la procedencia se declaran al pie para no fingir certeza que no hay.
+  "dictionary.lookup.senses": { en: "Senses", es: "Acepciones" },
+  "dictionary.lookup.senseHint": {
+    en: "Each sense with its category, example and audio.",
+    es: "Cada acepción con su categoría, su ejemplo y su audio.",
+  },
+  "dictionary.lookup.senseNumber": { en: "Sense {n}", es: "Acepción {n}" },
+  "dictionary.lookup.senseExample": { en: "Example", es: "Ejemplo" },
+  "dictionary.lookup.senseContext": { en: "Context", es: "Contexto" },
+  "dictionary.lookup.senseLemma": { en: "Base form", es: "Forma base" },
+  "dictionary.lookup.senseSourceModel": {
+    en: "From the model",
+    es: "Del modelo",
+  },
+  "dictionary.lookup.senseSourceLexicon": {
+    en: "From the offline lexicon",
+    es: "Del lexicón offline",
+  },
   // V3.88.0: el panel de alta pedía los mazos al abrirse y, mientras llegaban,
   // decía «sin mazos» (lo mismo que cuando de verdad no hay ninguno).
   "dictionary.lookup.decksLoading": {

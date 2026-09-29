@@ -18,6 +18,7 @@ Este repositorio nunca registra evidencia del alumno ni toca
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from contextlib import closing
 
 from repositories.db import (
@@ -26,14 +27,29 @@ from repositories.db import (
     _now,
     fts5_available,
 )
+
+# El contrato de ACEPCIÓN (`SENSE_KEYS`) vive con el contenido que lo produce
+# (`services.dictionary_content`, su prompt y su normalizador) y el repositorio lo
+# IMPORTA en vez de reescribirlo: el mismo criterio declarado para la plegadura
+# (`fold`) y para `front_key`. Duplicar la lista de claves aquí sería una segunda
+# fuente de verdad que se desincronizaría al primer campo nuevo.
+from services.dictionary_content import SENSE_KEYS
 from services.dictionary_reverse import fold, phrase_query, phrase_tokens
 
 
 def _decode_senses(raw: object) -> list[dict]:
-    """Sentidos desde el JSON persistido (`[]` si vacío o corrupto) (V3.44).
+    """Acepciones desde el JSON persistido (`[]` si vacío o corrupto) (V3.44 → V3.91).
 
     Tolerante a propósito: un `senses_json` ilegible no debe romper la consulta
     del diccionario ni el scoring (que degrada a `unknown`).
+
+    V3.91: se conservan las claves del contrato de ACEPCIÓN (`SENSE_KEYS`) que la
+    fila DECLARE —con su tipo normalizado: texto para las de texto, `bool`
+    estricto para `proper_noun`— y se ignoran las desconocidas. Una fila de la
+    caché anterior al contrato (1.6.0: `{pos, gloss}`) se sirve TAL CUAL, sin
+    rellenar campos que nadie declaró: rellenarlos aquí inventaría contenido, y
+    la política del proyecto es que la caché obsoleta se REGENERA (bump de
+    `GENERATOR_VERSION`), no se disfraza.
     """
     text = str(raw or "").strip()
     if not text:
@@ -44,21 +60,30 @@ def _decode_senses(raw: object) -> list[dict]:
         return []
     if not isinstance(data, list):
         return []
-    return [
-        {
-            "pos": str(item.get("pos") or ""),
-            "gloss": str(item.get("gloss") or ""),
-        }
-        for item in data
-        if isinstance(item, dict)
-    ]
+    senses: list[dict] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        entry: dict = {}
+        for key in SENSE_KEYS:
+            if key not in item:
+                continue
+            if key == "proper_noun":
+                entry[key] = item.get(key) is True
+            else:
+                entry[key] = str(item.get(key) or "").strip()
+        senses.append(entry)
+    return senses
 
 
 def _encode_senses(senses: object) -> str:
-    """Serializa los sentidos a JSON compacto y orden estable (V3.44).
+    """Serializa las acepciones a JSON compacto y orden estable (V3.44 → V3.91).
 
-    `""` cuando no hay sentidos. Acepta una lista de `{pos, gloss}` (o una
-    cadena JSON ya serializada, que se conserva). Descarta entradas vacías o no
+    `""` cuando no hay acepciones. Acepta una lista de diccionarios (o una
+    cadena JSON ya serializada, que se conserva) y escribe SOLO las claves del
+    contrato que cada acepción declare, en el orden de `SENSE_KEYS`: una acepción
+    de V3.91 viaja con sus nueve campos y una entrada antigua (`{pos, gloss}`) se
+    persiste sin campos inventados. Descarta entradas vacías o que no sean
     diccionario; nunca lanza.
     """
     if not senses:
@@ -69,11 +94,18 @@ def _encode_senses(senses: object) -> str:
     for item in senses if isinstance(senses, (list, tuple)) else ():
         if not isinstance(item, dict):
             continue
-        pos = str(item.get("pos") or "").strip()
-        gloss = str(item.get("gloss") or "").strip()
-        if not pos and not gloss:
+        entry: dict = {}
+        for key in SENSE_KEYS:
+            if key not in item:
+                continue
+            value = item.get(key)
+            if key == "proper_noun":
+                entry[key] = value is True
+            else:
+                entry[key] = str(value or "").strip()
+        if not entry:
             continue
-        cleaned.append({"pos": pos, "gloss": gloss})
+        cleaned.append(entry)
     if not cleaned:
         return ""
     return json.dumps(cleaned, ensure_ascii=False, separators=(",", ":"))
@@ -169,6 +201,39 @@ def get_entry(word: str) -> dict | None:
             (word,),
         ).fetchone()
     return _entry_dict(row) if row else None
+
+
+def fresh_entry_words(words: Iterable[str], *, version: str) -> set[str]:
+    """Subconjunto de `words` que la caché ya sirve FRESCA (V3.91, fase 2).
+
+    Mismo criterio que `domain.vocabulary._content_is_fresh`: versión de
+    generación vigente **y** definición no vacía (una fila sin definición no es
+    contenido servible: el dominio la degrada a `definition_source="none"`).
+    Es la consulta que hace REANUDABLE al lote de operador: una palabra ya
+    preparada deja de estar pendiente, así que relanzar continúa donde quedó sin
+    fichero de estado ni marcas de «hecho» que puedan desincronizarse.
+
+    Se consulta por lotes (`_IN_CHUNK`) para no depender del tope de parámetros
+    del build de SQLite, y NUNCA se materializa la tabla completa: devuelve solo
+    las palabras preguntadas.
+    """
+    wanted = [str(word).strip().lower() for word in words if str(word).strip()]
+    if not wanted:
+        return set()
+    fresh: set[str] = set()
+    with closing(_conn()) as conn:
+        for start in range(0, len(wanted), _IN_CHUNK):
+            chunk = list(dict.fromkeys(wanted[start : start + _IN_CHUNK]))
+            marks = ",".join("?" * len(chunk))
+            rows = conn.execute(
+                "SELECT word FROM dictionary_entries "
+                "WHERE generator_version = ? "
+                "AND TRIM(COALESCE(definition, '')) <> '' "
+                f"AND word IN ({marks})",
+                (version, *chunk),
+            ).fetchall()
+            fresh.update(str(row[0]) for row in rows)
+    return fresh
 
 
 def save_entry(

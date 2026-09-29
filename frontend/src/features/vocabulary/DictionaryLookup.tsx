@@ -27,6 +27,7 @@ import type {
   DictionaryDirection,
   DictionaryEntry,
   DictionaryMeaning,
+  DictionarySense,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
   FlashcardDeck,
@@ -1400,6 +1401,127 @@ function MeaningOption({
   );
 }
 
+/** V3.91: ACEPCIÓN pintada con su ejemplo y su audio.
+ *
+ *  La acepción (`senses_json`) nació en V3.44 como etiqueta del scoring y no se
+ *  leía en pantalla; desde V3.91 es la lista que desambigua la palabra. Cada
+ *  entrada muestra su número, su categoría, su equivalente (si lo trae), su
+ *  glosa, su ámbito y su etiqueta de contexto, más un EJEMPLO con audio PROPIO
+ *  (la frase suena, no la glosa). El lema verificado y la procedencia se
+ *  declaran en una línea al pie: `model` = contenido del modelo, `lexicon` =
+ *  lexicón offline. Un campo ausente NO se pinta: nunca se rellena a ojo. */
+function SenseList({
+  senses,
+  isReverse,
+  userId,
+}: {
+  senses: DictionarySense[];
+  isReverse: boolean;
+  userId: string | null;
+}) {
+  const { t } = useI18n();
+  if (senses.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex flex-col gap-0.5">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <BookOpen className="size-3.5" aria-hidden="true" />
+          {t("dictionary.lookup.senses")}
+        </span>
+        <span className="text-[11px] font-normal text-muted-foreground">
+          {t("dictionary.lookup.senseHint")}
+        </span>
+      </div>
+      <ol className="flex flex-col gap-2">
+        {senses.map((sense, index) => (
+          <li
+            key={`${sense.pos}-${sense.gloss}-${index}`}
+            className="flex flex-col gap-1.5 rounded-xl border border-border px-3 py-2"
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground">
+                {t("dictionary.lookup.senseNumber").replace(
+                  "{n}",
+                  String(index + 1),
+                )}
+              </span>
+              {sense.pos ? (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] font-semibold uppercase"
+                >
+                  {sense.pos}
+                </Badge>
+              ) : null}
+              {sense.term ? (
+                <span
+                  className="text-sm font-semibold"
+                  lang={isReverse ? "en" : "es"}
+                >
+                  {sense.term}
+                </span>
+              ) : null}
+              {sense.domain ? (
+                <span className="text-[11px] text-muted-foreground">
+                  {sense.domain}
+                </span>
+              ) : null}
+              {sense.proper_noun ? (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] text-muted-foreground"
+                >
+                  {t("dictionary.lookup.meaningProperNoun")}
+                </Badge>
+              ) : null}
+            </div>
+            {sense.gloss ? (
+              <p className="text-sm leading-relaxed">{sense.gloss}</p>
+            ) : null}
+            {sense.example ? (
+              <div className="flex items-start justify-between gap-2 rounded-lg bg-secondary/50 px-2.5 py-1.5">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("dictionary.lookup.senseExample")}
+                  </span>
+                  <p className="text-sm italic leading-relaxed" lang="en">
+                    {sense.example}
+                  </p>
+                </div>
+                <ItemReplayButton prompt={sense.example} userId={userId} />
+              </div>
+            ) : null}
+            {sense.context || sense.lemma || sense.source ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                {sense.context ? (
+                  <span>
+                    {t("dictionary.lookup.senseContext")}: {sense.context}
+                  </span>
+                ) : null}
+                {sense.lemma ? (
+                  <span>
+                    {t("dictionary.lookup.senseLemma")}:{" "}
+                    <span lang="en">{sense.lemma}</span>
+                  </span>
+                ) : null}
+                {sense.source === "lexicon" || sense.source === "model" ? (
+                  <span>
+                    {t(
+                      sense.source === "lexicon"
+                        ? "dictionary.lookup.senseSourceLexicon"
+                        : "dictionary.lookup.senseSourceModel",
+                    )}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ResultCard({
   entry,
   userId,
@@ -1622,6 +1744,16 @@ function ResultCard({
             ) : null}
           </fieldset>
         ) : null}
+
+        {/* V3.91: las ACEPCIONES pintadas (con ejemplo, contexto y audio). Van
+            después del selector de significados para que elegir uno siga siendo
+            la acción principal, y antes de la definición porque no dependen del
+            contenido del modelo. */}
+        <SenseList
+          senses={entry.senses ?? []}
+          isReverse={isReverse}
+          userId={userId}
+        />
 
         {entry.definition_source === "llm" ? (
           <div className="flex flex-col gap-4">

@@ -41,13 +41,21 @@ def _payload(**extra: object) -> str:
 
 # --- Contrato de contenido: normalize_senses (puro) --------------------------
 
+# V3.91: el contrato de acepción crece a nueve campos y `normalize_senses` los
+# emite SIEMPRE (un campo que el modelo no dio queda ""), así que la lectura de
+# `pos`/`gloss` —lo que el Sense Engine consume— se compara con esta proyección.
+def _pos_gloss(senses: list[dict]) -> list[dict]:
+    return [{"pos": item["pos"], "gloss": item["gloss"]} for item in senses]
+
 
 def test_normalize_senses_keeps_only_canonical_pos_and_orders_by_input():
-    assert dictionary_content.normalize_senses(
-        [
-            {"pos": "Verb", "gloss": "  to decide  "},
-            {"pos": "noun", "gloss": "an arrangement"},
-        ]
+    assert _pos_gloss(
+        dictionary_content.normalize_senses(
+            [
+                {"pos": "Verb", "gloss": "  to decide  "},
+                {"pos": "noun", "gloss": "an arrangement"},
+            ]
+        )
     ) == [
         {"pos": "verb", "gloss": "to decide"},
         {"pos": "noun", "gloss": "an arrangement"},
@@ -68,7 +76,7 @@ def test_normalize_senses_deduplicates_and_caps():
         {"pos": "noun", "gloss": "a place"},
         {"pos": "noun", "gloss": "another sense"},
     ]
-    assert dictionary_content.normalize_senses(duplicated) == [
+    assert _pos_gloss(dictionary_content.normalize_senses(duplicated)) == [
         {"pos": "noun", "gloss": "a place"},
         {"pos": "noun", "gloss": "another sense"},
     ]
@@ -101,7 +109,7 @@ def test_parse_content_extracts_senses_and_derives_top_pos():
         ),
         word="plan",
     )
-    assert out["senses"] == [
+    assert _pos_gloss(out["senses"]) == [
         {"pos": "verb", "gloss": "to decide"},
         {"pos": "noun", "gloss": "an arrangement"},
     ]
@@ -134,12 +142,17 @@ def test_parse_reverse_content_extracts_senses_and_derives_top_pos():
         )
     )
     assert out["english"] == "plan"
-    assert out["senses"] == [{"pos": "noun", "gloss": "an arrangement"}]
+    assert _pos_gloss(out["senses"]) == [
+        {"pos": "noun", "gloss": "an arrangement"}
+    ]
     assert out["pos"] == "noun"
 
 
 def test_prompts_declare_senses_and_version_is_bumped():
-    assert dictionary_content.GENERATOR_VERSION == "1.6.0"
+    # V3.91: el contrato de acepción crece (ejemplo, contexto, lema y
+    # procedencia) y sube la versión, que es la palanca que regenera la caché
+    # anterior de forma perezosa.
+    assert dictionary_content.GENERATOR_VERSION == "1.7.0"
     assert "senses" in dictionary_content._SYSTEM_PROMPT
     assert "senses" in dictionary_content._REVERSE_SYSTEM_PROMPT
     # V3.86.0: el contrato gana `meanings` (significados elegibles) y la regla
@@ -148,6 +161,13 @@ def test_prompts_declare_senses_and_version_is_bumped():
     assert "meanings" in dictionary_content._REVERSE_SYSTEM_PROMPT
     assert "proper_noun" in dictionary_content._SYSTEM_PROMPT
     assert "proper_noun" in dictionary_content._REVERSE_SYSTEM_PROMPT
+    # V3.91: los dos prompts piden el ejemplo y el contexto de cada acepción.
+    for prompt in (
+        dictionary_content._SYSTEM_PROMPT,
+        dictionary_content._REVERSE_SYSTEM_PROMPT,
+    ):
+        assert '"example"' in prompt
+        assert '"context"' in prompt
 
 
 # --- Persistencia y migración ------------------------------------------------

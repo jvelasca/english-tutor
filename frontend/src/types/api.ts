@@ -848,10 +848,30 @@ export interface DictionaryEntry {
   usage: DictionaryUsage;
 }
 
-/** V3.44: sentido declarado de una unidad léxica (contenido del diccionario). */
+/**
+ * V3.44 → V3.91: ACEPCIÓN de una unidad léxica (contenido del diccionario).
+ *
+ * V3.44 la declaró como `{pos, gloss}` y solo la leía el scoring semántico; desde
+ * V3.91 es la unidad que la ficha PINTA: su equivalente en el otro idioma
+ * (`term`), su categoría (`pos`), su glosa, su ámbito (`domain`), la marca de
+ * nombre propio (`proper_noun`), un ejemplo de uso (`example`, con su audio), una
+ * etiqueta de contexto (`context`), la forma base verificada (`lemma`) y la
+ * procedencia del contenido (`source`: `model` o `lexicon`).
+ *
+ * Es un contrato ADITIVO: una respuesta de la caché anterior al contrato puede
+ * traer solo `pos`/`gloss`, así que los campos nuevos se normalizan a "" en el
+ * cliente y la ficha los omite.
+ */
 export interface DictionarySense {
+  term?: string;
   pos: string;
   gloss: string;
+  domain?: string;
+  proper_noun?: boolean;
+  example?: string;
+  context?: string;
+  lemma?: string;
+  source?: string;
 }
 
 /**

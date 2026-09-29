@@ -32,7 +32,7 @@ import logging
 import re
 
 from schemas.chat import ChatMessage
-from services import llm, translate
+from services import llm, semantics, translate
 from services import situation as situation_service
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,18 @@ logger = logging.getLogger(__name__)
 # fallo real de V3.86.0: la plomería de significados existía, pero el modelo
 # devolvía uno solo para casi todo, así que el selector nacía con una opción. El
 # contenido con 1.5.0 se regenera una sola vez al primer lookup.
-GENERATOR_VERSION = "1.6.0"
+#
+# V3.91: bump 1.6.0 -> 1.7.0. El contrato de ACEPCIÓN crece de `{pos, gloss}` a
+# los nueve campos que el motor de sentidos necesita para DESAMBIGUAR y para
+# pintar la ficha: `{term, pos, gloss, domain, proper_noun, example, context,
+# lemma, source}`. Los sentidos dejan de ser una etiqueta interna del scoring
+# semántico y pasan a ser contenido de pantalla (acepción con su equivalente,
+# su ejemplo, su contexto y su audio). Los dos prompt piden UNA acepción por
+# significado, en el MISMO orden que `meanings`, y el contenido con 1.6.0 se
+# regenera una sola vez al primer lookup (misma invalidación perezosa: no hay
+# migración de datos ni de esquema, y `pos`/`gloss` siguen siendo la identidad
+# frente a los sentidos viejos, así que el scoring NO cambia de forma).
+GENERATOR_VERSION = "1.7.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
@@ -107,6 +118,49 @@ SITUATION_BLANK = situation_service.SITUATION_BLANK
 # glosa se acota para que sea una ETIQUETA de sentido, no una definición.
 MAX_SENSES = 4
 MAX_GLOSS_CHARS = 120
+
+# V3.91 (diccionario de sentidos): contrato de ACEPCIÓN. Un sentido deja de ser
+# una etiqueta para el scoring y pasa a ser la unidad que la ficha pinta:
+#
+# - `term`   — equivalente en el OTRO idioma de esa acepción (español en EN→ES,
+#              inglés en ES→EN): es lo que hace legible la acepción.
+# - `pos`    — categoría canónica (la misma taxonomía que `meanings`).
+# - `gloss`  — etiqueta corta en inglés simple.
+# - `domain` — ámbito («tools», «finance», «geography»).
+# - `proper_noun` — nombre propio: nunca el defecto y siempre marcado.
+# - `example`— UNA frase de uso en inglés de ESA acepción (lo que se lee con el
+#              altavoz por acepción).
+# - `context`— etiqueta corta del contexto donde se usa («money and finance»).
+# - `lemma`  — forma base declarada, ACEPTADA solo si el motor puro de morfología
+#              la reconoce como forma de la cabeza (nunca se inventa: ver
+#              `_sense_lemma`); "" si el modelo no la declaró o no es creíble.
+# - `source` — procedencia del contenido (`model` en esta fase; `lexicon`
+#              reservado al lexicón offline de la fase 2/3). Es lo que permite
+#              decir de dónde sale cada acepción sin mentir.
+#
+# El orden de `SENSE_KEYS` es el ORDEN DE LECTURA de la ficha y también el orden
+# de las claves del JSON persistido (estable, para que el diff de la caché sea
+# legible).
+SENSE_KEYS = (
+    "term",
+    "pos",
+    "gloss",
+    "domain",
+    "proper_noun",
+    "example",
+    "context",
+    "lemma",
+    "source",
+)
+# El ejemplo de uso es UNA frase corta (no un párrafo); el contexto es una
+# ETIQUETA («at a river»), no una explicación.
+MAX_SENSE_EXAMPLE_CHARS = 240
+MAX_CONTEXT_CHARS = 80
+# Procedencia del contenido de una acepción. `lexicon` NO se produce todavía:
+# existe para que el lexicón offline de la fase 2/3 marque lo suyo sin tocar el
+# contrato ni la UI.
+SENSE_SOURCE_MODEL = "model"
+SENSE_SOURCE_LEXICON = "lexicon"
 
 # V3.86.0 (diccionario polisémico): significados elegibles. Cada significado es
 # `{"term": <equivalente en el otro idioma>, "pos", "gloss", "domain",
@@ -146,6 +200,11 @@ _VALID_POS = frozenset(
         "phrase",
     }
 )
+# V3.91: alias PÚBLICO de la taxonomía. El mapeo de POS de un lexicón externo
+# (`services.dictionary_batch.map_pos`) tiene que validar contra la MISMA lista
+# que usa el modelo: dos taxonomías paralelas acabarían divergiendo, y una POS
+# que el scoring no reconoce es una POS que la UI pinta y el motor ignora.
+VALID_POS = _VALID_POS
 
 _SYSTEM_PROMPT = (
     "You are a learner-friendly English dictionary inside a local "
@@ -160,11 +219,18 @@ _SYSTEM_PROMPT = (
     "sets a concrete everyday scenario and contains EXACTLY one blank "
     '"_____" where the headword fits; do NOT write the headword or any form '
     "of it anywhere else in the sentence), "
-    '"senses" (a JSON array with ONE object per DIFFERENT part of speech the '
-    "headword can take, at most 4, ordered with the most common sense first; "
-    'each object has "pos" (same list as above) and "gloss" (a very short '
-    "sense label in SIMPLE English, at most 60 characters, for example "
-    '{"pos":"noun","gloss":"an arrangement to do something"}), '
+    '"senses" (a JSON array with ONE object per MEANING of the headword, at '
+    f"most {MAX_SENSES}, in the SAME order as the meanings below and "
+    "describing the SAME meanings, so its first objects are the senses of the "
+    'most common meanings; each object has "term" (the Spanish translation '
+    'for THAT meaning), "pos" (same list as above), "gloss" (a very short '
+    "sense label in SIMPLE English, at most 60 characters), \"domain\" (same "
+    'as the meanings below), "proper_noun" (same rule as the meanings below), '
+    '"example" (ONE short English sentence, at most 240 characters, that uses '
+    "the headword with THAT meaning and clearly fits THAT meaning, with no "
+    'blank in it) and "context" (a very short English label of the situation '
+    "where THAT meaning is used, at most 80 characters, for example "
+    '"money and finance" or "at a river"), '
     '"meanings" (a JSON array with ONE object per DIFFERENT meaning of the '
     f"headword, {_MEANINGS_COUNT_RULE}, ordered with the most common meaning "
     "first; each "
@@ -177,7 +243,9 @@ _SYSTEM_PROMPT = (
     "translation of a common noun; if the headword also names a place or a "
     "person, put that meaning LAST with \"proper_noun\": true. If the headword "
     "has several common meanings, NEVER return only one: list the most common "
-    "ones (most common first) so the learner can choose. "
+    "ones (most common first) so the learner can choose. Every \"example\" "
+    "must contain the headword in some form and must fit the meaning it "
+    "belongs to; never repeat the same example in two senses. "
     "Do not add any text outside the JSON object."
 )
 
@@ -201,10 +269,18 @@ _REVERSE_SYSTEM_PROMPT = (
     "sets a concrete everyday scenario and contains EXACTLY one blank "
     '"_____" where the English equivalent fits; do NOT write the English '
     "equivalent or any form of it anywhere else in the sentence), "
-    '"senses" (a JSON array with ONE object per DIFFERENT part of speech the '
-    "English equivalent can take, at most 4, ordered with the most common "
-    'sense first; each object has "pos" (same list as above) and "gloss" (a '
-    "very short sense label in SIMPLE English, at most 60 characters), "
+    '"senses" (a JSON array with ONE object per MEANING of the English '
+    f"equivalent, at most {MAX_SENSES}, in the SAME order as the meanings "
+    "below and describing the SAME meanings, so its first objects are the "
+    'senses of the most common meanings; each object has "term" (the English '
+    'equivalent for THAT meaning), "pos" (same list as above), "gloss" (a '
+    'very short sense label in SIMPLE English, at most 60 characters), '
+    '"domain" (same as the meanings below), "proper_noun" (same rule as the '
+    'meanings below), "example" (ONE short English sentence, at most 240 '
+    "characters, that uses the English equivalent with THAT meaning and "
+    'clearly fits THAT meaning, with no blank in it) and "context" (a very '
+    "short English label of the situation where THAT meaning is used, at most "
+    '80 characters, for example "money and finance" or "at a river"), '
     '"meanings" (a JSON array with ONE object per DIFFERENT English '
     "equivalent of the Spanish headword, "
     f"{_MEANINGS_COUNT_RULE}, ordered with the most "
@@ -218,7 +294,9 @@ _REVERSE_SYSTEM_PROMPT = (
     "place or a person, put that meaning LAST with \"proper_noun\": true. If "
     "the Spanish word has several common meanings, NEVER return only one: list "
     "the most common English equivalents (most common first) so the learner "
-    "can choose. "
+    "can choose. Every \"example\" must contain the English equivalent in some "
+    "form and must fit the meaning it belongs to; never repeat the same "
+    "example in two senses. "
     "Do not add any text outside the JSON object."
 )
 
@@ -281,17 +359,79 @@ def _first_json_object(text: str) -> dict | None:
     return None
 
 
-def normalize_senses(raw: object) -> list[dict]:
-    """Sentidos declarados de la unidad, normalizados y deterministas (V3.44).
+def _sense_text(value: object, limit: int) -> str:
+    """Texto de una acepción: espacios colapsados y recortado a `limit` (V3.91).
 
-    Acepta la lista cruda del modelo y devuelve una lista NUEVA de
-    `{"pos": <categoría canónica>, "gloss": <etiqueta corta>}`:
+    Un solo camino para los campos de una acepción (`term`, `gloss`, `domain`,
+    `example`, `context`, `lemma`): lo que el modelo devuelva como lista o número
+    se trata como TEXTO vacío en vez de romper el parseo, y nunca se deja un
+    campo con saltos de línea que romperían la ficha.
+    """
+    text = " ".join(str(value if value is not None else "").split())
+    return text[:limit].strip() if limit > 0 else text.strip()
+
+
+def _sense_lemma(declared: object, word: str) -> str:
+    """Forma base ACEPTADA de una acepción, o "" si no es creíble (V3.91, pura).
+
+    El `lemma` lo declara el modelo, pero no se sirve tal cual: la morfología de
+    la app (`services.semantics`, la MISMA que usa el Sense Engine) tiene que
+    reconocer la relación con la cabeza. Se acepta si
+
+    - es la propia cabeza (`bank` → `bank`), o
+    - es una forma de la cabeza según las variantes declaradas
+      (`banks` → `bank`, `making` → `make`), o
+    - la cabeza es una forma de ÉL (`run` → `run`, `running` → `run`).
+
+    Cualquier otra cosa se descarta y la acepción queda sin lema: la ficha lo
+    omite y NO se muestra una forma base inventada. Se descarta a propósito la
+    comprobación morfológica sobre el EJEMPLO (una flexión irregular legítima
+    —`go` → `went`— haría perder ejemplos buenos) porque el lema es una
+    RELACIÓN declarada y verificable, y el ejemplo es contenido de lectura.
+    """
+    candidate = _sense_text(declared, MAX_MEANING_TERM_CHARS).lower()
+    base = _sense_text(word, MAX_MEANING_TERM_CHARS).lower()
+    if not candidate or not base:
+        return ""
+    if candidate == base:
+        return candidate
+    if candidate in semantics.lemma_variants(base):
+        return candidate
+    if base in semantics.lemma_variants(candidate):
+        return candidate
+    return ""
+
+
+def normalize_senses(
+    raw: object,
+    *,
+    word: str = "",
+    source: str = SENSE_SOURCE_MODEL,
+) -> list[dict]:
+    """Acepciones declaradas de la unidad, normalizadas (V3.44 → V3.91).
+
+    Acepta la lista cruda del modelo y devuelve una lista NUEVA de objetos con el
+    contrato de `SENSE_KEYS` —`{term, pos, gloss, domain, proper_noun, example,
+    context, lemma, source}`—, SIEMPRE con las nueve claves (un campo que el
+    modelo no dio queda `""`/`False`, nunca ausente: el contrato tiene una forma,
+    no varias):
 
     - descarta los elementos que no son objetos o cuyo `pos` no es canónico
-      (nunca se inventa una categoría);
-    - colapsa los espacios de la glosa y la recorta a `MAX_GLOSS_CHARS`;
-    - deduplica por `(pos, gloss)` conservando el primer orden;
-    - limita a `MAX_SENSES`.
+      (nunca se inventa una categoría; es la MISMA regla de V3.44 y lo que
+      mantiene al Sense Engine sin cambios: sigue leyendo `pos` y `gloss`);
+    - colapsa los espacios y recorta `term`/`gloss`/`domain`/`example`/`context`;
+    - acepta `proper_noun` **solo si es boolean** (`True`/`False`), como en
+      `normalize_meanings`: el string `"false"` es *truthy* en Python y el
+      contenido lo genera un modelo;
+    - acepta el `lemma` solo si el motor puro lo reconoce (`_sense_lemma`) y
+      sella `source` con la procedencia declarada por quien llama;
+    - deduplica por `(pos, gloss)` conservando el primer orden —la identidad de
+      V3.44, para que el `sense_index` del intento de transferencia no cambie de
+      significado— y limita a `MAX_SENSES`.
+
+    `word` es la cabeza de la entrada (la palabra inglesa en EN→ES, el
+    equivalente inglés en ES→EN): sin ella no hay relación de lema que verificar
+    y `lemma` queda `""` (el modelo no puede declararlo solo).
 
     Es contenido OPCIONAL: una entrada inválida se descarta y devuelve `[]` sin
     invalidar definición/traducción. Nunca lanza.
@@ -306,13 +446,25 @@ def normalize_senses(raw: object) -> list[dict]:
         pos = str(item.get("pos") or "").strip().lower()
         if pos not in _VALID_POS:
             continue
-        gloss = " ".join(str(item.get("gloss") or "").split())
-        gloss = gloss[:MAX_GLOSS_CHARS].strip()
+        gloss = _sense_text(item.get("gloss"), MAX_GLOSS_CHARS)
         key = (pos, gloss)
         if key in seen:
             continue
         seen.add(key)
-        senses.append({"pos": pos, "gloss": gloss})
+        senses.append(
+            {
+                "term": _sense_text(item.get("term"), MAX_MEANING_TERM_CHARS),
+                "pos": pos,
+                "gloss": gloss,
+                "domain": _sense_text(item.get("domain"), MAX_DOMAIN_CHARS),
+                # Estricto a propósito, igual que en `normalize_meanings`.
+                "proper_noun": item.get("proper_noun") is True,
+                "example": _sense_text(item.get("example"), MAX_SENSE_EXAMPLE_CHARS),
+                "context": _sense_text(item.get("context"), MAX_CONTEXT_CHARS),
+                "lemma": _sense_lemma(item.get("lemma"), word),
+                "source": source,
+            }
+        )
         if len(senses) >= MAX_SENSES:
             break
     return senses
@@ -433,10 +585,15 @@ def parse_content(raw: str, *, word: str = "") -> dict:
     definición/traducción. `word` (normalizada) activa la comprobación de
     spoiler: el enunciado no puede contener la diana en ningún otro sitio.
 
-    V3.44: `senses` (lista de `{pos, gloss}`) es el modelo de sentidos con el
-    que el scoring semántico deja de depender de una `pos` global. También es
-    contenido OPCIONAL y se normaliza con `normalize_senses` (nunca invalida la
-    definición/traducción); el `pos` superior se deriva del primer sentido.
+    V3.44: `senses` es el modelo de sentidos con el que el scoring semántico deja
+    de depender de una `pos` global. También es contenido OPCIONAL y se normaliza
+    con `normalize_senses` (nunca invalida la definición/traducción); el `pos`
+    superior se deriva del primer sentido.
+
+    V3.91: `senses` deja de ser una etiqueta y pasa a ser la ACEPCIÓN que la
+    ficha pinta (`SENSE_KEYS`). El `lemma` se sella solo si el motor puro de
+    morfología lo reconoce frente a la cabeza (`word`) y `source` declara la
+    procedencia; los dos campos son DERIVADOS, no se copian del modelo.
     """
     text = (raw or "").strip()
     if not text:
@@ -452,7 +609,7 @@ def parse_content(raw: str, *, word: str = "") -> dict:
         raise ContentUnavailableError("La respuesta no incluye una definición")
     if len(definition) > MAX_DEFINITION_CHARS:
         raise ContentUnavailableError("La definición supera el límite de longitud")
-    senses = normalize_senses(obj.get("senses"))
+    senses = normalize_senses(obj.get("senses"), word=word)
     # V3.86.0: significados elegibles. Si el modelo no los dio, se sintetiza uno
     # desde `translation` para que la UI siempre tenga al menos una opción
     # seleccionable (degradación honesta, sin inventar acepciones). En ese caso
@@ -529,6 +686,10 @@ def parse_reverse_content(raw: str, *, word: str = "") -> dict:
 
     V3.44: `senses` (del equivalente INGLÉS) se normaliza con el mismo
     `normalize_senses`; el `pos` superior se deriva del primer sentido.
+
+    V3.91: la cabeza de la acepción en esta dirección es el EQUIVALENTE INGLÉS
+    (el término español solo se usa para buscar), así que el `lemma` se verifica
+    contra él y `source` declara la procedencia como en la dirección directa.
     """
     text = (raw or "").strip()
     if not text:
@@ -546,7 +707,7 @@ def parse_reverse_content(raw: str, *, word: str = "") -> dict:
     if len(definition) > MAX_DEFINITION_CHARS:
         raise ContentUnavailableError("La definición supera el límite de longitud")
     pos = str(obj.get("pos") or "").strip().lower()
-    senses = normalize_senses(obj.get("senses"))
+    senses = normalize_senses(obj.get("senses"), word=english)
     # V3.86.0: significados elegibles en la dirección inversa. El `term` de cada
     # significado es un EQUIVALENTE INGLÉS del término español; los nombres
     # propios van al final. Sin lista del modelo se sintetiza uno desde `english`

@@ -369,4 +369,19 @@ def test_dictionary_lookup_exposes_the_senses(monkeypatch, tmp_path):
             f"/api/vocabulary/dictionary?user_id={uid}", json={"word": "bank"}
         )
     assert res.status_code == 200, res.text
-    assert res.json()["senses"] == [{"pos": "noun", "gloss": "a financial place"}]
+    # V3.91: el contrato de la acepción tiene NUEVE campos y el contrato los
+    # rellena con su valor vacío cuando la fila no los declara (una fila de la
+    # caché de 1.6.0 se sirve tal cual, sin inventar contenido).
+    assert res.json()["senses"] == [
+        {
+            "term": "",
+            "pos": "noun",
+            "gloss": "a financial place",
+            "domain": "",
+            "proper_noun": False,
+            "example": "",
+            "context": "",
+            "lemma": "",
+            "source": "",
+        }
+    ]

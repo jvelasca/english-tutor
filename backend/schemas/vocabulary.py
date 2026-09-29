@@ -435,16 +435,33 @@ class DictionaryUsageOut(BaseModel):
 
 
 class DictionarySenseOut(BaseModel):
-    """Sentido declarado de una unidad léxica (V3.44).
+    """Acepción de una unidad léxica (V3.44 → V3.91).
 
     Contenido generado por el modelo local y cacheado (`dictionary_entries` /
-    `dictionary_reverse_entries`): cada sentido declara su categoría gramatical
-    (`pos`) y una etiqueta corta (`gloss`). Es lo que permite que el scoring
-    semántico deje de depender de una única `pos` global.
+    `dictionary_reverse_entries`). En V3.44 un sentido era solo una etiqueta para
+    el scoring semántico (`{pos, gloss}`); desde V3.91 es la ACEPCIÓN que la ficha
+    pinta: su equivalente en el otro idioma (`term`), su categoría (`pos`), su
+    glosa, su ámbito (`domain`), la marca de nombre propio (`proper_noun`), un
+    ejemplo de uso de ESA acepción (`example`, lo que lee el altavoz por
+    acepción), una etiqueta de contexto (`context`), la forma base verificada
+    (`lemma`) y la procedencia del contenido (`source`: `model` en esta fase,
+    `lexicon` cuando lo sirva el lexicón offline).
+
+    Los campos añadidos tienen valor por defecto: una fila de la caché anterior al
+    contrato se sirve sin ellos (nunca inventados) y el bump de
+    `GENERATOR_VERSION` la regenera al primer lookup.
     """
 
+    # V3.91: los nueve campos del contrato de acepción, en su orden de lectura.
+    term: str = ""
     pos: str = ""
     gloss: str = ""
+    domain: str = ""
+    proper_noun: bool = False
+    example: str = ""
+    context: str = ""
+    lemma: str = ""
+    source: str = ""
 
 
 class DictionaryMeaningOut(BaseModel):
@@ -490,9 +507,11 @@ class DictionaryEntryOut(BaseModel):
     # V3.38: enunciado situacional (frase de escenario con un hueco `_____`) del
     # 4.º peldaño de la escalera de recall. `None` si el generador no lo produjo.
     situation: str | None = None
-    # V3.44: sentidos declarados de la unidad (`[{pos, gloss}]`). Contenido
-    # aditivo que explica la adecuación semántica; `[]` si el generador no los
-    # dio (el scoring degrada a `unknown`, que nunca bloquea).
+    # V3.44 → V3.91: ACEPCIONES de la unidad (`[{term, pos, gloss, domain,
+    # proper_noun, example, context, lemma, source}]`). Contenido aditivo que
+    # explica la adecuación semántica y que la ficha pinta acepción por acepción
+    # (equivalente, glosa, ejemplo con audio y contexto); `[]` si el generador no
+    # las dio (el scoring degrada a `unknown`, que nunca bloquea).
     senses: list[DictionarySenseOut] = Field(default_factory=list)
     # V3.86.0 (diccionario polisémico): significados ELEGIBLES de la unidad. En
     # EN→ES cada `term` es una traducción al español; en ES→EN, un equivalente

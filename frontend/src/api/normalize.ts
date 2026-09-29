@@ -25,6 +25,7 @@ import type {
   DictionaryEntry,
   DictionaryExample,
   DictionaryMeaning,
+  DictionarySense,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
   DictionaryWarmupJob,
@@ -568,6 +569,26 @@ export function normalizeDictionaryMeaning(raw: Raw): DictionaryMeaning {
   };
 }
 
+/** V3.91: ACEPCIÓN del diccionario de sentidos. Los campos de texto se
+ *  normalizan a "" (una respuesta de la caché anterior al contrato trae solo
+ *  `pos`/`gloss`) y `proper_noun` a boolean: la ficha decide con ellos si pinta
+ *  ejemplo, contexto, lema y procedencia, así que ninguno puede ser `undefined`.
+ *  A diferencia de `meanings`, NO se descartan las acepciones sin `term`: la
+ *  glosa y el ejemplo siguen siendo contenido útil para desambiguar. */
+export function normalizeDictionarySense(raw: Raw): DictionarySense {
+  return {
+    term: asString(raw.term),
+    pos: asString(raw.pos),
+    gloss: asString(raw.gloss),
+    domain: asString(raw.domain),
+    proper_noun: asBoolean(raw.proper_noun),
+    example: asString(raw.example),
+    context: asString(raw.context),
+    lemma: asString(raw.lemma),
+    source: asString(raw.source),
+  };
+}
+
 export function normalizeDictionaryEntry(raw: unknown): DictionaryEntry {
   const data = isRecord(raw) ? raw : {};
   const usage = asRecordOrNull(data.usage) ?? {};
@@ -586,6 +607,11 @@ export function normalizeDictionaryEntry(raw: unknown): DictionaryEntry {
     translation: asNullableString(data.translation),
     direction,
     alternatives: asStringArray(data.alternatives),
+    senses: Array.isArray(data.senses)
+      ? data.senses
+          .filter((item): item is Raw => isRecord(item))
+          .map(normalizeDictionarySense)
+      : [],
     meanings: Array.isArray(data.meanings)
       ? data.meanings
           .filter((item): item is Raw => isRecord(item))
