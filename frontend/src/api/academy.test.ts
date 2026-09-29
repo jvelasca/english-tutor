@@ -3,6 +3,7 @@ import {
   completeLesson,
   completeSessionStep,
   finishSpeakingAssessment,
+  getDailyPlan,
   getEvidenceGraphNode,
   getGoal,
   getLevels,
@@ -157,18 +158,30 @@ describe("academy api", () => {
     expect(body).toEqual({ step_key: "review:grammar" });
   });
 
-  it("putGoal envía el objetivo con PUT", async () => {
+  it("putGoal envía el objetivo (con el plan diario) con PUT", async () => {
     const fn = mockJsonFetch({
       goal_type: "travel",
       minutes_per_day: 20,
       days_per_week: 6,
       target_level: "B2",
+      plan_mode: "mixed",
+      target_units: 3,
+      max_new: 0,
+      include_listening: false,
+      include_speaking: true,
     });
     await putGoal("u1", {
       goal_type: "travel",
       minutes_per_day: 20,
       days_per_week: 6,
       target_level: "B2",
+      // V3.90: el PUT sustituye el objetivo ENTERO, así que el plan diario viaja
+      // en el mismo cuerpo (si no, se perdería al editar desde la UI).
+      plan_mode: "mixed",
+      target_units: 3,
+      max_new: 0,
+      include_listening: false,
+      include_speaking: true,
     });
     const url = fn.mock.calls[0][0] as string;
     const method = fn.mock.calls[0][1].method;
@@ -180,7 +193,18 @@ describe("academy api", () => {
       minutes_per_day: 20,
       days_per_week: 6,
       target_level: "B2",
+      plan_mode: "mixed",
+      target_units: 3,
+      max_new: 0,
+      include_listening: false,
+      include_speaking: true,
     });
+  });
+
+  it("getDailyPlan pide el plan diario", async () => {
+    const fn = mockJsonFetch({ plan_mode: "time" });
+    await getDailyPlan("u1");
+    expect(String(fn.mock.calls[0][0])).toBe("/api/academy/daily-plan");
   });
 
   it("recordAttempts envía level/objective y results", async () => {

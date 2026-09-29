@@ -24,11 +24,19 @@ def test_upsert_goal_creates_and_reads(monkeypatch, tmp_path):
     a = _setup(monkeypatch, tmp_path)
     assert academy_repo.upsert_goal(a, "travel", 20, 6, "B2") is True
     row = academy_repo.get_goal(a)
+    # V3.90: el repo devuelve también el plan diario, con los MISMOS valores por
+    # defecto que la migración (`time` / 0 unidades / 1 nuevo / ambas destrezas).
+    # Los booleanos son 1/0 porque es la fila cruda de SQLite.
     assert row == {
         "goal_type": "travel",
         "minutes_per_day": 20,
         "days_per_week": 6,
         "target_level": "B2",
+        "plan_mode": "time",
+        "target_units": 0,
+        "max_new": 1,
+        "include_listening": 1,
+        "include_speaking": 1,
     }
 
 
@@ -58,6 +66,12 @@ def test_endpoint_goal_defaults(monkeypatch, tmp_path):
         "minutes_per_day": 15,
         "days_per_week": 5,
         "target_level": "B1",
+        # V3.90: plan diario por defecto = comportamiento de siempre.
+        "plan_mode": "time",
+        "target_units": 0,
+        "max_new": 1,
+        "include_listening": True,
+        "include_speaking": True,
     }
 
 

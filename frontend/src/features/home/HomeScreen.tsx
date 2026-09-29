@@ -8,9 +8,11 @@ import {
   Flame,
   Loader2,
   RefreshCw,
+  Target,
 } from "lucide-react";
-import { getFsrsSummary, getNextBestActivity } from "../../api/academy";
+import { getDailyPlan, getFsrsSummary, getNextBestActivity } from "../../api/academy";
 import type {
+  DailyPlan,
   FsrsSummary,
   LearningProfile,
   NextBestActivity,
@@ -137,6 +139,43 @@ export function HomeScreen({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [fsrsTick, setFsrsTick] = useState(0);
 
+  // V3.90: el plan diario lo lee Home UNA vez y lo reparte: la barra del
+  // encabezado y la lista de pasos del TodayPlan salen del mismo objeto, así que
+  // no pueden discrepar, y no se pide dos veces el mismo motor.
+  const [plan, setPlan] = useState<DailyPlan | null>(null);
+  const [planState, setPlanState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [planTick, setPlanTick] = useState(0);
+
+  useEffect(() => {
+    if (!userId) {
+      setPlan(null);
+      setPlanState("error");
+      return;
+    }
+    let cancelled = false;
+    setPlanState("loading");
+    void (async () => {
+      try {
+        const data = await getDailyPlan(userId);
+        if (!cancelled) {
+          setPlan(data);
+          setPlanState("ready");
+        }
+      } catch {
+        if (!cancelled) {
+          setPlan(null);
+          // El plan no está: TodayPlan se repliega a leer objetivo y sesión.
+          setPlanState("error");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, refreshKey, planTick]);
+
   useEffect(() => {
     if (!userId) {
       setSummary(null);
@@ -228,6 +267,20 @@ export function HomeScreen({
                   {streak.current_days} {t("home.streak")}
                 </span>
               )}
+              {/* V3.90: objetivo del día en el encabezado, con el mismo dato que
+                  la barra del TodayPlan (una sola lectura del plan). */}
+              {plan && (
+                <span
+                  data-testid="home-goal-progress"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground"
+                >
+                  <Target className="size-3.5" aria-hidden="true" />
+                  {t("home.todayGoal")}{" "}
+                  <span className="tabular-nums text-foreground">
+                    {Math.round(plan.progress.percent * 100)}%
+                  </span>
+                </span>
+              )}
             </div>
           )}
         </motion.header>
@@ -238,8 +291,10 @@ export function HomeScreen({
           <Card className="p-5">
             <TodayPlan
               userId={userId}
+              plan={plan}
+              planStatus={planState}
+              onRefreshPlan={() => setPlanTick((n) => n + 1)}
               onStep={onStep}
-              refreshKey={refreshKey}
             />
           </Card>
         </motion.section>

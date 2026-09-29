@@ -35,6 +35,10 @@ from schemas.academy import (
     AttemptOut,
     CefrProfileOut,
     CourseMapOut,
+    DailyPlanMetricsOut,
+    DailyPlanOut,
+    DailyPlanPendingOut,
+    DailyPlanProgressOut,
     DashboardOut,
     EnrollmentOut,
     EvidenceGraphNodeOut,
@@ -105,6 +109,7 @@ from services import (
     adaptive,
     assessment_v2,
     cefr_descriptors,
+    daily_plan,
     evidence_graph,
     fsrs,
     lexicon,
@@ -152,6 +157,15 @@ DEFAULT_GOAL = {
     "minutes_per_day": 15,
     "days_per_week": 5,
     "target_level": "B1",
+    # V3.90 (Plan diario): comportamiento por defecto = el de siempre: objetivo
+    # por tiempo, sin tope de unidades, UNA unidad nueva al día (que es el tope
+    # que `SESSION_CAPS` ya aplicaba a la categoría `new`) y las dos destrezas
+    # activas.
+    "plan_mode": "time",
+    "target_units": 0,
+    "max_new": 1,
+    "include_listening": True,
+    "include_speaking": True,
 }
 
 
@@ -2808,7 +2822,15 @@ def _objective_nodes_for(
 
 
 async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
-    """Pasos de la sesión diaria (Session Engine) y su perfil CEFR anotado.
+    """Pasos de la sesión diaria (Session Engine) y su perfil CEFR anotado."""
+    steps, skills, _day = await _session_steps_with_day(user_id)
+    return steps, skills
+
+
+async def _session_steps_with_day(
+    user_id: str,
+) -> tuple[list[dict], list[dict], dict]:
+    """Pasos de la sesión diaria (Session Engine), su perfil CEFR y el contexto del día.
 
     Repaso vencido → listening → debilidad → nuevo → refuerzo, unificando las
     señales CEFR y de listening en una secuencia accionable con presupuesto del
@@ -2822,6 +2844,16 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
     `graph_mastery`/`because[]`. Sin nodos (D7) el plan se comporta como antes.
     Devuelve `(steps, skills)`: `steps` ya enriquecidos y `skills` para el
     Priority Engine. Compartida por `get_session` y `get_next_best_activity`.
+
+    V3.90 (Plan diario): el presupuesto de la sesión ya **no** es el objetivo
+    entero, sino **lo que falta para cumplirlo**. Se leen una sola vez las
+    unidades completadas hoy (con su metadata, para las métricas) y con ellas se
+    calcula el progreso: los minutos restantes son el presupuesto que se reparte,
+    el objetivo de unidades acota cuántas unidades sirve el plan (`max_units`) y
+    `max_new` fija cuánto material nuevo entra. El tercer elemento del retorno es
+    el contexto del día (`goal`, `day`, `completions`, `minutes_target`,
+    `units_target`, `progress`), que `get_daily_plan` convierte en métricas sin
+    volver a leer el plan.
     """
     level_id = await _current_level_id(user_id)
     lv = _levels_by_id.get(level_id) or _levels_by_id["a1"]
@@ -2842,8 +2874,26 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
     listening_rows = await run_in_threadpool(listening_repo.list_attempts, user_id)
     listening_weak = listening_diagnostic(listening_rows)["weak"]
 
-    done = await run_in_threadpool(
-        academy_repo.list_session_steps, user_id, _today()
+    today = _today()
+    completions = await run_in_threadpool(
+        academy_repo.list_session_completions, user_id, today
+    )
+    done = {c["step_key"] for c in completions}
+
+    # V3.90: el objetivo del día en minutos y en unidades, y cuánto falta. El plan
+    # sirve lo que falta (`remaining_*`), no el presupuesto entero otra vez: si no,
+    # la barra de progreso no podría llegar nunca al 100 %.
+    minutes_target = daily_plan.day_minutes_target(
+        goal.minutes_per_day, goal.plan_mode, goal.target_units
+    )
+    units_target = daily_plan.day_units_target(goal.plan_mode, goal.target_units)
+    units_done = len(completions)
+    minutes_done = sum(max(0, int(c.get("minutes") or 0)) for c in completions)
+    progress = daily_plan.goal_progress(
+        minutes_target=minutes_target,
+        minutes_done=minutes_done,
+        units_target=units_target,
+        units_done=units_done,
     )
 
     # D1b + H6 (V3.17/V3.18): nodos del grafo SOLO donde hacen falta — el
@@ -2881,6 +2931,26 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
                 skill=r["skill"],
             )
 
+    # V3.90: contexto del día, compartido por get_session y get_daily_plan (para
+    # que las métricas no vuelvan a leer el plan).
+    day_context = {
+        "goal": goal,
+        "day": today,
+        "completions": completions,
+        "minutes_target": minutes_target,
+        "units_target": units_target,
+        "progress": progress,
+        "level_id": lv.level_id,
+        "listening_rows": listening_rows,
+    }
+
+    # V3.90: el objetivo del día ya está cumplido (tiempo y, si se declaró,
+    # unidades): no hay plan que servir. Es la lectura honesta de "objetivo
+    # cumplido" y evita rellenar la sesión con trabajo que ya no toca; los repasos
+    # que sigan pendientes se publican aparte en el panel de progreso.
+    if progress["done"]:
+        return [], skills, day_context
+
     steps = adaptive.session_plan(
         skills,
         lv,
@@ -2888,8 +2958,12 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
         mastered,
         oid,
         listening_weak=listening_weak,
-        budget_minutes=goal.minutes_per_day,
+        budget_minutes=daily_plan.remaining_minutes(minutes_target, minutes_done),
         exclude_keys=done,
+        max_new=goal.max_new,
+        max_units=daily_plan.remaining_units(units_target, units_done),
+        include_listening=goal.include_listening,
+        include_speaking=goal.include_speaking,
     )
 
     # Enriquecimiento aditivo de los pasos con objetivo (D1b; D7 si no hay nodo).
@@ -2914,7 +2988,7 @@ async def _session_steps(user_id: str) -> tuple[list[dict], list[dict]]:
         enriched.append(
             evidence_graph.enrich_item(step, node) if node is not None else step
         )
-    return enriched, skills
+    return enriched, skills, day_context
 
 
 async def get_session(user_id: str) -> SessionOut:
@@ -3027,9 +3101,25 @@ async def get_evidence_graph_node(
 async def set_session_step_done(user_id: str, step_key: str) -> SessionOut | None:
     """Marca un paso de la sesión como completado hoy y devuelve la sesión actualizada.
 
-    None si el usuario no existe."""
+    None si el usuario no existe.
+
+    V3.90: al completar se CONGELA la metadata del paso (`kind`, `skill`,
+    `minutes`). Los minutos se resuelven del plan vigente —el que el alumno acaba
+    de ver— y no de lo que declare el cliente: son la estimación del motor la
+    única vez que puede medirse, porque el plan se recalcula en cada lectura y
+    después ya no existe. Si el paso no aparece en el plan (p. ej. un re-marcado
+    idempotente) se persiste sin metadata y el repositorio **no** pisa lo que ya
+    había."""
+    steps, _ = await _session_steps(user_id)
+    step = next((s for s in steps if s.get("step_key") == step_key), None)
     ok = await run_in_threadpool(
-        academy_repo.mark_session_step, user_id, step_key, _today()
+        academy_repo.mark_session_step,
+        user_id,
+        step_key,
+        _today(),
+        kind=str((step or {}).get("kind") or ""),
+        skill=str((step or {}).get("skill") or ""),
+        minutes=int((step or {}).get("minutes") or 0),
     )
     if not ok:
         return None
@@ -3047,7 +3137,14 @@ async def get_learning_goal(user_id: str) -> LearningGoalOut:
 async def set_learning_goal(
     user_id: str, goal: LearningGoalIn
 ) -> LearningGoalOut | None:
-    """Crea o actualiza el objetivo personal. None si el usuario no existe."""
+    """Crea o actualiza el objetivo personal. None si el usuario no existe.
+
+    V3.90: se persiste también el plan diario (modo, unidades, tope de material
+    nuevo y destrezas incluidas). El esquema ya aplica las cotas, así que aquí no
+    se re-valida nada; las claves van keyword-only. NO se normaliza el objetivo
+    guardado (p. ej. `units` sin unidades se sigue guardando como `units`): la
+    lectura es quien cae a los minutos, para que la preferencia declarada no se
+    pierda al guardar."""
     ok = await run_in_threadpool(
         academy_repo.upsert_goal,
         user_id,
@@ -3055,10 +3152,79 @@ async def set_learning_goal(
         goal.minutes_per_day,
         goal.days_per_week,
         goal.target_level,
+        plan_mode=goal.plan_mode,
+        target_units=goal.target_units,
+        max_new=goal.max_new,
+        include_listening=goal.include_listening,
+        include_speaking=goal.include_speaking,
     )
     if not ok:
         return None
     return await get_learning_goal(user_id)
+
+
+async def get_daily_plan(user_id: str) -> DailyPlanOut:
+    """Plan diario (V3.90): objetivo interpretado, lo que falta, lo hecho y los
+    repasos pendientes.
+
+    Reutiliza el MISMO plan que `/session` (una sola lectura: `_session_steps_with_day`
+    devuelve el contexto del día), de modo que la barra de progreso y la lista de
+    pasos no puedan divergir. Lo que añade son las **métricas** y los **repasos
+    pendientes**:
+
+    - Métricas: se leen la evidencia del nivel actual y los intentos de listening
+      una vez y se agregan por día (`daily_plan.day_metrics`). `minutes` son los
+      minutos que el motor había asignado a las unidades completadas, **no** tiempo
+      de reloj.
+    - Pendientes: `fsrs` sale del resumen FSRS del panel (mismo `due_count` que
+      enseña la tarjeta de repaso, vía `sync_fsrs_cards`) y `listening` de la cola
+      de repaso de V3.89 ya vencida (`due_queue`). Se publican por separado para
+      que la UI pueda decir de dónde sale cada uno.
+    """
+    steps, _skills, day = await _session_steps_with_day(user_id)
+    goal: LearningGoalOut = day["goal"]
+    level_id: str = day["level_id"]
+
+    evidence_rows = await run_in_threadpool(
+        academy_repo.list_evidence, user_id, level_id
+    )
+    metrics = daily_plan.day_metrics(
+        day["completions"], evidence_rows, day["listening_rows"], day["day"]
+    )
+    summary = adaptive.session_summary(steps)
+    session = SessionOut(
+        items=[SessionStepOut(**s) for s in steps],
+        total_minutes=sum(s["minutes"] for s in steps),
+        review_count=summary["review_count"],
+        practice_count=summary["practice_count"],
+    )
+
+    fsrs_summary = await get_fsrs_summary(user_id)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    listening_due = await run_in_threadpool(
+        listening_repo.due_queue, user_id, now_iso
+    )
+    pending = daily_plan.review_pending(
+        fsrs_summary.due_count, len(listening_due)
+    )
+    return DailyPlanOut(
+        goal=goal,
+        plan_mode=daily_plan.normalize_plan_mode(goal.plan_mode),
+        minutes_target=day["minutes_target"],
+        units_target=day["units_target"],
+        units_remaining=daily_plan.remaining_units(
+            day["units_target"], day["progress"]["units_done"]
+        ),
+        minutes_remaining=daily_plan.remaining_minutes(
+            day["minutes_target"], day["progress"]["minutes_done"]
+        ),
+        include_listening=goal.include_listening,
+        include_speaking=goal.include_speaking,
+        pending=DailyPlanPendingOut(**pending),
+        progress=DailyPlanProgressOut(**day["progress"]),
+        metrics=DailyPlanMetricsOut(**metrics),
+        session=session,
+    )
 
 
 async def get_remediation(user_id: str, level_id: str) -> RemediationPlanOut | None:

@@ -11,14 +11,19 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { getFsrsSummary, getNextBestActivity } from "../../api/academy";
+import {
+  getDailyPlan,
+  getFsrsSummary,
+  getNextBestActivity,
+} from "../../api/academy";
 import { I18nProvider } from "../../hooks/useI18n";
-import type { LearningProfile } from "../../types/api";
+import type { DailyPlan, LearningProfile } from "../../types/api";
 import { HomeScreen } from "./HomeScreen";
 
 vi.mock("../../api/academy", () => ({
   getNextBestActivity: vi.fn(),
   getFsrsSummary: vi.fn(),
+  getDailyPlan: vi.fn(),
 }));
 vi.mock("../../components/TodayPlan", () => ({
   TodayPlan: () => <div data-testid="today-plan" />,
@@ -32,6 +37,7 @@ vi.mock("../../components/NextBestCard", () => ({
 
 const getNextBestMock = vi.mocked(getNextBestActivity);
 const getFsrsSummaryMock = vi.mocked(getFsrsSummary);
+const getDailyPlanMock = vi.mocked(getDailyPlan);
 
 /** Perfil mínimo real: el resto de campos no los usa Home. */
 function profile(): LearningProfile {
@@ -92,6 +98,7 @@ describe("HomeScreen · F2/F3 (V3.72)", () => {
     vi.clearAllMocks();
     getNextBestMock.mockResolvedValue(null);
     getFsrsSummaryMock.mockResolvedValue({ due_count: 0 } as never);
+    getDailyPlanMock.mockResolvedValue(null as unknown as DailyPlan);
   });
 
   afterEach(cleanup);
@@ -113,5 +120,23 @@ describe("HomeScreen · F2/F3 (V3.72)", () => {
     expect(anchor.textContent).toContain("Estás aquí");
     expect(anchor.textContent).toContain("A2");
     expect(anchor.textContent).toContain("Meta: B1");
+  });
+
+  it("V3.90: el encabezado muestra el progreso del objetivo de hoy", async () => {
+    // El chip del encabezado sale del MISMO plan que la tarjeta (una lectura).
+    getDailyPlanMock.mockResolvedValue({
+      progress: { percent: 0.4 },
+    } as DailyPlan);
+    renderHome();
+
+    const chip = await screen.findByTestId("home-goal-progress");
+    expect(chip.textContent).toContain("40%");
+  });
+
+  it("V3.90: sin plan (backend caído) el encabezado no inventa un porcentaje", () => {
+    getDailyPlanMock.mockRejectedValue(new Error("offline"));
+    renderHome();
+
+    expect(screen.queryByTestId("home-goal-progress")).toBeNull();
   });
 });

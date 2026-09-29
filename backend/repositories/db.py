@@ -536,11 +536,38 @@ def init_db() -> None:
                 minutes_per_day INTEGER NOT NULL DEFAULT 15,
                 days_per_week INTEGER NOT NULL DEFAULT 5,
                 target_level TEXT NOT NULL DEFAULT 'B1',
+                plan_mode TEXT NOT NULL DEFAULT 'time',
+                target_units INTEGER NOT NULL DEFAULT 0,
+                max_new INTEGER NOT NULL DEFAULT 1,
+                include_listening INTEGER NOT NULL DEFAULT 1,
+                include_speaking INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
+        # V3.90 (Plan diario): el objetivo deja de ser SOLO "más o menos minutos".
+        # `plan_mode` (`time`|`units`|`mixed`) elige con qué se declara el objetivo
+        # del día —tiempo, unidades de trabajo o las dos cosas—; `target_units` es
+        # el número de unidades de los modos `units`/`mixed` (0 = sin tope de
+        # unidades); `max_new` acota cuánto material NUEVO entra en el plan (0 =
+        # día de solo repaso); `include_listening`/`include_speaking` sacan esa
+        # destreza del plan de hoy. Todo aditivo e idempotente: las instalaciones
+        # previas conservan el comportamiento anterior (`time` con `max_new` = 1,
+        # que es exactamente el tope que ya aplicaba el Session Engine a la
+        # categoría `new`).
+        goal_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(learning_goal)")
+        }
+        for _col, _ddl in (
+            ("plan_mode", "TEXT NOT NULL DEFAULT 'time'"),
+            ("target_units", "INTEGER NOT NULL DEFAULT 0"),
+            ("max_new", "INTEGER NOT NULL DEFAULT 1"),
+            ("include_listening", "INTEGER NOT NULL DEFAULT 1"),
+            ("include_speaking", "INTEGER NOT NULL DEFAULT 1"),
+        ):
+            if _col not in goal_cols:
+                conn.execute(f"ALTER TABLE learning_goal ADD COLUMN {_col} {_ddl}")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS session_completions (
@@ -548,11 +575,34 @@ def init_db() -> None:
                 step_key TEXT NOT NULL,
                 completed_on TEXT NOT NULL,
                 completed_at TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT '',
+                skill TEXT NOT NULL DEFAULT '',
+                minutes INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, step_key),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
+        # V3.90: la unidad completada guarda QUÉ era (`kind`/`skill`) y cuántos
+        # minutos le había asignado el Session Engine cuando se completó
+        # (`minutes`). Sin esto, "unidades de hoy" habría que deducirlo del
+        # `step_key` (parseo frágil) y los minutos no existirían en absoluto: el
+        # plan se recalcula en cada lectura, así que la única medida honesta del
+        # tiempo es la que se congela al completar. Aditivo: las filas previas
+        # quedan con `kind`/`skill` vacíos y `minutes` = 0 y NO se cuentan en las
+        # métricas del día (mejor un 0 declarado que un dato inventado).
+        step_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(session_completions)")
+        }
+        for _col, _ddl in (
+            ("kind", "TEXT NOT NULL DEFAULT ''"),
+            ("skill", "TEXT NOT NULL DEFAULT ''"),
+            ("minutes", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            if _col not in step_cols:
+                conn.execute(
+                    f"ALTER TABLE session_completions ADD COLUMN {_col} {_ddl}"
+                )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS academy_enrollments (

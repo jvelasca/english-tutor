@@ -20,6 +20,7 @@ from schemas.academy import (
     CefrProfileOut,
     ConversationEnduranceOut,
     CourseMapOut,
+    DailyPlanOut,
     DashboardOut,
     EnrollmentOut,
     EnrollmentsOut,
@@ -256,6 +257,13 @@ async def put_goal(
     if goal is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return goal
+
+
+@router.get("/api/academy/daily-plan", response_model=DailyPlanOut)
+async def daily_plan(user: dict = Depends(current_user)) -> dict:
+    """Plan diario (V3.90): objetivo interpretado, progreso de hoy, métricas y
+    repasos pendientes, junto al MISMO plan de pasos que `/session`."""
+    return await academy_service.get_daily_plan(user["id"])
 
 
 @router.post("/api/academy/study-plan", response_model=StudyPlanOut)

@@ -574,6 +574,11 @@ def session_plan(
     listening_weak: list[str] | None = None,
     budget_minutes: int = TODAY_BUDGET,
     exclude_keys: set[str] | None = None,
+    *,
+    max_new: int | None = None,
+    max_units: int | None = None,
+    include_listening: bool = True,
+    include_speaking: bool = True,
 ) -> list[dict]:
     """Sesión diaria ordenada por prioridad pedagógica.
 
@@ -591,6 +596,24 @@ def session_plan(
     `SESSION_MIX`. Cada categoría está limitada por `SESSION_CAPS`. Los pasos cuya
     `step_key` esté en `exclude_keys` (ya completados hoy) se omiten antes de
     repartir los minutos. Determinista dados los mismos inputs.
+
+    V3.90 (Plan diario): el objetivo del alumno puede acotar el día. `max_new`
+    sustituye al tope fijo de la categoría `new` (0 = día de solo repaso, que es
+    trabajo sobre material ya visto y por eso **no** cuenta como contenido nuevo);
+    `max_units` recorta el plan a ese número de unidades **por la cola**; y
+    `include_listening=False` saca la categoría `listening` del plan de hoy.
+
+    V3.90 (destrezas incluidas): `include_speaking=False` no añade una categoría
+    nueva —el plan diario no presupuesta Speaking como tiempo hasta V3.92—, pero
+    sí **quita del día los pasos de Speaking** que ya podían aparecer por debilidad
+    o refuerzo: una preferencia declarada que no se aplicara sería una casilla que
+    miente.
+
+    **Repaso antes que nuevo.** `max_units` se aplica al FINAL, sobre una lista que
+    ya viene ordenada repaso → listening → debilidad → nuevo → refuerzo: lo que se
+    cae al recortar es siempre lo menos prioritario, y el contenido nuevo es lo
+    primero que desaparece. No hay que reordenar nada para cumplir la política: el
+    orden pedagógico ya la implementa.
     """
     remediation = remediation or []
     mastered_ids = mastered_ids or set()
@@ -598,8 +621,14 @@ def session_plan(
     exclude_keys = exclude_keys or set()
     steps: list[dict] = []
 
+    # V3.90: tope por categoría del día. El de siempre, salvo `new`, que el
+    # objetivo puede subir o bajar (0 = sin material nuevo hoy: día de repaso).
+    caps = dict(SESSION_CAPS)
+    if max_new is not None:
+        caps["new"] = max(0, int(max_new))
+
     def _cap(kind: str) -> int:
-        return SESSION_CAPS.get(kind, 1)
+        return caps.get(kind, 1)
 
     # 1. Review: destrezas con repaso pendiente (curva de olvido).
     for e in profile:
@@ -620,7 +649,8 @@ def session_plan(
             )
 
     # 2. Listening: sub-destrezas pendientes (ya ordenadas por debilidad).
-    for subskill in listening_weak:
+    # V3.90: el objetivo del día puede excluir la destreza por completo.
+    for subskill in [] if not include_listening else listening_weak:
         if len(steps_of(steps, "listening")) >= _cap("listening"):
             break
         steps.append(
@@ -637,9 +667,12 @@ def session_plan(
         )
 
     # 3. Weakness: destrezas débiles del plan de remediación (más débil primero).
+    # V3.90: `include_speaking=False` deja fuera del día los pasos de Speaking.
     for r in remediation:
         if len(steps_of(steps, "weakness")) >= _cap("weakness"):
             break
+        if not include_speaking and r["skill"] == "speaking":
+            continue
         oid = r["objective_ids"][0] if r.get("objective_ids") else None
         obj = get_objective(level, oid) if (level is not None and oid) else None
         steps.append(
@@ -679,6 +712,8 @@ def session_plan(
         if e.get("evidence_count", 0) > 0 and not e.get("review_due")
     ]
     strong.sort(key=lambda e: -e["score"])
+    if not include_speaking:
+        strong = [e for e in strong if e["skill"] != "speaking"]
     if strong and len(steps_of(steps, "easy_wins")) < _cap("easy_wins"):
         e = strong[0]
         steps.append(
@@ -699,6 +734,13 @@ def session_plan(
         s["step_key"] = step_key(s)
     if exclude_keys:
         steps = [s for s in steps if s["step_key"] not in exclude_keys]
+
+    # V3.90: recorte por unidades del día, POR LA COLA. El plan ya viene en orden
+    # pedagógico, así que truncar por el final ES "repaso antes que nuevo": lo que
+    # se cae es lo menos prioritario (`new` primero), y un día de repaso se queda
+    # sin contenido nuevo.
+    if max_units is not None:
+        steps = steps[: max(0, int(max_units))]
 
     return _assign_minutes(steps, budget_minutes, mix=SESSION_MIX)
 

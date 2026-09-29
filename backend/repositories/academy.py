@@ -797,12 +797,13 @@ def set_placement_calibration_estimates(
 
 
 def get_goal(user_id: str) -> dict | None:
-    """Objetivo personal del usuario (tipo, minutos/día, días/semana y meta CEFR),
-    o None si aún no lo ha configurado."""
+    """Objetivo personal del usuario (tipo, minutos/día, días/semana, meta CEFR y
+    el plan diario de V3.90), o None si aún no lo ha configurado."""
     with closing(_conn()) as conn:
         row = conn.execute(
-            "SELECT goal_type, minutes_per_day, days_per_week, target_level "
-            "FROM learning_goal WHERE user_id = ?",
+            "SELECT goal_type, minutes_per_day, days_per_week, target_level, "
+            "plan_mode, target_units, max_new, include_listening, "
+            "include_speaking FROM learning_goal WHERE user_id = ?",
             (user_id,),
         ).fetchone()
     return dict(row) if row is not None else None
@@ -814,8 +815,19 @@ def upsert_goal(
     minutes_per_day: int,
     days_per_week: int,
     target_level: str,
+    *,
+    plan_mode: str = "time",
+    target_units: int = 0,
+    max_new: int = 1,
+    include_listening: bool = True,
+    include_speaking: bool = True,
 ) -> bool:
-    """Crea o actualiza el objetivo personal del usuario. False si no existe."""
+    """Crea o actualiza el objetivo personal del usuario. False si no existe.
+
+    V3.90: las cinco claves del plan diario son keyword-only con los MISMOS
+    valores por defecto que la migración, de modo que un llamador antiguo (o un
+    test previo) que solo pase las cuatro de siempre siga escribiendo un objetivo
+    válido y con el comportamiento de antes."""
     if get_user(user_id) is None:
         return False
     now = _now()
@@ -823,14 +835,33 @@ def upsert_goal(
         conn.execute(
             "INSERT INTO learning_goal "
             "(user_id, goal_type, minutes_per_day, days_per_week, target_level, "
-            "updated_at) VALUES (?, ?, ?, ?, ?, ?) "
+            "plan_mode, target_units, max_new, include_listening, "
+            "include_speaking, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET "
             "goal_type = excluded.goal_type, "
             "minutes_per_day = excluded.minutes_per_day, "
             "days_per_week = excluded.days_per_week, "
             "target_level = excluded.target_level, "
+            "plan_mode = excluded.plan_mode, "
+            "target_units = excluded.target_units, "
+            "max_new = excluded.max_new, "
+            "include_listening = excluded.include_listening, "
+            "include_speaking = excluded.include_speaking, "
             "updated_at = excluded.updated_at",
-            (user_id, goal_type, minutes_per_day, days_per_week, target_level, now),
+            (
+                user_id,
+                goal_type,
+                minutes_per_day,
+                days_per_week,
+                target_level,
+                plan_mode,
+                target_units,
+                max_new,
+                1 if include_listening else 0,
+                1 if include_speaking else 0,
+                now,
+            ),
         )
     return True
 
@@ -838,22 +869,44 @@ def upsert_goal(
 # --- Sesión diaria (Session Engine): pasos completados --------------------
 
 
-def mark_session_step(user_id: str, step_key: str, completed_on: str) -> bool:
+def mark_session_step(
+    user_id: str,
+    step_key: str,
+    completed_on: str,
+    *,
+    kind: str = "",
+    skill: str = "",
+    minutes: int = 0,
+) -> bool:
     """Marca un paso de la sesión como completado hoy. False si no existe el usuario.
 
     La clave es (user_id, step_key): remarcar el mismo paso en un día posterior
-    actualiza `completed_on`, así el filtro "hoy" se autolimpia sin acumular filas."""
+    actualiza `completed_on`, así el filtro "hoy" se autolimpia sin acumular filas.
+
+    V3.90: `kind`/`skill`/`minutes` congelan QUÉ unidad se completó y cuántos
+    minutos le había asignado el Session Engine en ese momento. Son la materia
+    prima de las métricas del día; sin ellos habría que reinterpretar el
+    `step_key` (frágil) y los minutos no existirían (el plan se recalcula)."""
     if get_user(user_id) is None:
         return False
     now = _now()
     with closing(_conn()) as conn, conn:
+        # Un re-marcado sin metadata (el paso ya no está en el plan vigente) NO
+        # pisa lo que ya se congeló: "desconocido" no debe borrar "conocido".
         conn.execute(
             "INSERT INTO session_completions "
-            "(user_id, step_key, completed_on, completed_at) VALUES (?, ?, ?, ?) "
+            "(user_id, step_key, completed_on, completed_at, kind, skill, minutes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(user_id, step_key) DO UPDATE SET "
             "completed_on = excluded.completed_on, "
-            "completed_at = excluded.completed_at",
-            (user_id, step_key, completed_on, now),
+            "completed_at = excluded.completed_at, "
+            "kind = CASE WHEN excluded.kind = '' THEN session_completions.kind "
+            "ELSE excluded.kind END, "
+            "skill = CASE WHEN excluded.skill = '' THEN session_completions.skill "
+            "ELSE excluded.skill END, "
+            "minutes = CASE WHEN excluded.minutes = 0 "
+            "THEN session_completions.minutes ELSE excluded.minutes END",
+            (user_id, step_key, completed_on, now, kind, skill, minutes),
         )
     return True
 
@@ -867,6 +920,23 @@ def list_session_steps(user_id: str, completed_on: str) -> set[str]:
             (user_id, completed_on),
         ).fetchall()
     return {r["step_key"] for r in rows}
+
+
+def list_session_completions(user_id: str, completed_on: str) -> list[dict]:
+    """Unidades completadas hoy con su metadata (`step_key`, `kind`, `skill`,
+    `minutes`, `completed_at`), en orden de finalización.
+
+    Las filas anteriores a V3.90 traen `kind`/`skill` vacíos y `minutes` = 0: se
+    devuelven tal cual para que el agregador pueda declararlas como desconocidas
+    en vez de contarlas como cero minutos trabajados."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT step_key, kind, skill, minutes, completed_at "
+            "FROM session_completions WHERE user_id = ? AND completed_on = ? "
+            "ORDER BY completed_at ASC, step_key ASC",
+            (user_id, completed_on),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 # --- Sesión trazable de Assessment 2.0 (V2.10) ----------------------------

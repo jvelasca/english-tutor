@@ -1496,6 +1496,9 @@ class PronunciationResultOut(BaseModel):
 
 GoalType = Literal["general", "travel", "work", "interview", "exam"]
 CefrLevel = Literal["A1", "A2", "B1", "B2", "C1", "C2"]
+# V3.90 (Plan diario): con qué se declara el objetivo del día. `time` = minutos
+# (lo de siempre), `units` = unidades de trabajo, `mixed` = las dos cosas.
+PlanMode = Literal["time", "units", "mixed"]
 
 
 class LearningGoalIn(BaseModel):
@@ -1503,6 +1506,14 @@ class LearningGoalIn(BaseModel):
     minutes_per_day: int = Field(default=15, ge=5, le=180)
     days_per_week: int = Field(default=5, ge=1, le=7)
     target_level: CefrLevel = "B1"
+    # V3.90: plan diario. Las cotas son del esquema (no de la UI): `target_units`
+    # 0 = el modo no fija unidades (y en `units` cae a los minutos), `max_new`
+    # 0 = día de solo repaso, 5 = tope razonable de contenido nuevo en una sesión.
+    plan_mode: PlanMode = "time"
+    target_units: int = Field(default=0, ge=0, le=12)
+    max_new: int = Field(default=1, ge=0, le=5)
+    include_listening: bool = True
+    include_speaking: bool = True
 
 
 class LearningGoalOut(BaseModel):
@@ -1510,3 +1521,72 @@ class LearningGoalOut(BaseModel):
     minutes_per_day: int
     days_per_week: int
     target_level: str
+    plan_mode: str
+    target_units: int
+    max_new: int
+    include_listening: bool
+    include_speaking: bool
+
+
+class DailyPlanMetricsOut(BaseModel):
+    """Métricas del día. `minutes` es la suma de los minutos que el Session Engine
+    había asignado a las unidades completadas (estimación del motor, **no** tiempo
+    de reloj: no hay cronómetro). `accuracy` es el resultado medio observado hoy
+    (evidencia + listening), no una nota del alumno."""
+
+    day: str
+    units: int
+    unknown_units: int = 0
+    minutes: int
+    reviews: int
+    new: int
+    listening: int
+    practice: int
+    speaking: int
+    listening_attempts: int
+    listening_accuracy: float | None
+    accuracy: float | None
+    by_kind: dict[str, int]
+    by_skill: dict[str, int]
+
+
+class DailyPlanPendingOut(BaseModel):
+    """Repasos pendientes, publicados con su origen para que la UI pueda decir de
+    dónde sale cada uno en vez de sumar a ciegas."""
+
+    fsrs: int
+    listening: int
+    total: int
+
+
+class DailyPlanProgressOut(BaseModel):
+    """Progreso del objetivo de hoy. En `mixed` el `percent` es el mínimo de los
+    dos objetivos declarados (el día se cumple con ambos)."""
+
+    units_done: int
+    units_target: int
+    minutes_done: int
+    minutes_target: int
+    units_ratio: float | None
+    minutes_ratio: float | None
+    percent: float
+    done: bool
+
+
+class DailyPlanOut(BaseModel):
+    """Plan diario (V3.90): el objetivo tal como lo interpreta el motor, lo que
+    falta para cumplirlo y lo que se ha hecho hoy."""
+
+    goal: LearningGoalOut
+    plan_mode: str
+    minutes_target: int
+    units_target: int
+    # Unidades que el plan de hoy puede servir (None = el día no limita unidades).
+    units_remaining: int | None
+    minutes_remaining: int
+    include_listening: bool
+    include_speaking: bool
+    pending: DailyPlanPendingOut
+    progress: DailyPlanProgressOut
+    metrics: DailyPlanMetricsOut
+    session: SessionOut

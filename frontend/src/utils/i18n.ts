@@ -2889,6 +2889,34 @@ const STRINGS: Record<string, Entry> = {
   "today.goalType.interview": { en: "Interview", es: "Entrevista" },
   "today.goalType.exam": { en: "Exam", es: "Examen" },
 
+  // V3.90 (Plan diario): el objetivo del día se puede declarar por tiempo, por
+  // unidades o por ambos. `engine estimate` es deliberado: los minutos son los
+  // que el motor reparte, NO tiempo de reloj medido (no hay cronómetro).
+  "today.planMode": { en: "Daily plan", es: "Plan diario" },
+  "today.planMode.time": { en: "By time", es: "Por tiempo" },
+  "today.planMode.units": { en: "By units", es: "Por unidades" },
+  "today.planMode.mixed": { en: "Time and units", es: "Tiempo y unidades" },
+  "today.targetUnits": { en: "Units", es: "Unidades" },
+  "today.unitsShort": { en: "units", es: "unidades" },
+  "today.maxNew": { en: "New items max", es: "Máximo de nuevas" },
+  "today.includeListening": { en: "Include Listening", es: "Incluir Listening" },
+  "today.includeSpeaking": { en: "Include Speaking", es: "Incluir Speaking" },
+  "today.goalProgress": { en: "Today's goal", es: "Objetivo de hoy" },
+  "today.progressUnits": { en: "Units done", es: "Unidades hechas" },
+  "today.progressMinutes": { en: "Minutes done", es: "Minutos hechos" },
+  "today.estimated": { en: "engine estimate", es: "estimación del motor" },
+  "today.pendingReviews": { en: "Pending reviews", es: "Repasos pendientes" },
+  "today.pendingBreakdown": {
+    en: "{fsrs} FSRS, {listening} Listening",
+    es: "{fsrs} FSRS, {listening} Listening",
+  },
+  "today.todayAccuracy": { en: "Today's accuracy", es: "Acierto de hoy" },
+  "today.noData": { en: "No data yet", es: "Sin datos aún" },
+  "today.goalMet": {
+    en: "Today's goal is met",
+    es: "Objetivo de hoy cumplido",
+  },
+
   // Estados vacíos
   "empty.noSpeaking": {
     en: "No speaking practice recorded yet.",

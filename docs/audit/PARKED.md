@@ -2492,6 +2492,97 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.90.0 — El objetivo del día deja de ser solo minutos: unidades, mezcla nuevo/repaso y progreso visible · 2026-09-29
+
+> Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
+> idempotente** (cinco columnas en `learning_goal` —`plan_mode`, `target_units`, `max_new`,
+> `include_listening`, `include_speaking`— y tres en `session_completions` —`kind`, `skill`,
+> `minutes`—), **CON un endpoint nuevo** (`GET /api/academy/daily-plan`) y **CON `GET`/`PUT
+> /api/academy/goal` ampliados**, y **SIN bump** de `GENERATOR_VERSION` (`1.6.0`) /
+> `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION`.
+> **Sin gates nuevos ni retirados** (siguen los ocho, todos `pending`). Detalle en
+> `release-notes-v3.90.0.md`.
+
+### Cerrado en V3.90.0 (deja de ser deuda)
+
+- **El objetivo diario solo sabía contar minutos.** `learning_goal.minutes_per_day` era la **única**
+  fuente de verdad del presupuesto del Session Engine (`→ budget_minutes`): no había unidades, ni
+  mezcla declarada de nuevo/repaso, ni destrezas activables, ni progreso visible. Se **extiende
+  `learning_goal`** (no se crea un «Plan diario» paralelo, que habría duplicado la verdad del
+  presupuesto) con `plan_mode` (`time` | `units` | `mixed`), `target_units` (0–12), `max_new`
+  (0–5), `include_listening` e `include_speaking`, con **defaults que conservan el comportamiento
+  anterior**. `[PRODUCTO]`
+- **Repaso antes que nuevo, sin reordenar el motor.** `session_plan` ya entrega los pasos en orden
+  pedagógico (repaso → listening → debilidad → nuevo → refuerzo), así que el recorte por unidades
+  (`max_units`) se aplica **por la cola** y **el material nuevo es el primero que se cae**;
+  `max_new` sustituye el tope fijo de la categoría `new` (**0 = día de solo repaso**) e
+  `include_listening = False` saca la categoría de listening del plan. `[MOTOR]`
+- **`include_speaking` deja de ser una casilla decorativa.** El plan **no** presupuesta Speaking
+  como tiempo hasta V3.92, pero la preferencia **sí** quita del día los pasos de Speaking que
+  podían entrar por debilidad o refuerzo: una preferencia declarada que no se aplicara sería una
+  casilla que miente. `[PRODUCTO]`
+- **El plan sirve lo que FALTA, no el cupo entero otra vez.** Nuevo `_session_steps_with_day` (lee
+  **una sola vez** las unidades completadas del día): el presupuesto es `remaining_minutes` y el
+  tope `remaining_units`, y con el objetivo **cumplido** el plan devuelve **cero pasos** en vez de
+  seguir sirviendo trabajo. `GET /api/academy/session` y `GET /api/academy/daily-plan` comparten
+  **el mismo** plan de pasos, así que **la barra y la lista no pueden divergir**. `[MOTOR]`
+- **Métricas honestas, en un módulo puro.** Nuevo `services/daily_plan.py` (**puro**: recibe filas
+  ya leídas, no toca la BD, no lee el reloj, no depende de FastAPI, y por eso se fija con tests sin
+  `monkeypatch`): `minutes` es la **estimación del motor** —los minutos que el plan **había
+  asignado** a la unidad al completarse—, **no tiempo de reloj** (la UI lo etiqueta
+  `engine estimate`); `unknown_units` **declara** las filas anteriores a V3.90 (cuentan como
+  trabajo hecho y **no** suman minutos); `accuracy` es la media **observada** del día (evidencia de
+  academia + intentos de listening, ponderada por nº de intentos) y **no una nota**; y `pending`
+  publica los repasos pendientes **por origen** (FSRS + cola de Listening de V3.89, con
+  `due_queue` y el mismo `due_count` del panel) para no sumar a ciegas. `set_session_step_done`
+  **congela** `kind`/`skill`/`minutes` al completar (los minutos solo pueden medirse una vez,
+  porque el plan se recalcula en cada lectura) y un re-marcado **no pisa** lo ya congelado.
+  `[MOTOR]` `[CONTRATO]`
+- **El progreso publica el mínimo de los objetivos declarados.** En `mixed` el día se cumple con
+  **los dos**, así que la barra no puede ir más rápido que el objetivo más atrasado. `[MOTOR]`
+- **El objetivo se configura y se ve.** `TodayPlan.tsx` gana el selector de **modo**, los campos de
+  unidades y de máximo de nuevas, los toggles de Listening y Speaking y la barra **«Today's goal»**
+  (unidades hechas, minutos hechos **con la etiqueta de estimación**, repasos pendientes
+  **desglosados por origen** y el acierto de hoy, o «sin datos» — **nunca** un 0 disfrazado);
+  `HomeScreen.tsx` lee el plan **una vez** y lo reparte (chip del encabezado + lista de pasos), con
+  i18n es/en y `--strict` en verde. `[UX]`
+- **Repliegue declarado.** Si la lectura del plan **falla**, `TodayPlan` **no desaparece**: relee
+  objetivo y sesión como en V3.89 y se pinta **sin** barra de progreso (la barra necesita las
+  métricas que solo el plan trae, así que **no se improvisa**); mientras Home sigue cargando **no**
+  se pregunta nada por duplicado. `[UX]`
+
+### Abierto y medido a propósito (frontera declarada, no defecto)
+
+- **No hay cronómetro.** Los minutos son **estimación del motor** (lo que el plan había asignado a
+  la unidad), no tiempo de reloj. `[MOTOR]`
+- **`max_new` > 1 no añade más material nuevo** mientras el motor solo conozca **un** siguiente
+  objetivo del currículo: la subida es efectiva a **1** y se declara, en vez de prometer en la UI lo
+  que el motor no hace. `[MOTOR]`
+- **El plan no consume la cola de repaso**: la **publica** con su origen, y se consume donde
+  siempre. `[PRODUCTO]`
+- **Speaking no presupuesta tiempo** todavía (llega como objetivo de tiempo en V3.92); por ahora la
+  destreza solo se puede **excluir** del día. `[PRODUCTO]`
+- **Los ocho gates humanos siguen `pending`** y `validation-evidence.json` sigue sin existir.
+  `[AUDITORÍA]`
+
+### Estado de publicación (a fecha de este commit)
+
+| Comprobación | Resultado |
+|---|---|
+| `ruff check .` (backend y launcher) | limpio |
+| `pytest` backend | **3276 passed** (incluye `test_daily_plan_v390.py` y `test_academy_goal.py` ampliado) |
+| `vitest run` | **1094 passed** (111 ficheros) |
+| `tsc --noEmit` / `npm run build` | limpio / correcto |
+| `check_i18n_coverage.py --strict` | **1856** cadenas · 0 huérfanas · 0 sin definir · 0 duplicadas · 0 vacías |
+| `contrast_audit.mjs --strict` | 480 pares + 6 guardas · **0 bloqueantes** |
+| Playwright en las rutas tocadas (**Home**) en los 3 breakpoints | **19 passed · 2 skipped** (`homeDailyPlan.spec.ts` nuevo) |
+| `check_release_consistency` | OK en los **6 orígenes** (`3.90.0`) |
+| Tag anotado `v3.90.0` / GitHub Release / CI | **pendientes** al escribir esta sección; se sellan tras el verde de CI (invariante de orden restablecido en V3.88.0) |
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- Todo lo declarado abierto en V3.89.0 y anteriores sigue abierto.
+
 ## V3.89.0 — Listening robusto: el fallo es evidencia, no barrera de navegación · 2026-09-29
 
 > Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
@@ -2532,7 +2623,7 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
   desde el panel, no se **gestiona**. `[UX]`
 - **La cola es por usuario** y se guarda en SQLite local, como el resto del progreso. `[PRODUCTO]`
 
-### Estado de publicación (a fecha de este commit)
+### Estado de publicación (verificado el 2026-09-29, tras el verde de CI)
 
 | Comprobación | Resultado |
 |---|---|
@@ -2543,7 +2634,11 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 | `check_i18n_coverage.py --strict` | 0 huérfanas · 0 sin definir |
 | `contrast_audit.mjs --strict` | 480 pares + 6 guardas · **0 bloqueantes** |
 | `check_release_consistency` | OK en los **6 orígenes** (`3.89.0`) |
-| Tag anotado `v3.89.0` / GitHub Release / CI | **pendientes** en el momento de escribir esta sección; se sellan tras el verde de CI (invariante de orden de V3.88.0) |
+| Tag anotado `v3.89.0` | **publicado** (`refs/tags/v3.89.0` en `origin`) → commit `e283dac` |
+| GitHub Release | https://github.com/jvelasca/english-tutor/releases/tag/v3.89.0 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `e283dac` | `success` — run `36563083080`, **12/12 jobs en verde** |
+| Orden tag/CI | el tag se creó **DESPUÉS** del verde: el invariante se mantiene |
+| `main` vs `origin/main` | al día en `e283dac` |
 
 ### Sigue abierto o aparcado (deuda declarada)
 

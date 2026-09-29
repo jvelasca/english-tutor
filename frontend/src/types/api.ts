@@ -3603,9 +3603,75 @@ export type LearningGoalType =
   | "interview"
   | "exam";
 
+/** V3.90 (Plan diario): con qué se declara el objetivo del día. */
+export type PlanMode = "time" | "units" | "mixed";
+
 export interface LearningGoal {
   goal_type: LearningGoalType;
   minutes_per_day: number;
   days_per_week: number;
   target_level: EstimatedLevel;
+  // V3.90 (Plan diario). `target_units` 0 = el modo no fija unidades (y en
+  // `units` el motor cae a los minutos); `max_new` 0 = día de solo repaso.
+  plan_mode: PlanMode;
+  target_units: number;
+  max_new: number;
+  include_listening: boolean;
+  include_speaking: boolean;
+}
+
+/** Progreso del objetivo de hoy. En `mixed` el `percent` es el mínimo de los dos
+ *  objetivos declarados: el día se cumple con ambos. */
+export interface DailyPlanProgress {
+  units_done: number;
+  units_target: number;
+  minutes_done: number;
+  minutes_target: number;
+  units_ratio: number | null;
+  minutes_ratio: number | null;
+  percent: number;
+  done: boolean;
+}
+
+/** Métricas del día. `minutes` es la estimación del motor (los minutos que el
+ *  plan asignó a las unidades completadas), NO tiempo de reloj medido. */
+export interface DailyPlanMetrics {
+  day: string;
+  units: number;
+  unknown_units: number;
+  minutes: number;
+  reviews: number;
+  new: number;
+  listening: number;
+  practice: number;
+  speaking: number;
+  listening_attempts: number;
+  listening_accuracy: number | null;
+  accuracy: number | null;
+  by_kind: Record<string, number>;
+  by_skill: Record<string, number>;
+}
+
+/** Repasos pendientes con su origen, para no sumar a ciegas en la UI. */
+export interface DailyPlanPending {
+  fsrs: number;
+  listening: number;
+  total: number;
+}
+
+export interface DailyPlan {
+  goal: LearningGoal;
+  plan_mode: PlanMode;
+  minutes_target: number;
+  units_target: number;
+  /** Unidades que el plan de hoy puede servir (null = el día no limita unidades). */
+  units_remaining: number | null;
+  minutes_remaining: number;
+  include_listening: boolean;
+  include_speaking: boolean;
+  pending: DailyPlanPending;
+  progress: DailyPlanProgress;
+  metrics: DailyPlanMetrics;
+  /** El MISMO plan de pasos que `/session`: la barra y la lista no divergen. */
+  session: Session;
 }

@@ -5,6 +5,7 @@ import type {
   CefrLadder,
   ConversationEndurance,
   CourseMap,
+  DailyPlan,
   Dashboard,
   Enrollment,
   EvidenceGraph,
@@ -567,4 +568,10 @@ export function putGoal(
   goal: LearningGoal,
 ): Promise<LearningGoal> {
   return putJson<LearningGoal>(`/api/academy/goal`, goal);
+}
+
+/** Plan diario (V3.90): objetivo interpretado, progreso, métricas y pendientes,
+ *  junto al MISMO plan de pasos que `/session`. */
+export function getDailyPlan(_userId: string): Promise<DailyPlan> {
+  return getJson<DailyPlan>(`/api/academy/daily-plan`);
 }
