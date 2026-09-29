@@ -3,7 +3,7 @@
  * packs temáticos. Solo materializa léxico + FSRS; no escribe mastery.
  */
 import { useCallback, useEffect, useState } from "react";
-import { ListPlus, Package, Plus } from "lucide-react";
+import { ListPlus, Loader2, Package, Plus } from "lucide-react";
 import {
   addVocabularyBulk,
   addVocabularyItem,
@@ -29,6 +29,22 @@ interface AddVocabSectionProps {
   onStudy?: (opts: { collectionId: number; label: string }) => void;
 }
 
+/**
+ * V3.88.0: qué acción está en vuelo. Antes las tres compartían un `busy` que
+ * solo deshabilitaba botones: al añadir una palabra se apagaban también las
+ * tarjetas de listas y packs, sin decir cuál estaba trabajando.
+ */
+type BusyAction =
+  | { kind: "add" }
+  | { kind: "bulk" }
+  | { kind: "enroll"; id: number }
+  | null;
+
+/** Icono de espera para el botón que está trabajando (V3.88.0). */
+function BusySpinner() {
+  return <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />;
+}
+
 export function AddVocabSection({
   userId,
   onChanged,
@@ -40,7 +56,8 @@ export function AddVocabSection({
   const [listTitle, setListTitle] = useState("");
   const [listText, setListText] = useState("");
   const [packs, setPacks] = useState<VocabCollection[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const busy = busyAction !== null;
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -67,7 +84,7 @@ export function AddVocabSection({
   async function handleAddWord(e: React.FormEvent) {
     e.preventDefault();
     if (!word.trim() || busy) return;
-    setBusy(true);
+    setBusyAction({ kind: "add" });
     setMessage(null);
     try {
       const out = await addVocabularyItem(userId, word.trim(), {
@@ -83,14 +100,14 @@ export function AddVocabSection({
     } catch {
       setMessage(t("dictionary.add.error"));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function handleBulk(e: React.FormEvent) {
     e.preventDefault();
     if (!listText.trim() || busy) return;
-    setBusy(true);
+    setBusyAction({ kind: "bulk" });
     setMessage(null);
     try {
       const out = await addVocabularyBulk(userId, listText, {
@@ -106,13 +123,13 @@ export function AddVocabSection({
     } catch {
       setMessage(t("dictionary.add.error"));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function handleEnroll(pack: VocabCollection) {
     if (busy) return;
-    setBusy(true);
+    setBusyAction({ kind: "enroll", id: pack.id });
     setMessage(null);
     try {
       const out = await enrollVocabCollection(userId, pack.id);
@@ -126,7 +143,7 @@ export function AddVocabSection({
     } catch {
       setMessage(t("dictionary.add.error"));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -158,7 +175,10 @@ export function AddVocabSection({
             lang="es"
           />
           <Button type="submit" size="sm" disabled={busy || !word.trim()}>
-            {t("dictionary.add.wordCta")}
+            {busyAction?.kind === "add" ? <BusySpinner /> : null}
+            {busyAction?.kind === "add"
+              ? t("common.saving")
+              : t("dictionary.add.wordCta")}
           </Button>
         </form>
       </Card>
@@ -193,7 +213,10 @@ export function AddVocabSection({
             className="w-fit"
             disabled={busy || !listText.trim()}
           >
-            {t("dictionary.add.listCta")}
+            {busyAction?.kind === "bulk" ? <BusySpinner /> : null}
+            {busyAction?.kind === "bulk"
+              ? t("common.saving")
+              : t("dictionary.add.listCta")}
           </Button>
         </form>
       </Card>
@@ -264,7 +287,14 @@ export function AddVocabSection({
                         disabled={busy}
                         onClick={() => void handleEnroll(pack)}
                       >
-                        {t("dictionary.add.enroll")}
+                        {busyAction?.kind === "enroll" &&
+                        busyAction.id === pack.id ? (
+                          <BusySpinner />
+                        ) : null}
+                        {busyAction?.kind === "enroll" &&
+                        busyAction.id === pack.id
+                          ? t("common.saving")
+                          : t("dictionary.add.enroll")}
                       </Button>
                     )}
                   </div>

@@ -883,6 +883,23 @@ export interface DictionaryLookupRequest {
 /** V3.39: dirección de búsqueda del diccionario de consulta. */
 export type DictionaryDirection = "en-es" | "es-en";
 
+/** Estado del trabajo de precalentado del diccionario (V3.88.0).
+ *
+ * El RESULTADO del trabajo es la caché global del backend, no este objeto:
+ * `prepared` cuenta las palabras que quedaron frescas (generadas ahora o ya lo
+ * estaban) y `skipped` las que no se pudieron preparar en esta pasada (cuota de
+ * generación agotada, modelo caído o timeout). `skipped` no es un error.
+ */
+export interface DictionaryWarmupJob {
+  id: string;
+  status: "running" | "done" | "error";
+  total: number;
+  prepared: number;
+  skipped: number;
+  pending: number;
+  error: string | null;
+}
+
 export interface CefrBucket {
   cefr: string;
   count: number;
@@ -1175,7 +1192,10 @@ export interface FlashcardStudyItem {
 export interface FlashcardQueue {
   deck: FlashcardDeck;
   items: FlashcardStudyItem[];
+  /** V3.87.1: `due_count` = vencidas; `upcoming_count` = adelantos de `intensive` (≤ 24 h). */
   due_count: number;
+  upcoming_count: number;
+  queue_count: number;
   new_count: number;
   reviewed_today: number;
   new_today: number;

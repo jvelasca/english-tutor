@@ -2,6 +2,7 @@ import { deleteJson, getJson, patchJson, postJson, withTimeout } from "./client"
 import {
   normalizeDeckList,
   normalizeDictionaryEntry,
+  normalizeDictionaryWarmupJob,
   normalizeDrillCandidates,
   normalizeFlashcardDeckDelete,
   normalizeFlashcardList,
@@ -18,6 +19,7 @@ import type {
   DictionaryDirection,
   DictionaryEntry,
   DictionaryLookupRequest,
+  DictionaryWarmupJob,
   DrillAttempt,
   DrillCandidates,
   DrillRecallAttempt,
@@ -80,6 +82,34 @@ export function lookupDictionaryWord(
     120_000,
     "dictionary lookup",
   );
+}
+
+/** Arranca el precalentado del diccionario del alumno (V3.88.0).
+ *
+ * El backend responde 202 con el estado inicial del trabajo y lo ejecuta en
+ * segundo plano; el progreso se sigue con `getDictionaryWarmupJob`. Es la
+ * palanca que convierte «la primera consulta de esta palabra tarda» en «ya está
+ * lista»: prepara las palabras del léxico con el mismo camino (y las mismas
+ * cuotas) que una consulta.
+ */
+export function startDictionaryWarmup(
+  _userId: string,
+  limit?: number,
+): Promise<DictionaryWarmupJob> {
+  const body = limit == null ? {} : { limit };
+  return postJson<unknown>("/api/vocabulary/dictionary/warmup", body).then(
+    normalizeDictionaryWarmupJob,
+  );
+}
+
+/** Estado de un trabajo de precalentado (polling, V3.88.0). */
+export function getDictionaryWarmupJob(
+  _userId: string,
+  jobId: string,
+): Promise<DictionaryWarmupJob> {
+  return getJson<unknown>(
+    `/api/vocabulary/dictionary/warmup/${encodeURIComponent(jobId)}`,
+  ).then(normalizeDictionaryWarmupJob);
 }
 
 /** Candidatas al speaking micro-drill (V3.19): señal determinista en servidor

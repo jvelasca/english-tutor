@@ -504,6 +504,36 @@ class DictionaryEntryOut(BaseModel):
     usage: DictionaryUsageOut
 
 
+class DictionaryWarmupRequest(BaseModel):
+    """Petición de precalentado del diccionario (V3.88.0).
+
+    `limit` acota cuántas palabras del léxico se intentan preparar en una
+    pasada; el servidor lo recorta a su propio tope. Sin `limit` se usa el
+    tope del servidor.
+    """
+
+    limit: int | None = Field(default=None, ge=1, le=500)
+
+
+class DictionaryWarmupJobOut(BaseModel):
+    """Estado del trabajo de precalentado del diccionario (V3.88.0).
+
+    El RESULTADO del trabajo es la caché global (`dictionary_entries`), no este
+    objeto: `prepared` cuenta las palabras que quedaron frescas (generadas
+    ahora o ya lo estaban) y `skipped` las que no se pudieron preparar en esta
+    pasada (cuota de generación agotada, modelo caído o timeout). `skipped` no
+    es un error: se puede reintentar más tarde.
+    """
+
+    id: str
+    status: Literal["running", "done", "error"] = "running"
+    total: int = 0
+    prepared: int = 0
+    skipped: int = 0
+    pending: int = 0
+    error: str | None = None
+
+
 class DrillCandidatesOut(BaseModel):
     """Candidatos al speaking micro-drill (V3.19).
 
@@ -1260,7 +1290,11 @@ class FlashcardStudyItemOut(BaseModel):
 class FlashcardQueueOut(BaseModel):
     deck: FlashcardDeckOut
     items: list[FlashcardStudyItemOut]
+    #: V3.87.1: `due_count` = vencidas reales; `upcoming_count` = adelantos de
+    #: `intensive` (≤ 24 h, sin tocar su calendario); `queue_count` = servido.
     due_count: int = 0
+    upcoming_count: int = 0
+    queue_count: int = 0
     new_count: int = 0
     reviewed_today: int = 0
     new_today: int = 0

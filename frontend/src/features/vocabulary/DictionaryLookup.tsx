@@ -36,6 +36,8 @@ import type {
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
 import { ItemReplayButton } from "../../components/ItemReplayButton";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
+import { LoadingNotice } from "../../components/LoadingNotice";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -157,6 +159,9 @@ export function DictionaryLookup({
   const [addOpen, setAddOpen] = useState(false);
   const [decks, setDecks] = useState<FlashcardDeck[] | null>(null);
   const [deckError, setDeckError] = useState(false);
+  // V3.88.0: `decks === null` significaba a la vez «no se ha pedido» y «estoy
+  // pidiendo». Mientras cargaba, el panel decía «sin mazos» sin saberlo.
+  const [decksLoading, setDecksLoading] = useState(false);
   const [selectedDecks, setSelectedDecks] = useState<number[]>([]);
   const [addMnemonic, setAddMnemonic] = useState("");
   const [addBack, setAddBack] = useState("");
@@ -225,6 +230,7 @@ export function DictionaryLookup({
   async function loadDecks() {
     if (!userId) return;
     setDeckError(false);
+    setDecksLoading(true);
     try {
       const data = await listFlashcardDecks(userId);
       const all = Array.isArray(data?.decks) ? data.decks : [];
@@ -232,6 +238,8 @@ export function DictionaryLookup({
     } catch {
       setDeckError(true);
       setDecks(null);
+    } finally {
+      setDecksLoading(false);
     }
   }
 
@@ -741,6 +749,7 @@ export function DictionaryLookup({
                   onMnemonic={setAddMnemonic}
                   tracked={tracked}
                   decks={decks}
+                  decksLoading={decksLoading}
                   deckError={deckError}
                   deckCreateError={deckCreateError}
                   selectedDecks={selectedDecks}
@@ -822,6 +831,7 @@ function AddToFlashcardsPanel({
   onMnemonic,
   tracked,
   decks,
+  decksLoading,
   deckError,
   deckCreateError,
   selectedDecks,
@@ -849,6 +859,8 @@ function AddToFlashcardsPanel({
   onMnemonic: (value: string) => void;
   tracked: boolean;
   decks: FlashcardDeck[] | null;
+  /** V3.88.0: la lista de mazos se está pidiendo (para no decir «sin mazos»). */
+  decksLoading: boolean;
   deckError: boolean;
   deckCreateError: DeckCreateError;
   selectedDecks: number[];
@@ -1012,7 +1024,14 @@ function AddToFlashcardsPanel({
             <Layers className="size-3.5" aria-hidden="true" />
             {t("dictionary.lookup.addDecksLabel")}
           </legend>
-          {(decks ?? []).length === 0 ? (
+          {decksLoading ? (
+            /* V3.88.0: mientras la lista viajaba, esto decía «sin mazos», que es
+               lo mismo que cuando de verdad no hay ninguno. */
+            <LoadingNotice
+              label={t("dictionary.lookup.decksLoading")}
+              className="text-[11px]"
+            />
+          ) : (decks ?? []).length === 0 ? (
             <p className="text-[11px] text-muted-foreground">
               {t("dictionary.lookup.addNoDeck")}
             </p>
@@ -1301,11 +1320,90 @@ function CompetenceChips({ competence }: { competence: LexicalCompetence }) {
   );
 }
 
+/**
+ * V3.88.0: cuántos significados se muestran sin un clic. La tarjeta enseña los
+ * PRINCIPALES (los que el prompt pide como mínimo) y esconde el resto tras el
+ * «...»; con seis acepciones la ficha se comía la pantalla en móvil y el alumno
+ * tenía que desplazarse para llegar a la definición.
+ */
+const PRIMARY_MEANINGS = 3;
+
+/** Opción de significado del selector de la tarjeta (V3.86.0 / V3.88.0). */
+function MeaningOption({
+  meaning,
+  index,
+  selected,
+  isReverse,
+  onPick,
+}: {
+  meaning: DictionaryMeaning;
+  index: number;
+  selected: boolean;
+  isReverse: boolean;
+  onPick?: (index: number) => void;
+}) {
+  const { t } = useI18n();
+  const label = `${meaning.term}${meaning.pos ? ` · ${meaning.pos}` : ""}`;
+  return (
+    <li>
+      <label
+        className={cn(
+          "flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 transition-colors",
+          selected
+            ? "border-primary/50 bg-primary/5"
+            : "border-border hover:border-primary/30",
+        )}
+      >
+        <input
+          type="radio"
+          name="dictionary-meaning"
+          className="mt-1"
+          checked={selected}
+          aria-label={`${t("dictionary.lookup.meaningAria")}: ${label}`}
+          onChange={() => onPick?.(index)}
+        />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm font-semibold" lang={isReverse ? "en" : "es"}>
+              {meaning.term}
+            </span>
+            {meaning.pos ? (
+              <Badge
+                variant="secondary"
+                className="text-[10px] font-semibold uppercase"
+              >
+                {meaning.pos}
+              </Badge>
+            ) : null}
+            {meaning.domain ? (
+              <span className="text-[11px] text-muted-foreground">
+                {meaning.domain}
+              </span>
+            ) : null}
+            {meaning.proper_noun ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] text-muted-foreground"
+              >
+                {t("dictionary.lookup.meaningProperNoun")}
+              </Badge>
+            ) : null}
+          </span>
+          {meaning.gloss ? (
+            <span className="text-[11px] leading-relaxed text-muted-foreground">
+              {meaning.gloss}
+            </span>
+          ) : null}
+        </span>
+      </label>
+    </li>
+  );
+}
+
 function ResultCard({
   entry,
   userId,
-  onPractice,
-  tracked = false,
+  onPractice,  tracked = false,
   addOpen = false,
   onToggleAdd,
   onOpenFlashcards,
@@ -1481,70 +1579,47 @@ function ResultCard({
               </span>
             </legend>
             <ul className="flex flex-col gap-1.5">
-              {meanings.map((meaning, index) => {
-                const selected = index === meaningIndex;
-                const label = `${meaning.term}${
-                  meaning.pos ? ` · ${meaning.pos}` : ""
-                }`;
-                return (
-                  <li key={`${meaning.term}-${meaning.pos}-${index}`}>
-                    <label
-                      className={cn(
-                        "flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 transition-colors",
-                        selected
-                          ? "border-primary/50 bg-primary/5"
-                          : "border-border hover:border-primary/30",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="dictionary-meaning"
-                        className="mt-1"
-                        checked={selected}
-                        aria-label={`${t("dictionary.lookup.meaningAria")}: ${label}`}
-                        onChange={() => onPickMeaning?.(index)}
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span
-                            className="text-sm font-semibold"
-                            lang={isReverse ? "en" : "es"}
-                          >
-                            {meaning.term}
-                          </span>
-                          {meaning.pos ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] font-semibold uppercase"
-                            >
-                              {meaning.pos}
-                            </Badge>
-                          ) : null}
-                          {meaning.domain ? (
-                            <span className="text-[11px] text-muted-foreground">
-                              {meaning.domain}
-                            </span>
-                          ) : null}
-                          {meaning.proper_noun ? (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] text-muted-foreground"
-                            >
-                              {t("dictionary.lookup.meaningProperNoun")}
-                            </Badge>
-                          ) : null}
-                        </span>
-                        {meaning.gloss ? (
-                          <span className="text-[11px] leading-relaxed text-muted-foreground">
-                            {meaning.gloss}
-                          </span>
-                        ) : null}
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
+              {meanings.slice(0, PRIMARY_MEANINGS).map((meaning, index) => (
+                <MeaningOption
+                  key={`${meaning.term}-${meaning.pos}-${index}`}
+                  meaning={meaning}
+                  index={index}
+                  selected={index === meaningIndex}
+                  isReverse={isReverse}
+                  onPick={onPickMeaning}
+                />
+              ))}
             </ul>
+            {/* V3.88.0: el resto de acepciones no se pierde, pero tampoco ocupa
+                la tarjeta. Se despliegan desde el «...» con la misma lista de
+                radios, así que la elección sigue mandando en audio, práctica y
+                alta. */}
+            {meanings.length > PRIMARY_MEANINGS ? (
+              <InfoDisclosure
+                label={t("dictionary.lookup.moreMeanings").replace(
+                  "{count}",
+                  String(meanings.length - PRIMARY_MEANINGS),
+                )}
+                content="options"
+                id="dictionary-extra-meanings"
+              >
+                <ul className="flex flex-col gap-1.5">
+                  {meanings.slice(PRIMARY_MEANINGS).map((meaning, offset) => {
+                    const index = PRIMARY_MEANINGS + offset;
+                    return (
+                      <MeaningOption
+                        key={`${meaning.term}-${meaning.pos}-${index}`}
+                        meaning={meaning}
+                        index={index}
+                        selected={index === meaningIndex}
+                        isReverse={isReverse}
+                        onPick={onPickMeaning}
+                      />
+                    );
+                  })}
+                </ul>
+              </InfoDisclosure>
+            ) : null}
           </fieldset>
         ) : null}
 

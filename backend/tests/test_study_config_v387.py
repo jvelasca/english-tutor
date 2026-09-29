@@ -327,6 +327,53 @@ def test_intensive_serves_reviews_due_within_24h_without_touching_schedule(
         assert row[0] == future
 
 
+def test_intensive_separates_due_and_upcoming_counts(monkeypatch, tmp_path):
+    """V3.87.1: `intensive` sirve los adelantos pero no los cuenta como vencidos."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        deck = _make_deck(client, a, "Casa")
+        overdue = _create_card(
+            client, a, front="house", back="casa", deck_ids=[deck]
+        ).json()
+        soon = _create_card(
+            client, a, front="river", back="río", deck_ids=[deck]
+        ).json()
+        assert _review(client, a, deck, overdue["id"], grade=3).status_code == 200
+        assert _review(client, a, deck, soon["id"], grade=3).status_code == 200
+
+        now = datetime.now(timezone.utc)
+        conn = sqlite3.connect(db.DB_PATH)
+        try:
+            conn.execute(
+                "UPDATE fsrs_cards SET due_at = ? WHERE user_id = ? "
+                "AND target_type = 'flashcard' AND target_id = ?",
+                ((now - timedelta(hours=1)).isoformat(), a, str(overdue["id"])),
+            )
+            conn.execute(
+                "UPDATE fsrs_cards SET due_at = ? WHERE user_id = ? "
+                "AND target_type = 'flashcard' AND target_id = ?",
+                ((now + timedelta(hours=2)).isoformat(), a, str(soon["id"])),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        # `auto`: solo la vencida; el adelanto no entra ni se cuenta.
+        auto = _queue(client, a, deck)
+        assert auto["due_count"] == 1
+        assert auto["upcoming_count"] == 0
+        assert auto["queue_count"] == 1
+        assert {i["card_id"] for i in auto["items"]} == {str(overdue["id"])}
+
+        # `intensive`: se sirven ambas, pero `due_count` NO mezcla el adelanto.
+        _put_config(client, a, {"difficulty": "intensive"})
+        intensive = _queue(client, a, deck)
+        assert intensive["due_count"] == 1  # solo la vencida real
+        assert intensive["upcoming_count"] == 1  # el adelanto de ≤ 24 h
+        assert intensive["queue_count"] == 2
+        assert len(intensive["items"]) == 2
+
+
 # --- 5. Planner 3.0: solo filtra actividades --------------------------------
 
 
@@ -416,3 +463,58 @@ def test_review_queue_endpoint_honours_saved_mode(monkeypatch, tmp_path):
         _put_config(client, a, {"mode": "recognition"})
         body = client.get("/api/learning/review", params={"user_id": a}).json()
         assert body["items"][0]["activity"] == "recall"
+
+
+# --- 6. Política B: `mode` es preferencia, no filtro duro (V3.87.1) ----------
+
+
+def test_mode_policy_b_recommendation_matrix():
+    """Política B (V3.87.1): el modo orienta la recomendación, no la encierra."""
+    row = {"word": "river", "exposure_count": 3}
+
+    def activity(matrix: dict, allowed) -> str:
+        return lexicon.recommend_review_activity(
+            row, dict(matrix), allowed_activities=allowed
+        )["activity"]
+
+    # Reconocida con hueco de producción: la recomendación natural es producir.
+    with_gap = {"cued_recall": True, "production_gap": True}
+    assert activity(with_gap, None) == "sentence"  # mixed: sin preferencia
+    assert activity(with_gap, study_config.PRODUCTION_ACTIVITIES) == "sentence"
+    # En reconocimiento NO se produce: baja al peldaño de recuperación.
+    assert activity(with_gap, study_config.RECOGNITION_ACTIVITIES) == "recall"
+
+    # Recuperada sin hueco de producción: la recomendación natural es `recall`.
+    no_gap = {"cued_recall": True}
+    assert activity(no_gap, None) == "recall"
+    # En producción la recuperación sube a construir.
+    assert activity(no_gap, study_config.PRODUCTION_ACTIVITIES) == "sentence"
+
+
+def test_mode_policy_b_keeps_recognition_prerequisite():
+    """Política B: en producción, `recognition` se conserva como prerrequisito."""
+    weak = {"word": "river", "exposure_count": 0}
+    assert (
+        lexicon.recommend_review_activity(
+            weak, None, allowed_activities=study_config.PRODUCTION_ACTIVITIES
+        )["activity"]
+        == "recognition"
+    )
+    # Sin preferencia (mixed) la misma cascada también cae en reconocimiento.
+    assert lexicon.recommend_review_activity(weak, None)["activity"] == "recognition"
+
+
+def test_review_queue_production_mode_keeps_recognition_prerequisite(
+    monkeypatch, tmp_path
+):
+    """E2E: `production` puede servir `recognition` cuando falta base receptiva."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    # Fila léxica SIN exposición (recall fallido): la cascada pide `recognition`.
+    assert vocabulary_repo.record_recall_attempt(a, ["river"], success=False)
+    _due_lexicon_card(a, "river", stability=5.0, days_ago=3)
+
+    with TestClient(app) as client:
+        _put_config(client, a, {"mode": "production"})
+        body = client.get("/api/learning/review", params={"user_id": a}).json()
+        assert body["items"], body
+        assert body["items"][0]["activity"] == "recognition"

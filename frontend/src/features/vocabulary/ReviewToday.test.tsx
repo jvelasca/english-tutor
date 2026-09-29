@@ -13,7 +13,14 @@
  * muestra una vez, para la palabra que se está trabajando.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { I18nProvider } from "../../hooks/useI18n";
 import { ReviewSession, useReviewToday } from "./ReviewToday";
 import type { ReviewQueue, ReviewQueueItem } from "../../types/api";
@@ -508,5 +515,68 @@ describe("ReviewToday · peldaños reconductivos y accesibilidad (V3.85.1)", () 
     const next = await screen.findByRole("button", { name: "Next word" });
     // El foco se mueve al CTA: el usuario de teclado no tabula por todo el drill.
     await waitFor(() => expect(document.activeElement).toBe(next));
+  });
+});
+
+describe("ReviewToday · estado de carga de la cola (V3.88.0)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  /** Consumidor mínimo que declara la espera, como hace el bloque de estudio. */
+  function LoadingHarness() {
+    const { items, dueCount, loadError, loading } = useReviewToday("u1");
+    if (loadError) return <p>Could not load the review queue. </p>;
+    if (loading) return <p>loading the queue</p>;
+    if (items.length === 0) {
+      return (
+        <p>
+          {dueCount > 0
+            ? "loading next batch"
+            : "Nothing to review right now — come back later."}
+        </p>
+      );
+    }
+    return <p>{`${items.length} items`}</p>;
+  }
+
+  function renderLoadingHarness() {
+    return render(
+      <I18nProvider lang="en" setLang={() => {}}>
+        <LoadingHarness />
+      </I18nProvider>,
+    );
+  }
+
+  it("declara la espera mientras la cola viaja, en vez de fingir que está vacía", async () => {
+    let resolveQueue: (value: ReviewQueue) => void = () => {};
+    mocks.getReviewQueue.mockReturnValue(
+      new Promise<ReviewQueue>((resolve) => {
+        resolveQueue = resolve;
+      }),
+    );
+
+    renderLoadingHarness();
+
+    // El hook arranca en espera y el consumidor lo dice: ni «nada que repasar»
+    // ni una lista vacía antes de que el backend conteste.
+    expect(screen.getByText("loading the queue")).toBeTruthy();
+    expect(screen.queryByText(/Nothing to review/)).toBeNull();
+
+    await act(async () => {
+      resolveQueue(queue({ due_count: 1, items: [dueWord("river")] }));
+    });
+
+    expect(await screen.findByText("1 items")).toBeTruthy();
+  });
+
+  it("la cola vacía se declara solo después de responder", async () => {
+    mocks.getReviewQueue.mockResolvedValue(queue({}));
+
+    renderLoadingHarness();
+
+    expect(screen.getByText("loading the queue")).toBeTruthy();
+    expect(await screen.findByText(/Nothing to review/)).toBeTruthy();
   });
 });

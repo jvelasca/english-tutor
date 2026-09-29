@@ -34,9 +34,9 @@ import {
   Eraser,
   Library,
   Layers,
+  Loader2,
   Plus,
   RefreshCw,
-  Settings2,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -73,6 +73,8 @@ import { getStudyConfig, saveStudyConfig } from "../../api/study";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { InfoDisclosure } from "../../components/InfoDisclosure";
+import { LoadingNotice } from "../../components/LoadingNotice";
 import { cn } from "../../lib/utils";
 import { StudySession } from "./StudySession";
 import { LexiconInventory } from "./LexiconInventory";
@@ -80,6 +82,15 @@ import { ReviewSession, useReviewToday } from "./ReviewToday";
 
 const INPUT =
   "rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground";
+
+/**
+ * V3.88.0: icono de espera para los botones que hoy solo se deshabilitaban.
+ * Sustituye al icono de la acción (o lo acompaña) mientras la petición vuela,
+ * de modo que un botón apagado sin más no se lea como «roto».
+ */
+function BusyIcon() {
+  return <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />;
+}
 
 export type FlashcardsTab = "study" | "lexicon" | "decks" | "cards" | "stats";
 
@@ -429,12 +440,20 @@ const STUDY_CONFIG_FALLBACK: StudyConfig = {
 };
 
 /**
- * Panel de configuración de estudio (V3.87.0 · FASE 2, incremento 1).
+ * Configuración de estudio (V3.87.0 · FASE 2, incremento 1), **plegada** tras el
+ * disparador «...» (V3.87.1).
  *
  * Cuatro decisiones, no un panel de control: en qué dirección se pregunta
  * (EN↔ES), si se reconoce o se produce, qué ayuda se ve antes de voltear y
  * cuánta carga entra. Cada cambio se guarda en el perfil y recarga la cola; la
  * sesión en curso no se reescribe por detrás.
+ *
+ * Arranca **cerrado**: en la pestaña Estudiar lo que el alumno viene a pulsar son
+ * las dos acciones de estudio, y cuatro selectores abiertos por defecto empujaban
+ * esos botones fuera de la primera pantalla del móvil. La divulgación reutiliza
+ * `InfoDisclosure` con `content="options"` para que el disparador sea el «...»
+ * que en esta app ya significa «abre para configurar» (V3.75.7), y así no hay que
+ * inventar una segunda convención para lo mismo.
  */
 function StudyConfigPanel({
   config,
@@ -446,11 +465,12 @@ function StudyConfigPanel({
   const { t } = useI18n();
   const value = config ?? STUDY_CONFIG_FALLBACK;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
-      <span className="flex items-center gap-1.5 text-xs font-semibold">
-        <Settings2 className="size-3.5 text-primary" aria-hidden="true" />
-        {t("flashcards.study.configTitle")}
-      </span>
+    <InfoDisclosure
+      label={t("flashcards.study.configTitle")}
+      content="options"
+      align="end"
+      id="study-config-panel"
+    >
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
           {t("flashcards.study.direction")}
@@ -524,7 +544,7 @@ function StudyConfigPanel({
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {t("flashcards.study.configHint")}
       </p>
-    </div>
+    </InfoDisclosure>
   );
 }
 
@@ -576,6 +596,7 @@ function StudyTab({
     items: reviewItems,
     dueCount: reviewDue,
     loadError: reviewError,
+    loading: reviewLoading,
     refresh: refreshReview,
   } = useReviewToday(userId);
   const [reviewing, setReviewing] = useState(false);
@@ -831,8 +852,8 @@ function StudyTab({
         ) : null}
       </div>
 
-      {/* V3.87.0: configuración de estudio. Cada cambio se guarda y recarga la
-          cola (ver `changeStudyConfig`). */}
+      {/* V3.87.0: configuración de estudio, plegada tras el «...» (V3.87.1).
+          Cada cambio se guarda y recarga la cola (ver `changeStudyConfig`). */}
       <StudyConfigPanel
         config={studyConfig}
         onChange={(patch) => void changeStudyConfig(patch)}
@@ -849,16 +870,25 @@ function StudyTab({
             <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
             {t("dictionary.review.title")}
           </span>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            {reviewError
-              ? t("dictionary.review.loadError")
-              : reviewDue > 0
+          {reviewError ? (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t("dictionary.review.loadError")}
+            </p>
+          ) : reviewLoading ? (
+            /* V3.88.0: la cola del día no tenía estado de carga. Mientras la
+               petición viajaba, el panel decía «nada que repasar» —una mentira
+               mientras no se sabe— y el alumno no veía que algo estaba pasando. */
+            <LoadingNotice className="text-[11px]" />
+          ) : (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {reviewDue > 0
                 ? t("dictionary.review.todaySummary").replace(
                     "{count}",
                     String(reviewDue),
                   )
                 : t("dictionary.review.empty")}
-          </p>
+            </p>
+          )}
           {reviewError ? (
             <Button
               type="button"
@@ -870,7 +900,7 @@ function StudyTab({
               <RefreshCw className="size-3.5" aria-hidden="true" />
               {t("common.retry")}
             </Button>
-          ) : reviewDue > 0 ? (
+          ) : !reviewLoading && reviewDue > 0 ? (
             <Button
               type="button"
               size="sm"
@@ -890,16 +920,22 @@ function StudyTab({
             <Layers className="size-3.5 text-primary" aria-hidden="true" />
             {t("flashcards.study.cardsTitle")}
           </span>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            {error
-              ? t("dictionary.loadError")
-              : loading
-                ? t("common.loading")
-                : t("flashcards.study.pendingToday").replace(
-                    "{n}",
-                    String(items.length),
-                  )}
-          </p>
+          {error ? (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t("dictionary.loadError")}
+            </p>
+          ) : loading ? (
+            /* V3.88.0: la cola FSRS ya avisaba con texto plano; ahora lleva
+               también spinner y, si se alarga, el reloj del aviso. */
+            <LoadingNotice className="text-[11px]" />
+          ) : (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t("flashcards.study.pendingToday").replace(
+                "{n}",
+                String(items.length),
+              )}
+            </p>
+          )}
           {error ? (
             <Button
               type="button"
@@ -1001,6 +1037,9 @@ function DecksTab({
   const { t } = useI18n();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // V3.88.0: el borrado tiene su propio indicador. Compartía `busy` con el alta,
+  // así que borrar un mazo habría hecho girar el botón de crear.
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   // V3.86.0: qué se borró de verdad en el último borrado de mazo, para poder
@@ -1035,7 +1074,7 @@ function DecksTab({
   }
 
   async function handleDelete(deck: FlashcardDeck) {
-    if (busy) return;
+    if (busy || deletingId != null) return;
     // V3.86.0: el aviso dice qué pasa con las fichas COMPARTIDAS, que es la
     // información que faltaba: borrar un mazo ya no borra una ficha que vive en
     // otro. Solo se promete lo que se sabe (`shared_count`).
@@ -1053,7 +1092,7 @@ function DecksTab({
             .replace("{n}", String(deck.card_count)),
     );
     if (!ok) return;
-    setBusy(true);
+    setDeletingId(deck.id);
     setError(false);
     try {
       const result = await deleteFlashcardDeck(userId, deck.id);
@@ -1062,7 +1101,7 @@ function DecksTab({
     } catch {
       setError(true);
     } finally {
-      setBusy(false);
+      setDeletingId(null);
     }
   }
 
@@ -1198,10 +1237,14 @@ function DecksTab({
                       size="sm"
                       variant="ghost"
                       className="text-destructive"
-                      disabled={busy}
+                      disabled={busy || deletingId != null}
                       onClick={() => void handleDelete(deck)}
                     >
-                      <Trash2 className="size-3.5" aria-hidden="true" />
+                      {deletingId === deck.id ? (
+                        <BusyIcon />
+                      ) : (
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                      )}
                       {t("flashcards.decks.delete")}
                     </Button>
                   </div>
@@ -1249,8 +1292,12 @@ function DecksTab({
             className={cn(INPUT, "flex-1")}
           />
           <Button type="submit" size="sm" disabled={busy || !name.trim()}>
-            <Plus className="size-3.5" aria-hidden="true" />
-            {t("flashcards.decks.create")}
+            {busy ? (
+              <BusyIcon />
+            ) : (
+              <Plus className="size-3.5" aria-hidden="true" />
+            )}
+            {busy ? t("common.saving") : t("flashcards.decks.create")}
           </Button>
         </form>
       </Card>
@@ -1388,8 +1435,14 @@ function ReadyDecks({
                     disabled={busyId != null}
                     onClick={() => void handleEnroll(pack)}
                   >
-                    <Plus className="size-3.5" aria-hidden="true" />
-                    {t("flashcards.decks.readyAdd")}
+                    {busyId === pack.id ? (
+                      <BusyIcon />
+                    ) : (
+                      <Plus className="size-3.5" aria-hidden="true" />
+                    )}
+                    {busyId === pack.id
+                      ? t("common.saving")
+                      : t("flashcards.decks.readyAdd")}
                   </Button>
                 )}
               </div>
@@ -1475,7 +1528,8 @@ function DeckEditor({
         />
       </label>
       <Button type="submit" size="sm" disabled={busy}>
-        {t("flashcards.decks.save")}
+        {busy ? <BusyIcon /> : null}
+        {busy ? t("common.saving") : t("flashcards.decks.save")}
       </Button>
       {error ? (
         <span className="text-[11px] text-destructive">
@@ -1540,6 +1594,10 @@ function CardsTab({
   /** Filtro por mazo: `"all"` = todas las fichas (el defecto, sin mazo forzado). */
   const [filter, setFilter] = useState<number | "all">("all");
   const [cards, setCards] = useState<FlashcardCard[]>([]);
+  // V3.88.0: la lista se pintaba vacía mientras la petición viajaba y decía
+  // «no hay fichas» antes de saberlo. Ahora el vacío se declara cuando de
+  // verdad se ha respondido.
+  const [cardsLoading, setCardsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
   const [order, setOrder] = useState<CardOrder>("recent");
@@ -1550,6 +1608,9 @@ function CardsTab({
   const [formDecks, setFormDecks] = useState<number[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // V3.88.0: el borrado de una ficha tiene su propio indicador (antes compartía
+  // `busy` con el alta y el spinner habría caído en el botón equivocado).
+  const [deletingCardId, setDeletingCardId] = useState<number | null>(null);
   const [error, setError] = useState(false);
   // V3.80.0: pegado masivo. `bulkResult` guarda cuántas entraron de verdad, que
   // es lo único honesto que se puede decir después de pegar 40 líneas.
@@ -1585,6 +1646,7 @@ function CardsTab({
 
   const loadCards = useCallback(async () => {
     setError(false);
+    setCardsLoading(true);
     try {
       const data = await listVocabularyCards(userId, {
         deckId: filter === "all" ? null : filter,
@@ -1593,6 +1655,8 @@ function CardsTab({
     } catch {
       setError(true);
       setCards([]);
+    } finally {
+      setCardsLoading(false);
     }
   }, [userId, filter]);
 
@@ -1658,8 +1722,8 @@ function CardsTab({
   }
 
   async function handleDelete(card: FlashcardCard) {
-    if (busy) return;
-    setBusy(true);
+    if (busy || deletingCardId != null) return;
+    setDeletingCardId(card.id);
     setError(false);
     try {
       await deleteVocabularyCard(userId, card.id);
@@ -1667,7 +1731,7 @@ function CardsTab({
     } catch {
       setError(true);
     } finally {
-      setBusy(false);
+      setDeletingCardId(null);
     }
   }
 
@@ -1799,7 +1863,9 @@ function CardsTab({
           <p className="text-sm text-destructive">{t("flashcards.cards.error")}</p>
         ) : null}
 
-        {visible.length === 0 ? (
+        {cardsLoading ? (
+          <LoadingNotice />
+        ) : visible.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {cards.length === 0
               ? t("flashcards.cards.empty")
@@ -1888,10 +1954,14 @@ function CardsTab({
                         size="sm"
                         variant="ghost"
                         className="text-destructive"
-                        disabled={busy}
+                        disabled={busy || deletingCardId != null}
                         onClick={() => void handleDelete(card)}
                       >
-                        <Trash2 className="size-3.5" aria-hidden="true" />
+                        {deletingCardId === card.id ? (
+                          <BusyIcon />
+                        ) : (
+                          <Trash2 className="size-3.5" aria-hidden="true" />
+                        )}
                         {t("flashcards.cards.delete")}
                       </Button>
                     </div>
@@ -1967,8 +2037,12 @@ function CardsTab({
             className="w-fit"
             disabled={busy || !newFront.trim() || targetDecks.length === 0}
           >
-            <Plus className="size-3.5" aria-hidden="true" />
-            {t("flashcards.cards.save")}
+            {busy ? (
+              <BusyIcon />
+            ) : (
+              <Plus className="size-3.5" aria-hidden="true" />
+            )}
+            {busy ? t("common.saving") : t("flashcards.cards.save")}
           </Button>
         </form>
       </Card>
@@ -2011,8 +2085,12 @@ function CardsTab({
               ))}
             </select>
             <Button type="submit" size="sm" disabled={bulkBusy || !bulkText.trim()}>
-              <Plus className="size-3.5" aria-hidden="true" />
-              {t("flashcards.cards.bulkAdd")}
+              {bulkBusy ? (
+                <BusyIcon />
+              ) : (
+                <Plus className="size-3.5" aria-hidden="true" />
+              )}
+              {bulkBusy ? t("common.saving") : t("flashcards.cards.bulkAdd")}
             </Button>
             {bulkResult != null ? (
               <span className="text-xs text-muted-foreground">
@@ -2153,7 +2231,8 @@ function CardEditor({
       </fieldset>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" disabled={busy}>
-          {t("flashcards.cards.save")}
+          {busy ? <BusyIcon /> : null}
+          {busy ? t("common.saving") : t("flashcards.cards.save")}
         </Button>
         {error ? (
           <span className="text-[11px] text-destructive" role="alert">
@@ -2226,7 +2305,7 @@ function StatsTab({
       {error ? (
         <p className="text-sm text-muted-foreground">{t("dictionary.loadError")}</p>
       ) : loading ? (
-        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        <LoadingNotice />
       ) : !stats ? null : !hasData ? (
         <p className="text-sm text-muted-foreground">
           {t("flashcards.stats.empty")}

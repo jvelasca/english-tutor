@@ -11,7 +11,14 @@
  *   unidad canónica).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactElement } from "react";
 import { I18nProvider } from "../../hooks/useI18n";
 import { DictionaryLookup } from "./DictionaryLookup";
@@ -1120,6 +1127,50 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
   });
 
+  it("V3.88.0: mientras los mazos viajan el panel declara la espera, no «sin mazos»", async () => {
+    let resolveDecks: (value: unknown) => void = () => {};
+    const decksPromise = new Promise((resolve) => {
+      resolveDecks = resolve;
+    });
+    const fn = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/vocabulary/dictionary")) {
+        return Promise.resolve({ ok: true, json: async () => COFFEE });
+      }
+      if (url.includes("/api/vocabulary/decks")) {
+        return decksPromise;
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fn);
+
+    renderPanel(<DictionaryLookup userId="u1" />);
+    fillAndSubmit("coffee");
+    await screen.findByText(/A hot drink made from roasted coffee beans/);
+    fireEvent.click(screen.getByRole("button", { name: "Add to Flashcards" }));
+
+    // La espera se declara: ni «sin mazos» ni un selector silenciosamente vacío.
+    expect(await screen.findByText("Loading your decks…")).toBeTruthy();
+    expect(
+      screen.queryByText(/only the word enters your dictionary/),
+    ).toBeNull();
+
+    await act(async () => {
+      resolveDecks({
+        ok: true,
+        json: async () => ({
+          decks: [AUTO_DECK, MANUAL_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        }),
+      });
+    });
+
+    // Al llegar, el selector ofrece el mazo manual (el automático no es destino).
+    expect(await screen.findByText("Mi mazo")).toBeTruthy();
+    expect(screen.queryByText("Loading your decks…")).toBeNull();
+  });
+
   // V3.86.0: «lima → la capital del Perú» deja de ser una trampa. La consulta ES→EN
   // trae los significados candidatos y el alumno elige: el nombre propio va
   // marcado y NUNCA por defecto.
@@ -1245,6 +1296,59 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
       translation: "lima",
       collection_id: null,
     });
+  });
+
+  // V3.88.0: el prompt ahora EXIGE varios significados, así que la tarjeta tiene
+  // que saber enseñarlos sin comerse la pantalla en móvil: los principales a la
+  // vista y el resto tras el «...».
+  const POLYSEMOUS = {
+    word: "bank",
+    kind: "word",
+    cefr: "A2",
+    definition_source: "llm",
+    pos: "noun",
+    definition: "The land alongside a river, or a place for money.",
+    translation: "banco",
+    direction: "en-es",
+    alternatives: [],
+    meanings: [
+      { term: "banco", pos: "noun", gloss: "para sentarse", domain: "", proper_noun: false },
+      { term: "orilla", pos: "noun", gloss: "de un río", domain: "geography", proper_noun: false },
+      { term: "banca", pos: "noun", gloss: "sector financiero", domain: "finance", proper_noun: false },
+      { term: "banco de arena", pos: "noun", gloss: "acumulación de arena", domain: "geography", proper_noun: false },
+      { term: "Bank", pos: "noun", gloss: "apellido", domain: "", proper_noun: true },
+    ],
+    example: null,
+    usage: { tracked: false, surface: null, unit: null },
+  };
+
+  it("V3.88.0: enseña los 3 principales y pliega el resto tras el «...»", async () => {
+    routeFetch([{ url: "/api/vocabulary/dictionary", data: POLYSEMOUS }]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+
+    fillAndSubmit("bank");
+    await screen.findByText(/place for money/);
+
+    // Los tres principales, a la vista sin un clic.
+    expect(screen.getByRole("radio", { name: "Meaning: banco · noun" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Meaning: orilla · noun" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Meaning: banca · noun" })).toBeTruthy();
+    // El resto NO está montado, y se dice cuántos quedan.
+    expect(screen.queryByRole("radio", { name: "Meaning: banco de arena · noun" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Meaning: Bank · noun" })).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show the other 2 meanings" }),
+    );
+
+    // Al desplegar, las acepciones plegadas vuelven a ser radios de la MISMA
+    // lista: elegir una manda igual que las principales.
+    expect(screen.getByRole("radio", { name: "Meaning: banco de arena · noun" })).toBeTruthy();
+    const properRadio = screen.getByRole("radio", {
+      name: "Meaning: Bank · noun",
+    }) as HTMLInputElement;
+    fireEvent.click(properRadio);
+    expect(properRadio.checked).toBe(true);
   });
 
   it("V3.86.0: el recordatorio viaja en la ficha y los mazos marcados van juntos", async () => {

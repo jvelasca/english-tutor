@@ -29,8 +29,20 @@ DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS = 30.0  # palabra fallida → no reintenta
 DICTIONARY_MAX_GENERATIONS_PER_USER_MINUTE = 10  # palabras NUEVAS por usuario/min
 DICTIONARY_MAX_GENERATIONS_PER_MINUTE_GLOBAL = 40  # y tope global de seguridad
 
+# Precalentado del diccionario a petición del alumno (V3.88.0). El trabajo corre
+# en segundo plano y reutiliza las cuotas de arriba palabra a palabra, así que el
+# tope solo acota cuánto dura una pasada (y cuánta caché se puede generar de una
+# vez), no la puerta de generación. Con 10 palabras/min por usuario, un tope de
+# 60 cubre varios minutos de trabajo útil sin dejar el proceso ocupado para
+# siempre; las que no den cupo quedan como `skipped` y se pueden reintentar.
+DICTIONARY_WARMUP_MAX_WORDS = 60
+# Trabajos de precalentado retenidos en memoria por proceso (el más antiguo se
+# descarta). El resultado real vive en la caché `dictionary_entries`, así que
+# perder el registro solo pierde la barra de progreso.
+DICTIONARY_WARMUP_JOBS_KEPT = 20
 
-VERSION = "3.87.0"
+
+VERSION = "3.88.0"
 
 # Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
 # mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo

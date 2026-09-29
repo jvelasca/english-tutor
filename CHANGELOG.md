@@ -4,6 +4,40 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.88.0] — 2026-09-29
+
+**La app deja de parecer colgada cuando el modelo local tarda, el diccionario deja de servir un significado único cuando la palabra tiene varios, y la caché del diccionario se puede precalentar y medir.** Release de **PRODUCTO (minor)** **CON backend y frontend**, **SIN migración de BD** (todo es aditivo: el precalentado reutiliza `dictionary_entries` y no crea tablas), **CON dos endpoints nuevos** (`POST /api/vocabulary/dictionary/warmup` → 202 + trabajo de fondo, y `GET /api/vocabulary/dictionary/warmup/{job_id}`) y **CON bump de `GENERATOR_VERSION` (`1.5.0 → 1.6.0`)**. `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos en `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. Incluye, además, el **estudio de viabilidad del diccionario offline** (`docs/DISENO-V388-DICCIONARIO-OFFLINE.md`), que **no implementa** el empaquetado y sí lo mide con datos.
+
+**(A) La espera se ve.** Hasta ahora había operaciones lentas que se presentaban como una pantalla inocente o un botón mudo: la cola de repaso del día, la creación y el borrado de mazos y fichas, la carga de mazos del panel de alta (que decía «no hay mazos» *mientras* cargaba), la carga inicial del léxico y los tres altas de vocabulario. Nuevo componente compartido `LoadingNotice` (`role="status"` + `aria-busy` + `aria-live="polite"`, spinner `Loader2` que **se convierte en reloj** con `common.stillWorking` pasados **4 s** sin resolverse) y spinner en el **botón activo** de cada acción (borrar un mazo ≠ añadir uno ≠ cargar en bloque: estados separados para que un `disabled` no parezca un cuelgue). Nuevas claves `common.stillWorking` y `dictionary.lookup.decksLoading`.
+
+**(B) Los dos o tres significados principales.** La plomería de significados existía desde V3.86.0; el fallo era de **datos**: el prompt pedía «at most 6» **sin exigir mínimo** y solo 6 de 33 entradas tenían significados. `services/dictionary_content.py` gana `MIN_MEANINGS = 2` (inyectado como regla dura en **ambos** prompts, EN→ES y ES→EN, con los significados ordenados del más común al menos) y `GENERATOR_VERSION` sube a **`1.6.0`**, lo que **invalida la caché anterior de forma perezosa** (las 33 + 13 filas se regeneran al consultarlas o al precalentar; no hay barrido en el arranque). En la UI, el `fieldset` de significados muestra **los 3 primeros desplegados** y pliega el resto tras `InfoDisclosure` con `content="options"` (`dictionary.lookup.meanings` pasa a «Significados principales» y aparece `dictionary.lookup.moreMeanings`), **sin cambiar la semántica de selección**: el significado elegido sigue mandando sobre audio, práctica y alta.
+
+**(C) Precalentado del léxico y medición de la caché.** `POST /api/vocabulary/dictionary/warmup` acepta `{words: [...]}` y devuelve **202** con un **trabajo en memoria** (`domain/dictionary_warmup.py`, con `DICTIONARY_WARMUP_MAX_WORDS = 60` y `DICTIONARY_WARMUP_JOBS_KEPT = 20`); `GET .../warmup/{job_id}` publica `status`/`total`/`prepared`/`skipped`/`pending`. Reutiliza **el camino de generación que ya existía** (`_ensure_cached_content`: single-flight, negative cache y las **mismas cuotas**) palabra a palabra, así que precalentar **no genera nada que una consulta no generaría**, solo antes; cada palabra deniega sin cupo se cuenta como `skipped` (no es un error), y el resultado **real** no es el trabajo sino la **caché global**, que sobrevive al proceso. En la vista de consulta, `DictionaryWarmupAction` arranca el trabajo, sigue el progreso con `LoadingNotice` y declara el resultado honesto («N preparadas, M no se pudieron preparar»). Y `scripts/dictionary_cache_report.py` —**solo lectura**, abre SQLite en `mode=ro`— informa de volumen y **frescura por `generator_version`** y del **porcentaje con 2+ significados**, que es la métrica que este incremento persigue.
+
+**(D) El diccionario offline: estudio, no implementación.** `docs/DISENO-V388-DICCIONARIO-OFFLINE.md` mide (no opina) y concluye: **no** se empaqueta un diccionario completo ahora; **sí** conviene un **índice FTS5** sobre la caché y un **precalentado por lotes** de las **2.238** palabras del currículum (**≈ 2 h 31 min de CPU**, una vez, sin licencias de terceros). Datos medidos que sostienen el veredicto: una palabra nueva tarda **4,05 s** de media con el modelo que la app elige (`llama3.1:8b`); la fuente empaquetada más razonable (FreeDict **eng-spa** 2025.11.23) tiene **64.258 entradas / 3,54 MiB / CC BY-SA 3.0** y se convierte al esquema de la app en **35.935 entradas / 19,94 MiB** (**+4,58 MiB** con FTS5, construido en **0,2 s**); la consulta inversa ES→EN **escanea la tabla entera en Python** y costaría **192 ms de SQL + 76 ms de bucle** con un diccionario completo, frente a **0,034 ms** con índice. La premisa con la que V3.30 descartó el empaquetado («sin fuente con licencia y bilingüe EN→ES disponible») **era falsa**; la conclusión se mantiene por otras tres razones que sí se sostienen (el léxico real es 2.238 palabras, CC BY-SA obliga a *ShareAlike* de la obra derivada, y FreeDict **no** cubre la inversa: su `spa-eng` tiene 4.502 entradas y está marcado `too small`).
+
+**Fuera de alcance, declarado.** El campo `senses_json` sigue **sin pintarse** en la UI; no se empaqueta ningún dataset; no se cambia el contrato de la consulta; y la generación de significados sigue **orientada por prompt, no garantizada por el modelo** (de 4 palabras medidas, `lantern` devolvió **un** significado y `quaint` coló el topónimo `San Miguel` como tercero: el filtro de nombres propios de V3.86.0 lo deja al final y nunca preseleccionado, pero **el modelo lo propone**).
+
+**Nota de estado del árbol.** El delta de **V3.87.1** (cierre de los hallazgos P1/P2 de la auditoría de V3.87.0) viaja **dentro de este mismo árbol de trabajo** y **sigue sin etiquetar**; su nota de release se conserva intacta en `release-notes-v3.87.1.md`.
+
+Ver `release-notes-v3.88.0.md` y el estudio `docs/DISENO-V388-DICCIONARIO-OFFLINE.md`.
+
+## [3.87.1] — 2026-09-27
+
+**Cierre de los hallazgos de la auditoría de V3.87.0: el contrato de `mode` se fija como preferencia pedagógica (documentación + tests), la cola de flashcards separa `due_count` de `upcoming_count` en `intensive`, se corrige el `casefold` de la documentación y la configuración de estudio pasa a desplegable.** Release de **ROBUSTEZ (patch)** **CON backend y frontend**, **SIN migración de BD**, **SIN endpoints nuevos** (la cola de flashcards publica dos campos ADITIVOS, `upcoming_count` y `queue_count`), **CON un cambio de UX** (el panel de configuración de estudio de V3.87.0 se pliega tras el disparador «...»), **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones, y **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`). No cambia el **comportamiento runtime** del Planner: fija por escrito y con tests la política que el motor ya implementaba.
+
+**(A) P1 — contrato de `mode` (Política B).** La redacción de V3.87.0 describía el fallback como una sola regla («conjunto filtrado vacío → conjunto sin filtrar»), pero el motor aplica **dos capas**: (1) `task_candidates` cae al conjunto **sin filtrar** cuando el filtro queda vacío; (2) `study_config.fallback_activity` traduce una recomendación fuera del modo a la actividad admisible más cercana (`recognition` → `recall`; `recall` → `sentence`) y **conserva `recognition` como prerrequisito receptivo en `production`**. `mode` es una **preferencia pedagógica**, no un filtro duro. Se corrigen las notas de V3.87.0 (con errata trazable), `CHANGELOG`, `PLAN.md`, `docs/RELEVO.md`, `docs/audit/PARKED.md` y los docstrings de `services/study_config.py`, `services/planner.py` y `services/lexicon.py`; y se añaden **tests contractuales** que la congelan (reconocimiento + recomendación de producción, producción + recomendación de recuperación, `mixed`, prerrequisito receptivo y un e2e HTTP de `/api/learning/review`).
+
+**(B) P2 — `due_count` no mezcla vencidas con adelantos.** En `intensive`, `deck_queue` servía `due + upcoming` y publicaba `due_count = len(due)`, así que la UI podía presentar como «vencidas» tarjetas que aún vencen en ≤ 24 h. Ahora `due_count` = **vencidas reales**, `upcoming_count` = **adelantos de `intensive`** (0 en el resto) y `queue_count` = **lo servido** (vencidas + adelantos); el `due_at` sigue **sin reescribirse**.
+
+**(C) P2 — documentación del comparador de producción.** Donde decía `casefold` (JS no tiene `String.casefold()`) ahora dice la verdad del código: **case-insensitive + espacios colapsados** (`trim` + minúsculas + colapso de espacios).
+
+**(D) UX — la configuración de estudio se pliega.** En V3.87.0 el panel vivía **siempre abierto** entre el selector de mazo y las dos acciones de estudio, y en móvil empujaba **«Repasar hoy» y «Estudiar tarjetas»** fuera de la primera pantalla. Ahora arranca **cerrado** y se despliega con el disparador **«...»** alineado a la derecha, reutilizando `InfoDisclosure` con `content="options"` (en esta app el «...» ya significa «abre para configurar», V3.75.7) y sin cadenas de i18n nuevas. Sin cambio de contrato ni de comportamiento: mismo `PUT /api/study/config` y misma recarga de cola.
+
+**Fuera de alcance, declarado.** La persistencia de `study_config` sigue siendo un merge lectura-modificación-escritura no atómico (P2 diferido para la etapa multi-dispositivo). No se toca FSRS, `fsrs_cards`, el diccionario ni las versiones de contenido.
+
+Ver `release-notes-v3.87.1.md`.
+
 ## [3.87.0] — 2026-09-27
 
 **El alumno deja de estudiar como el programa decide y pasa a decidir cómo estudia: dirección
@@ -41,17 +75,21 @@ por dirección, `hint` antes del volteo (definición, recordatorio o ambos segú
 `study_config` en la respuesta. La **dificultad** ajusta el embudo **sin tocar el `schedule` de
 FSRS**: `gentle` no adelanta y **reduce a la mitad el techo de nuevas**; `auto` es el comportamiento
 de siempre; `intensive` **incluye los repasos que vencen en ≤ 24 h**. En el frontend, `production`
-añade un **campo de texto antes del volteo** con **comparación tolerante** (`casefold` + espacios
-colapsados) y **autocalificación FSRS** —acierto → `Good`, fallo → `Again`—, mostrando **siempre**
+añade un **campo de texto antes del volteo** con **comparación tolerante** (**case-insensitive** +
+espacios colapsados: `trim` + minúsculas + colapso de espacios; JS no tiene `String.casefold()`) y
+**autocalificación FSRS** —acierto → `Good`, fallo → `Again`—, mostrando **siempre**
 la respuesta correcta; el `lang` de los textos sigue la dirección.
 
-**El Planner 3.0 solo filtra actividades.** `mode` restringe el **conjunto admisible** —`production`
-→ `sentence`/`write`/`transfer`; `recognition` → `recognition`/`recall`; `mixed` → sin filtro—
-**antes del argmax**; `support_level`/`difficulty` quedan intactos, así que `task_key`, la
-procedencia y la evidencia **no cambian de semántica**. Con **fallback documentado**: si el filtro
-deja el conjunto **vacío** (p. ej. `production` sin contenido de producción), se cae al conjunto
-**sin filtrar** para no dejar la sesión sin ítems. El modo es una **preferencia**, no una garantía
-dura.
+**El Planner 3.0 respeta el modo como preferencia.** `mode` orienta el **conjunto de actividades**
+—`production` → `sentence`/`write`/`transfer`; `recognition` → `recognition`/`recall`; `mixed` → sin
+preferencia— **antes del argmax**; `support_level`/`difficulty` quedan intactos, así que `task_key`,
+la procedencia y la evidencia **no cambian de semántica**. El modo es una **preferencia pedagógica**,
+**no un filtro duro**, en **dos capas**: si el conjunto filtrado queda **vacío** (p. ej. `production`
+sin contenido de producción) se cae al conjunto **sin filtrar** para no dejar la sesión sin ítems; y
+una recomendación fuera del modo se traduce a la actividad admisible más cercana, **conservando
+`recognition` como prerrequisito receptivo en `production`** (por eso `production` puede seguir
+sirviendo `recognition`). *(Errata: la redacción original de V3.87.0 describía solo la primera capa;
+corregido en V3.87.1.)*
 
 **Las dos deudas P2 de V3.86.1, cerradas.** El docstring de `create_cards()` deja de describir una
 «política de producto» que el código no implementaba y pasa a documentar la identidad fuerte real

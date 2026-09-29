@@ -6,6 +6,7 @@ import { useTabList } from "../../hooks/useTabList";
 import { cn } from "../../lib/utils";
 import { takePendingStudyFocus } from "../../utils/studyFocus";
 import { DictionaryLookup } from "./DictionaryLookup";
+import { DictionaryWarmupAction } from "./DictionaryWarmupAction";
 import { FlashcardsScreen, type FlashcardsTab } from "./FlashcardsScreen";
 
 /**
@@ -197,20 +198,27 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
           className="min-h-0 flex-1 focus:outline-none"
         >
           {activeTab === "lookup" ? (
-            /* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
-               vista de consulta no repite cabecera (antes había dos `h1` en la
-               misma página) ni vuelve a aplicar el ancho y el relleno de
-               página, que ya pone este contenedor. */
-            <DictionaryLookup
-              userId={userId}
-              showHeader={false}
-              /* V3.83.0: tras añadir (o si la palabra ya está en el léxico), el
-                 panel ofrece estudiar. El destino es el modo Flashcards de esta
-                 misma pantalla: el foco no persiste, es un salto de un clic.
-                 V3.84.0: si el alta guardó la palabra en un mazo manual, se
-                 abre ese mazo. */
-              onOpenFlashcards={openFlashcards}
-            />
+            /* V3.88.0: el precalentado del diccionario va en la vista de
+               consulta —es donde el alumno sufre la primera espera— y por
+               encima del buscador, para poder adelantar el coste antes de
+               chocar con él. */
+            <div className="flex flex-col gap-4">
+              <DictionaryWarmupAction userId={userId} />
+              {/* V3.75.8: la pantalla ya trae su `h1` y su subtítulo, así que la
+                 vista de consulta no repite cabecera (antes había dos `h1` en la
+                 misma página) ni vuelve a aplicar el ancho y el relleno de
+                 página, que ya pone este contenedor. */}
+              <DictionaryLookup
+                userId={userId}
+                showHeader={false}
+                /* V3.83.0: tras añadir (o si la palabra ya está en el léxico), el
+                   panel ofrece estudiar. El destino es el modo Flashcards de esta
+                   misma pantalla: el foco no persiste, es un salto de un clic.
+                   V3.84.0: si el alta guardó la palabra en un mazo manual, se
+                   abre ese mazo. */
+                onOpenFlashcards={openFlashcards}
+              />
+            </div>
           ) : (
             /* V3.85.0: Flashcards es el dueño de las cinco sub-pestañas y esta
                pantalla controla cuál está activa y qué valor se persiste. */

@@ -18,11 +18,15 @@ Tres decisiones que conviene entender antes de tocar esto:
    por dirección sería un cambio de clave del scheduler que este incremento NO
    hace: el calendario de repaso no cambia al girar la tarjeta.
 
-2. **`mode` es un FILTRO declarado sobre la taxonomía del Planner 3.0**, no una
-   segunda taxonomía. Las actividades viven en `services.lexicon.
-   REVIEW_ACTIVITIES`; aquí solo se dice a qué modo pertenece cada una. Si el
-   planner añade una actividad hay que clasificarla aquí (y `mixed` no filtra,
-   así que una actividad nueva nunca queda inalcanzable por olvido).
+2. **`mode` es una PREFERENCIA declarada sobre la taxonomía del Planner 3.0**
+   (Política B, V3.87.1), no un filtro duro ni una segunda taxonomía. Las
+   actividades viven en `services.lexicon.REVIEW_ACTIVITIES`; aquí solo se dice
+   a qué modo pertenece cada una. Si el planner añade una actividad hay que
+   clasificarla aquí (y `mixed` no filtra, así que una actividad nueva nunca
+   queda inalcanzable por olvido). El modo orienta la selección; no garantiza la
+   exclusión absoluta: `fallback_activity` conserva `recognition` como
+   prerrequisito en producción y el conjunto filtrado vacío se degrada al
+   conjunto sin filtrar.
 
 3. **Un valor desconocido no rompe: cae al defecto.** La configuración viaja como
    JSON en la tabla `settings` y puede llegar de una versión anterior o de una
@@ -34,7 +38,7 @@ from __future__ import annotations
 #: Direcciones de la tarjeta: el idioma del que se pregunta y el que se responde.
 DIRECTIONS: tuple[str, ...] = ("en-es", "es-en")
 
-#: Modo de la sesión. `mixed` admite la taxonomía entera (sin filtro).
+#: Modo de la sesión. `mixed` admite la taxonomía entera (sin preferencia).
 MODES: tuple[str, ...] = ("recognition", "production", "mixed")
 
 #: Qué se ofrece antes de voltear. La DEFINICIÓN (diccionario) y el RECORDATORIO
@@ -92,11 +96,16 @@ def normalize_study_config(raw: object) -> dict[str, str]:
 
 
 def allowed_activities(config: dict | None) -> tuple[str, ...] | None:
-    """Actividades admisibles del Planner 3.0 para este modo, o `None` sin filtro.
+    """Actividades PREFERIDAS del Planner 3.0 para este modo, o `None` sin filtro.
 
     `None` significa «no restrinjas»: es el caso de `mixed` y también el de una
-    configuración ausente o corrupta, para que el filtro nunca vacíe la sesión por
-    un valor que no se entiende.
+    configuración ausente o corrupta, para que la preferencia nunca vacíe la
+    sesión por un valor que no se entiende.
+
+    Ojo: esto es la PRIMERA capa de la Política B (ver `fallback_activity`). NO
+    es un filtro duro: restringe las candidatas del argmax, pero si el conjunto
+    queda vacío el Planner sirve el conjunto SIN filtrar, y una recomendación de
+    cascada fuera del modo se sirve como la actividad admisible más cercana.
     """
     mode = (config or {}).get("mode")
     if mode == "production":
@@ -109,15 +118,22 @@ def allowed_activities(config: dict | None) -> tuple[str, ...] | None:
 def fallback_activity(activity: str, allowed: tuple[str, ...] | None) -> str:
     """Actividad admisible más cercana a la recomendada por la cascada.
 
-    El modo no borra la pedagogía: cuando la evidencia pide una actividad fuera
-    del conjunto, se sirve la admisible más cercana en vez de saltarse el ítem
-    (que sigue vencido y hay que atender). Dos reglas explícitas:
+    `mode` es una **preferencia pedagógica**, no un filtro estricto (Política B,
+    congelada en V3.87.1). El modo no borra la pedagogía: cuando la evidencia
+    pide una actividad fuera del conjunto, se sirve la admisible más cercana en
+    vez de saltarse el ítem (que sigue vencido y hay que atender). Dos reglas
+    explícitas:
 
     - modo reconocimiento → `recall` (nunca se produce si el alumno pidió no
       producir);
     - modo producción → `sentence`, SALVO si la cascada pide `recognition`: sin
       base receptiva no hay con qué producir, así que se respeta el primer
-      peldaño (es el fallback declarado: mejor reconocer que forzar).
+      peldaño como PRERREQUISITO (mejor reconocer que forzar).
+
+    Por tanto `production` no garantiza la exclusión de `recognition`: el modo
+    orienta la selección, no la encierra. La otra capa de la misma política vive
+    en `planner.task_candidates` (un filtro que deja el conjunto vacío se degrada
+    al conjunto SIN filtrar). Ver la release V3.87.1.
     """
     if not allowed or activity in allowed:
         return activity

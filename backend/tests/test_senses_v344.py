@@ -139,7 +139,7 @@ def test_parse_reverse_content_extracts_senses_and_derives_top_pos():
 
 
 def test_prompts_declare_senses_and_version_is_bumped():
-    assert dictionary_content.GENERATOR_VERSION == "1.5.0"
+    assert dictionary_content.GENERATOR_VERSION == "1.6.0"
     assert "senses" in dictionary_content._SYSTEM_PROMPT
     assert "senses" in dictionary_content._REVERSE_SYSTEM_PROMPT
     # V3.86.0: el contrato gana `meanings` (significados elegibles) y la regla

@@ -78,7 +78,13 @@ logger = logging.getLogger(__name__)
 # «lima» (un nombre propio servido como equivalente de un nombre común) y lo que
 # permite elegir «file» en lugar de «Lima». El contenido con 1.4.0 se regenera
 # una sola vez al primer lookup (misma invalidación lazy).
-GENERATOR_VERSION = "1.5.0"
+#
+# V3.88.0: bump 1.5.0 -> 1.6.0. El prompt deja de pedir «at most 6» y EXIGE el
+# mínimo `MIN_MEANINGS` cuando la palabra tiene más de un sentido común. Era el
+# fallo real de V3.86.0: la plomería de significados existía, pero el modelo
+# devolvía uno solo para casi todo, así que el selector nacía con una opción. El
+# contenido con 1.5.0 se regenera una sola vez al primer lookup.
+GENERATOR_VERSION = "1.6.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
@@ -108,6 +114,19 @@ MAX_GLOSS_CHARS = 120
 # polisémica real (banco, lima, hoja) tiene más acepciones que categorías
 # gramaticales, pero sigue acotado para no convertir la ficha en un listado.
 MAX_MEANINGS = 6
+# V3.88.0: mínimo exigido. El prompt decía «at most 6» sin pedir ninguno, así que
+# el modelo devolvía un solo significado para casi todo y el selector de la
+# tarjeta nacía con una única opción (y `senses`/`alternatives` no lo cubrían).
+# El mínimo solo aplica cuando la palabra tiene más de un sentido común: una
+# palabra monosémica sigue devolviendo uno, y eso es correcto.
+MIN_MEANINGS = 2
+# Regla de recuento inyectada en AMBOS prompts. Se construye aquí para que el
+# contrato sea verificable por test (el literal aparece en el prompt) y para no
+# volver a escribir el número a mano en dos sitios.
+_MEANINGS_COUNT_RULE = (
+    f"at least {MIN_MEANINGS} and at most {MAX_MEANINGS} when the headword "
+    "has more than one common meaning, otherwise just the one"
+)
 MAX_MEANING_TERM_CHARS = 120
 MAX_DOMAIN_CHARS = 40
 
@@ -147,7 +166,8 @@ _SYSTEM_PROMPT = (
     "sense label in SIMPLE English, at most 60 characters, for example "
     '{"pos":"noun","gloss":"an arrangement to do something"}), '
     '"meanings" (a JSON array with ONE object per DIFFERENT meaning of the '
-    "headword, at most 6, ordered with the most common meaning first; each "
+    f"headword, {_MEANINGS_COUNT_RULE}, ordered with the most common meaning "
+    "first; each "
     'object has "term" (the Spanish translation for THAT meaning), "pos" '
     "(same list as above), \"gloss\" (a very short English label, at most 60 "
     'characters), "domain" (a very short area label in English, for example '
@@ -155,7 +175,9 @@ _SYSTEM_PROMPT = (
     '"proper_noun" (true ONLY if that meaning is a proper noun: a place, a '
     "person or a brand name). RULES: a proper noun must NEVER be the only "
     "translation of a common noun; if the headword also names a place or a "
-    "person, put that meaning LAST with \"proper_noun\": true. "
+    "person, put that meaning LAST with \"proper_noun\": true. If the headword "
+    "has several common meanings, NEVER return only one: list the most common "
+    "ones (most common first) so the learner can choose. "
     "Do not add any text outside the JSON object."
 )
 
@@ -184,15 +206,19 @@ _REVERSE_SYSTEM_PROMPT = (
     'sense first; each object has "pos" (same list as above) and "gloss" (a '
     "very short sense label in SIMPLE English, at most 60 characters), "
     '"meanings" (a JSON array with ONE object per DIFFERENT English '
-    "equivalent of the Spanish headword, at most 6, ordered with the most "
-    'common meaning first; each object has "term" (the English equivalent '
+    "equivalent of the Spanish headword, "
+    f"{_MEANINGS_COUNT_RULE}, ordered with the most "
+    "common meaning first; each object has \"term\" (the English equivalent "
     'for THAT meaning), "pos", "gloss" (a very short English label, at most '
     '60 characters), "domain" (a very short area label in English, for '
     'example "tools", "geography", "botany", "finance", or "" if unclear) '
     'and "proper_noun" (true ONLY if that equivalent is a proper noun: a '
     "place, a person or a brand name). RULES: a proper noun must NEVER be "
     "the only equivalent of a common noun; if the Spanish word also names a "
-    "place or a person, put that meaning LAST with \"proper_noun\": true. "
+    "place or a person, put that meaning LAST with \"proper_noun\": true. If "
+    "the Spanish word has several common meanings, NEVER return only one: list "
+    "the most common English equivalents (most common first) so the learner "
+    "can choose. "
     "Do not add any text outside the JSON object."
 )
 

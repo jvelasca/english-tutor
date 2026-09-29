@@ -19,7 +19,7 @@
  * 6. «Mi léxico» monta el inventario (buscador, filtros, añadir) sin estudio.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within, act } from "@testing-library/react";
 import { I18nProvider } from "../../hooks/useI18n";
 import type { FlashcardDeck, FlashcardQueue } from "../../types/api";
 import { FlashcardsScreen } from "./FlashcardsScreen";
@@ -141,6 +141,8 @@ function queue(overrides: Partial<FlashcardQueue> = {}): FlashcardQueue {
       },
     ],
     due_count: 2,
+    upcoming_count: 0,
+    queue_count: 2,
     new_count: 3,
     reviewed_today: 0,
     new_today: 0,
@@ -336,6 +338,43 @@ describe("FlashcardsScreen", () => {
       await screen.findByText("Nothing to review right now — come back later."),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Review now/ })).toBeNull();
+  });
+
+  it("declara la espera de la cola del día en vez de decir «nada que repasar» (V3.88.0)", async () => {
+    let resolveReview: (value: {
+      due_count: number;
+      items: never[];
+      fsrs_version: string;
+    }) => void = () => {};
+    vi.mocked(getReviewQueue).mockReturnValue(
+      new Promise((resolve) => {
+        resolveReview = resolve;
+      }) as never,
+    );
+
+    renderScreen();
+
+    // Mientras la cola viaja no se afirma que no haya nada: se declara la espera
+    // (región viva con `aria-busy`).
+    const statuses = await screen.findAllByRole("status");
+    expect(
+      statuses.some(
+        (el) =>
+          el.getAttribute("aria-busy") === "true" &&
+          /Loading/.test(el.textContent ?? ""),
+      ),
+    ).toBe(true);
+    expect(
+      screen.queryByText("Nothing to review right now — come back later."),
+    ).toBeNull();
+
+    await act(async () => {
+      resolveReview({ due_count: 0, items: [], fsrs_version: "test" });
+    });
+
+    expect(
+      await screen.findByText("Nothing to review right now — come back later."),
+    ).toBeTruthy();
   });
 
   it("estudiar califica por el endpoint del mazo y el resumen es alcanzable", async () => {
@@ -867,8 +906,32 @@ describe("FlashcardsScreen", () => {
 
   // --- V3.87.0: configuración de estudio ------------------------------------
 
+  it("el panel de estudio arranca plegado y se despliega con el «...»", async () => {
+    renderScreen();
+
+    // V3.87.1: las cuatro decisiones no ocupan sitio hasta que se piden; el
+    // disparador conserva el nombre accesible y declara su estado.
+    const trigger = await screen.findByRole("button", {
+      name: "Study settings",
+    });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByLabelText("Mode")).toBeNull();
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(await screen.findByLabelText("Mode")).toBeTruthy();
+
+    // Y se vuelve a plegar.
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByLabelText("Mode")).toBeNull();
+  });
+
   it("el panel de estudio guarda el modo y recarga la cola", async () => {
     renderScreen();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Study settings" }),
+    );
     const mode = (await screen.findByLabelText("Mode")) as HTMLSelectElement;
     fireEvent.change(mode, { target: { value: "production" } });
 

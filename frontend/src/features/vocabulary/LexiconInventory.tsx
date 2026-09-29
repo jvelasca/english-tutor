@@ -9,6 +9,7 @@ import { SpeakingDrillSection } from "./wordDrill";
 import { AddVocabSection } from "./AddVocabSection";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
+import { LoadingNotice } from "../../components/LoadingNotice";
 import { SkillBar } from "../../components/SkillBar";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -95,12 +96,16 @@ export function LexiconInventory({
   const [candidates, setCandidates] = useState<string[]>([]);
   const [drillWord, setDrillWord] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // V3.88.0: `refresh` corría en silencio también con datos ya en pantalla (al
+  // equipar un pack, al producir evidencia). Ahora se declara mientras dura.
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<LexicalStatus | "all">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
 
   const refresh = useCallback(async () => {
     if (!userId) return;
+    setRefreshing(true);
     try {
       const [data, drill] = await Promise.all([
         getLexicon(userId),
@@ -117,6 +122,8 @@ export function LexiconInventory({
     } catch {
       /* backend no disponible */
       setLoadError(true);
+    } finally {
+      setRefreshing(false);
     }
   }, [userId]);
 
@@ -174,7 +181,7 @@ export function LexiconInventory({
             </button>
           </p>
         ) : (
-          <p className="mt-4 text-sm text-muted-foreground">{t("common.loading")}</p>
+          <LoadingNotice className="mt-4" />
         )}
       </div>
     );
@@ -196,6 +203,11 @@ export function LexiconInventory({
         className="flex flex-col gap-5"
       >
         {showHeader && <DictionaryHeader total={summary.total} />}
+
+        {/* V3.88.0: recarga en segundo plano (al equipar un pack, al producir
+            evidencia). Con datos ya en pantalla basta un aviso fino, no un
+            esqueleto: la lista sigue siendo utilizable mientras llega. */}
+        {refreshing ? <LoadingNotice /> : null}
 
         {/* V3.85.0: aquí solo queda la cola de competencia del drill oral, que
             es PRODUCCIÓN y no calificación de tarjetas. Estudio y repaso se

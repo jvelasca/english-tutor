@@ -118,13 +118,19 @@ function DecisionSignals({
  * Carga la cola de repaso del día. Expone el recuento para que el bloque de
  * estudio pueda rotular su acción («Repasar ahora (N)») y los ítems que la
  * sesión encadenada va a recorrer.
+ *
+ * V3.88.0: expone además `loading`. Sin él, el bloque de estudio no distinguía
+ * «la cola está vacía» de «la cola aún no ha llegado» y pintaba el vacío en
+ * ambos casos: mientras la petición viajaba, decía «nada que repasar».
  */
 export function useReviewToday(userId: string) {
   const [items, setItems] = useState<ReviewQueueItem[]>([]);
   const [dueCount, setDueCount] = useState(0);
   const [loadError, setLoadError] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     try {
       // V3.77.2: se normaliza en la frontera del estado. El `queue?.items ?? []`
       // de antes no protegía contra un `items` no-array pero *truthy*.
@@ -137,6 +143,8 @@ export function useReviewToday(userId: string) {
     } catch {
       /* backend no disponible */
       setLoadError(true);
+    } finally {
+      setLoading(false);
     }
   }, [userId]);
 
@@ -144,7 +152,7 @@ export function useReviewToday(userId: string) {
     void refresh();
   }, [refresh]);
 
-  return { items, dueCount, loadError, refresh };
+  return { items, dueCount, loadError, loading, refresh };
 }
 
 interface ReviewSessionProps {

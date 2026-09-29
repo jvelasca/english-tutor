@@ -2189,6 +2189,30 @@ async def _ensure_cached_content(
         return None
 
 
+async def warm_dictionary_word(
+    word: str,
+    *,
+    model: str | None = None,
+    user_id: str | None = None,
+    direction: str = DIRECTION_EN_ES,
+) -> dict | None:
+    """Prepara (genera y persiste) el contenido de `word` si la caché no es
+    fresca (V3.88.0).
+
+    Es EXACTAMENTE el camino de una consulta (`_ensure_cached_content`), expuesto
+    para el precalentado en segundo plano: comparte el single-flight —si el
+    alumno busca la palabra mientras se precalienta, ambos comparten la misma
+    generación—, las cuotas de generación, la negative cache y la persistencia.
+    Precalentar no puede saltarse ninguna puerta.
+
+    Devuelve la fila cacheada, o `None` si no se pudo preparar (cuota, modelo
+    caído, timeout). No lanza: el precalentado es best-effort por definición.
+    """
+    return await _ensure_cached_content(
+        word, model=model, user_id=user_id, direction=direction
+    )
+
+
 async def set_item_translation(
     user_id: str, word: str, translation: str
 ) -> dict | None:

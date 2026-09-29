@@ -3,11 +3,21 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from starlette.concurrency import run_in_threadpool
 
 import config
 from dependencies import current_user, read_audio_limited
+from domain import dictionary_warmup as dictionary_warmup_service
 from domain import flashcards as flashcards_service
 from domain import learning as learning_service
 from domain import retention as retention_service
@@ -19,6 +29,8 @@ from schemas.vocabulary import (
     DecisionLifecycleOut,
     DictionaryEntryOut,
     DictionaryLookupRequest,
+    DictionaryWarmupJobOut,
+    DictionaryWarmupRequest,
     DrillAttemptOut,
     DrillCandidatesOut,
     FlashcardCardIn,
@@ -232,6 +244,63 @@ async def dictionary_lookup(
         raise HTTPException(
             status_code=422, detail="La palabra buscada no es válida"
         ) from None
+
+
+@router.post(
+    "/api/vocabulary/dictionary/warmup",
+    response_model=DictionaryWarmupJobOut,
+    status_code=202,
+)
+async def dictionary_warmup(
+    background_tasks: BackgroundTasks,
+    body: DictionaryWarmupRequest | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Precalienta el diccionario del alumno en segundo plano (V3.88.0).
+
+    La primera consulta de una palabra sin caché paga la generación con el modelo
+    local; este trabajo la adelanta recorriendo el léxico del alumno. Reutiliza el
+    single-flight y las cuotas de la consulta, así que no es una puerta trasera de
+    generación. Responde 202 con el estado inicial y el frontend hace polling en
+    `GET .../dictionary/warmup/{job_id}`. Sin nada que precargar, el trabajo nace
+    con `total=0` y `done`.
+    """
+    requested = body.limit if body is not None else None
+    job, is_new = await dictionary_warmup_service.start_warmup_job(
+        user["id"], requested
+    )
+    if is_new:
+        background_tasks.add_task(
+            dictionary_warmup_service.run_warmup_job, job["id"]
+        )
+    return _warmup_job_out(job)
+
+
+@router.get(
+    "/api/vocabulary/dictionary/warmup/{job_id}",
+    response_model=DictionaryWarmupJobOut,
+)
+async def dictionary_warmup_status(
+    job_id: str, user: dict = Depends(current_user)
+) -> dict:
+    """Estado del precalentado (polling del frontend, V3.88.0)."""
+    job = await dictionary_warmup_service.warmup_job(job_id)
+    if job is None or job.get("user_id") != user["id"]:
+        raise HTTPException(status_code=404, detail="Trabajo no encontrado")
+    return _warmup_job_out(job)
+
+
+def _warmup_job_out(job: dict) -> dict:
+    """Proyección pública del trabajo (nunca expone la lista interna de palabras)."""
+    return {
+        "id": job["id"],
+        "status": job.get("status", "running"),
+        "total": int(job.get("total", 0)),
+        "prepared": int(job.get("prepared", 0)),
+        "skipped": int(job.get("skipped", 0)),
+        "pending": int(job.get("pending", 0)),
+        "error": job.get("error"),
+    }
 
 
 @router.get("/api/vocabulary/drill/candidates", response_model=DrillCandidatesOut)

@@ -807,11 +807,15 @@ def task_candidates(
     candidata por modalidad (sin duplicados) y `support_level` declarado por la
     actividad, de modo que el argmax devuelva el mismo contrato que `select_task`.
 
-    V3.87.0: `allowed_activities` (opcional) restringe el conjunto al modo de
-    estudio elegido por el alumno. **Fallback declarado**: si el filtro deja el
-    conjunto VACÍO (p. ej. modo producción sobre un ítem sin ningún hueco de
-    producción), se sirve el conjunto completo antes que dejar la sesión sin
-    tarea; el filtro no puede convertir una cola en una cola vacía.
+    V3.87.0: `allowed_activities` (opcional) orienta el conjunto al modo de
+    estudio elegido por el alumno. Es una **preferencia**, no un filtro duro
+    (Política B, congelada en V3.87.1): **si el filtro deja el conjunto VACÍO**
+    (p. ej. modo producción sobre un ítem sin ningún hueco de producción), **se
+    sirve el conjunto SIN filtrar** antes que dejar la sesión sin tarea; la
+    preferencia no puede convertir una cola en una cola vacía. La otra capa de la
+    misma política vive en `services.study_config.fallback_activity` (una
+    recomendación fuera del modo se sirve como la actividad admisible más
+    cercana; `production` conserva `recognition` como prerrequisito receptivo).
     """
     mx = matrix if isinstance(matrix, dict) else {}
     try:
@@ -876,6 +880,13 @@ def select_task_by_elv(
     candidatas o sin ningún margen comparable devuelve `select_task` EXACTO: sin
     estado del alumno la tarea servida es la de V3.56.0. El empate lo rompe el
     orden canónico de `task_candidates` (`>` estricto). Nunca lanza.
+
+    V3.87.0: `allowed_activities` (opcional) llega hasta `task_candidates` y
+    orienta las candidatas al modo del alumno. Es una **preferencia**, no un
+    filtro duro (Política B): un conjunto filtrado vacío se degrada al conjunto
+    SIN filtrar y una recomendación fuera del modo se sirve, aguas arriba, como
+    la actividad admisible más cercana (`study_config.fallback_activity`). Ver la
+    release V3.87.1.
 
     V3.64 (Planner 3.0, ADITIVO) añade dos argumentos OPCIONALES que vienen de la
     **Decision Projection** (`services.decision_projection`), nunca del estado

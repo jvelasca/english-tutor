@@ -27,6 +27,7 @@ import type {
   DictionaryMeaning,
   DictionarySurfaceUsage,
   DictionaryUnitUsage,
+  DictionaryWarmupJob,
   DrillCandidates,
   FlashcardCard,
   FlashcardCardType,
@@ -470,6 +471,8 @@ export function normalizeStudyQueue(raw: unknown): FlashcardQueue {
       : normalizeFlashcardDeck({ is_auto: true, id: 0 }),
     items: asRecordArray(data.items).map(normalizeStudyItem),
     due_count: asNumber(data.due_count),
+    upcoming_count: asNumber(data.upcoming_count),
+    queue_count: asNumber(data.queue_count),
     new_count: asNumber(data.new_count),
     reviewed_today: asNumber(data.reviewed_today),
     new_today: asNumber(data.new_today),
@@ -595,6 +598,25 @@ export function normalizeDictionaryEntry(raw: unknown): DictionaryEntry {
       surface: surface ? normalizeSurfaceUsage(surface) : null,
       unit: unit ? normalizeUnitUsage(unit) : null,
     },
+  };
+}
+
+/** `POST /api/vocabulary/dictionary/warmup` y su GET de estado (V3.88.0).
+ *  El contador de progreso se lee en cada poll, así que los números nunca
+ *  pueden llegar `undefined` (un `pending` ausente se degrada a 0, no a NaN). */
+export function normalizeDictionaryWarmupJob(
+  raw: unknown,
+): DictionaryWarmupJob {
+  const data = isRecord(raw) ? raw : {};
+  const status = data.status;
+  return {
+    id: asString(data.id),
+    status: status === "done" || status === "error" ? status : "running",
+    total: asNumber(data.total),
+    prepared: asNumber(data.prepared),
+    skipped: asNumber(data.skipped),
+    pending: asNumber(data.pending),
+    error: asNullableString(data.error),
   };
 }
 

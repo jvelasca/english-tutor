@@ -18,6 +18,7 @@ import {
   normalizeLexicon,
   normalizeRetentionDue,
   normalizeReviewQueue,
+  normalizeStudyQueue,
   normalizeVocabBulkAdd,
   normalizeVocabCollections,
   normalizeVocabItemAdd,
@@ -150,6 +151,21 @@ describe("normalizeRetentionDue", () => {
       translation: "",
       stability: 0,
     });
+  });
+});
+
+describe("normalizeStudyQueue", () => {
+  it("separa due_count de upcoming_count y coercciona los escalares", () => {
+    const out = normalizeStudyQueue({
+      deck: {},
+      items: [],
+      due_count: "2",
+      upcoming_count: 3,
+      queue_count: null,
+    });
+    expect(out.due_count).toBe(0); // "2" no es número → neutro
+    expect(out.upcoming_count).toBe(3);
+    expect(out.queue_count).toBe(0);
   });
 });
 

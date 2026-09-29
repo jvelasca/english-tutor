@@ -106,7 +106,8 @@ def test_generator_version_and_prompt_declare_the_situation_field():
     # para regenerar una sola vez la caché previa bajo la política nueva.
     # V3.44: sube a 1.4.0 al ganar `senses` (modelo de sentidos del scoring).
     # V3.86.0: sube a 1.5.0 al ganar `meanings` (significados elegibles).
-    assert dictionary_content.GENERATOR_VERSION == "1.5.0"
+    # V3.88.0: sube a 1.6.0 al EXIGIR un mínimo de significados (MIN_MEANINGS).
+    assert dictionary_content.GENERATOR_VERSION == "1.6.0"
     assert "situation" in dictionary_content._SYSTEM_PROMPT
     assert "situation" in dictionary_content._REVERSE_SYSTEM_PROMPT
     # V3.44 (P1-01): el contrato de contenido también declara `senses`.

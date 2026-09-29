@@ -74,7 +74,9 @@ def _today_prefix() -> str:
 
 #: V3.87.0: ventana de adelanto del modo `intensive`. Los repasos que vencen
 #: dentro de este plazo se sirven ya, SIN tocar su calendario (el `due_at` no se
-#: reescribe: solo se presenta antes la oportunidad de repasarlos).
+#: reescribe: solo se presenta antes la oportunidad de repasarlos). V3.87.1:
+#: entran en la cola pero NO en `due_count`; se cuentan aparte en
+#: `upcoming_count` para no presentar como vencido lo que aún no lo está.
 INTENSIVE_HORIZON_HOURS = 24
 
 
@@ -803,6 +805,12 @@ async def deck_queue(
     Orden: primero los repasos vencidos y después las nuevas. Es el orden clásico
     de Anki y además el que respeta el dinero del alumno —lo que ya se sabe y se
     está olvidando va antes que lo que nunca ha visto—.
+
+    V3.87.1: en `intensive` los repasos que vencen en ≤ 24 h (`upcoming`) se
+    SIRVEN (sin reescribir su `due_at`) pero se cuentan APARTE, para que la UI no
+    presente como vencido lo que aún no lo está: `due_count` = vencidas reales,
+    `upcoming_count` = adelantos voluntarios (0 fuera de `intensive`) y
+    `queue_count` = lo que la cola sirve de verdad (vencidas + adelantos).
     """
     if deck_id == flashcards_repo.AUTO_DECK_ID:
         deck = _auto_deck()
@@ -833,16 +841,22 @@ async def deck_queue(
     # la ventana (repasos que vencen en 24 h) SIN reescribir ningún `due_at`;
     # `gentle` recorta el techo de nuevas. `auto` (el defecto) no toca nada: la
     # cola de un alumno sin configurar es EXACTAMENTE la de V3.86.1.
+    #
+    # V3.87.1: `due` son SIEMPRE las vencidas y `upcoming` los adelantos de
+    # `intensive`; se sirven juntos pero se cuentan por separado (`due_count` /
+    # `upcoming_count`) para no mezclar «vencido» con «vence en ≤ 24 h».
     study = await study_config_domain.get_study_config(user_id)
     config = study["config"]
     difficulty = config.get("difficulty") or "auto"
-    if difficulty == "intensive":
-        due = due + upcoming
+    intensive = difficulty == "intensive"
+    served_reviews = due + upcoming if intensive else due
     effective_new_per_day = _difficulty_new_cap(new_per_day, difficulty)
 
     new_remaining = max(0, effective_new_per_day - state["new"])
     review_remaining = max(0, review_per_day - state["reviews"])
-    taken_reviews = [{**c, "is_new": False} for c in due[:review_remaining]]
+    taken_reviews = [
+        {**c, "is_new": False} for c in served_reviews[:review_remaining]
+    ]
     taken_new = [
         {**c, "is_new": True}
         for c in fresh[: min(new_remaining, max(0, limit - len(taken_reviews)))]
@@ -885,7 +899,13 @@ async def deck_queue(
     return {
         "deck": deck,
         "items": items,
+        # V3.87.1: `due_count` = vencidas REALES (siempre); `upcoming_count` =
+        # adelantos voluntarios de `intensive` (≤ 24 h, sin tocar su calendario),
+        # 0 en el resto; `queue_count` = vencidas + adelantos (candidatas de
+        # repaso antes del tope diario).
         "due_count": len(due),
+        "upcoming_count": len(upcoming) if intensive else 0,
+        "queue_count": len(served_reviews),
         "new_count": len(fresh),
         "reviewed_today": state["reviews"],
         "new_today": state["new"],

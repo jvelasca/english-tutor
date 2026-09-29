@@ -605,6 +605,14 @@ def recommend_review_activity(
     El reconocimiento débil se detecta por su señal propia (falta de exposición).
 
     Devuelve `{activity, reason}` con `activity` en `REVIEW_ACTIVITIES`.
+
+    V3.87.0/V3.87.1: `allowed_activities` (opcional) es la **preferencia** de
+    modo del alumno (Política B, no un filtro duro). `_recommend` traduce la
+    recomendación a la actividad admisible más cercana vía
+    `study_config.fallback_activity`: en `recognition` nunca se produce; en
+    `production` la recuperación sube a construir, SALVO que haga falta la base
+    receptiva (`recognition` se conserva como prerrequisito). `mixed`/ausente no
+    filtran.
     """
     matrix = competence if competence is not None else item_competence_matrix(row)
 
@@ -1032,6 +1040,12 @@ def _task_decision(
     `{skill, activity, reason, support_level}` de V3.39 y `decision` (o `None` si
     el llamador no aporta la Decision Projection) es el bloque ADITIVO y
     explicable del Planner 3.0, que el ítem expone aparte.
+
+    V3.87.0/V3.87.1: `allowed_activities` es la **preferencia** de modo
+    (Política B). El argmax puede devolver la tarea de la CASCADA (sin candidatas
+    del modo); si esa actividad no es admisible, se sirve la recomendación YA
+    filtrada por `fallback_activity` y se descarta el bloque `decision` (explicaría
+    una tarea que no es la servida). No es un filtro duro.
     """
     planned = planner.select_task_by_elv(
         matrix,

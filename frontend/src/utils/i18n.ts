@@ -1337,15 +1337,65 @@ const STRINGS: Record<string, Entry> = {
   // automático «Mi diccionario»: es el mismo vocabulario, no una copia.
   // V3.86.0: significados elegibles. El nombre propio se marca y NUNCA se
   // preselecciona (el defecto es el primer significado común).
-  "dictionary.lookup.meanings": { en: "Meanings", es: "Significados" },
+  "dictionary.lookup.meanings": {
+    en: "Main meanings",
+    es: "Significados principales",
+  },
   "dictionary.lookup.meaningPick": {
     en: "Pick the meaning you want to study.",
     es: "Elige el significado que quieres estudiar.",
+  },
+  // V3.88.0: las acepciones que no caben en los principales se pliegan tras el
+  // «...». Se dice cuántas quedan para que el plegado no parezca una pérdida.
+  "dictionary.lookup.moreMeanings": {
+    en: "Show the other {count} meanings",
+    es: "Ver los otros {count} significados",
   },
   "dictionary.lookup.meaningAria": { en: "Meaning", es: "Significado" },
   "dictionary.lookup.meaningProperNoun": {
     en: "Proper noun",
     es: "Nombre propio",
+  },
+  // V3.88.0: el panel de alta pedía los mazos al abrirse y, mientras llegaban,
+  // decía «sin mazos» (lo mismo que cuando de verdad no hay ninguno).
+  "dictionary.lookup.decksLoading": {
+    en: "Loading your decks…",
+    es: "Cargando tus mazos…",
+  },
+
+  // V3.88.0: precalentado del diccionario. La primera consulta de una palabra
+  // sin caché paga la generación del modelo local; este bloque la adelanta.
+  "dictionary.warmup.title": {
+    en: "Pre-load my words",
+    es: "Precargar mis palabras",
+  },
+  "dictionary.warmup.hint": {
+    en: "The local model takes a while the first time a word is looked up. Pre-load the words in your dictionary and they will open right away.",
+    es: "El modelo local tarda la primera vez que se consulta una palabra. Precarga las de tu diccionario y se abrirán al instante.",
+  },
+  "dictionary.warmup.cta": {
+    en: "Pre-load now",
+    es: "Precargar ahora",
+  },
+  "dictionary.warmup.running": {
+    en: "Pre-loading your words…",
+    es: "Precargando tus palabras…",
+  },
+  "dictionary.warmup.progress": {
+    en: "{done} of {total} reviewed",
+    es: "{done} de {total} revisadas",
+  },
+  "dictionary.warmup.done": {
+    en: "{prepared} words ready. {skipped} could not be prepared (the local model may be busy); try again later.",
+    es: "{prepared} palabras listas. {skipped} no se pudieron preparar (el modelo local puede estar ocupado); inténtalo más tarde.",
+  },
+  "dictionary.warmup.nothing": {
+    en: "There is nothing to pre-load yet. Add words to your dictionary first.",
+    es: "Todavía no hay nada que precargar. Añade palabras a tu diccionario primero.",
+  },
+  "dictionary.warmup.error": {
+    en: "Couldn't pre-load your words. You can try again.",
+    es: "No se pudieron precargar tus palabras. Puedes intentarlo de nuevo.",
   },
   "dictionary.lookup.addCta": {
     en: "Add to Flashcards",
@@ -2060,6 +2110,13 @@ const STRINGS: Record<string, Entry> = {
   "common.unavailable": {
     en: "Couldn't load this panel right now.",
     es: "Ahora mismo no se ha podido cargar este panel.",
+  },
+  // V3.88.0: segundo tiempo del aviso de espera. Si una lectura de la BD o una
+  // generación con el modelo local se alarga por encima del umbral, el spinner
+  // pasa a reloj y se añade esta frase para que el alumno sepa que sigue vivo.
+  "common.stillWorking": {
+    en: "Still working… the local model can take a while.",
+    es: "Seguimos trabajando… el modelo local puede tardar un poco.",
   },
   "common.close": { en: "Close", es: "Cerrar" },
   "common.done": { en: "Done", es: "Hecho" },

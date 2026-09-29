@@ -3,6 +3,18 @@
 **Fecha:** 2026-09-27 · **Tipo:** release **DE PRODUCTO** (minor) · **Versión de app:**
 `3.86.1 → 3.87.0`
 
+> **Errata (corregida en v3.87.1).** La §6 y el punto 5 de la §10 describían el fallback del modo
+> como una sola regla («conjunto filtrado vacío → conjunto sin filtrar»). El motor implementa
+> **dos** capas: además, `fallback_activity` traduce una recomendación fuera del modo a la actividad
+> admisible más cercana y conserva `recognition` como prerrequisito receptivo en `production`. El
+> texto de abajo queda corregido; la errata se conserva para trazabilidad. Ver
+> `release-notes-v3.87.1.md`.
+>
+> **Cambio posterior (v3.87.1).** El panel de configuración de estudio de esta release se pintaba
+> **siempre abierto** en DICCIONARIO/Estudiar; v3.87.1 lo **pliega** tras el disparador «...» (mismos
+> cuatro ajustes, mismo endpoint, mismo guardado). Nada de lo que estas notas describen sobre el
+> comportamiento queda invalidado: solo cambia dónde está el panel.
+
 **Con backend y frontend, SIN migración de BD, CON dos endpoints nuevos** (`GET`/`PUT
 /api/study/config`) y **CON un cambio de contrato ADITIVO** en la cola de flashcards: los ítems
 publican `prompt`/`answer`/`hint` y la cola publica `study_config`, mientras `front`/`back` se
@@ -105,24 +117,33 @@ Ambas exigen `Depends(current_user)`. Schemas en `backend/schemas/study.py` (`St
 | `intensive` | **Incluye los repasos que vencen en ≤ 24 h** |
 
 En el frontend, `production` añade un **campo de texto antes del volteo**, con **comparación
-tolerante** (`casefold` + espacios colapsados) y **autocalificación FSRS**: acierto → `Good`,
+tolerante** (**case-insensitive** + espacios colapsados: `trim` + minúsculas + colapso de espacios;
+JS no tiene `String.casefold()`) y **autocalificación FSRS**: acierto → `Good`,
 fallo → `Again`, mostrando **siempre** la respuesta correcta. El `lang` de los textos sigue la
 dirección.
 
-## 6. El Planner 3.0 solo filtra actividades
+## 6. El Planner 3.0 respeta el modo como preferencia
 
-`mode` restringe el **conjunto admisible de actividades** **antes del argmax**:
+`mode` orienta el **conjunto de actividades candidatas** **antes del argmax**:
 
-| `mode` | Actividades admisibles |
+| `mode` | Actividades preferidas |
 |---|---|
 | `recognition` | `recognition`, `recall` |
 | `production` | `sentence`, `write`, `transfer` |
-| `mixed` | *(sin filtro)* |
+| `mixed` | *(sin preferencia)* |
 
 `support_level` / `difficulty` quedan **intactos**, así que `task_key`, la procedencia y la
-evidencia **no cambian de semántica**. **Fallback documentado**: si el filtro deja el conjunto
-**vacío** (p. ej. `production` sin contenido de producción), se cae al conjunto **sin filtrar** para
-no dejar la sesión sin ítems. El modo es una **preferencia**, no una garantía dura.
+evidencia **no cambian de semántica**. El modo es una **preferencia pedagógica**, **no un filtro
+duro** ni una garantía de exclusión, y se materializa en **dos capas** declaradas:
+
+1. **Conjunto filtrado vacío → conjunto SIN filtrar.** Si el filtro deja el conjunto **vacío**
+   (p. ej. `production` sin contenido de producción), `task_candidates` sirve el conjunto **sin
+   filtrar** para no dejar la sesión sin ítems.
+2. **Recomendación fuera del modo → actividad admisible más cercana.** `fallback_activity` no
+   descarta el ítem: lo traduce a la actividad admisible más próxima (`recognition` → `recall`;
+   `recall` → `sentence`). **Excepción declarada**: en `production`, una recomendación de
+   `recognition` **se conserva** como **prerrequisito receptivo** (sin base receptiva no hay con
+   qué producir). Por eso `production` puede seguir sirviendo `recognition`.
 
 ## 7. Las dos deudas P2 de V3.86.1, cerradas
 
@@ -172,11 +193,14 @@ existente **`409 CARD_FRONT_TAKEN`**.
    compartida por ambas direcciones; lo que cambia es la cara presentada. Progresos separados por
    dirección exigirían una decisión de producto y una migración nuevas.
 2. **El modo *listening* queda fuera**: es un subsistema aparte.
-3. **El Planner 3.0 solo filtra actividades**: el `mode` no altera `support_level` ni la dificultad
-   del planner, ni la selección adaptativa más allá del filtro.
+3. **El Planner 3.0 solo orienta por preferencia de modo**: el `mode` no altera `support_level` ni
+   la dificultad del planner, ni la selección adaptativa más allá de esa preferencia; no es un
+   filtro duro.
 4. **No hay overrides por mazo**: la configuración es **per-usuario**.
-5. **El fallback del planner es deliberadamente permisivo**: con el conjunto filtrado vacío, el
-   modo se degrada a «sin filtro» para no dejar la sesión sin ítems.
+5. **La preferencia de modo es deliberadamente permisiva**: con el conjunto filtrado vacío, el
+   modo se degrada a «sin filtro» para no dejar la sesión sin ítems; y una recomendación fuera del
+   modo se traduce a la actividad admisible más cercana, conservando `recognition` como
+   prerrequisito receptivo en `production`.
 6. **`deck_id` sigue existiendo** como **proyección legacy** (declarado en V3.86.1); este
    incremento no lo toca.
 7. **Los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`.

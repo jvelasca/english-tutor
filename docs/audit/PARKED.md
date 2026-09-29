@@ -2492,6 +2492,108 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.88.0 — La espera se ve, los significados principales y el estudio del diccionario offline · 2026-09-29
+
+> Release **DE PRODUCTO** (minor) **CON backend y frontend**, **SIN migración de BD** (todo es
+> aditivo: el precalentado reutiliza `dictionary_entries` y no crea tablas), **CON dos endpoints
+> nuevos** (`POST /api/vocabulary/dictionary/warmup` → **202** + trabajo de fondo en memoria, y
+> `GET /api/vocabulary/dictionary/warmup/{job_id}`) y **CON bump de `GENERATOR_VERSION`
+> (`1.5.0 → 1.6.0`)**. `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y
+> `LISTENING_BANK_VERSION` no cambian; **sin gates nuevos ni retirados** (siguen los ocho, todos
+> `pending`). Incluye el **estudio de viabilidad del diccionario offline**
+> (`docs/DISENO-V388-DICCIONARIO-OFFLINE.md`), que **no implementa** el empaquetado. Detalle en
+> `release-notes-v3.88.0.md`.
+
+### Cerrado en V3.88.0 (deja de ser deuda)
+
+- **La espera silenciosa en las operaciones lentas.** La cola de repaso del día decía «nada que
+  repasar» **mientras la petición volaba**; `loadDecks()` del panel de alta decía «no hay mazos»
+  **mientras cargaba**; crear/borrar mazos y fichas y las tres altas de vocabulario solo se veían
+  como un `disabled` mudo; el léxico y las pestañas de estudio/estadísticas cargaban sin señal.
+  Nuevo `LoadingNotice` (`role="status"` + `aria-busy` + `aria-live="polite"`; spinner que se
+  **convierte en reloj** con `common.stillWorking` pasados **4 s**) y spinner en el **botón activo**
+  de cada acción, con estados separados (`deletingId` ≠ `deletingCardId` ≠ `busyAction`). `[UX]`
+- **Los 2–3 significados principales.** La plomería existía (V3.86.0) pero los **datos** no: el
+  prompt pedía «at most 6» **sin mínimo** y solo **6 de 33** entradas tenían significados.
+  `MIN_MEANINGS = 2` se inyecta como regla dura en **ambos** prompts y `GENERATOR_VERSION` sube a
+  `1.6.0`, que **invalida la caché anterior de forma perezosa** (33 + 13 filas se regeneran al
+  consultarlas o al precalentar; sin barrido en el arranque). En la UI, los **3 primeros
+  significados se ven desplegados** y el resto se pliega tras `InfoDisclosure` con
+  `content="options"`, **sin tocar la semántica de selección**. `[CONTENIDO]`
+- **El precalentado del léxico.** `domain/dictionary_warmup.py` + endpoint 202 + `GET` de estado +
+  acción `DictionaryWarmupAction` en la vista de consulta. Reutiliza **el camino de generación que
+  ya existía** (`_ensure_cached_content`: single-flight, negative cache y **las mismas cuotas**),
+  así que **no genera nada que una consulta no generaría**; sin cupo la palabra queda `skipped` (no
+  es error) y el resultado **real** es la **caché global**, que sobrevive al proceso. `[PRODUCTO]`
+- **La caché del diccionario se puede medir.** `scripts/dictionary_cache_report.py` (**solo
+  lectura**, `mode=ro`) informa de volumen y **frescura por `generator_version`** y del **% con 2+
+  significados** —la métrica que persigue este incremento—, con desglose por tabla y muestra de
+  huecos. `[INSTRUMENTO]`
+
+### Abierto y medido a propósito (frontera declarada, no defecto)
+
+- **El diccionario offline completo NO se empaqueta**, y el estudio dice por qué con datos: el
+  léxico real de la app es de **2.238 palabras** frente a las **35.935** del subconjunto más pequeño
+  que ofrece la fuente empaquetable; la única fuente EN→ES seria (FreeDict **eng-spa** 2025.11.23,
+  **CC BY-SA 3.0**, 64.258 entradas, 3,54 MiB) impondría **atribución y *ShareAlike* de la obra
+  derivada**, y **no cubre la inversa** (su `spa-eng` tiene **4.502** entradas y su propio índice la
+  marca `too small`). `[DATOS]`
+- **El escaneo O(N) de la inversa ES→EN sigue donde estaba.** `dictionary_repo.list_entries()` lee
+  la tabla **entera** (5 llamadas) y `dictionary_reverse.match_translation` la recorre en Python:
+  medido a 64.258 filas son **192 ms de SQL + 76 ms de bucle** por consulta, frente a **0,034 ms**
+  con índice FTS5 (que **está disponible** en `backend/.venv` y costaría **+4,58 MiB** a tamaño
+  completo). Es la **fase 1 recomendada** del estudio y **no** se ha implementado aquí. `[DATOS]`
+- **La generación de significados está orientada por prompt, no garantizada por el modelo.**
+  Medido con 4 palabras: `lantern` devolvió **un** significado y `quaint` coló el topónimo
+  `San Miguel` como tercero (el filtro de nombres propios de V3.86.0 lo deja al final y nunca
+  preseleccionado, pero **el modelo lo propone**). `[CONTENIDO]`
+- **`senses_json` (hasta 4 sentidos gramaticales) sigue sin pintarse** en la UI, como estaba.
+  `[UX]`
+- **El delta de V3.87.1 sigue sin etiquetar** y viaja en el mismo árbol que esta release.
+  `[PROCESO]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- Todo lo declarado abierto en V3.87.1 y anteriores sigue abierto.
+
+## V3.87.1 — Cierre de los hallazgos P1/P2 de la auditoría de V3.87.0 · 2026-09-27
+
+> Release **DE ROBUSTEZ** (patch) **CON backend y frontend**, **SIN migración de BD**, **SIN
+> endpoints nuevos** (la cola de flashcards publica dos campos **aditivos**: `upcoming_count` y
+> `queue_count`), **CON un cambio de UX** (la configuración de estudio de V3.87.0 pasa a
+> desplegable) y **SIN cambio de comportamiento runtime del Planner 3.0**. **SIN bump** de
+> `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) /
+> `LISTENING_BANK_VERSION`; **sin gates nuevos ni retirados** (siguen los ocho, todos `pending`).
+> Detalle en `release-notes-v3.87.1.md`.
+
+- **P1 · Contrato de `mode` (Política B).** `mode` es una **preferencia pedagógica**, **no un filtro
+  duro**, en **dos capas**: (1) `planner.task_candidates` cae al conjunto **sin filtrar** cuando el
+  filtro deja el conjunto **vacío**; (2) `study_config.fallback_activity` traduce una recomendación
+  fuera del modo a la actividad admisible más cercana y **conserva `recognition` como prerrequisito
+  receptivo en `production`**. **No cambia el runtime**: se corrige la redacción de V3.87.0 (con
+  errata trazable), `CHANGELOG`, `PLAN.md`, `docs/RELEVO.md` y los docstrings de
+  `services/study_config.py`/`planner.py`/`lexicon.py`, y se añaden **tests contractuales** que la
+  congelan. `[DOCUMENTACIÓN]` `[PRODUCTO]`
+- **P2 · `due_count` no mezcla vencidas con adelantos.** En `intensive`, `deck_queue` sirve
+  `due + upcoming` (sin reescribir `due_at`) pero **cuenta por separado**: `due_count` = vencidas
+  reales, `upcoming_count` = adelantos de ≤ 24 h, `queue_count` = lo servido. `[CONTRATO]`
+- **P2 · Comparador de producción.** La documentación decía `casefold` (JS no tiene
+  `String.casefold()`); ahora dice la verdad del código: **case-insensitive + espacios colapsados**.
+  `[DOCUMENTACIÓN]`
+- **UX · La configuración de estudio se pliega.** El panel **siempre abierto** de V3.87.0 empujaba
+  **«Repasar hoy» y «Estudiar tarjetas»** fuera de la primera pantalla del móvil; ahora arranca
+  **cerrado** y se despliega con el disparador **«...»** (`InfoDisclosure` con `content="options"`,
+  la convención «...» = «abre para configurar» de V3.75.7), sin cadenas de i18n nuevas y sin cambio
+  de contrato. Plegado, la configuración activa **no se ve de un vistazo** (deuda aceptada).
+  `[UX]`
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **Persistencia de `study_config` no atómica.** `set_study_config` hace lectura-modificación-
+  escritura (merge + normalización + `SET`) sin transacción optimista; en el futuro multi-dispositivo
+  dos pestañas podrían pisarse un campo. P2 diferido. `[DATOS]`
+- Todo lo declarado abierto en V3.87.0 y anteriores sigue abierto.
+
 ## V3.87.0 — FASE 2 (incremento 1): Estudio configurable · 2026-09-27
 
 > Release **DE PRODUCTO** (minor) **CON backend y frontend**, **SIN migración de BD**, **CON dos
@@ -2520,10 +2622,11 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
   ajusta el embudo (techo de nuevas / inclusión de repasos a ≤ 24 h) **sin tocar el `schedule` de
   FSRS**. En el frontend, `production` añade campo de texto con **comparación tolerante** y
   **autocalificación FSRS**, y el `lang` sigue la dirección. `[PRODUCTO]`
-- **FASE 2 · Planner 3.0 respeta el modo.** `mode` filtra el **conjunto admisible de actividades**
-  (`production` → `sentence`/`write`/`transfer`; `recognition` → `recognition`/`recall`; `mixed` →
-  sin filtro) **antes del argmax**, sin tocar `support_level`/`difficulty` ni la semántica de
-  `task_key`/procedencia/evidencia. `[ARQUITECTURA]` `[PRODUCTO]`
+- **FASE 2 · Planner 3.0 respeta el modo como preferencia.** `mode` orienta el **conjunto de
+  actividades** (`production` → `sentence`/`write`/`transfer`; `recognition` → `recognition`/`recall`;
+  `mixed` → sin preferencia) **antes del argmax**, sin tocar `support_level`/`difficulty` ni la
+  semántica de `task_key`/procedencia/evidencia. No es un filtro duro (ver la deuda de abajo).
+  `[ARQUITECTURA]` `[PRODUCTO]`
 
 ### Sigue abierto o aparcado (deuda declarada)
 
@@ -2532,18 +2635,21 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
   separados por dirección necesita una decisión de producto y una migración nuevas. `[PRODUCTO]`
 - **El modo *listening* queda fuera.** Es un subsistema aparte y no entra en este incremento.
   `[PRODUCTO]`
-- **El Planner 3.0 solo filtra actividades.** El `mode` no altera `support_level` ni la dificultad
-  del planner, ni la selección adaptativa más allá del filtro. `[ARQUITECTURA]`
+- **El Planner 3.0 orienta por preferencia de modo.** El `mode` no altera `support_level` ni la
+  dificultad del planner, ni la selección adaptativa más allá de la preferencia; no es un filtro
+  duro. `[ARQUITECTURA]`
 - **No hay overrides por mazo.** La configuración es **per-usuario**: no se puede estudiar un mazo
   en producción y otro en reconocimiento a la vez. `[PRODUCTO]`
 - **El spec de Playwright de la superficie nueva NO se añadió** (el plan lo marcaba como
   **opcional**): la cobertura de dirección/ayudas/producción vive en **Vitest**, y el **barrido
   completo** se ejecutó igualmente para descartar regresiones visuales (**118 passed · 0 failed ·
   32 skipped**, el mismo recuento que V3.86.1). `[VALIDACIÓN]`
-- **El fallback del planner es deliberadamente permisivo.** Si el filtro de actividades deja el
-  conjunto **vacío** (p. ej. `production` sin contenido de producción), se cae al conjunto **sin
-  filtrar** para no dejar la sesión sin ítems: el modo es una **preferencia**, no una garantía
-  dura. `[PRODUCTO]`
+- **La preferencia de modo es deliberadamente permisiva** (Política B, fijada en v3.87.1). Se
+  materializa en **dos capas**: si el conjunto filtrado queda **vacío** (p. ej. `production` sin
+  contenido de producción) se cae al conjunto **sin filtrar** para no dejar la sesión sin ítems; y
+  una recomendación fuera del modo se traduce a la actividad admisible más cercana, **conservando
+  `recognition` como prerrequisito receptivo en `production`**. Por eso `production` puede seguir
+  sirviendo `recognition`: el modo es una **preferencia**, no una garantía dura. `[PRODUCTO]`
 - **`deck_id` sigue existiendo** como proyección legacy (declarado en V3.86.1); este incremento no
   lo toca. `[DATOS]`
 - **El ancla de certificación sigue en `v3.83.1`** y la cola de auditoría sigue atrasada (`AV`,
