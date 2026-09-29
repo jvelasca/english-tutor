@@ -2549,8 +2549,32 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
   preseleccionado, pero **el modelo lo propone**). `[CONTENIDO]`
 - **`senses_json` (hasta 4 sentidos gramaticales) sigue sin pintarse** en la UI, como estaba.
   `[UX]`
-- **El delta de V3.87.1 sigue sin etiquetar** y viaja en el mismo árbol que esta release.
+- **No hay tag `v3.87.1`.** Su delta —la errata del contrato de `mode`, los contadores de la cola,
+  el comparador sin `casefold` y el panel de estudio plegado— **se publica dentro de `v3.88.0`**,
+  por decisión explícita de no partirlo en dos commits ni re-sellar las versiones a `3.87.1`.
   `[PROCESO]`
+
+### Estado de publicación (verificado el 2026-09-29)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.88.0` | **publicado** (`refs/tags/v3.88.0` en `origin`) → commit `969e027` |
+| GitHub Release | https://github.com/jvelasca/english-tutor/releases/tag/v3.88.0 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `969e027` | `success` — run `36547401324`, **12/12 jobs en verde** |
+| Orden tag/CI | el tag se creó **DESPUÉS** del verde: se **restablece** el invariante que `v3.87.0` había declarado incumplido (allí el tag se empujó junto con `main`) |
+| Primer run sobre `efe4d45` | **`failure`** — run `36545123518`, **11/12**: cayó solo `Backend (ruff + pytest)` por `test_the_owner_can_poll_the_job` (`assert 0 == 1`). Era **aislamiento del test**, no el producto: la cuota global de generación (10 palabras nuevas/usuario/min, ventana deslizante de 60 s) se filtraba entre pruebas porque a ese fichero le faltaba la fixture `autouse` que los otros cinco ficheros de diccionario sí tienen, y **solo se manifiesta donde el modelo no responde al instante**. Se corrigió en `969e027` y el histórico **se conserva**: `efe4d45` sigue en `main` y su run rojo es parte del rastro |
+| Ruido a no confundir | `efe4d45` tiene **además** un run en verde `36545266775`, pero es de **Dependabot Updates** (`npm_and_yarn in /frontend for vite`), **no** de la CI. El run de CI de ese commit es el **rojo** |
+| `main` vs `origin/main` | al día en `969e027` |
+| Encargo de auditoría de `v3.88.0` | **no existe** todavía (`agentes/auditoria-total-externa-v388.md` no está) |
+| Tag `v3.87.1` | **NO existe y no se creará**: su delta se publica **dentro de `v3.88.0`** (declarado en `release-notes-v3.87.1.md` y en la §7.7 de las notas de `v3.88.0`) |
+| PRs de Dependabot abiertos | **10** (vite 6→8, pytest 8→9, ruff, uvicorn, piper-tts, motion, jsdom, `@types/node`, react y `actions/setup-node`): **no** forman parte de esta release y **no** están fusionados |
+| Prefijo de dos letras | **`AZ` agotado**; la convención sigue pendiente del dictamen del informe `AZ` |
+| `ruff check .` desde la RAÍZ | sigue reportando **1 hallazgo preexistente y ajeno** (`scripts/purge_virtual_testers.py:198`, `DTZ005`), **idéntico** al declarado en V3.86.0, V3.86.1 y V3.87.0. La puerta canónica es `ruff check .` **dentro de** `backend` y `launcher` —que es lo que ejecuta la CI—, y **ambas están limpias**. No es una regresión de esta release y se declara en vez de arreglarse en silencio |
+
+**Aviso de anclaje:** hay tags **SIN Release** —`v3.84.0`, `v3.84.1`, `v3.85.0`, `v3.75.x`,
+`v3.76.0`, `v3.77.x`, `v3.78.0`, `v3.79.0` y `v3.81.0`—, así que «no hay Release» **no** significa
+«no hay release»: el ancla es el **tag** y `git fetch --tags` los trae todos. `v3.88.0` **sí** tiene
+Release, como `v3.86.0`, `v3.86.1` y `v3.87.0`.
 
 ### Sigue abierto o aparcado (deuda declarada)
 
