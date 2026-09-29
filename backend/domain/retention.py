@@ -219,9 +219,17 @@ async def add_item(
     word: str,
     *,
     translation: str = "",
+    sense: dict | None = None,
     collection_id: int | None = None,
 ) -> dict | None:
-    """Añade una palabra suelta al léxico personal + FSRS. Sin evidencia de skill."""
+    """Añade una palabra suelta al léxico personal + FSRS. Sin evidencia de skill.
+
+    V3.92: `sense` es la ACEPCIÓN elegida en el diccionario (`{term, pos, gloss,
+    lemma, source}`). Se persiste con la palabra para que la práctica y el repaso
+    sepan con qué SIGNIFICADO se aprendió —y no solo con qué traducción—; es la
+    pieza que hace que el circuito diccionario → vocabulario → FSRS tenga un
+    único objeto pedagógico. `None` (o sin campos útiles) no escribe nada.
+    """
     normalized = _normalize_word(word)
     if not normalized:
         return None
@@ -235,6 +243,7 @@ async def add_item(
             "lemma": normalized,
             "translation": (translation or "").strip(),
             "kind": "word",
+            "sense": sense,
         }
     ]
     touched = await run_in_threadpool(

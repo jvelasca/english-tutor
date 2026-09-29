@@ -652,6 +652,42 @@ describe("LexiconInventory · V3.78.0 inventario (buscador, filtros, memoria)", 
     const ticket = (await screen.findByText("ticket")).closest("li")!;
     expect(ticket.textContent).not.toContain("Your reverse");
   });
+
+  it("muestra la acepción registrada y no la inventa si no consta (V3.92)", async () => {
+    // V3.92: el inventario dice CON QUÉ SENTIDO entró la palabra, en solo
+    // lectura. Es información, no una promesa de edición.
+    const withSense: Lexicon = {
+      ...INVENTORY,
+      items: [
+        {
+          ...INVENTORY.items[0],
+          sense: {
+            term: "bank",
+            pos: "noun",
+            gloss: "A place for money.",
+            lemma: "bank",
+            source: "dictionary",
+            domain: "finance",
+          },
+        },
+        INVENTORY.items[1],
+      ],
+    };
+    routeFetch([{ url: "/api/vocabulary/lexicon", data: withSense }]);
+    renderPanel(<LexiconInventory userId="u1" showHeader={false} />);
+
+    const airport = (await screen.findByText("airport")).closest("li")!;
+    expect(screen.getByTestId("lexical-sense").textContent).toContain(
+      "Meaning: noun · A place for money.",
+    );
+    expect(
+      airport.querySelector("p[data-testid='lexical-sense']")?.getAttribute("title"),
+    ).toContain("anchored");
+
+    // Una palabra sin acepción declarada NO pinta significado inventado.
+    const ticket = (await screen.findByText("ticket")).closest("li")!;
+    expect(ticket.querySelector("p[data-testid='lexical-sense']")).toBeNull();
+  });
 });
 
 describe("LexiconInventory · V3.33 paso Recognition", () => {

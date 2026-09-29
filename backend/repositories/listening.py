@@ -491,3 +491,79 @@ def queue_fail_counts(user_id: str) -> dict[str, int]:
             (user_id,),
         ).fetchall()
     return {r["question_id"]: int(r["fail_count"]) for r in rows}
+
+
+# --- Puente Listening → FSRS (V3.92, integración pedagógica) ------------------
+# Rastro append-only de la evidencia de dificultad que un fallo de comprensión
+# deja en una palabra del léxico del alumno. La carta FSRS guarda el ESTADO
+# (`difficulty`, `due_at`, `why`); aquí queda el SUCESO, que es lo que permite
+# contarlo por día y explicar de qué frase vino (`question_id`).
+
+_EVIDENCE_COLUMNS = (
+    "id, user_id, question_id, word, fail_count, difficulty_before, "
+    "difficulty_after, due_at, created_at"
+)
+
+
+def record_difficulty_evidence(
+    user_id: str,
+    question_id: str,
+    word: str,
+    *,
+    fail_count: int = 1,
+    difficulty_before: float = 0.0,
+    difficulty_after: float = 0.0,
+    due_at: str = "",
+) -> bool:
+    """Registra una subida de dificultad de `word` causada por `question_id`.
+
+    Devuelve False si el usuario no existe. No deduplica: dos fallos distintos de
+    la misma palabra en la misma frase son DOS evidencias, y contarlas es la
+    lectura honesta (la carta, en cambio, se acota sola: su dificultad está
+    topada en 10).
+    """
+    if get_user(user_id) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT INTO listening_difficulty_evidence "
+            "(user_id, question_id, word, fail_count, difficulty_before, "
+            "difficulty_after, due_at, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                question_id,
+                str(word or "").strip().lower(),
+                max(1, int(fail_count)),
+                float(difficulty_before),
+                float(difficulty_after),
+                due_at,
+                _now(),
+            ),
+        )
+    return True
+
+
+def list_difficulty_evidence(user_id: str, day: str = "") -> list[dict]:
+    """Evidencia del puente del usuario, opcionalmente de un día (`YYYY-MM-DD`).
+
+    Mismo criterio de día que `services.daily_plan.rows_on_day` (los 10 primeros
+    caracteres de la marca ISO): no se parsea la fecha ni se depende de SQLite
+    para entenderla.
+    """
+    with closing(_conn()) as conn:
+        if day:
+            rows = conn.execute(
+                f"SELECT {_EVIDENCE_COLUMNS} FROM listening_difficulty_evidence "
+                "WHERE user_id = ? AND substr(created_at, 1, 10) = ? "
+                "ORDER BY id ASC",
+                (user_id, day),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT {_EVIDENCE_COLUMNS} FROM listening_difficulty_evidence "
+                "WHERE user_id = ? ORDER BY id ASC",
+                (user_id,),
+            ).fetchall()
+    return [dict(r) for r in rows]
+

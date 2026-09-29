@@ -495,6 +495,28 @@ def init_db() -> None:
             )
             """
         )
+        # V3.92 (integración pedagógica): rastro del PUENTE Listening → FSRS. Cada
+        # fila dice que un fallo de comprensión de una frase subió la dificultad
+        # de una palabra del léxico del alumno. Es append-only y vive aparte de
+        # `fsrs_cards` por dos razones: (1) permite contar la evidencia por día sin
+        # deducirla de un `why` de texto, y (2) deja la carta FSRS con su contrato
+        # intacto (el suceso NO es un repaso: no toca `reps`/`stability`).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS listening_difficulty_evidence (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                word TEXT NOT NULL,
+                fail_count INTEGER NOT NULL DEFAULT 1,
+                difficulty_before REAL NOT NULL DEFAULT 0,
+                difficulty_after REAL NOT NULL DEFAULT 0,
+                due_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS learning_profile (
@@ -1413,6 +1435,20 @@ def init_db() -> None:
                 "NOT NULL DEFAULT 0"
             )
 
+        # V3.92 (integración pedagógica): la ACEPCIÓN con la que el alumno dio de
+        # alta la palabra (`{term, pos, gloss, lemma, source}` en JSON). Hasta
+        # aquí, elegir un significado en el diccionario decidía la palabra y su
+        # reverso, pero el POR QUÉ de esa elección (qué acepción) se perdía: la
+        # práctica y el repaso no podían distinguir «bank» de «bank». Columna
+        # ADITIVA con DEFAULT '': una BD anterior se abre sin migrar nada y las
+        # filas viejas quedan en '' (acepción no declarada, que es la verdad), y
+        # el contrato de la cara de la tarjeta no cambia.
+        if "sense_json" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN sense_json TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
         # V3.35: `event_role` clasifica cada evento de `learning_events` como
         # evidencia, telemetría o señal informativa. Antes la tabla mezclaba
         # señales heterogéneas (una pregunta de Recognition informativa convivía
@@ -1774,6 +1810,11 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_listening_review_queue_user "
             "ON listening_review_queue(user_id, state, priority)"
+        )
+        # V3.92: la métrica del día cuenta la evidencia por usuario y fecha.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_listening_difficulty_evidence_user "
+            "ON listening_difficulty_evidence(user_id, created_at)"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "

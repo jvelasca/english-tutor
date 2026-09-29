@@ -565,6 +565,26 @@ function GoalProgress({ plan }: { plan: DailyPlan }) {
           </span>
         </span>
       </p>
+      {/* V3.92: la evidencia de dificultad se publica como EVIDENCIA, no como
+          repaso. Solo aparece cuando el día ha levantado algo, para no añadir
+          ruido con un cero. */}
+      {metrics.words_flagged > 0 ? (
+        <p className="goal-progress-detail">
+          <span data-testid="goal-difficulty-evidence">
+            {t("today.difficultyEvidence").replace(
+              "{words}",
+              String(metrics.words_flagged),
+            )}
+            <span className="goal-progress-note">
+              {" "}
+              {t("today.difficultyEvidenceNote").replace(
+                "{count}",
+                String(metrics.difficulty_evidence),
+              )}
+            </span>
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -191,6 +191,23 @@ class LexicalMemoryOut(BaseModel):
     next_in_days: float = 0.0
 
 
+class VocabSenseOut(BaseModel):
+    """Acepción registrada con una palabra del léxico (V3.92).
+
+    Es el POR QUÉ de la elección: `bank` no es una palabra, es un conjunto de
+    acepciones, y el alumno aprende una. Sin acepción (`None`) la palabra viene de
+    un alta que no la declaró (lista pegada, currículo, importación), y eso es lo
+    que la UI debe decir —no inventar un significado—.
+    """
+
+    term: str = ""
+    pos: str = ""
+    gloss: str = ""
+    lemma: str = ""
+    source: str = ""
+    domain: str = ""
+
+
 class LexicalItemOut(BaseModel):
     """Ítem del léxico personal (lexicón).
 
@@ -236,6 +253,9 @@ class LexicalItemOut(BaseModel):
     # Es la que manda sobre el pack y la caché al resolver la cara B de la
     # tarjeta; aquí viaja en SOLO LECTURA (se edita en la sesión de estudio).
     translation: str = ""
+    # V3.92 (integración pedagógica): la ACEPCIÓN elegida al dar de alta la
+    # palabra (`None` si no consta). Aditiva y de solo lectura.
+    sense: VocabSenseOut | None = None
 
 
 class LexicalUnitSurfaceOut(BaseModel):
@@ -1055,9 +1075,29 @@ class TransferAttemptOut(BaseModel):
 # --- Retención Personal (colecciones + sesión tarjetas) --------------------
 
 
+class VocabSenseIn(BaseModel):
+    """Acepción ELEGIDA en el diccionario (V3.92, integración pedagógica).
+
+    Es la decisión que hace único el objeto pedagógico: `bank` no es una palabra,
+    es un conjunto de acepciones, y el alumno elige una. Los topes de longitud
+    son los mismos que aplica el repositorio (que además los vuelve a recortar):
+    la validación de forma no es la del almacén. Todos los campos son opcionales
+    —una consulta que solo tiene POS y glosa no puede impedir el alta— y un
+    `sense` sin campos útiles se lee como «no consta».
+    """
+
+    term: str = Field(default="", max_length=80)
+    pos: str = Field(default="", max_length=40)
+    gloss: str = Field(default="", max_length=300)
+    lemma: str = Field(default="", max_length=80)
+    source: str = Field(default="", max_length=40)
+    domain: str = Field(default="", max_length=60)
+
+
 class VocabItemAddIn(BaseModel):
     word: str = Field(min_length=1, max_length=80)
     translation: str = Field(default="", max_length=200)
+    sense: VocabSenseIn | None = None
     collection_id: int | None = None
 
 

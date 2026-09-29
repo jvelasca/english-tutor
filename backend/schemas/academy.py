@@ -1532,7 +1532,12 @@ class DailyPlanMetricsOut(BaseModel):
     """Métricas del día. `minutes` es la suma de los minutos que el Session Engine
     había asignado a las unidades completadas (estimación del motor, **no** tiempo
     de reloj: no hay cronómetro). `accuracy` es el resultado medio observado hoy
-    (evidencia + listening), no una nota del alumno."""
+    (evidencia + listening), no una nota del alumno.
+
+    V3.92 (integración pedagógica): `difficulty_evidence` y `words_flagged` son la
+    pata del puente Listening → FSRS. La primera cuenta SUCESOS (una palabra puede
+    subir varias veces el mismo día); la segunda, palabras DISTINTAS. Se publican
+    por separado porque no son sumables entre sí."""
 
     day: str
     units: int
@@ -1546,6 +1551,8 @@ class DailyPlanMetricsOut(BaseModel):
     listening_attempts: int
     listening_accuracy: float | None
     accuracy: float | None
+    difficulty_evidence: int = 0
+    words_flagged: int = 0
     by_kind: dict[str, int]
     by_skill: dict[str, int]
 

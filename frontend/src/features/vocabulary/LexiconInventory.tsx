@@ -582,6 +582,13 @@ function LexicalRow({ lexical }: { lexical: LexicalItem }) {
         .replace("{stability}", memory.stability.toFixed(1))
         .replace("{retrievability}", String(Math.round(memory.retrievability * 100)))
     : undefined;
+  /* V3.92: acepción registrada, en formato «noun · A place for money.». Si el
+     backend no la declaró (`null` o todos los campos vacíos) NO se pinta nada:
+     no se inventa un significado que el alumno no eligió. */
+  const sense = lexical.sense ?? null;
+  const senseText = sense
+    ? [sense.pos, sense.gloss].filter(Boolean).join(" · ")
+    : "";
 
   return (
     <li className="flex items-center gap-3 p-3 sm:p-4">
@@ -620,6 +627,18 @@ function LexicalRow({ lexical }: { lexical: LexicalItem }) {
               "{text}",
               lexical.translation,
             )}
+          </p>
+        ) : null}
+        {/* V3.92: con qué SENTIDO entró la palabra. Sin acepción no se pinta
+            nada: «no consta» es información, inventar un significado no lo es.
+            Mismo patrón en solo lectura que la traducción propia. */}
+        {senseText ? (
+          <p
+            className="mt-1 truncate text-xs text-muted-foreground"
+            title={t("dictionary.inventory.senseTitle")}
+            data-testid="lexical-sense"
+          >
+            {t("dictionary.inventory.sense").replace("{text}", senseText)}
           </p>
         ) : null}
       </div>

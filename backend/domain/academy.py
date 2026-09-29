@@ -139,6 +139,7 @@ from services.curriculum import (
 )
 from services.interaction import interaction_evidence
 from services.listening import listening_diagnostic, route_competence
+from services.listening_bridge import SOURCE as LISTENING_BRIDGE_SOURCE
 from services.mastery import mastery_records
 
 logger = logging.getLogger(__name__)
@@ -2062,9 +2063,19 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
             why = fsrs.why_for_lexicon(status)
         key = ("lexicon", word)
         prev = existing.get(key)
-        if prev and int(prev.get("reps") or 0) > 0:
+        # V3.92: una carta señalada por el puente Listening → FSRS queda FUERA de
+        # la re-siembra. Su `due_at` y su `difficulty` los fijó la evidencia de un
+        # fallo real, y volver a sembrarla desde `item_mastery` (que para una
+        # palabra recién marcada es 0) reprogramaría la carta a 12 horas vista y
+        # borraría justo lo que la evidencia dice: «esta palabra toca hoy». Se
+        # conserva TODO (incluida su razón) y solo se refresca la etiqueta.
+        bridge_flagged = (
+            str(prev.get("why") or "") == LISTENING_BRIDGE_SOURCE if prev else False
+        )
+        if prev and (int(prev.get("reps") or 0) > 0 or bridge_flagged):
             updated = dict(prev)
-            updated["why"] = why
+            if not bridge_flagged:
+                updated["why"] = why
             updated["label"] = word
             await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
             continue
@@ -3188,8 +3199,17 @@ async def get_daily_plan(user_id: str) -> DailyPlanOut:
     evidence_rows = await run_in_threadpool(
         academy_repo.list_evidence, user_id, level_id
     )
+    # V3.92 (integración pedagógica): la evidencia del puente Listening → FSRS del
+    # día. Se lee AQUÍ (una sola vez) y se agrega con el resto en `day_metrics`.
+    bridge_rows = await run_in_threadpool(
+        listening_repo.list_difficulty_evidence, user_id, day["day"]
+    )
     metrics = daily_plan.day_metrics(
-        day["completions"], evidence_rows, day["listening_rows"], day["day"]
+        day["completions"],
+        evidence_rows,
+        day["listening_rows"],
+        day["day"],
+        bridge_rows,
     )
     summary = adaptive.session_summary(steps)
     session = SessionOut(

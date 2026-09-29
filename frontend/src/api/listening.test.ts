@@ -170,3 +170,80 @@ describe("listening api", () => {
     });
   });
 });
+
+// --- V3.92: el ítem servido llega en snake_case y la UI lo lee en camelCase ---
+// Sin esta traga, `transcriptPolicy` era `undefined` y con él se caía la tarjeta
+// de fallo de V3.89 (tres acciones) y el karaoke de V3.29. Aquí se fija contra la
+// forma EXACTA que sirve el backend (`flow_for_question` + `coarse_sentence_timings`
+// + `word_timings_for`), no contra un mock complaciente.
+describe("getListeningQuestion normaliza el contrato del backend (V3.92)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const RAW = {
+    id: "l1",
+    level: "A1",
+    skill: "numbers",
+    script: "It's a quarter past eight.",
+    question: "Which time did you hear?",
+    options: ["8:45", "8:15"],
+    flow: [
+      {
+        stage: "while2",
+        task: "native_question",
+        transcript_state_inicial: "hidden",
+        allow_skip: false,
+        requires_audio: true,
+      },
+    ],
+    transcript_policy: {
+      revelation: "on_first_fail",
+      max_attempts_per_stage: 2,
+      allow_manual_reveal: true,
+      shadowing_optional: true,
+    },
+    sentence_timings: [
+      { index: 0, start: 0, end: 2.5, text: "It's a quarter past eight.", sync: "coarse_heuristic" },
+    ],
+    word_timings: [
+      { index: 0, text: "It's", start: 0, end: 0.4, sentence: 0 },
+    ],
+  };
+
+  it("traduce transcript_policy, sentence_timings y word_timings", async () => {
+    mockFetch(true, RAW);
+    const q = await getListeningQuestion("u1", "A1");
+
+    expect(q.transcriptPolicy).toEqual({
+      revelation: "on_first_fail",
+      max_attempts_per_stage: 2,
+      allow_manual_reveal: true,
+      shadowing_optional: true,
+    });
+    // La política es lo que decide si quedan reintentos: sin ella la tarjeta de
+    // fallo no se pinta y el alumno no ve «Continuar / Repasar ahora / Después».
+    expect(q.transcriptPolicy?.max_attempts_per_stage).toBe(2);
+    expect(q.sentenceTimings).toHaveLength(1);
+    expect(q.wordTimings).toHaveLength(1);
+    // `flow` ya venía con el nombre correcto y no se toca.
+    expect(q.flow).toHaveLength(1);
+  });
+
+  it("no deja las claves crudas en el objeto que ve la UI", async () => {
+    mockFetch(true, RAW);
+    const q = (await getListeningQuestion("u1", "A1")) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect("transcript_policy" in q).toBe(false);
+    expect("sentence_timings" in q).toBe(false);
+    expect("word_timings" in q).toBe(false);
+  });
+
+  it("un ítem sin flow ni timings no inventa política", async () => {
+    mockFetch(true, { id: "l1", level: "A1", script: "Hi" });
+    const q = await getListeningQuestion("u1", "A1");
+    expect(q.transcriptPolicy).toBeUndefined();
+    expect(q.sentenceTimings).toBeUndefined();
+    expect(q.wordTimings).toBeUndefined();
+  });
+});

@@ -504,6 +504,24 @@ export interface LexicalItem {
   // Manda sobre el pack y la caché al resolver la cara B de la tarjeta; aquí
   // viaja en solo lectura (se edita en la sesión de estudio).
   translation?: string;
+  // V3.92 (integración pedagógica): la ACEPCIÓN elegida en el diccionario al dar
+  // de alta la palabra (`null` si no consta). En solo lectura: sirve para que el
+  // inventario diga CON QUÉ SENTIDO entró la palabra, y para que después no se
+  // confunda «banco» (mueble) con «banco» (dinero).
+  sense?: LexicalSense | null;
+}
+
+/** Acepción registrada con una palabra del léxico (V3.92). Es el POR QUÉ de la
+ *  elección: `bank` no es una palabra, es un conjunto de acepciones y el alumno
+ *  aprende una. `null` = el alta no la declaró (lista pegada, currículo,
+ *  importación), y la UI debe decir eso en vez de inventar un significado. */
+export interface LexicalSense {
+  term: string;
+  pos: string;
+  gloss: string;
+  lemma: string;
+  source: string;
+  domain: string;
 }
 
 /** Estado FSRS de una palabra, tal como lo ve PERSONAL (V3.78.0). */
@@ -1634,6 +1652,13 @@ export interface ListeningAnswerResponse {
   outcome?: string;
   queued_for_review?: boolean;
   immediate_retry_available?: boolean;
+  // V3.92 (integración pedagógica): el fallo NO se convierte en flashcard, pero
+  // si la frase contenía palabras que el alumno YA tiene, sube su dificultad de
+  // FSRS y se declara aquí. Es evidencia, no un repaso: el alumno puede seguir.
+  difficulty_evidence?: {
+    words: string[];
+    count: number;
+  };
 }
 
 export interface ListeningReviewEntry {
@@ -3668,6 +3693,12 @@ export interface DailyPlanMetrics {
   listening_attempts: number;
   listening_accuracy: number | null;
   accuracy: number | null;
+  /** V3.92: veces que el día ha subido la dificultad de una palabra por un fallo
+   *  de Listening (evidencia, NO repaso: la palabra no se ha practicado). */
+  difficulty_evidence: number;
+  /** V3.92: palabras DISTINTAS que han subido de dificultad hoy. Se cuenta
+   *  aparte porque una palabra puede fallar varias veces en el mismo día. */
+  words_flagged: number;
   by_kind: Record<string, number>;
   by_skill: Record<string, number>;
 }

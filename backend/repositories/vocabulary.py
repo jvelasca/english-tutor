@@ -10,6 +10,7 @@ independientes cuando comparten lemma.
 """
 from __future__ import annotations
 
+import json
 from contextlib import closing
 
 from repositories.db import _conn, _now
@@ -402,14 +403,19 @@ def get_vocabulary(user_id: str) -> list[dict]:
     `conversation_prod`). V3.23 añade la evidencia de recuperación demorada
     (`retrieval_successes`/`retrieval_days`/`last_retrieval_at`) y el contexto
     de producción por actividad (`context_tags`). V3.34 añade la señal de recall
-    por texto (`recall_successes`/`recall_days`/`last_recall_at`)."""
+    por texto (`recall_successes`/`recall_days`/`last_recall_at`).
+
+    V3.92 añade `sense` (la acepción ELEGIDA al dar de alta la palabra, ya
+    deserializada; `{}` si no consta) además de `sense_json`: la práctica y el
+    repaso pueden así decir con qué significado se aprendió, no solo con qué
+    traducción."""
     with closing(_conn()) as conn:
         rows = conn.execute(
             "SELECT word, production_count, first_seen, last_seen, "
             "exposure_count, last_exposed_at, exposure_days, first_exposed_at, "
             "production_days, "
             "cefr, level_id, objective_id, source, lemma, kind, lexical_unit, "
-            "translation, "
+            "translation, sense_json, "
             "chat_prod, speaking_prod, writing_prod, conversation_prod, "
             "retrieval_successes, retrieval_days, last_retrieval_at, "
             "recall_successes, recall_days, recall_attempts, last_recall_at, "
@@ -418,7 +424,27 @@ def get_vocabulary(user_id: str) -> list[dict]:
             "WHERE user_id = ? ORDER BY production_count DESC, word ASC",
             (user_id,),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_with_sense(dict(r)) for r in rows]
+
+
+def _with_sense(row: dict) -> dict:
+    """Añade `sense` (dict) a una fila de vocabulario desde su `sense_json`.
+
+    Tolerante a propósito: un JSON corrupto o de otra forma se lee como `{}`
+    (acepción no declarada). La fila se devuelve igual: una acepción ilegible no
+    puede esconder la palabra del alumno.
+    """
+    raw = row.pop("sense_json", "") or ""
+    sense: dict = {}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            sense = parsed
+    row["sense"] = sense
+    return row
 
 
 def translation_for_word(user_id: str, word: str) -> str:
@@ -580,6 +606,12 @@ def seed_study_items(
     `vocabulary.translation`, que es la que manda sobre el pack y la caché del
     diccionario al resolver la cara B. Nunca pisa una traducción existente con
     un vacío: quien escribe `word` a secas no borra lo que ya había escrito.
+
+    V3.92 (integración pedagógica): `sense` (la ACEPCIÓN elegida en el
+    diccionario) se persiste en `sense_json`. Misma política que `translation`,
+    por la misma razón: es una DECISIÓN explícita del alumno y manda; el vacío
+    no borra lo que ya había. Se guarda el dict tal cual llegó, recortado a un
+    objeto plano de campos cortos, y sin él la fila queda en '' (no consta).
     """
     if get_user(user_id) is None:
         return []
@@ -596,6 +628,7 @@ def seed_study_items(
             cefr = str(it.get("cefr") or "").strip()
             kind = str(it.get("kind") or "word").strip() or "word"
             translation = str(it.get("translation") or "").strip()[:500]
+            sense_json = _sense_json(it.get("sense"))
             row = conn.execute(
                 "SELECT word, source FROM vocabulary "
                 "WHERE user_id = ? AND word = ?",
@@ -607,9 +640,20 @@ def seed_study_items(
                     "(user_id, word, production_count, first_seen, last_seen, "
                     "exposure_count, last_exposed_at, production_days, "
                     "cefr, level_id, objective_id, source, lemma, kind, "
-                    "lexical_unit, translation) "
-                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, '', '', ?, ?, ?, ?, ?)",
-                    (user_id, word, cefr, source, lemma, kind, unit, translation),
+                    "lexical_unit, translation, sense_json) "
+                    "VALUES (?, ?, 0, '', '', 0, '', 0, ?, '', '', ?, ?, ?, ?, ?, "
+                    "?)",
+                    (
+                        user_id,
+                        word,
+                        cefr,
+                        source,
+                        lemma,
+                        kind,
+                        unit,
+                        translation,
+                        sense_json,
+                    ),
                 )
             else:
                 conn.execute(
@@ -620,6 +664,8 @@ def seed_study_items(
                     "THEN ? ELSE lexical_unit END, "
                     "translation = CASE WHEN ? = '' THEN translation "
                     "ELSE ? END, "
+                    "sense_json = CASE WHEN ? = '' THEN sense_json "
+                    "ELSE ? END, "
                     "source = CASE WHEN source = 'user' AND ? = 'imported' "
                     "THEN 'imported' ELSE source END "
                     "WHERE user_id = ? AND word = ?",
@@ -629,6 +675,8 @@ def seed_study_items(
                         unit,
                         translation,
                         translation,
+                        sense_json,
+                        sense_json,
                         source,
                         user_id,
                         word,
@@ -636,4 +684,35 @@ def seed_study_items(
                 )
             touched.append(word)
     return touched
+
+
+# Campos que se conservan de una acepción y su longitud máxima. Es una lista
+# CERRADA (no un `dict` abierto): lo que se persiste lo decide este módulo, no el
+# cliente, así que un payload grande o ajeno no puede acabar en la BD.
+_SENSE_FIELDS: tuple[tuple[str, int], ...] = (
+    ("term", 80),
+    ("pos", 40),
+    ("gloss", 300),
+    ("lemma", 80),
+    ("source", 40),
+    ("domain", 60),
+)
+
+
+def _sense_json(sense: object) -> str:
+    """Serializa la acepción elegida a JSON plano; `''` si no hay nada que guardar.
+
+    Solo conserva los campos declarados en `_SENSE_FIELDS` con valor no vacío.
+    Sin campos útiles devuelve `''` (no `'{}'`): «no consta» y «consta vacío» no
+    son lo mismo, y la columna usa `''` como valor por defecto.
+    """
+    if not isinstance(sense, dict):
+        return ""
+    clean: dict[str, str] = {}
+    for field, limit in _SENSE_FIELDS:
+        value = str(sense.get(field) or "").strip()[:limit]
+        if value:
+            clean[field] = value
+    return json.dumps(clean, ensure_ascii=False, sort_keys=True) if clean else ""
+
 

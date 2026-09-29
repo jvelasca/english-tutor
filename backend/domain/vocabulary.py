@@ -342,6 +342,11 @@ async def get_lexicon(user_id: str) -> dict:
             # V3.80.0: la traducción propia del alumno (`''` si no escribió
             # ninguna). Manda sobre el pack y la caché al resolver la cara B.
             "translation": str(row.get("translation") or ""),
+            # V3.92 (integración pedagógica): la ACEPCIÓN con la que se dio de
+            # alta la palabra (`None` si no consta). Es la que declara CON QUÉ
+            # SIGNIFICADO se aprendió; el diccionario la escribe al adoptar un
+            # sentido y aquí viaja en SOLO LECTURA.
+            "sense": row.get("sense") or None,
             "status": lexicon.item_status(row),
             "recall": lexicon.item_recall(row),
             "next_review_days": lexicon.next_review_days(row),

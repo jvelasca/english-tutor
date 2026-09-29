@@ -430,15 +430,35 @@ export function markDrillAbandoned(
   return markDrillDecisionEvent(_userId, decisionId, "abandoned", options);
 }
 
+/** Acepción elegida en el diccionario (V3.92). Es la DECISIÓN del alumno, y viaja
+ * con el alta para que la práctica y el repaso sepan con qué SIGNIFICADO se
+ * aprendió la palabra, no solo con qué traducción. */
+export interface VocabularySenseInput {
+  term?: string;
+  pos?: string;
+  gloss?: string;
+  lemma?: string;
+  source?: string;
+  domain?: string;
+}
+
 /** Añade una palabra suelta al léxico personal + carta FSRS (sin mastery). */
+// V3.92: la acepción elegida viaja solo cuando existe. Si el alumno no eligió
+// sentido (o el diccionario no ofrecía acepciones), no se manda `sense: null`:
+// el alta queda exactamente como antes.
 export function addVocabularyItem(
   _userId: string,
   word: string,
-  options: { translation?: string; collectionId?: number } = {},
+  options: {
+    translation?: string;
+    collectionId?: number;
+    sense?: VocabularySenseInput | null;
+  } = {},
 ): Promise<VocabItemAddResult> {
   return postJson<unknown>("/api/vocabulary/items", {
     word,
     translation: options.translation ?? "",
+    ...(options.sense ? { sense: options.sense } : {}),
     collection_id: options.collectionId ?? null,
   }).then(normalizeVocabItemAdd);
 }

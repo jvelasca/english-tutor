@@ -176,6 +176,8 @@ function metrics(over: Partial<DailyPlanMetrics> = {}): DailyPlanMetrics {
     listening_attempts: 0,
     listening_accuracy: null,
     accuracy: null,
+    difficulty_evidence: 0,
+    words_flagged: 0,
     by_kind: { new: 1 },
     by_skill: { vocabulary: 1 },
     ...over,
@@ -386,6 +388,32 @@ describe("TodayPlan plan diario (V3.90)", () => {
 
     expect(await screen.findByText("Today's goal is met")).toBeTruthy();
     expect(screen.queryByText("Greetings")).toBeNull();
+  });
+
+  it("V3.92: la evidencia de dificultad se declara aparte y solo si la hay", async () => {
+    routeModel(MODEL);
+    const { unmount } = renderPlan(
+      <TodayPlan
+        userId="u1"
+        plan={plan({
+          metrics: metrics({ difficulty_evidence: 3, words_flagged: 2 }),
+        })}
+      />,
+    );
+    await screen.findByText("Greetings");
+    // Se nombra como evidencia (cuántas palabras) y se aclara que no es repaso.
+    expect(screen.getByText(/Words that got harder: 2/)).toBeTruthy();
+    expect(screen.getByText(/3 listening misses; it's evidence, not a review/)).toBeTruthy();
+    // Y no se confunde con repaso pendiente: la cola sigue a cero.
+    expect(screen.getAllByText(/Pending reviews: 0/).length).toBeGreaterThan(0);
+    unmount();
+
+    cleanup();
+    routeModel(MODEL);
+    renderPlan(<TodayPlan userId="u1" plan={plan()} />);
+    await screen.findByText("Greetings");
+    // Sin evidencia, el bloque no aparece: no se inventa un cero.
+    expect(screen.queryByTestId("goal-difficulty-evidence")).toBeNull();
   });
 
   it("el formulario guarda el plan diario completo del objetivo", async () => {

@@ -195,9 +195,39 @@ describe("vocabulary api", () => {
     await addVocabularyItem("u1", "ticket", { translation: "billete" });
     const [url, init] = fn.mock.calls[0];
     expect(url).toBe("/api/vocabulary/items");
-    expect(JSON.parse(init.body as string)).toEqual({
+    const body = JSON.parse(init.body as string);
+    expect(body).toEqual({
       word: "ticket",
       translation: "billete",
+      collection_id: null,
+    });
+    // V3.92: sin acepción elegida, el campo no viaja (ni como null).
+    expect("sense" in body).toBe(false);
+  });
+
+  it("addVocabularyItem declara la acepción elegida (V3.92)", async () => {
+    const fn = mockFetch({ added: ["bank"], item: { word: "bank" } });
+    await addVocabularyItem("u1", "bank", {
+      translation: "banco",
+      sense: {
+        term: "bank",
+        pos: "noun",
+        gloss: "Institución financiera.",
+        domain: "finance",
+        source: "dictionary",
+      },
+    });
+    const [, init] = fn.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({
+      word: "bank",
+      translation: "banco",
+      sense: {
+        term: "bank",
+        pos: "noun",
+        gloss: "Institución financiera.",
+        domain: "finance",
+        source: "dictionary",
+      },
       collection_id: null,
     });
   });

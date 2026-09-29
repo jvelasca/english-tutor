@@ -779,11 +779,17 @@ async def drill_decision_lifecycle(
 async def add_vocabulary_item(
     body: VocabItemAddIn, user: dict = Depends(current_user)
 ) -> dict:
-    """Añade una palabra suelta al léxico personal + carta FSRS (sin mastery)."""
+    """Añade una palabra suelta al léxico personal + carta FSRS (sin mastery).
+
+    V3.92: `sense` viaja con el alta para que quede registrada la ACEPCIÓN con la
+    que el alumno aprendió la palabra (no solo su traducción). Es aditivo: sin
+    acepción, el alta se comporta exactamente como antes.
+    """
     result = await retention_service.add_item(
         user["id"],
         body.word,
         translation=body.translation,
+        sense=body.sense.model_dump() if body.sense is not None else None,
         collection_id=body.collection_id,
     )
     if result is None:

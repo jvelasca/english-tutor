@@ -102,6 +102,20 @@ class ListeningAnswerRequest(BaseModel):
     solution_shown: bool = False
 
 
+class ListeningDifficultyEvidence(BaseModel):
+    """Palabras que este fallo ha marcado como más difíciles (V3.92).
+
+    `words` son las palabras del LÉXICO del alumno que aparecían en la frase y han
+    recibido evidencia de dificultad en su carta FSRS; `count` es cuántas cartas
+    se han tocado (no cuántas coincidieron: una carta ya dominada no se toca, y
+    eso es lo que el contrato dice). Es **informativo**: ninguna acción del
+    cliente depende de él.
+    """
+
+    words: list[str] = Field(default_factory=list)
+    count: int = 0
+
+
 class ListeningAnswerResponse(BaseModel):
     question_id: str
     correct: bool
@@ -117,6 +131,11 @@ class ListeningAnswerResponse(BaseModel):
     outcome: str = ""
     queued_for_review: bool = False
     immediate_retry_available: bool = False
+    # V3.92 (integración pedagógica): el puente hacia FSRS. Aditivo: sin palabras
+    # del léxico en la frase, viaja con ceros.
+    difficulty_evidence: ListeningDifficultyEvidence = Field(
+        default_factory=ListeningDifficultyEvidence
+    )
 
 
 class ListeningReviewEntry(BaseModel):

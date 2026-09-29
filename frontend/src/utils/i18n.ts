@@ -1434,6 +1434,10 @@ const STRINGS: Record<string, Entry> = {
     en: "It shows up in Personal and in your “My dictionary” deck, and it follows the full study flow (spaced repetition).",
     es: "Aparece en Personal y en tu mazo «Mi diccionario», y sigue el proceso de estudio completo (repetición espaciada).",
   },
+  "dictionary.lookup.addSense": {
+    en: "Saved meaning: {sense}",
+    es: "Significado guardado: {sense}",
+  },
   "dictionary.lookup.addHint": {
     en: "The word always joins your study flow: it stays in learning, shows up in Personal and in the auto deck, and repeats with spaced review. You can also save it as a card in a manual deck.",
     es: "La palabra entra siempre en tu proceso de estudio: queda en aprendizaje, aparece en Personal y en el mazo automático, y se repasa con repetición espaciada. Además puedes guardarla como tarjeta en un mazo manual.",
@@ -1584,6 +1588,14 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.inventory.ownTranslationTitle": {
     en: "The reverse you wrote. It wins over the pack and the dictionary cache; it is edited while studying.",
     es: "El reverso que escribiste. Manda sobre el pack y la caché del diccionario; se edita al estudiar.",
+  },
+  "dictionary.inventory.sense": {
+    en: "Meaning: {text}",
+    es: "Significado: {text}",
+  },
+  "dictionary.inventory.senseTitle": {
+    en: "The sense you picked in the dictionary when you added this word. It is what practice and review are anchored to.",
+    es: "La acepción que elegiste en el diccionario al añadir esta palabra. Es a la que se anclan la práctica y el repaso.",
   },
   "dictionary.inventory.search": {
     en: "Search words",
@@ -2933,6 +2945,14 @@ const STRINGS: Record<string, Entry> = {
   },
   "today.todayAccuracy": { en: "Today's accuracy", es: "Acierto de hoy" },
   "today.noData": { en: "No data yet", es: "Sin datos aún" },
+  "today.difficultyEvidence": {
+    en: "Words that got harder: {words}",
+    es: "Palabras que se han complicado: {words}",
+  },
+  "today.difficultyEvidenceNote": {
+    en: "({count} listening misses; it's evidence, not a review)",
+    es: "({count} fallos de escucha; es evidencia, no un repaso)",
+  },
   "today.goalMet": {
     en: "Today's goal is met",
     es: "Objetivo de hoy cumplido",
@@ -3278,6 +3298,10 @@ const STRINGS: Record<string, Entry> = {
   "fsrs.whyReason.retention-import": {
     en: "added for retention",
     es: "añadida para retención",
+  },
+  "fsrs.whyReason.listening-evidence": {
+    en: "harder when heard",
+    es: "más difícil al oírla",
   },
   "fsrs.whyReason.new": { en: "new card", es: "carta nueva" },
   "fsrs.whyReason.evidence": { en: "from evidence", es: "desde evidencia" },
@@ -3864,6 +3888,10 @@ const STRINGS: Record<string, Entry> = {
   "listening.review.failTitle": {
     en: "Not quite — you can keep going",
     es: "Casi — puedes continuar",
+  },
+  "listening.bridge.wordsHarder": {
+    en: "{count} word(s) you already had are now marked as harder — evidence, not a review. Nothing is blocked.",
+    es: "{count} palabra(s) que ya tenías quedan marcadas como más difíciles: es evidencia, no un repaso. No se bloquea nada.",
   },
   "listening.review.retryNow": {
     en: "Review now",

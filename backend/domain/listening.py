@@ -7,10 +7,12 @@ from pathlib import Path
 
 from starlette.concurrency import run_in_threadpool
 
+from repositories import academy as academy_repo
 from repositories import db
 from repositories import listening as listening_repo
 from repositories import settings as settings_repo
-from services import listening_review, tts
+from repositories import vocabulary as vocabulary_repo
+from services import fsrs, listening_bridge, listening_review, tts
 from services.audio_library import is_recorded, recorded_audio_path
 from services.auditory_profile import auditory_profile
 from services.curriculum import LISTENING_BANK_VERSION
@@ -372,8 +374,15 @@ async def submit_answer(
         word_breakdown=word_breakdown,
         outcome=outcome,
     )
-    queued = await _sync_review_queue(
+    fail_count = await _sync_review_queue(
         user_id, question_id, question, correct, skill, task_type
+    )
+    evidence = (
+        {"words": [], "count": 0}
+        if fail_count == 0
+        else await _apply_difficulty_evidence(
+            user_id, question_id, question, fail_count=fail_count
+        )
     )
     return {
         "question_id": question_id,
@@ -385,12 +394,93 @@ async def submit_answer(
         "realized_difficulty": realized,
         # V3.89: contrato del fallo como evidencia (nunca como bloqueo).
         "outcome": outcome,
-        "queued_for_review": queued,
+        "queued_for_review": fail_count > 0,
+        # V3.92 (integración pedagógica): palabras del léxico del alumno que
+        # aparecían en la frase fallada y han recibido evidencia de dificultad.
+        # Es INFORMATIVO: ninguna acción del cliente depende de esto y el fallo
+        # sigue sin bloquear nada.
+        "difficulty_evidence": evidence,
         "immediate_retry_available": (
             not correct
             and listening_review.can_retry_immediately(attempt_number)
         ),
     }
+
+
+async def _apply_difficulty_evidence(
+    user_id: str,
+    question_id: str,
+    question: dict,
+    *,
+    fail_count: int = 1,
+) -> dict:
+    """Puente Listening → FSRS: el fallo sube la dificultad de las palabras suyas.
+
+    V3.92. La frase NO entra en FSRS (eso lo resolvió V3.89 con su propia cola);
+    lo que entra es la EVIDENCIA de que las palabras que el alumno ya tiene y que
+    aparecían en la frase son más difíciles de lo que su carta decía.
+
+    Reglas duras, todas comprobables en `services/listening_bridge.py`:
+
+    - Solo palabras que el alumno YA tiene en `vocabulary`: el puente nunca crea
+      vocabulario (invariante D3 del proyecto).
+    - Solo cartas débiles: un dominio demostrado no se castiga por no entender
+      una frase. Una palabra sin carta la recibe aquí (es suya desde el alta) con
+      la dificultad ya subida.
+    - Ni un solo fallo más que una escritura por palabra y fallo.
+
+    Devuelve `{"words": [...], "count": n}`; `count` es el número de cartas
+    tocadas, no el de coincidencias léxicas. Nunca lanza hacia el cliente: si algo
+    del puente falla, el intento ya está persistido y la sesión puede continuar.
+    """
+    text = audio_text(question)
+    if not text:
+        return {"words": [], "count": 0}
+    known = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    matches = listening_bridge.match_units(text, known)
+    if not matches:
+        return {"words": [], "count": 0}
+    cards = await run_in_threadpool(
+        academy_repo.fsrs_cards_by_ids,
+        user_id,
+        "lexicon",
+        [m["word"] for m in matches],
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    words: list[str] = []
+    for target in listening_bridge.select_targets(matches, cards):
+        card = target["card"]
+        if card is None:
+            card = fsrs.empty_card(
+                target_type="lexicon",
+                target_id=target["word"],
+                label=target["word"],
+                why=listening_bridge.SOURCE,
+                now=now,
+            )
+        updated = fsrs.apply_difficulty_evidence(
+            card, source=listening_bridge.SOURCE, now=now
+        )
+        if updated is None:
+            continue
+        saved = await run_in_threadpool(
+            academy_repo.upsert_fsrs_card, user_id, updated
+        )
+        if saved is None:
+            continue
+        await run_in_threadpool(
+            listening_repo.record_difficulty_evidence,
+            user_id,
+            question_id,
+            target["word"],
+            fail_count=fail_count,
+            difficulty_before=float(card.get("difficulty") or 5.0),
+            difficulty_after=float(updated.get("difficulty") or 5.0),
+            due_at=updated.get("due_at") or "",
+        )
+        words.append(target["word"])
+    return {"words": words, "count": len(words)}
+
 
 
 async def _sync_review_queue(
@@ -400,18 +490,23 @@ async def _sync_review_queue(
     correct: bool,
     skill: str,
     task_type: str,
-) -> bool:
+) -> int:
     """Mantiene la cola de repaso coherente con el desenlace del intento.
 
     Un fallo encola (incrementando `fail_count` si ya estaba); un acierto saca la
     frase de la cola, porque acertarla es la forma natural de «repasarla». Se
     ejecuta en el threadpool: el repositorio toca SQLite.
+
+    Devuelve el `fail_count` ACUMULADO de la frase (`0` si el intento fue un
+    acierto y la frase salió de la cola). V3.92: ese número es también la
+    evidencia con la que el puente hacia FSRS declara la dificultad, así que se
+    calcula UNA vez aquí y se comparte en vez de releer la cola dos veces.
     """
     if correct:
         await run_in_threadpool(
             listening_repo.mark_queue_reviewed, user_id, question_id
         )
-        return False
+        return 0
     counts = await run_in_threadpool(listening_repo.queue_fail_counts, user_id)
     fail_count = counts.get(question_id, 0) + 1
     plan = listening_review.schedule(fail_count, skill=skill)
@@ -426,7 +521,7 @@ async def _sync_review_queue(
         next_review_at=plan["next_review_at"],
         priority=plan["priority"],
     )
-    return True
+    return int(plan["fail_count"])
 
 
 async def submit_production(

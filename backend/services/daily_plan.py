@@ -144,6 +144,7 @@ def day_metrics(
     evidence_rows: list[dict],
     listening_rows: list[dict],
     day: str,
+    bridge_rows: list[dict] | None = None,
 ) -> dict:
     """Métricas del día a partir de filas YA leídas y ya filtradas al día.
 
@@ -164,6 +165,16 @@ def day_metrics(
     - `accuracy`: media agregada de los resultados registrados hoy (evidencia de
       academia + intentos de listening), ponderada por número de intentos. **No es
       una nota del alumno**: es el resultado medio observado hoy.
+
+    V3.92 (integración pedagógica) añade la pata del puente Listening → FSRS, con
+    los mismos criterios de honestidad que el resto:
+
+    - `difficulty_evidence`: cuántas VECES el día ha subido la dificultad de una
+      palabra del léxico por no entender una frase que la contenía (`bridge_rows`,
+      ya filtradas al día). Es evidencia REGISTRADA, no una estimación.
+    - `words_flagged`: cuántas palabras DISTINTAS han subido. Se publica aparte
+      porque una frase que se falla tres veces genera tres evidencias y una sola
+      palabra marcada: sumar las dos cifras sería contar dos veces lo mismo.
     """
     by_kind: dict[str, int] = {}
     by_skill: dict[str, int] = {}
@@ -182,6 +193,7 @@ def day_metrics(
 
     listening = rows_on_day(listening_rows, day)
     evidence = rows_on_day(evidence_rows, day)
+    bridge = rows_on_day(list(bridge_rows or []), day)
     correct = [1.0 if r.get("correct") else 0.0 for r in listening]
     results = [float(r.get("result") or 0.0) for r in evidence]
     pooled = correct + results
@@ -202,6 +214,10 @@ def day_metrics(
         "listening_attempts": len(correct),
         "listening_accuracy": listening_accuracy,
         "accuracy": round(sum(pooled) / attempts, 3) if attempts else None,
+        "difficulty_evidence": len(bridge),
+        "words_flagged": len(
+            {str(r.get("word") or "") for r in bridge if r.get("word")}
+        ),
         "by_kind": by_kind,
         "by_skill": by_skill,
     }

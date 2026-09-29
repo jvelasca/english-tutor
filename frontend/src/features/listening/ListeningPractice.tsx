@@ -366,6 +366,11 @@ export function ListeningPractice({
     question?.id ? `${question.id}:reference` : undefined,
   );
 
+  // V3.92: evidencia de dificultad que devolvió el último fallo. El backend solo
+  // la manda cuando la frase contenía palabras que el alumno ya tiene; se cuenta
+  // aquí para declararla sin inventar nada si el campo no viene.
+  const evidenceCount = result?.difficulty_evidence?.count ?? 0;
+
   // --- Micro-flujo por ítem (V3.27/V3.28): derivados y controles -----------
   // `flowSteps`/`flowPolicy`/`micro` existen cuando el backend sirvió `flow`
   // (adaptativo, nivel y drill; no en el repaso mastered compacto). Los ítems
@@ -1982,6 +1987,20 @@ async function submitDictation() {
                     {t("listening.flow.withTranscript")}
                   </p>
                 )}
+                {/* V3.92: el fallo también explica a QUÉ palabras afecta. No se
+                    convierte en flashcards; sube la dificultad de las que el
+                    alumno ya tiene, y eso se dice en vez de esconderse. */}
+                {evidenceCount > 0 ? (
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-testid="listening-difficulty-evidence"
+                  >
+                    {t("listening.bridge.wordsHarder").replace(
+                      "{count}",
+                      String(evidenceCount),
+                    )}
+                  </p>
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   {retriesRemain(micro, flowPolicy) && (
                     <Button

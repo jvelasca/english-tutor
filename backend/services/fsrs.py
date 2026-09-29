@@ -288,6 +288,61 @@ def schedule(
     }
 
 
+# --- Evidencia de dificultad de OTRO subsistema (V3.92, integración pedagógica)
+# El scheduler de arriba mueve la carta cuando el alumno RECUPERA el ítem
+# (`schedule`): eso es un repaso y toca `reps`/`stability`/`due_at`. Pero hay una
+# señal distinta que no tenía por dónde entrar: el alumno falla al ENTENDER una
+# frase que contiene una palabra que ya es suya (Listening). No hubo recuperación
+# que medir, así que no puede consumir un repaso; sí es evidencia de que la
+# palabra es más difícil de lo que se creía.
+
+DIFFICULTY_EVIDENCE_DELTA = 0.6
+DIFFICULTY_EVIDENCE_MAX = 10.0
+
+
+def apply_difficulty_evidence(
+    card: dict | None,
+    *,
+    source: str,
+    now: str = "",
+    delta: float = DIFFICULTY_EVIDENCE_DELTA,
+) -> dict | None:
+    """Sube la dificultad de una carta por evidencia EXTERNA, sin consumir repaso.
+
+    Qué mueve y qué NO:
+
+    - `difficulty` sube `delta` (acotada 1..10): la palabra pasa a ser más difícil.
+    - `due_at` se adelanta a AHORA si aún no tocaba: la evidencia no se guarda
+      para más tarde, la palabra vuelve en la siguiente sesión de repaso.
+    - `why` declara el origen (`source`), para que la UI pueda explicarlo.
+    - **No** toca `reps`, `stability`, `state`, `last_grade` ni `last_review_at`.
+      No hubo recuperación del alumno y fingirla corrompería el intervalo de
+      estabilidad (la curva de olvido se mide desde la última RECUPERACIÓN, y
+      adelantar esa ancla haría crecer la estabilidad en el siguiente repaso
+      real: justo lo contrario de lo que dice la evidencia).
+    - **No** toca `last_evidence_at` por la misma razón: `due_queue` usa esa
+      marca para ordenar por urgencia, y la palabra recién señalada debe quedar
+      DELANTE, no detrás. La marca del suceso vive en la tabla que lo registra.
+
+    Pura y total: sin carta devuelve `None` (no hay nada que subir); nunca lanza.
+    """
+    if not isinstance(card, dict) or not card.get("target_id"):
+        return None
+    now_iso = now or _iso(datetime.now(timezone.utc))
+    prev = dict(card)
+    before = _clamp(float(prev.get("difficulty") or 5.0), 1.0, DIFFICULTY_EVIDENCE_MAX)
+    after = round(
+        _clamp(before + max(0.0, float(delta)), 1.0, DIFFICULTY_EVIDENCE_MAX), 3
+    )
+    due_at = str(prev.get("due_at") or "")
+    if not due_at or now_iso < due_at:
+        due_at = now_iso
+    prev["difficulty"] = after
+    prev["due_at"] = due_at
+    prev["why"] = str(source or "") or prev.get("why") or "evidence"
+    return prev
+
+
 def explain(card: dict, *, now: str = "") -> dict:
     """Respuesta auditable: What / Why / When / How strong / Last / Next."""
     now_iso = now or _iso(datetime.now(timezone.utc))

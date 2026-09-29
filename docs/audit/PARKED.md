@@ -2525,6 +2525,76 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.92.0 — El fallo de Listening pasa a ser evidencia de dificultad y el circuito pedagógico se cierra · 2026-09-29
+
+> Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
+> idempotente** (tabla append-only `listening_difficulty_evidence` + índice por `(user_id, created_at)`;
+> columna aditiva `vocabulary.sense_json`), **SIN endpoints nuevos** y **SIN cambio de contrato
+> incompatible** (los cuatro endpoints que cambian crecen con campos **aditivos**). `GENERATOR_VERSION`
+> (`1.7.0`), `CURRICULUM_VERSION` (`1.3.1`) y `LISTENING_BANK_VERSION` no cambian. **SIN añadir ni
+> retirar gate:** siguen los **ocho**, todos `pending`, y `validation-evidence.json` sigue sin existir.
+
+### Cerrado en V3.92.0 (deja de ser deuda)
+
+- **El fallo de Listening no dejaba rastro sobre las palabras del alumno.** Nuevo módulo **puro**
+  `services/listening_bridge.py`: empareja por **lema y morfología** (`banks`/`banking` → `bank`) las
+  palabras que el alumno **ya tiene** y que aparecían en la frase fallada, con el mismo lematizador
+  declarado que el Sense Engine (`services.semantics`), **sin diccionario, sin LLM y sin dependencias
+  nuevas**. **Nunca crea vocabulario** (invariante D3 intacto).
+- **Ninguna señal receptiva entraba en FSRS.** `fsrs.apply_difficulty_evidence()`
+  (`DIFFICULTY_EVIDENCE_DELTA = 0.6`, tope `10.0`) sube `difficulty` y adelanta el vencimiento a ahora,
+  **sin tocar `reps`, `stability`, `state` ni `last_evidence_at`**: un fallo receptivo **no es** una
+  recuperación, así que **no consume un repaso ni corrompe el intervalo real**. Las cartas **fuertes**
+  (`review`, `difficulty < 6.0`) **no se penalizan**. El evento queda en la tabla **append-only**
+  `listening_difficulty_evidence` y `POST /api/listening/answer` devuelve
+  `difficulty_evidence: {words, count}`.
+- **La acepción elegida en el diccionario se perdía.** `bank` no es una palabra: es un conjunto de
+  acepciones y el alumno aprende **una**. La elección viaja en el alta (`sense`), se persiste en
+  `vocabulary.sense_json` (`{term, pos, gloss, lemma, source, domain}`) y se expone **en solo lectura**
+  en el léxico. Si el alta **no** declara acepción, el campo **no se manda** y el inventario **no pinta**
+  ningún significado: «no consta» es información, inventarlo no lo es.
+- **La métrica del día no contaba la evidencia.** `services/daily_plan.py::day_metrics` publica
+  `difficulty_evidence` (cuántas **veces**) y `words_flagged` (cuántas palabras **distintas**),
+  **por separado** porque sumarlas mentiría. En Home es una línea propia que solo aparece si la hay y
+  que **no** toca el porcentaje del objetivo ni los repasos pendientes: la evidencia **no es trabajo
+  hecho**.
+- **Un fallo de contrato real de V3.27–V3.91 (encontrado al cerrar el circuito).** El backend sirve
+  `transcript_policy`/`sentence_timings`/`word_timings` en **snake_case** y el cliente los leía en
+  **camelCase**: llegaban `undefined` y con ellos se caía, **sin ruido**, la **tarjeta de fallo de
+  V3.89** (las tres acciones) y el **karaoke por palabra de V3.29**. Se arregla en el **borde**
+  (`api/listening.ts::toListeningQuestion`) y se fija con vitest contra la forma **exacta** del backend
+  y una **E2E que mockea snake_case**.
+
+### Abierto y medido a propósito (frontera declarada, no defecto)
+
+- **La evidencia de dificultad NO es un repaso.** No sube `reps`, no reinicia `stability` y no
+  certifica nada: solo sube `difficulty` y reclama la palabra para hoy.
+- **El emparejamiento es morfológico y por lemma, no semántico.** Una frase fallada puede **no** señalar
+  ninguna palabra, y eso es un resultado **válido**: no se inventa evidencia. El tope es `MAX_MATCHES = 8`.
+- **La tabla es append-only y por usuario.** Crece con el uso y **todavía no se poda**.
+- **`sense_json` es contexto declarado, no una segunda fuente de verdad.** No cambia el scoring ni la
+  cara B: la traducción del alumno sigue mandando.
+
+### Estado de publicación
+
+| Puerta | Resultado |
+|---|---|
+| `ruff check .` (backend y lanzador) | limpio |
+| `pytest` backend | **3408/3408** |
+| `vitest run` | **1103/1103** (111 ficheros) |
+| `tsc --noEmit` / `npm run build` | limpios |
+| `check_i18n_coverage.py --strict` | **1871** cadenas · 0 huérfanas · 0 sin definir · 0 duplicadas |
+| `contrast_audit.mjs --strict` | 480 pares + 6 guardas · **0 bloqueantes** |
+| Playwright (Listening, Home, Diccionario, 3 breakpoints) | `integratedCircuitV392` (nuevo) y rutas tocadas en verde |
+| `validation_gate.py auto --require-dist` | **10/10** (8 gates) |
+| `check_release_consistency` | OK en los **6 orígenes** (`3.92.0`) |
+
+### Sigue abierto o aparcado (deuda declarada)
+
+- **El `expected` del E2E del circuito depende del banco de Listening** y de qué palabras del léxico
+  aparezcan en la frase servida; el E2E usa mocks deterministas para no depender del banco real.
+- **Los ocho gates humanos siguen `pending`** y `docs/audit/validation-evidence.json` sigue sin existir.
+
 ## V3.91.0 — El diccionario pasa a motor de sentidos y la inversa deja de barrer la tabla · 2026-09-29
 
 > Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e

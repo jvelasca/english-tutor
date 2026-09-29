@@ -11,6 +11,9 @@ import type {
   ListeningRouteExtras,
   ListeningStats,
   ListeningSupportMetadata,
+  ListeningTranscriptPolicy,
+  ListeningWordTiming,
+  SentenceTiming,
 } from "../types/api";
 
 // Timeouts de red del bucle de práctica: el backend es local, pero en iPad por
@@ -22,6 +25,46 @@ const TIMEOUT_QUESTION_MS = 15000;
 const TIMEOUT_READ_MS = 10000;
 
 export type ListeningQuestionMode = "all" | "failed" | "mastered";
+
+/**
+ * Forma CRUDA del ítem tal como la sirve el backend.
+ *
+ * V3.92: `transcript_policy`, `sentence_timings` y `word_timings` viajan en
+ * snake_case (el contrato de Pydantic), pero el cliente los consume en camelCase
+ * (V3.27/V3.28/V3.29). Sin esta traga, `question.transcriptPolicy` llegaba
+ * `undefined` y con él se caía la tarjeta de fallo de V3.89 (las tres acciones
+ * «Continuar / Repasar ahora / Repasar después» nunca se pintaban) y el karaoke
+ * de V3.29 servía siempre lista vacía. Se normaliza en el BORDE, una vez, para
+ * que ninguna pantalla tenga que conocer las dos formas.
+ */
+interface RawListeningQuestion extends ListeningQuestion {
+  transcript_policy?: ListeningTranscriptPolicy;
+  sentence_timings?: SentenceTiming[];
+  word_timings?: ListeningWordTiming[];
+}
+
+/** Traduce el ítem servido (snake_case) a la forma que consume la UI. */
+export function toListeningQuestion(raw: RawListeningQuestion): ListeningQuestion {
+  const {
+    transcript_policy: policy,
+    sentence_timings: sentences,
+    word_timings: words,
+    ...rest
+  } = raw;
+  const out: ListeningQuestion = { ...rest };
+  // El camelCase manda si ya viniera (mocks, consumidores nuevos): solo se
+  // rellena lo que falte, nunca se pisa un valor explícito.
+  if (out.transcriptPolicy === undefined && policy !== undefined) {
+    out.transcriptPolicy = policy;
+  }
+  if (out.sentenceTimings === undefined && sentences !== undefined) {
+    out.sentenceTimings = sentences;
+  }
+  if (out.wordTimings === undefined && words !== undefined) {
+    out.wordTimings = words;
+  }
+  return out;
+}
 
 export function getListeningQuestion(
   _userId: string,
@@ -38,7 +81,9 @@ export function getListeningQuestion(
   if (mode && mode !== "all") params.set("mode", mode);
   const query = params.toString();
   return withTimeout(
-    getJson<ListeningQuestion>(`/api/listening/question${query ? `?${query}` : ""}`),
+    getJson<RawListeningQuestion>(
+      `/api/listening/question${query ? `?${query}` : ""}`,
+    ).then(toListeningQuestion),
     TIMEOUT_QUESTION_MS,
     "get question",
   );

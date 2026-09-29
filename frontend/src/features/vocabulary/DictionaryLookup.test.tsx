@@ -1008,11 +1008,18 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     const addCall = fn.mock.calls.find((call) =>
       String(call[0]).includes("/api/vocabulary/items"),
     );
-    expect(JSON.parse(String(addCall?.[1]?.body))).toEqual({
+    const addBody = JSON.parse(String(addCall?.[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    expect(addBody).toEqual({
       word: "nebula",
       translation: "",
       collection_id: null,
     });
+    // V3.92: sin acepción elegida NO se manda `sense` (ni null): el alta queda
+    // exactamente como antes de que existiera el contrato de sentido.
+    expect("sense" in addBody).toBe(false);
 
     // 2) La tarjeta manual: UNA escritura que la crea en TODOS los mazos
     //    marcados (tabla puente), con su recordatorio.
@@ -1291,11 +1298,23 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     const addCall = fn.mock.calls.find((call) =>
       String(call[0]).includes("/api/vocabulary/items"),
     );
+    // V3.92: el alta no solo guarda el término de práctica: declara la ACEPCIÓN
+    // elegida (pos + glosa + dominio), que es lo que después gobierna alta,
+    // práctica y repaso. Sin ambigüedad para el alumno ni para el motor.
     expect(JSON.parse(String(addCall?.[1]?.body))).toEqual({
       word: "Lima",
       translation: "lima",
+      sense: {
+        term: "Lima",
+        pos: "noun",
+        gloss: "Capital del Perú.",
+        domain: "geography",
+        source: "dictionary",
+      },
       collection_id: null,
     });
+    // Y se le dice al alumno, sin obligarle a adivinar, qué significado quedó.
+    expect(screen.getByText("Saved meaning: noun · Capital del Perú.")).toBeTruthy();
   });
 
   // V3.88.0: el prompt ahora EXIGE varios significados, así que la tarjeta tiene

@@ -352,7 +352,22 @@ export function DictionaryLookup({
       const translation =
         entry?.direction === "en-es" ? equivalent : entry?.word ?? "";
       try {
-        await addVocabularyItem(userId, term, { translation });
+        // V3.92: la ACEPCIÓN elegida viaja con el alta. Elegir un significado no
+        // es solo elegir la palabra de práctica: es la decisión de QUÉ se
+        // aprende, y sin registrarla la práctica y el repaso no podrían
+        // distinguir «bank» (institución) de «bank» (orilla).
+        await addVocabularyItem(userId, term, {
+          translation,
+          sense: chosenMeaning
+            ? {
+                term: chosenMeaning.term,
+                pos: chosenMeaning.pos,
+                gloss: chosenMeaning.gloss,
+                domain: chosenMeaning.domain,
+                source: "dictionary",
+              }
+            : null,
+        });
       } catch {
         setAddStatus("error");
         setAdding(false);
@@ -443,6 +458,12 @@ export function DictionaryLookup({
     meanings.length > 0 ? meanings[activeMeaningIndex] ?? null : null;
   /** Equivalente mostrado: el significado elegido o, si no hay, el de siempre. */
   const equivalent = chosenMeaning?.term ?? entry?.translation ?? "";
+  // V3.92: etiqueta legible de la acepción elegida («noun · a place for money»).
+  // Es lo que se declara al alumno y lo que viaja con el alta: la decisión es el
+  // SENTIDO, no solo el término de práctica.
+  const senseLabel = chosenMeaning
+    ? [chosenMeaning.pos, chosenMeaning.gloss].filter(Boolean).join(" · ")
+    : "";
 
   const isReverse = entry?.direction === "es-en";
   // Cara de la ficha: en ES→EN es el equivalente inglés elegido (o el término
@@ -749,6 +770,7 @@ export function DictionaryLookup({
                   mnemonic={addMnemonic}
                   onMnemonic={setAddMnemonic}
                   tracked={tracked}
+                  senseLabel={senseLabel}
                   decks={decks}
                   decksLoading={decksLoading}
                   deckError={deckError}
@@ -831,6 +853,7 @@ function AddToFlashcardsPanel({
   mnemonic,
   onMnemonic,
   tracked,
+  senseLabel,
   decks,
   decksLoading,
   deckError,
@@ -859,6 +882,10 @@ function AddToFlashcardsPanel({
   mnemonic: string;
   onMnemonic: (value: string) => void;
   tracked: boolean;
+  /** V3.92: la acepción que se va a registrar con el alta (`""` si no consta).
+   *  Se declara en el panel de éxito para que el alumno vea QUÉ aprende, no solo
+   *  con qué palabra. */
+  senseLabel: string;
   decks: FlashcardDeck[] | null;
   /** V3.88.0: la lista de mazos se está pidiendo (para no decir «sin mazos»). */
   decksLoading: boolean;
@@ -947,6 +974,11 @@ function AddToFlashcardsPanel({
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t("dictionary.lookup.addLearning")}
         </p>
+        {senseLabel && !tracked ? (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {t("dictionary.lookup.addSense").replace("{sense}", senseLabel)}
+          </p>
+        ) : null}
         {savedDecks.length > 0 ? (
           <p className="text-xs leading-relaxed text-success">
             {t("dictionary.lookup.addOkDeck").replace(
