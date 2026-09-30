@@ -1,12 +1,13 @@
-"""Informe del dark launch sense-aware de Listening (V3.93, solo lectura).
+"""Informe del veredicto sense-aware de Listening (V3.94, solo lectura).
 
-V3.93 consulta el Sense Resolver al registrar la evidencia de dificultad de
-Listening y **guarda el veredicto** (`sense_key`/`sense_match`/`sense_reason`) en
-la tabla `listening_difficulty_evidence`, pero **no cambia qué evidencia se
-genera**: sigue siendo exactamente lo de V3.92. La pregunta que este informe
-responde, con datos reales, es la que decide si la fase ENFORCE (V3.94) es segura:
+V3.93 cableó el Sense Resolver para **guardar el veredicto**
+(`sense_key`/`sense_match`/`sense_reason`) en la tabla
+`listening_difficulty_evidence`. V3.94 lo **aplica** (fase ENFORCE): un `mismatch`
+PROBADO no sube la carta y se registra como exposición; todo lo demás conserva la
+evidencia de V3.92. Este informe responde, con datos reales, a la pregunta que
+gobierna esa política:
 
-    ¿cuánta evidencia de dificultad SOBREVIVIRÍA si solo `matched` la generara?
+    ¿cuánta evidencia de dificultad SOBREVIVIRÍA con `allows_difficulty_evidence`?
 
 Qué mide:
 
@@ -14,12 +15,12 @@ Qué mide:
    cuántas son anteriores (sin veredicto, que el informe no proyecta: la política
    se aplica hacia delante, no reescribe el pasado).
 2. **Reparto `matched` / `mismatch` / `ambiguous`** y, dentro de `ambiguous`, la
-   razón (`declared:none`, `alternatives:none`, `tie`…). El caso dominante suele
-   ser `declared:none` —palabras que el alumno nunca declaró con qué acepción— y
-   ese es el número que hay que mirar antes de aplicar la política.
-3. **Proyección ENFORCE**: evidencia que se conservaría (`matched`) y evidencia que
-   se suprimiría (el resto). Es una proyección, no una promesa: mide las filas ya
-   registradas.
+   razón (`declared:none`, `alternatives:none`, `tie`…). El caso dominante suele ser
+   `declared:none` —palabras que el alumno nunca declaró con qué acepción—.
+3. **Proyección ENFORCE con la política REAL** (V3.94): qué evidencia se conservaría
+   y qué se suprimiría, aplicando la MISMA `allows_difficulty_evidence` que decide en
+   producción. Desde V3.94 solo un `mismatch` PROBADO suprime; `declared:none` y
+   `ambiguous` se conservan. Es una proyección sobre lo ya registrado, no una promesa.
 
 El script es de LECTURA: abre SQLite en modo `mode=ro` (con repliegue si el WAL lo
 impide) y no ejecuta ningún `INSERT`, `UPDATE` ni `DELETE`.
@@ -47,6 +48,12 @@ if hasattr(sys.stdout, "reconfigure"):
 # El script vive en <repo>/scripts/, así que la raíz es el padre de `scripts`.
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "backend" / "data" / "tutor.db"
+
+# La política de decisión vive en el BACKEND y este informe usa LA MISMA función que
+# decide en producción: una copia local podría desviarse de la verdad y proyectar
+# algo que la app no hace.
+sys.path.insert(0, str(ROOT / "backend"))
+from services.sense_context import allows_difficulty_evidence
 
 TABLE = "listening_difficulty_evidence"
 VERDICTS = ("matched", "mismatch", "ambiguous")
@@ -78,6 +85,7 @@ def _report(conn: sqlite3.Connection) -> dict:
     by_reason: dict[str, int] = {}
     without_verdict = 0
     declared = 0
+    kept = 0
     for match, reason, key in rows:
         match = str(match or "")
         reason = str(reason or "")
@@ -88,8 +96,10 @@ def _report(conn: sqlite3.Connection) -> dict:
         by_reason[reason] = by_reason.get(reason, 0) + 1
         if str(key or ""):
             declared += 1
+        # La MISMA política que decide en producción (V3.94, ENFORCE).
+        if allows_difficulty_evidence({"match": match}):
+            kept += 1
     with_verdict = total - without_verdict
-    kept = by_match.get("matched", 0)
     return {
         "total": total,
         "with_verdict": with_verdict,
@@ -119,22 +129,23 @@ def _print_report(report: dict) -> None:
             print(f"  {reason:<18} {count:>7}  ({_pct(count, with_verdict)})")
     kept = report["enforce_kept"]
     suppressed = report["enforce_suppressed"]
-    print("\nProyección ENFORCE (solo `matched` genera evidencia):")
+    print("\nProyección ENFORCE (política V3.94: solo un `mismatch` probado suprime):")
     print(f"  se conservaría {kept}  ({_pct(kept, with_verdict)})")
     print(f"  se suprimiría  {suppressed}  ({_pct(suppressed, with_verdict)})")
     print(
-        "\nNota: es una PROYECCIÓN sobre lo ya registrado, no una promesa. La "
-        "fase ENFORCE\n(V3.94) no debe activarse sin decidir antes qué hacer con "
-        "las filas `declared:none`\n(palabras sin acepción declarada): tratarlas "
-        "como `ambiguous` apagaría la mayor\nparte del puente."
+        "\nNota: usa la MISMA `allows_difficulty_evidence` que decide en producción. "
+        "Desde\nV3.94 (ENFORCE) solo un `mismatch` PROBADO suprime evidencia; "
+        "`declared:none` y\n`ambiguous` se CONSERVAN por decisión (la duda no RESTA "
+        "evidencia igual que no la\nFABRICA). Como `mismatch` exige alternativas "
+        "conocidas, sin volumen de estas la\nproyección ve poco que suprimir."
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Informe del dark launch sense-aware del puente de Listening "
-            "(solo lectura)."
+            "Informe del veredicto sense-aware del puente de Listening "
+            "(política ENFORCE de V3.94, solo lectura)."
         ),
     )
     parser.add_argument(

@@ -9,6 +9,7 @@ from starlette.concurrency import run_in_threadpool
 
 from repositories import academy as academy_repo
 from repositories import db
+from repositories import dictionary as dictionary_repo
 from repositories import listening as listening_repo
 from repositories import settings as settings_repo
 from repositories import vocabulary as vocabulary_repo
@@ -385,7 +386,7 @@ async def submit_answer(
         return None
     fail_count = int(event["fail_count"])
     evidence = (
-        {"words": [], "count": 0}
+        _empty_evidence()
         if fail_count == 0
         else await _apply_difficulty_evidence(
             user_id,
@@ -411,7 +412,14 @@ async def submit_answer(
         # aparecían en la frase fallada y han recibido evidencia de dificultad.
         # Es INFORMATIVO: ninguna acción del cliente depende de esto y el fallo
         # sigue sin bloquear nada.
-        "difficulty_evidence": evidence,
+        "difficulty_evidence": {
+            "words": evidence["words"],
+            "count": evidence["count"],
+        },
+        # V3.94 (ENFORCE): palabras que aparecían en la frase en una acepción
+        # DISTINTA a la aprendida. Su carta NO se penalizó (sería señalar la carta
+        # equivocada) y el suceso queda registrado. Aditivo e informativo.
+        "new_sense_exposure": evidence["new_sense_exposure"],
         "immediate_retry_available": (
             not correct
             and listening_review.can_retry_immediately(attempt_number)
@@ -443,10 +451,14 @@ async def _apply_difficulty_evidence(
       la dificultad ya subida.
     - Ni un solo fallo más que una escritura por palabra y fallo.
 
-    V3.93 (dark launch sense-aware): además se consulta el Sense Resolver y su
-    veredicto (`match`/`reason`/`sense_key`) se REGISTRA en el ledger, pero **no**
-    decide nada todavía: qué palabras reciben evidencia sigue siendo exactamente
-    lo de V3.92. Es una medida, no una política; aplicarla es V3.94+.
+    V3.94 (ENFORCE sense-aware): el Sense Resolver **decide**. Un `mismatch`
+    PROBADO —el contexto usa una acepción DISTINTA a la aprendida— **no** sube la
+    dificultad de la carta: el fallo no penaliza la acepción aprendida y se
+    registra como `new_sense_exposure`. Todo lo demás (`matched`, `ambiguous`, sin
+    veredicto) conserva la evidencia de V3.92 (ver `allows_difficulty_evidence`: la
+    duda no resta evidencia). Las ALTERNATIVAS del diccionario se cablean
+    (`alternatives_index`) para que `mismatch` sea ALCANZABLE: sin ellas la política
+    no podría actuar.
 
     V3.93 (robustez): el ledger reclama la clave del intento ANTES de tocar la
     carta (una repetición del mismo intento no vuelve a sumar) y la carta se
@@ -459,29 +471,68 @@ async def _apply_difficulty_evidence(
     revierte (no queda fila y la clave se libera) y se reintenta con la carta
     fresca.
 
-    Devuelve `{"words": [...], "count": n}`; `count` es el número de cartas
-    tocadas, no el de coincidencias léxicas. Nunca lanza hacia el cliente: si algo
-    del puente falla, el intento ya está persistido y la sesión puede continuar.
+    Devuelve `{"words": [...], "count": n, "new_sense_exposure": {"words", "count"}}`;
+    `count` es el número de cartas tocadas (no el de coincidencias léxicas) y
+    `new_sense_exposure` las palabras que aparecían en una acepción distinta. Nunca
+    lanza hacia el cliente: si algo del puente falla, el intento ya está persistido
+    y la sesión puede continuar.
     """
     text = audio_text(question)
     if not text:
-        return {"words": [], "count": 0}
+        return _empty_evidence()
     known = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
     matches = listening_bridge.match_units(text, known)
     if not matches:
-        return {"words": [], "count": 0}
+        return _empty_evidence()
+    matched_words = [m["word"] for m in matches]
     cards = await run_in_threadpool(
         academy_repo.fsrs_cards_by_ids,
         user_id,
         "lexicon",
-        [m["word"] for m in matches],
+        matched_words,
     )
     senses = listening_bridge.sense_index(known)
+    # V3.94: las ALTERNATIVAS del diccionario (todas las acepciones que la caché
+    # conoce de la palabra) son lo que hace ALCANZABLE un `mismatch`. Sin ellas el
+    # resolver solo puede decir `matched`/`ambiguous` y la política no tendría nada
+    # que suprimir: ENFORCE sería un no-op.
+    dictionary_entries = await run_in_threadpool(
+        dictionary_repo.find_by_words, matched_words
+    )
+    alternatives = listening_bridge.alternatives_index(dictionary_entries)
     now = datetime.now(timezone.utc).isoformat()
     words: list[str] = []
+    exposures: list[str] = []
     for target in listening_bridge.select_targets(matches, cards):
         word = target["word"]
         card = target["card"]
+        verdict = sense_context.classify_sense_evidence(
+            word, text, senses.get(word), senses=alternatives.get(word, ())
+        )
+        if not sense_context.allows_difficulty_evidence(verdict):
+            # ENFORCE (V3.94): la frase usa una acepción DISTINTA a la aprendida. La
+            # carta de la acepción aprendida NO se toca —subirla sería señalar la
+            # carta equivocada— y el suceso se registra como exposición a un sentido
+            # nuevo, con la dificultad SIN cambiar (`before == after`). El registro es
+            # idempotente por la clave del intento (una repetición no reexpone).
+            base = float((card or {}).get("difficulty") or 5.0)
+            inserted = await run_in_threadpool(
+                listening_repo.record_difficulty_evidence,
+                user_id,
+                question_id,
+                word,
+                fail_count=fail_count,
+                difficulty_before=base,
+                difficulty_after=base,
+                attempt_number=attempt_number,
+                attempt_id=attempt_id,
+                sense_key=verdict["declared_key"],
+                sense_match=verdict["match"],
+                sense_reason=verdict["reason"],
+            )
+            if inserted:
+                exposures.append(word)
+            continue
         if card is None:
             card = fsrs.empty_card(
                 target_type="lexicon",
@@ -490,13 +541,6 @@ async def _apply_difficulty_evidence(
                 why=listening_bridge.SOURCE,
                 now=now,
             )
-        # Dark launch: el veredicto se registra, no decide. Sin alternativas
-        # conocidas (`senses=()`) `mismatch` todavía no puede dispararse; lo que
-        # sí se mide es cuánta evidencia se apoya en una acepción declarada
-        # (`matched`) y cuánta en una que nadie declaró (`ambiguous`).
-        verdict = sense_context.classify_sense_evidence(
-            word, text, senses.get(word), senses=()
-        )
         # V3.93.1: el claim de la evidencia y el CAS de la carta van en UNA sola
         # transacción (`claim_evidence_and_write_card`): o ambas cosas, o ninguna.
         # `duplicate` = el intento ya estaba aplicado (no-op). `conflict` = otro
@@ -541,7 +585,24 @@ async def _apply_difficulty_evidence(
             if fresh is None:
                 break
             card = fresh
-    return {"words": words, "count": len(words)}
+    return {
+        "words": words,
+        "count": len(words),
+        "new_sense_exposure": {"words": exposures, "count": len(exposures)},
+    }
+
+
+def _empty_evidence() -> dict:
+    """Evidencia vacía del puente, con la forma COMPLETA del contrato (V3.94).
+
+    Se construye nueva en cada llamada (no es una constante mutable compartida): el
+    contrato de la respuesta lleva `words`/`count` y, desde V3.94, `new_sense_exposure`.
+    """
+    return {
+        "words": [],
+        "count": 0,
+        "new_sense_exposure": {"words": [], "count": 0},
+    }
 
 
 # Reintentos del CAS antes de rendirse. La contención real es de dos escritores

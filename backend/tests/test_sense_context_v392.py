@@ -1,8 +1,9 @@
 """SENSE-CONTEXT-01 (diseño): identidad de acepción y resolución de sentido.
 
-Fija, con tests, el DISEÑO de la fase y su frontera de cableado. V3.93 lo consulta
-en modo DARK LAUNCH (`domain/listening.py` registra el veredicto pero NO decide):
-`test_sense_context_is_dark_launched_but_does_not_gate_evidence` lo garantiza.
+Fija, con tests, el DISEÑO del resolver y su CONTRATO de decisión. V3.94 lo cablea
+en ENFORCE: `domain/listening.py` registra el veredicto y **decide** con
+`allows_difficulty_evidence`. La frontera del dark launch de V3.93 se cierra en
+`test_sense_enforce_v394.py`.
 
 Qué se fija:
 
@@ -10,8 +11,9 @@ Qué se fija:
    familia POS + dominio + glosa), y `''` cuando no consta nada;
 2. el Sense Resolver clasifica en `matched` / `mismatch` / `ambiguous` siendo
    CONSERVADOR: `mismatch` exige una alternativa con evidencia léxica, y
-   `ambiguous` (que NO penaliza) es el resultado por defecto ante la duda;
-3. solo `matched` autoriza evidencia de dificultad.
+   `ambiguous` es el resultado por defecto ante la duda;
+3. la política de V3.94 (ENFORCE) suprime la evidencia SOLO ante un `mismatch`
+   PROBADO; `ambiguous` (incluido `declared:none`) la conserva.
 """
 from pathlib import Path
 
@@ -170,11 +172,21 @@ def test_word_absent_from_the_phrase_is_ambiguous():
     assert verdict["reason"] == sc.REASON_OCCURRENCE_NONE
 
 
-def test_only_matched_authorizes_evidence():
+def test_only_a_proven_mismatch_suppresses_evidence():
+    """ENFORCE (V3.94): la evidencia se quita SOLO ante un `mismatch` PROBADO.
+
+    Un `ambiguous` CONSERVA la evidencia (la duda no RESTA evidencia igual que no la
+    FABRICA), y sin veredicto se comporta como antes de V3.94. El `mismatch` es la
+    base de `new_sense_exposure`; la política es exactamente su negación.
+    """
     assert sc.allows_difficulty_evidence({"match": sc.SENSE_MATCHED}) is True
     assert sc.allows_difficulty_evidence({"match": sc.SENSE_MISMATCH}) is False
-    assert sc.allows_difficulty_evidence({"match": sc.SENSE_AMBIGUOUS}) is False
-    assert sc.allows_difficulty_evidence(None) is False
+    assert sc.allows_difficulty_evidence({"match": sc.SENSE_AMBIGUOUS}) is True
+    assert sc.allows_difficulty_evidence(None) is True
+    assert sc.is_new_sense_exposure({"match": sc.SENSE_MISMATCH}) is True
+    assert sc.is_new_sense_exposure({"match": sc.SENSE_MATCHED}) is False
+    assert sc.is_new_sense_exposure({"match": sc.SENSE_AMBIGUOUS}) is False
+    assert sc.is_new_sense_exposure(None) is False
 
 
 def test_the_same_sense_repeated_is_not_an_alternative():
@@ -193,16 +205,16 @@ def test_classifier_is_total_with_junk():
     assert sc.classify_sense_evidence("bank", None, FINANCE)["match"] in sc.MATCHES
 
 
-# --- Frontera de la fase: el resolver NO está cableado ----------------------
+# --- Frontera de la fase: el resolver decide, y SOLO por el puente ----------
 
 
-def test_sense_context_is_dark_launched_but_does_not_gate_evidence():
-    """V3.93: el resolver se consulta en producción, pero SOLO para registrar.
+def test_sense_context_is_wired_only_through_the_listening_bridge():
+    """V3.94 (ENFORCE): el resolver DECIDE, y solo a través del puente de Listening.
 
-    El único importador de producción es `domain/listening.py`, y allí el veredicto
-    NO filtra: no se llama a `allows_difficulty_evidence`. Si alguien importa el
-    resolver en otro sitio o usa la política para decidir evidencia, este test cae:
-    el cambio de comportamiento (enforce) tendrá que llegar con su propia release.
+    El único importador de producción es `domain/listening.py`, y allí la política
+    **sí** decide (`allows_difficulty_evidence`). Si otro camino importara el
+    resolver, o si el puente dejara de aplicar la política, este test cae: es la
+    frontera que el diseño dejó escrita y que V3.94 cierra.
     """
     backend = Path(__file__).resolve().parents[1]
     skip = {"tests", ".venv", "__pycache__", "data"}
@@ -216,4 +228,4 @@ def test_sense_context_is_dark_launched_but_does_not_gate_evidence():
             importers.append(path.relative_to(backend).as_posix())
     assert importers == ["domain/listening.py"]
     listening = (backend / "domain" / "listening.py").read_text(encoding="utf-8")
-    assert "allows_difficulty_evidence" not in listening
+    assert "allows_difficulty_evidence" in listening

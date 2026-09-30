@@ -122,6 +122,21 @@ class ListeningDifficultyEvidence(BaseModel):
     count: int = 0
 
 
+class ListeningSenseExposure(BaseModel):
+    """Palabras usadas en una acepción DISTINTA a la aprendida (V3.94, ENFORCE).
+
+    El Sense Resolver probó un `mismatch`: la frase empleaba la palabra en otra de
+    sus acepciones. Entonces su carta **NO** se penaliza —subir la dificultad de la
+    acepción aprendida por un uso que no es el suyo sería señalar la carta
+    equivocada— y el suceso se registra aquí como exposición a un sentido nuevo.
+    `words` son las palabras expuestas y `count` cuántas. Aditivo e informativo:
+    ninguna acción del cliente depende de él.
+    """
+
+    words: list[str] = Field(default_factory=list)
+    count: int = 0
+
+
 class ListeningAnswerResponse(BaseModel):
     question_id: str
     correct: bool
@@ -141,6 +156,11 @@ class ListeningAnswerResponse(BaseModel):
     # del léxico en la frase, viaja con ceros.
     difficulty_evidence: ListeningDifficultyEvidence = Field(
         default_factory=ListeningDifficultyEvidence
+    )
+    # V3.94 (ENFORCE): palabras que la frase usaba en OTRA acepción. Su carta no se
+    # penalizó; el suceso se registra aquí. Aditivo: sin exposición, ceros.
+    new_sense_exposure: ListeningSenseExposure = Field(
+        default_factory=ListeningSenseExposure
     )
 
 

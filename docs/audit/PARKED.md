@@ -2525,6 +2525,50 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.94.0 — ENFORCE: el Sense Resolver decide y la evidencia de Listening deja de ser lemma-based · 2026-09-30
+
+> **Naturaleza:** cierre de la fase **ENFORCE** de SENSE-CONTEXT-01, la que V3.93 dejó
+> *aplazada a propósito*. **Sí cambia la conducta**, pero solo donde el resolver **prueba**
+> una acepción distinta. Detalle en `release-notes-v3.94.0.md`.
+
+### Qué cierra (deja de ser deuda)
+
+- **`mismatch` es ALCANZABLE.** V3.93 consultaba el resolver con `senses=()`, así que
+  `mismatch` no podía dispararse y aplicar la política habría sido un **no-op silencioso**.
+  `services/listening_bridge.py::alternatives_index` (helper **puro**) reúne las acepciones
+  de la caché del diccionario (`dictionary_repo.find_by_words`) y `domain/listening.py` las
+  reparte al resolver. Sin alternativas conocidas el veredicto sigue siendo `ambiguous`:
+  nunca se inventa una acepción distinta.
+- **La política se aplica y está declarada.** `services/sense_context.py::allows_difficulty_evidence`
+  suprime la dificultad **SOLO ante un `mismatch` PROBADO**. `matched`, `ambiguous`
+  (`declared:none`, `alternatives:none`, `tie`, `occurrence:none`) y la ausencia de veredicto
+  **conservan** la evidencia de V3.92: la duda no RESTA evidencia igual que no la FABRICA.
+  Es **DECISIÓN declarada, no medición** (el ledger tenía **0 filas**) y es **reversible**
+  (volver al diseño estricto de SENSE-CONTEXT-01 es `match == matched`).
+- **La exposición se registra sin castigar.** El `mismatch` deja fila con
+  `difficulty_before == difficulty_after` (carta intacta), idempotente por la clave del
+  intento; `POST /api/listening/answer` publica `new_sense_exposure: {words, count}` y
+  `services/daily_plan.py::day_metrics` **separa** `sense_exposures` de
+  `difficulty_evidence`/`words_flagged` en vez de contarlas juntas.
+- **El instrumento usa la política REAL.** `scripts/sense_shadow_report.py` importa
+  `allows_difficulty_evidence` del backend en vez de replicar la regla: una copia local
+  podría desviarse de la verdad y proyectar algo que la app no hace. Sigue en **solo
+  lectura** (`mode=ro`).
+
+### Sigue abierto (V3.95+)
+
+**Cartas FSRS por acepción** (`sense_id` estable emitido por el generador) —V3.94 evita
+señalar la carta equivocada, **no** crea la carta correcta—, `MAX_MATCHES` por **relevancia**
+en vez de por orden de aparición, **poda del ledger**, la **revisión de la política de
+`declared:none` con datos** cuando el instrumento tenga volumen, y consumir
+`new_sense_exposure` en la UI si los datos lo justifican. **Los ocho gates humanos siguen
+`pending`** y `docs/audit/validation-evidence.json` sigue sin existir.
+
+**Honestidad registrada aquí.** Con el ledger a **0 filas**, la proyección de
+`sense_shadow_report.py` está **vacía**: no hay evidencia empírica de cuánto se conservaría
+ni de cuánto se suprimiría. La política se adoptó como **decisión mínima** —quitar solo lo
+que se puede **probar**— y su revisión está explícitamente aparcada a que haya volumen.
+
 ## V3.93.x — La fase sense-aware se publica: v3.93.0 (dark launch), v3.93.1 (atomicidad) y v3.93.2 (idempotencia en producción) · 2026-09-30
 
 > **Naturaleza:** cierre y **publicación** de la fase V3.93 (auditoría + diseño en
@@ -2675,6 +2719,15 @@ en `v3.93.2` **a propósito** (es la más reciente).
 > parcial) y el **lost update** (`upsert_fsrs_card_cas`). La fase **ENFORCE**
 > (aplicar la política) y la decisión sobre `declared:none` siguen **abiertas**;
 > ver `release-notes-v3.93.0.md`.
+>
+> **V3.94.0 (2026-09-30): ENFORCE entregado.** El resolver **DECIDE**:
+> `allows_difficulty_evidence` suprime la evidencia **solo** ante un `mismatch` **PROBADO**,
+> la exposición se publica como `new_sense_exposure` y las **alternativas del diccionario**
+> se cablean (`listening_bridge.alternatives_index`) para que `mismatch` sea
+> **alcanzable** —sin ellas la política habría sido un **no-op**—. **Decisión declarada
+> sobre `declared:none`** (con el ledger a **0 filas**, sin datos para medirla): se
+> **conserva** la evidencia, porque la ausencia de declaración **no es** una contradicción;
+> es **revisable** con volumen. Ver `release-notes-v3.94.0.md`.
 
 ### Hallazgo central (confirmado con QA real de este árbol)
 
@@ -2685,31 +2738,36 @@ sentido (`select_sense`/`sense_fit`), pero **nadie lo llama desde el puente**. C
 reproducible: acepción financiera de `bank` + «We sat on the bank of the river» →
 `match_units` devuelve `bank` y **sí** se genera evidencia.
 
-### Diseñado y fijado con tests (cableado en V3.93 en modo dark launch)
+### Diseñado y fijado con tests (cableado en V3.93 en dark launch; ENFORCE en V3.94)
 
 - **Identidad:** `semantics.sense_key` (`lemma|familia_pos|dominio|glosa`), pura y
   aditiva. Un `sense_key` nulo/'' se lee como «no consta» → `ambiguous`.
 - **Resolver:** `services/sense_context.py` (puro), con la matriz
-  `matched`/`mismatch`/`ambiguous`; `mismatch` y `ambiguous` **nunca** penalizan.
-  **V3.93 lo consulta en dark launch** (registra el veredicto, no decide) y un test
-  sigue garantizando que **ningún** camino de producción llama a la política
-  (`allows_difficulty_evidence`).
+  `matched`/`mismatch`/`ambiguous`. **V3.93 lo consultó en dark launch** (registraba el
+  veredicto, no decidía) y un test garantizaba que **ningún** camino de producción llamaba
+  a la política; **V3.94 cambia esa frontera a propósito**: `allows_difficulty_evidence`
+  **decide** en producción y el test fija la **nueva** frontera (solo un `mismatch`
+  PROBADO suprime; `matched`/`ambiguous`/sin veredicto conservan la evidencia).
 - **Contrato:** categoría **Contract E2E** (`backend/tests/test_contract_v392.py`
   + `frontend/src/api/contract.test.ts`) que fija la forma exacta del borde.
 
 ### Deuda que abre esta fase (V3.93+)
 
-- **Cablear** el resolver en el puente y el ledger (romper a propósito los tests de
-  caracterización de V3.92).
-- **Idempotencia/dedup** del ledger: H8 (el mismo fallo repetido suma `+0.6` cada
-  vez) y H7 (read-compute-write → *lost update*).
+- ✅ **Cablear** el resolver en el puente y el ledger — V3.93.0 (rompió a propósito los
+  tests de caracterización de V3.92).
+- ✅ **Idempotencia/dedup** del ledger — V3.93.0 (`evidence_key` + índice único parcial) y
+  V3.93.1 (`claim_evidence_and_write_card`); la ruta de producción, en V3.93.2.
+- ✅ **`new_sense_exposure`** a partir de `mismatch` — **V3.94.0**, con las alternativas del
+  diccionario cableadas para que `mismatch` sea alcanzable.
 - **`sense_id` emitido por el generador**: `sense_key` es *content-addressed* y un
-  bump de `GENERATOR_VERSION` que reescriba la glosa cambia la clave.
+  bump de `GENERATOR_VERSION` que reescriba la glosa cambia la clave. *(pendiente)*
 - **H12:** dos sentidos del **mismo POS** sin pistas léxicas son irresolubles → el
-  resolver debe responder `ambiguous` y **no** inventar evidencia.
-- **`new_sense_exposure`** a partir de `mismatch`.
+  resolver responde `ambiguous` y **no** inventa evidencia. *(sigue siendo el
+  comportamiento, ahora como **decisión** explícita de V3.94: `ambiguous` conserva la
+  evidencia)*
 - **`MAX_MATCHES` por relevancia** (hoy por orden de aparición) y
-  **`WEAK_DIFFICULTY = 6.0`** declarado en contrato o suavizado.
+  **`WEAK_DIFFICULTY = 6.0`** declarado en contrato o suavizado. *(pendiente, V3.95+)*
+- **Cartas FSRS por acepción** y **poda del ledger**. *(pendiente, V3.95+)*
 
 ## V3.91.0 — El diccionario pasa a motor de sentidos y la inversa deja de barrer la tabla · 2026-09-29
 

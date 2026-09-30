@@ -110,6 +110,11 @@ def test_answer_difficulty_evidence_shape(monkeypatch, tmp_path):
         body["difficulty_evidence"]["words"]
     )
     assert body["difficulty_evidence"]["words"] == [word]
+    # V3.94 (ENFORCE): la exposición a un sentido nuevo es ADITIVA y con la MISMA
+    # forma `{words, count}`; en este caso (palabra sin alternativas conocidas) va
+    # vacía, porque `mismatch` exige una alternativa probada.
+    assert set(body["new_sense_exposure"]) == {"words", "count"}
+    assert body["new_sense_exposure"] == {"words": [], "count": 0}
 
 
 # --- 3. La acepción de la palabra ----------------------------------------------

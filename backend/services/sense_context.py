@@ -1,11 +1,10 @@
 """Sense Resolver del puente Listening → evidencia (SENSE-CONTEXT-01, DISEÑO).
 
-**Estado: PURO, cableado en DARK LAUNCH (V3.93).** `domain/listening.py` lo consulta
-al registrar evidencia y guarda el veredicto, pero NO lo usa para decidir: qué
-evidencia se genera sigue siendo exactamente lo de V3.92 (lo fija `tests/
-test_sense_context_v392.py::test_sense_context_is_dark_launched_but_does_not_gate_
-evidence`). Aplicar la política (`allows_difficulty_evidence`) es la fase ENFORCE
-(V3.94+).
+**Estado: PURO, ENFORCE desde V3.94.** `domain/listening.py` lo consulta al registrar
+evidencia y **decide** con `allows_difficulty_evidence`: un `mismatch` PROBADO no sube
+la dificultad de la acepción aprendida (se registra como `new_sense_exposure`); todo lo
+demás conserva la evidencia de V3.92. La frontera del dark launch (V3.93) queda cerrada
+en `tests/test_sense_enforce_v394.py`.
 
 El problema que resuelve, medido en V3.92: `listening_bridge` empareja por
 `word`/`lemma`, así que una frase de «orilla» genera evidencia de dificultad sobre
@@ -22,10 +21,10 @@ Taxonomía (`MATCHES`), conservadora por diseño:
 - `matched` — hay evidencia LÉXICA de que el contexto expresa la acepción
   aprendida → la evidencia de dificultad es válida.
 - `mismatch` — hay evidencia léxica de un sentido DISTINTO → NO se penaliza la
-  acepción aprendida; es la base de `new_sense_exposure` (detección de polisemia,
-  fase posterior).
-- `ambiguous` — no se puede decidir → **NO se genera evidencia**. La incertidumbre
-  no se convierte en evidencia falsa: misma filosofía que `semantics.py`.
+  acepción aprendida; el fallo se registra como `new_sense_exposure` (V3.94).
+- `ambiguous` — no se puede decidir → **CONSERVA la evidencia** (decisión de V3.94):
+  la duda no RESTA evidencia igual que no la FABRICA, y en `declared:none` /
+  `alternatives:none` no hay NADA que contradecir.
 
 Regla dura: `matched` EXIGE solapamiento léxico positivo o un desempate
 gramatical con alternativas declaradas. Nunca se fabrica un «coincide» por
@@ -80,13 +79,41 @@ def _sense_family(sense: object) -> str:
     return pos_family(sense.get("pos"))
 
 
-def allows_difficulty_evidence(verdict: object) -> bool:
-    """Solo un `matched` autoriza evidencia de dificultad (pura, total).
+def is_new_sense_exposure(verdict: object) -> bool:
+    """¿El veredicto es un `mismatch` PROBADO? (pura y total).
 
-    `mismatch` y `ambiguous` NO penalizan: una acepción distinta o una duda no son
-    un fallo de la palabra que el alumno aprendió.
+    Un `mismatch` es la única señal POSITIVA de que el contexto expresa una acepción
+    DISTINTA a la aprendida, así que es la base de `new_sense_exposure`: el alumno no
+    falló la palabra, se topó con otro de sus sentidos. La política de V3.94 es
+    exactamente su negación (ver `allows_difficulty_evidence`).
     """
-    return isinstance(verdict, dict) and verdict.get("match") == SENSE_MATCHED
+    return isinstance(verdict, dict) and verdict.get("match") == SENSE_MISMATCH
+
+
+def allows_difficulty_evidence(verdict: object) -> bool:
+    """¿La evidencia de dificultad se aplica a la carta? (ENFORCE V3.94; pura y total).
+
+    La política de V3.94 suprime la evidencia **SOLO ante un `mismatch` PROBADO**: es
+    la única señal positiva de que el contexto usa una acepción DISTINTA a la
+    aprendida, y subir la dificultad de la acepción aprendida por un uso que no es el
+    suyo sería señalar la carta equivocada. Todo lo demás **conserva** la evidencia de
+    V3.92, y se declara por qué:
+
+    - `matched`: hay evidencia léxica de que el contexto es la acepción aprendida;
+    - `ambiguous` (`declared:none`, `alternatives:none`, `tie`, `occurrence:none`):
+      NO hay prueba de una acepción distinta. La duda no RESTA evidencia igual que no
+      la FABRICA; y en `declared:none` (palabra sin acepción declarada) o
+      `alternatives:none` (palabra monosémica conocida) no hay NADA que contradecir;
+    - sin veredicto (`None`): se comporta como antes de V3.94 (conserva).
+
+    **Decisión declarada, no medición.** El diseño de SENSE-CONTEXT-01 proponía «solo
+    `matched`» y advirtió de que tratar `declared:none` como `ambiguous` «apagaría la
+    mayor parte del puente». Con el ledger **vacío** (0 filas) no hay datos para
+    medirlo, así que V3.94 elige la política MÍNIMA —quitar solo lo que puede probar—
+    y deja el instrumento (`scripts/sense_shadow_report.py`) para revisarla cuando haya
+    volumen. Es **reversible**: volver al diseño estricto es `match == matched`.
+    """
+    return not is_new_sense_exposure(verdict)
 
 
 def _evaluate_position(

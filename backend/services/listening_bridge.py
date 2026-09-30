@@ -143,6 +143,35 @@ def sense_index(known: object) -> dict[str, object]:
     return index
 
 
+def alternatives_index(entries: object) -> dict[str, list[dict]]:
+    """`{palabra canónica: [acepciones conocidas]}` de la caché del diccionario (pura).
+
+    Complementa a `sense_index`: aquel devuelve la acepción **declarada** por el
+    alumno (`vocabulary.sense_json`), este devuelve **todas** las acepciones que la
+    caché del diccionario conoce de la palabra. Son las **alternativas** que el
+    Sense Resolver necesita para poder declarar un `mismatch`: sin ellas, una
+    acepción distinta es indetectable y toda duda cae a `ambiguous` (que NO
+    penaliza, así que `mismatch` es la única vía por la que el resolver suprime
+    evidencia).
+
+    `entries` es la salida de `dictionary_repo.find_by_words` (cada entrada con su
+    lista `senses` ya decodificada). Pura y total: entrada rara o sin acepciones
+    no aporta nada en vez de romper.
+    """
+    index: dict[str, list[dict]] = {}
+    for row in entries or ():
+        if not isinstance(row, dict):
+            continue
+        word = str(row.get("word") or "").strip().lower()
+        senses = row.get("senses")
+        if not word or not isinstance(senses, (list, tuple)):
+            continue
+        clean = [sense for sense in senses if isinstance(sense, dict) and sense]
+        if clean:
+            index.setdefault(word, []).extend(clean)
+    return index
+
+
 def is_weak_card(card: object) -> bool:
     """¿La carta admite evidencia de dificultad? (ausente = sí, no hay dominio).
 

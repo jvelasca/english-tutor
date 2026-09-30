@@ -175,6 +175,9 @@ def day_metrics(
     - `words_flagged`: cuántas palabras DISTINTAS han subido. Se publica aparte
       porque una frase que se falla tres veces genera tres evidencias y una sola
       palabra marcada: sumar las dos cifras sería contar dos veces lo mismo.
+    - `sense_exposures` (V3.94, ENFORCE): cuántas filas son una exposición a un
+      sentido NUEVO (veredicto `mismatch`). NO subieron ninguna carta, así que no
+      se cuentan como dificultad: el ledger las guarda y aquí se separan.
     """
     by_kind: dict[str, int] = {}
     by_skill: dict[str, int] = {}
@@ -194,6 +197,11 @@ def day_metrics(
     listening = rows_on_day(listening_rows, day)
     evidence = rows_on_day(evidence_rows, day)
     bridge = rows_on_day(list(bridge_rows or []), day)
+    # V3.94 (ENFORCE): el ledger guarda también las filas `mismatch`, que registran
+    # una acepción DISTINTA y NO subieron la dificultad de ninguna carta (viajan con
+    # `difficulty_before == difficulty_after`). Contarlas como dificultad mentiría:
+    # aquí se separan de las que sí aplicaron evidencia.
+    applied = [r for r in bridge if str(r.get("sense_match") or "") != "mismatch"]
     correct = [1.0 if r.get("correct") else 0.0 for r in listening]
     results = [float(r.get("result") or 0.0) for r in evidence]
     pooled = correct + results
@@ -214,10 +222,13 @@ def day_metrics(
         "listening_attempts": len(correct),
         "listening_accuracy": listening_accuracy,
         "accuracy": round(sum(pooled) / attempts, 3) if attempts else None,
-        "difficulty_evidence": len(bridge),
+        "difficulty_evidence": len(applied),
         "words_flagged": len(
-            {str(r.get("word") or "") for r in bridge if r.get("word")}
+            {str(r.get("word") or "") for r in applied if r.get("word")}
         ),
+        # V3.94 (ENFORCE): exposiciones a un sentido nuevo. NO son dificultad —no
+        # subieron ninguna carta—, así que se publican aparte.
+        "sense_exposures": len(bridge) - len(applied),
         "by_kind": by_kind,
         "by_skill": by_skill,
     }

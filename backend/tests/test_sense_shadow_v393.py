@@ -1,13 +1,14 @@
-"""SENSE-CONTEXT-01 (V3.93): el dark launch sense-aware del puente.
+"""SENSE-CONTEXT-01 (V3.93/V3.94): el veredicto sense-aware del puente.
 
-V3.93 consulta el Sense Resolver al registrar evidencia de dificultad y GUARDA su
-veredicto en el ledger (`sense_key`/`sense_match`/`sense_reason`), pero NO cambia
-qué evidencia se genera: eso sigue siendo exactamente lo de V3.92. Estos tests fijan
-las dos caras de esa frontera:
+V3.93 cableó el Sense Resolver para GUARDAR su veredicto en el ledger
+(`sense_key`/`sense_match`/`sense_reason`). V3.94 lo APLICA (ENFORCE): un `mismatch`
+probado NO sube la carta y se registra como `new_sense_exposure`; el resto conserva
+la evidencia. Estos tests fijan la cara que el ENFORCE NO cambió:
 
 - el veredicto se registra (`matched` / `ambiguous`, con su razón);
-- la evidencia NO se filtra: una acepción NO declarada sigue generando evidencia,
-  que es justo lo que hay que medir antes de aplicar la política (enforce).
+- una acepción NO declarada (`declared:none`) SIGUE generando evidencia: es la
+  DECISIÓN de V3.94 (la ausencia de acepción no es una contradicción). El caso
+  `mismatch` vive en `test_sense_enforce_v394.py`.
 """
 import json
 from contextlib import closing
@@ -105,14 +106,12 @@ def test_sense_index_is_total_with_junk():
 # --- Dark launch: el veredicto se registra, la evidencia NO se filtra --------
 
 
-def test_undeclared_sense_is_recorded_as_ambiguous_without_gating(
-    monkeypatch, tmp_path
-):
-    """Sin acepción declarada la evidencia se SIGUE generando (comportamiento V3.92).
+def test_undeclared_sense_keeps_evidence_by_decision(monkeypatch, tmp_path):
+    """Sin acepción declarada la evidencia se MANTIENE (decisión de V3.94).
 
-    Es el hallazgo clave del dark launch: si se aplicara la política, esta evidencia
-    se suprimiría. Aquí se comprueba que todavía NO se suprime y que el ledger deja
-    el veredicto medible.
+    Es la decisión que ENFORCE hace explícita: `declared:none` es ausencia de
+    declaración, no una contradicción, así que NO se suprime (hacerlo «apagaría la
+    mayor parte del puente», avisó el diseño). El ledger deja el veredicto medible.
     """
     uid = _setup(monkeypatch, tmp_path)
     q = _receptive_question()
@@ -120,7 +119,8 @@ def test_undeclared_sense_is_recorded_as_ambiguous_without_gating(
     _seed_word(uid, word)  # sin `sense_json`: acepción no declarada
     with TestClient(app) as client:
         body = _fail(client, uid, q).json()
-    assert body["difficulty_evidence"]["count"] == 1  # NO se filtra
+    assert body["difficulty_evidence"]["count"] == 1  # se conserva
+    assert body["new_sense_exposure"]["count"] == 0
     rows = _rows(uid)
     assert len(rows) == 1
     assert rows[0]["sense_match"] == "ambiguous"
