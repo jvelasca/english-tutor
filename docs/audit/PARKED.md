@@ -2525,6 +2525,62 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.93.x — La fase sense-aware se publica: v3.93.0 (dark launch), v3.93.1 (atomicidad) y v3.93.2 (idempotencia en producción) · 2026-09-30
+
+> **Naturaleza:** cierre y **publicación** de la fase V3.93 (auditoría + diseño en
+> `SENSE-CONTEXT-01`, *dark launch* en V3.93.0 y dos patches de robustez, V3.93.1 y V3.93.2).
+> **Ninguna de las tres cambia la conducta para el alumno**: la política sense-aware sigue
+> aplazada a **V3.94 `ENFORCE`**. Detalle en `release-notes-v3.93.0.md`,
+> `release-notes-v3.93.1.md` y `release-notes-v3.93.2.md`.
+
+### Qué cierra cada una (deja de ser deuda)
+
+- **V3.93.0** · *Dark launch*: el resolver se **cablea pero no decide** (registra
+  `sense_key`/`sense_match`/`sense_reason`), la evidencia es **idempotente por intento**
+  (`evidence_key` + índice único parcial) y el CAS deja de perder una subida concurrente.
+- **V3.93.1** · La evidencia y la carta FSRS se escriben en **UNA** transacción
+  (`claim_evidence_and_write_card`, rollback si el CAS no escribe), el intento es
+  **idempotente por `attempt_id`** (`record_answer_event`), la cola no pierde incrementos
+  concurrentes, el CAS protege la **fila completa** (`fsrs_cards.version`) y el resolver
+  elige la ocurrencia por **discriminación** (margen).
+- **V3.93.2** · La idempotencia del intento **alcanza la ruta de producción**
+  (dictado/shadowing) reutilizando la unidad atómica con `sync_queue=False`, **sin** tocar la
+  cola de repaso (que es de frases receptivas, V3.89).
+
+### Sigue abierto (V3.94+)
+
+`ENFORCE` (`allows_difficulty_evidence`) y la decisión sobre `declared:none` con datos
+reales, `mismatch` alcanzable cableando las alternativas del diccionario
+(`new_sense_exposure`), `sense_id` estable emitido por el generador, `MAX_MATCHES` por
+relevancia, poda del ledger y cartas FSRS por acepción. **Los ocho gates humanos siguen
+`pending`** y `docs/audit/validation-evidence.json` sigue sin existir.
+
+### Estado de publicación (verificado el 2026-09-30)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.93.0` | **publicado** (`refs/tags/v3.93.0` en `origin`) → commit `91a272b` |
+| Tag anotado `v3.93.1` | **publicado** → commit `6de0553` |
+| Tag anotado `v3.93.2` | **publicado** → commit `04f6720` |
+| GitHub Release `v3.93.0` | https://github.com/jvelasca/english-tutor/releases/tag/v3.93.0 — **no** *draft*, **no** *prerelease* |
+| GitHub Release `v3.93.1` | https://github.com/jvelasca/english-tutor/releases/tag/v3.93.1 — **no** *draft*, **no** *prerelease* |
+| GitHub Release `v3.93.2` | https://github.com/jvelasca/english-tutor/releases/tag/v3.93.2 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `91a272b` (v3.93.0) | `success` — run `36685289332`, **12/12 jobs en verde** |
+| CI sobre `6de0553` (v3.93.1) | `success` — run `36706167270`, **12/12 jobs en verde** |
+| CI sobre `04f6720` (v3.93.2) | `success` — runs `36710016587` (PR) y `36712763091` (push a `main`), **12/12** cada uno |
+| Orden tag/CI | los **tres** tags se crearon **DESPUÉS** del verde de su commit: el invariante se mantiene |
+| `main` vs `origin/main` | al día en `04f6720` (**fast-forward** desde `fa2a15a`, sin merge commit) |
+| PR #20 | **MERGED** (GitHub la marcó al detectar sus commits en `main`) |
+| Rama `release/v3.93.0` | **conservada** como referencia de la auditoría (no borrada) |
+| Encargo de auditoría de V3.93.x | **no existe** todavía |
+
+**Aviso de anclaje (hueco preexistente, NO de esta fase):** `v3.92.0` tiene **tag anotado
+pero NO tiene GitHub Release** (`gh release view v3.92.0` → *release not found*) y su sección
+de este documento **no tenía tabla de publicación**. Consecuencia: la *Latest* pasó de
+`v3.91.0` a `v3.93.2` **saltándose** `v3.92.0`. El ancla de esa release es su **tag**
+(`refs/tags/v3.92.0` → `fa2a15a`), que existe y ha viajado en `main` todo el tiempo; lo que
+falta es la **Release pública** y el registro. **Queda declarado, no arreglado.**
+
 ## V3.92.0 — El fallo de Listening pasa a ser evidencia de dificultad y el circuito pedagógico se cierra · 2026-09-29
 
 > Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
