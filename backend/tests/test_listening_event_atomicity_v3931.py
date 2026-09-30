@@ -350,3 +350,122 @@ def test_sense_resolver_selects_occurrence_by_discrimination():
     assert verdict["reason"] == sense_context.REASON_GLOSS_DECLARED
     assert verdict["declared_overlap"] == 1
     assert verdict["best_other_overlap"] == 0
+
+
+# --- V3.93.2: la ruta de PRODUCCIÓN (dictado/shadowing) también es idempotente ---
+#
+# Era el mismo P0-B en la otra puerta de entrada: `submit_production` llamaba a
+# `record_attempt` directo (sin `attempt_id`, sin dedup), así que un doble POST del
+# mismo dictado dejaba 2 filas e inflaba el diagnóstico auditivo. El arreglo reusa
+# `record_answer_event` con `sync_queue=False`: deduplica el intento y conserva
+# intacto el comportamiento de V3.89 (producción nunca tocó la cola de repaso).
+
+
+def _production_text(q: dict) -> str:
+    return q.get("transcript") or q.get("script") or ""
+
+
+def _submit_production(
+    client,
+    uid: str,
+    q: dict,
+    text: str,
+    attempt_id: str = "",
+    endpoint: str = "dictation",
+):
+    payload = {"question_id": q["id"], "transcript": text}
+    if attempt_id:
+        payload["attempt_id"] = attempt_id
+    return client.post(
+        f"/api/listening/{endpoint}", params={"user_id": uid}, json=payload
+    )
+
+
+def test_production_double_submit_same_attempt_id_is_idempotent(
+    monkeypatch, tmp_path, production_items
+):
+    """Repetir el MISMO `attempt_id` de un dictado = 1 intento (no 2)."""
+    uid = _setup(monkeypatch, tmp_path)
+    q = production_items("dictation")["prod-dictation"]
+    text = _production_text(q)
+    with TestClient(app) as client:
+        first = _submit_production(client, uid, q, text, attempt_id="P1")
+        second = _submit_production(client, uid, q, text, attempt_id="P1")
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["score"] == second.json()["score"]
+    assert _attempt_count(uid, q["id"]) == 1
+
+
+def test_production_shadowing_double_submit_is_idempotent(
+    monkeypatch, tmp_path, production_items
+):
+    """Lo mismo en la puerta de shadowing."""
+    uid = _setup(monkeypatch, tmp_path)
+    q = production_items("shadowing")["prod-shadowing"]
+    text = _production_text(q)
+    with TestClient(app) as client:
+        _submit_production(client, uid, q, text, attempt_id="S1", endpoint="shadowing")
+        _submit_production(client, uid, q, text, attempt_id="S1", endpoint="shadowing")
+    assert _attempt_count(uid, q["id"]) == 1
+
+
+def test_production_distinct_attempt_ids_create_two_attempts(
+    monkeypatch, tmp_path, production_items
+):
+    """Dos INTENTOS reales (ids distintos) siguen siendo 2 filas."""
+    uid = _setup(monkeypatch, tmp_path)
+    q = production_items("dictation")["prod-dictation"]
+    text = _production_text(q)
+    with TestClient(app) as client:
+        _submit_production(client, uid, q, text, attempt_id="P1")
+        _submit_production(client, uid, q, text, attempt_id="P2")
+    assert _attempt_count(uid, q["id"]) == 2
+
+
+def test_production_legacy_empty_attempt_id_keeps_old_behaviour(
+    monkeypatch, tmp_path, production_items
+):
+    """Sin `attempt_id` (cliente legacy) no hay dedup: cada envío es un intento."""
+    uid = _setup(monkeypatch, tmp_path)
+    q = production_items("dictation")["prod-dictation"]
+    text = _production_text(q)
+    with TestClient(app) as client:
+        _submit_production(client, uid, q, text)
+        _submit_production(client, uid, q, text)
+    assert _attempt_count(uid, q["id"]) == 2
+
+
+def test_production_never_enqueues_failed_task(
+    monkeypatch, tmp_path, production_items
+):
+    """Un dictado FALLADO NO entra en la cola: es de frases receptivas (V3.89).
+
+    Es la garantía de que añadir idempotencia no cambió el comportamiento: con
+    `sync_queue=False`, ni el borrado al acertar ni el encolado al fallar ocurren.
+    """
+    uid = _setup(monkeypatch, tmp_path)
+    q = production_items("dictation")["prod-dictation"]
+    with TestClient(app) as client:
+        r = _submit_production(client, uid, q, "", attempt_id="P1")  # oye mal: vacío
+    assert r.status_code == 200
+    assert r.json()["correct"] is False
+    assert _attempt_count(uid, q["id"]) == 1
+    assert listening_repo.get_queue_entry(uid, q["id"]) is None
+
+
+def test_production_submit_does_not_disturb_existing_queue_entry(
+    monkeypatch, tmp_path, production_items
+):
+    """Un dictado no toca una frase receptiva ya encolada (colas independientes)."""
+    uid = _setup(monkeypatch, tmp_path)
+    receptive = _receptive_question()
+    with TestClient(app) as client:
+        _fail(client, uid, receptive, attempt_id="R1")  # encola la frase receptiva
+    assert listening_repo.get_queue_entry(uid, receptive["id"]) is not None
+    prod = production_items("dictation")["prod-dictation"]
+    with TestClient(app) as client:
+        _submit_production(client, uid, prod, _production_text(prod), attempt_id="P1")
+    # La cola es por `(user_id, question_id)`: el intento de producción no la toca.
+    assert listening_repo.get_queue_entry(uid, receptive["id"])["fail_count"] == 1
+    assert listening_repo.get_queue_entry(uid, prod["id"]) is None

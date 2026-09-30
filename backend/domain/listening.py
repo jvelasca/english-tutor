@@ -560,6 +560,7 @@ async def submit_production(
     speed_used: str = "normal",
     shadowing_duration_ms: int | None = None,
     shadowing_speech_rate: float | None = None,
+    attempt_id: str = "",
 ) -> dict | None:
     """Evalúa y persiste una tarea de producción (dictado/shadowing), sin LLM.
 
@@ -583,6 +584,13 @@ async def submit_production(
     señales auxiliares informativas que el cliente calcula desde el audio grabado
     (duración y velocidad proxy). Solo se persisten en intentos `shadowing` y sin
     peso de mastery: el scoring determinista sigue siendo el texto oído.
+
+    V3.93.2: la persistencia pasa por `record_answer_event` con
+    `sync_queue=False`, de modo que el intento se **deduplica por `attempt_id`**
+    (UUID del cliente reutilizado en el reintento HTTP) sin alterar en nada el
+    comportamiento histórico: una tarea de producción nunca ha tocado
+    `listening_review_queue` (esa cola es de frases receptivas falladas, V3.89).
+    Un `attempt_id` vacío mantiene la semántica anterior (inserta siempre).
     """
     question = await _resolve_question(question_id)
     if question is None:
@@ -597,19 +605,19 @@ async def submit_production(
     difficulty = difficulty_from_vector(question.get("difficulty_vector", {}))
     realized = realized_difficulty(question)
     await run_in_threadpool(
-        listening_repo.record_attempt,
+        listening_repo.record_answer_event,
         user_id,
         question_id,
         -1,
         correct,
-        task_type,
-        difficulty,
-        None,
-        0,
-        question.get("topic", ""),
-        realized,
-        task_type,
-        result["score"] / 100.0,
+        skill=task_type,
+        difficulty=difficulty,
+        response_time_ms=None,
+        replay_count=0,
+        topic=question.get("topic", ""),
+        realized_difficulty=realized,
+        task_type=task_type,
+        score=result["score"] / 100.0,
         stage=stage,
         transcript_used=transcript_used,
         speed_used=speed_used,
@@ -624,6 +632,11 @@ async def submit_production(
         # indica exactamente qué palabras el alumno no oyó bien; se persiste
         # para el futuro salto a palabra fallada y agregados (V3.30).
         word_breakdown=result["breakdown"],
+        attempt_id=attempt_id,
+        # La cola de repaso es de frases RECEPTIVAS falladas (V3.89): una tarea
+        # de producción nunca la ha tocado y este cambio (V3.93.2) NO lo altera;
+        # solo añade la deduplicación por `attempt_id`.
+        sync_queue=False,
     )
     return {
         "question_id": question_id,

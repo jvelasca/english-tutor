@@ -188,6 +188,10 @@ class ListeningProductionRequest(BaseModel):
     # shadowing sigue siendo la comparación del texto oído con la referencia).
     shadowing_duration_ms: int | None = None
     shadowing_speech_rate: float | None = None
+    # V3.93.2: idempotencia del intento de producción por UUID del cliente,
+    # reutilizado en el reintento HTTP (mismo contrato que `ListeningAnswerRequest`).
+    # Vacío (clientes legacy / tests) mantiene la semántica previa: sin dedup.
+    attempt_id: str = ""
 
 
 class ListeningProductionResult(BaseModel):

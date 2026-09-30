@@ -529,6 +529,7 @@ def record_answer_event(
     outcome: str = "",
     attempt_id: str = "",
     level: str = "",
+    sync_queue: bool = True,
 ) -> dict | None:
     """Inserta el intento y actualiza la cola de repaso EN UNA transacción (V3.93.1).
 
@@ -547,6 +548,12 @@ def record_answer_event(
     Un `attempt_id` vacío (llamadores legacy / tests) NUNCA deduplica: se comporta
     como V3.92 (inserta y encola). Devuelve `{"inserted", "fail_count", "attempt"}`
     o `None` si el usuario no existe.
+
+    `sync_queue=False` (V3.93.2, ruta de PRODUCCIÓN) conserva exactamente el otro
+    comportamiento histórico: la tarea de producción —dictado/shadowing— **nunca**
+    ha tocado `listening_review_queue` (la cola es de frases receptivas falladas,
+    V3.89). Se deduce igual por `attempt_id`, pero no se lee, inserta ni borra la
+    cola; `fail_count` se informa como 0.
     """
     if get_user(user_id) is None:
         return None
@@ -568,7 +575,11 @@ def record_answer_event(
                 existing_id = row["id"] if row is not None else None
             if existing_id is not None:
                 # Reintento del MISMO intento: NO se re-inserta ni se re-cuenta.
-                fail_count = _read_queue_fail_count(conn, user_id, question_id)
+                fail_count = (
+                    _read_queue_fail_count(conn, user_id, question_id)
+                    if sync_queue
+                    else 0
+                )
                 conn.execute("COMMIT")
                 return {
                     "inserted": False,
@@ -604,7 +615,11 @@ def record_answer_event(
                 ),
             )
             attempt_row_id = cursor.lastrowid
-            if correct:
+            fail_count = 0
+            if not sync_queue:
+                # Producción (dictado/shadowing): nunca ha tocado la cola.
+                pass
+            elif correct:
                 # Acertar la frase la saca de la cola (es la forma natural de
                 # repasarla); el intento queda registrado igual.
                 conn.execute(

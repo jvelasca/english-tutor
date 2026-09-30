@@ -206,6 +206,8 @@ function submitProduction(
       ...(aux.speechRate !== undefined
         ? { shadowing_speech_rate: aux.speechRate }
         : {}),
+      // V3.93.2: UUID del intento de producción (idempotencia del intento).
+      ...(opts.attemptId !== undefined ? { attempt_id: opts.attemptId } : {}),
     }),
     TIMEOUT_SUBMIT_MS,
     "submit production",

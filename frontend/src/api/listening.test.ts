@@ -169,6 +169,49 @@ describe("listening api", () => {
       shadowing_speech_rate: 152,
     });
   });
+
+  // V3.93.2: la ruta de producción también viaja con `attempt_id` para que el
+  // backend deduplique el intento (y sin él no lo manda: cliente legacy).
+  it("submitListeningDictation propaga attemptId cuando existe", async () => {
+    const fn = mockFetch(true, {
+      question_id: "l18",
+      task_type: "dictation",
+      correct: true,
+      score: 100,
+    });
+    await submitListeningDictation("u1", "l18", "hello world", {
+      attemptId: "uuid-p1",
+    });
+    const [, init] = fn.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({
+      question_id: "l18",
+      transcript: "hello world",
+      attempt_id: "uuid-p1",
+    });
+  });
+
+  it("submitListeningShadowing propaga attemptId junto a las señales", async () => {
+    const fn = mockFetch(true, {
+      question_id: "l19",
+      task_type: "shadowing",
+      correct: true,
+      score: 90,
+    });
+    await submitListeningShadowing(
+      "u1",
+      "l19",
+      "could you repeat that",
+      { attemptId: "uuid-s1" },
+      { durationMs: 2340 },
+    );
+    const [, init] = fn.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({
+      question_id: "l19",
+      transcript: "could you repeat that",
+      shadowing_duration_ms: 2340,
+      attempt_id: "uuid-s1",
+    });
+  });
 });
 
 // --- V3.92: el ítem servido llega en snake_case y la UI lo lee en camelCase ---

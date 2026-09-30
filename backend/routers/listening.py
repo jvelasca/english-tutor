@@ -197,6 +197,7 @@ async def dictation(
         body.stage,
         body.transcript_used,
         body.speed_used,
+        attempt_id=body.attempt_id,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
@@ -222,6 +223,7 @@ async def shadowing(
         body.speed_used,
         shadowing_duration_ms=body.shadowing_duration_ms,
         shadowing_speech_rate=body.shadowing_speech_rate,
+        attempt_id=body.attempt_id,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")

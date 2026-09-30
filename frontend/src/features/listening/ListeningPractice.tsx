@@ -269,6 +269,11 @@ export function ListeningPractice({
   // otra pregunta, de modo que un intento posterior de la misma frase (por
   // ejemplo re-servida desde la cola de repaso) recibe un id nuevo.
   const attemptIdRef = useRef<{ key: string; id: string } | null>(null);
+  // V3.93.2: identidad del intento de PRODUCCIÓN (dictado/shadowing). No puede
+  // colgar de `supportOpts()` porque ese exige `flowState`, y estos ítems suelen
+  // no tener micro-flujo: sin id, el reintento de red del mismo dictado duplicaba
+  // el intento. Se reutiliza el UUID mientras la pregunta no cambie.
+  const productionAttemptIdRef = useRef<{ key: string; id: string } | null>(null);
   const [stats, setStats] = useState<ListeningStats | null>(null);
   const [diagnostic, setDiagnostic] = useState<ListeningDiagnostic | null>(null);
   // AudioController 4.0 (V3.28): único elemento de audio para el audio de
@@ -486,6 +491,20 @@ export function ListeningPractice({
     };
   }
 
+  /** V3.93.2: identidad del intento de producción (dictado/shadowing).
+   *
+   * Independiente de `supportOpts()`: estos ítems pueden no tener micro-flujo, y
+   * el id debe existir igual para que un reintento de red no duplique el intento.
+   * Mismo UUID mientras la pregunta no cambie. */
+  function productionAttemptId(): string {
+    if (!question) return "";
+    const key = question.id;
+    if (productionAttemptIdRef.current?.key !== key) {
+      productionAttemptIdRef.current = { key, id: crypto.randomUUID() };
+    }
+    return productionAttemptIdRef.current.id;
+  }
+
   /** Aplica la máquina de estados tras responder en while2. */
   function applyFlowAnswer(correct: boolean) {
     if (!question || !flowState || !flowPolicy || !micro) return;
@@ -601,6 +620,7 @@ export function ListeningPractice({
       setQuestion(next);
       // V3.93.1: nueva pregunta ⇒ nuevo intento ⇒ nuevo `attempt_id`.
       attemptIdRef.current = null;
+      productionAttemptIdRef.current = null;
       // El micro-flujo arranca cuando el backend sirvió `flow` (adaptativo,
       // nivel y drill); el repaso mastered (compacto) no lo usa.
       setFlowState(hasFlow(next) ? initialFlow(next) : null);
@@ -949,7 +969,7 @@ async function submitDictation() {
       userId,
       question.id,
       text,
-      supportOpts(),
+      { ...supportOpts(), attemptId: productionAttemptId() },
     );
     setProductionResult(res);
     applySessionOutcome(question.id, res.correct);
@@ -1024,7 +1044,7 @@ async function submitDictation() {
               userId,
               question.id,
               text,
-              supportOpts(),
+              { ...supportOpts(), attemptId: productionAttemptId() },
               {
                 durationMs: durationMs > 0 ? durationMs : undefined,
                 speechRate: rate ?? undefined,
