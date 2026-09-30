@@ -2582,6 +2582,28 @@ que se puede **probar**— y su revisión está explícitamente aparcada a que h
 | Rama `release/v3.94.0` | **conservada** como referencia de la auditoría (no borrada) |
 | Encargo de auditoría de V3.94.0 | **pendiente**: el gerente la envía a auditoría externa tras esta publicación |
 
+### Deuda detectada en la verificación de esta release (NO es de V3.94)
+
+- **Flake de CI en `frontend/src/features/vocabulary/ReviewToday.test.tsx`.** El job
+  «Frontend (tsc + vitest + build)» **falló una vez** en el CI de la PR **#22** —que solo
+  cambiaba markdown, así que **no puede** ser una regresión de esta release— en el test
+  `ReviewToday · resumen y sesión encadenada (V3.85.0) > encadena: al superar el peldaño
+  ofrece «Siguiente palabra» y avanza a la última`, con
+  `TestingLibraryElementError: Unable to find role="button" and name "Next word"`.
+  **Evidencia de que es del entorno y no del código:** (i) el **rerun del mismo job pasó
+  en verde** sin tocar nada (1 m 8 s); (ii) el fichero pasa **3/3 en local** (16/16 tests
+  cada vez); (iii) el job de frontend ya había pasado **12/12** en el commit de release
+  `7e11c01`. **Diagnóstico:** `writeAndSend()` dispara «Check sentence» y el test espera el
+  CTA con el `findByRole` **por defecto (1 s)**; bajo un runner cargado (12 jobs en
+  paralelo) la cadena submit → estado → render puede superar ese segundo —el fichero entero
+  tardó **1474 ms** con 16 tests, compatible con una única espera de 1 s—. **No se arregla
+  aquí** (la release ya está etiquetada y publicada, y tocar el test sería una entrega con
+  su propio ciclo): queda **declarado** como deuda de validación, con la misma política que
+  `resize.spec.ts` y `keyboard.spec.ts` (barrido visual, V3.80.1). `[VALIDACIÓN]`
+  **Arreglo propuesto** (si se decide hacerlo): espera explícita en vez del timeout por
+  defecto —`await screen.findByRole("button", { name: "Next word" }, { timeout: 5000 })`
+  o un `await waitFor(...)` tras el envío— en los tests de la sesión que esperan el CTA.
+
 ## V3.93.x — La fase sense-aware se publica: v3.93.0 (dark launch), v3.93.1 (atomicidad) y v3.93.2 (idempotencia en producción) · 2026-09-30
 
 > **Naturaleza:** cierre y **publicación** de la fase V3.93 (auditoría + diseño en
