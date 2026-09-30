@@ -1090,41 +1090,57 @@ def upsert_fsrs_card(user_id: str, card: dict) -> dict | None:
 
 
 def upsert_fsrs_card_cas(
-    user_id: str, card: dict, *, expected_difficulty: float
+    user_id: str, card: dict, *, expected_version: int
 ) -> bool:
-    """Upsert de carta con control de concurrencia OPTIMISTA sobre `difficulty`.
+    """Upsert de carta con control de concurrencia OPTIMISTA sobre la FILA completa.
 
-    V3.93. Escribe solo si la dificultad guardada sigue siendo la que el que
-    llama leyó (`expected_difficulty`); devuelve `False` si otro escritor se
-    adelantó, para que relea y vuelva a calcular. Es el arreglo del *lost update*
-    del read-compute-write de V3.92: sin esto, dos evidencias simultáneas
-    calculan la MISMA subida y la segunda pisa a la primera, y una de las dos
-    señales se pierde. Con esto, dos evidencias simultáneas suman las DOS.
+    V3.93.1. Escribe solo si la `version` guardada sigue siendo la que el que llama
+    leyó (`expected_version`); devuelve `False` si otro escritor se adelantó, para
+    que relea y vuelva a calcular. Sustituye al CAS de V3.93, que comparaba SOLO
+    `difficulty`: un repaso FSRS legítimo que cambiara `reps`/`stability` sin mover
+    `difficulty` podía ser sobrescrito por una evidencia de Listening. La versión
+    cubre toda la fila, así que cualquier escritura (`upsert_fsrs_card`,
+    `upsert_fsrs_cards`, este CAS) la incrementa.
 
     Un alta nueva (sin conflicto) siempre escribe y devuelve `True`.
     """
     if get_user(user_id) is None:
         return False
     with closing(_conn()) as conn, conn:
-        cursor = conn.execute(
-            _FSRS_UPSERT_CAS_SQL,
-            _fsrs_row(user_id, card, _now()) + (float(expected_difficulty),),
+        return write_fsrs_card_cas(
+            conn, user_id, card, expected_version=expected_version
         )
+
+
+def write_fsrs_card_cas(
+    conn, user_id: str, card: dict, *, expected_version: int
+) -> bool:
+    """CAS de fila completa sobre una conexión DADA (V3.93.1).
+
+    Existe para que una transacción mayor (el claim de evidencia de Listening) pueda
+    escribir la carta DENTRO de su propia transacción, garantizando atomicidad
+    evidencia ↔ FSRS. No abre ni cierra conexión ni transacción: eso lo gobierna el
+    que llama. Devuelve `True` si escribió (o insertó) la fila.
+    """
+    cursor = conn.execute(
+        _FSRS_UPSERT_CAS_SQL,
+        _fsrs_row(user_id, card, _now()) + (int(expected_version),),
+    )
     return cursor.rowcount > 0
 
 
 _FSRS_CARD_COLUMNS = (
     "user_id, target_type, target_id, label, state, difficulty, "
     "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
-    "last_grade, why, fsrs_version, created_at, updated_at"
+    "last_grade, why, fsrs_version, version, created_at, updated_at"
 )
 
 _FSRS_UPSERT_SQL = (
     "INSERT INTO fsrs_cards "
     "(user_id, target_type, target_id, label, state, difficulty, "
     "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
-    "last_grade, why, fsrs_version, created_at, updated_at) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "last_grade, why, fsrs_version, version, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET "
     "label = excluded.label, "
     "state = excluded.state, "
@@ -1138,18 +1154,20 @@ _FSRS_UPSERT_SQL = (
     "last_grade = excluded.last_grade, "
     "why = excluded.why, "
     "fsrs_version = excluded.fsrs_version, "
+    "version = fsrs_cards.version + 1, "
     "updated_at = excluded.updated_at"
 )
 
-# V3.93: misma escritura, pero condicionada a la dificultad observada. El `WHERE`
-# del `DO UPDATE` convierte el upsert ciego en una escritura optimista: si la
-# carta cambió desde que se leyó, no pisa nada y `rowcount` queda en 0.
+# V3.93.1: misma escritura, pero condicionada a la VERSIÓN DE FILA observada. El
+# `WHERE` del `DO UPDATE` la convierte en una escritura optimista de fila completa:
+# si la carta cambió desde que se leyó (cualquier campo, no solo `difficulty`), no
+# pisa nada y `rowcount` queda en 0. La versión se incrementa en cada escritura.
 _FSRS_UPSERT_CAS_SQL = (
     "INSERT INTO fsrs_cards "
     "(user_id, target_type, target_id, label, state, difficulty, "
     "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
-    "last_grade, why, fsrs_version, created_at, updated_at) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "last_grade, why, fsrs_version, version, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
     "ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET "
     "label = excluded.label, "
     "state = excluded.state, "
@@ -1163,8 +1181,9 @@ _FSRS_UPSERT_CAS_SQL = (
     "last_grade = excluded.last_grade, "
     "why = excluded.why, "
     "fsrs_version = excluded.fsrs_version, "
+    "version = fsrs_cards.version + 1, "
     "updated_at = excluded.updated_at "
-    "WHERE fsrs_cards.difficulty = ?"
+    "WHERE fsrs_cards.version = ?"
 )
 
 
@@ -1185,6 +1204,7 @@ def _fsrs_row(user_id: str, card: dict, now: str) -> tuple:
         card.get("last_grade"),
         card.get("why") or "",
         card.get("fsrs_version") or "",
+        int(card.get("version") or 0),
         now,
         now,
     )
@@ -1249,7 +1269,7 @@ def get_fsrs_card(
         row = conn.execute(
             "SELECT user_id, target_type, target_id, label, state, difficulty, "
             "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
-            "last_grade, why, fsrs_version, created_at, updated_at "
+            "last_grade, why, fsrs_version, version, created_at, updated_at "
             "FROM fsrs_cards WHERE user_id = ? AND target_type = ? "
             "AND target_id = ?",
             (user_id, target_type, target_id),
@@ -1262,7 +1282,7 @@ def list_fsrs_cards(user_id: str) -> list[dict]:
         rows = conn.execute(
             "SELECT user_id, target_type, target_id, label, state, difficulty, "
             "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
-            "last_grade, why, fsrs_version, created_at, updated_at "
+            "last_grade, why, fsrs_version, version, created_at, updated_at "
             "FROM fsrs_cards WHERE user_id = ? ORDER BY due_at ASC",
             (user_id,),
         ).fetchall()

@@ -129,6 +129,8 @@ export function submitListeningAnswer(
       ...(opts.solutionShown !== undefined
         ? { solution_shown: opts.solutionShown }
         : {}),
+      // V3.93.1: UUID del intento (idempotencia del intento completo).
+      ...(opts.attemptId !== undefined ? { attempt_id: opts.attemptId } : {}),
     }),
     TIMEOUT_SUBMIT_MS,
     "submit answer",

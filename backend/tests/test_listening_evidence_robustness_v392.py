@@ -8,8 +8,8 @@ frentes que SENSE-CONTEXT-01 dejó medidos:
   índice único parcial; repetir el MISMO intento no vuelve a sumar, dos intentos
   distintos sí;
 - H7 (lost update): `academy_repo.upsert_fsrs_card_cas` escribe solo si la
-  dificultad guardada es la que se leyó, así que dos evidencias simultáneas suman
-  las DOS en vez de pisarse;
+  versión de fila guardada es la que se leyó, así que dos evidencias simultáneas
+  suman las DOS en vez de pisarse;
 - la migración desde un árbol anterior es ADITIVA e idempotente.
 """
 import sqlite3
@@ -67,15 +67,18 @@ def _seed_word_with_empty_card(user_id: str, word: str) -> None:
     )
 
 
-def _fail(client, uid: str, q: dict, attempt: int = 1):
+def _fail(client, uid: str, q: dict, attempt: int = 1, attempt_id: str = ""):
+    payload = {
+        "question_id": q["id"],
+        "answer_index": _wrong_index(q),
+        "attempt_number": attempt,
+    }
+    if attempt_id:
+        payload["attempt_id"] = attempt_id
     return client.post(
         "/api/listening/answer",
         params={"user_id": uid},
-        json={
-            "question_id": q["id"],
-            "answer_index": _wrong_index(q),
-            "attempt_number": attempt,
-        },
+        json=payload,
     )
 
 
@@ -105,18 +108,25 @@ def test_distinct_attempts_stack_difficulty_and_evidence_rows(monkeypatch, tmp_p
 
 
 def test_repeating_the_same_attempt_does_not_double_count(monkeypatch, tmp_path):
-    """V3.93: la evidencia es idempotente por intento (`evidence_key`).
+    """V3.93.1: el intento COMPLETO es idempotente por `attempt_id`.
 
-    Un reintento de red o un doble toque repiten el MISMO `attempt_number`: el
-    ledger no inserta una segunda fila y la carta no vuelve a subir.
+    Un reintento de red o un doble toque repiten el MISMO `attempt_id`: no se
+    inserta una segunda fila, la cola no vuelve a contar y la carta no re-sube.
     """
     uid = _setup(monkeypatch, tmp_path)
     q = _receptive_question()
     word = _phrase_word(q)
     _seed_word_with_empty_card(uid, word)
     with TestClient(app) as client:
-        _fail(client, uid, q)  # intento 1
-        _fail(client, uid, q)  # el MISMO intento 1, otra vez
+        _fail(client, uid, q, attempt_id="A1")  # intento 1
+        _fail(client, uid, q, attempt_id="A1")  # el MISMO intento 1, otra vez
+    with closing(db._conn()) as conn:
+        attempts = conn.execute(
+            "SELECT COUNT(*) AS n FROM listening_attempts WHERE user_id = ?",
+            (uid,),
+        ).fetchone()["n"]
+    assert attempts == 1
+    assert listening_repo.get_queue_entry(uid, q["id"])["fail_count"] == 1
     rows = listening_repo.list_difficulty_evidence(uid)
     assert len(rows) == 1
     card = academy_repo.get_fsrs_card(uid, "lexicon", word)
@@ -127,11 +137,12 @@ def test_repeating_the_same_attempt_does_not_double_count(monkeypatch, tmp_path)
 
 
 def test_cas_prevents_lost_update(monkeypatch, tmp_path):
-    """V3.93: dos evidencias sobre la MISMA base suman las DOS, no se pisan.
+    """V3.93.1: dos evidencias sobre la MISMA base suman las DOS, no se pisan.
 
     Con el upsert ciego de V3.92, ambas calculaban `5.6` y la segunda pisaba a la
-    primera (lost update). Con el CAS, la segunda parte de una base obsoleta, NO
-    escribe, y el reintento con la carta fresca suma hasta `6.2`.
+    primera (lost update). Con el CAS de fila completa por `version`, la segunda
+    parte de una base obsoleta, NO escribe, y el reintento con la carta fresca
+    suma hasta `6.2`.
     """
     uid = _setup(monkeypatch, tmp_path)
     base = fsrs.empty_card(target_type="lexicon", target_id="bank", label="bank")
@@ -139,20 +150,20 @@ def test_cas_prevents_lost_update(monkeypatch, tmp_path):
     academy_repo.upsert_fsrs_card(uid, base)
     first = fsrs.apply_difficulty_evidence(base, source="listening-evidence", now=now)
     second = fsrs.apply_difficulty_evidence(base, source="listening-evidence", now=now)
-    assert academy_repo.upsert_fsrs_card_cas(
-        uid, first, expected_difficulty=5.0
-    ) is True
-    # La segunda parte de la MISMA base ya obsoleta: el CAS la rechaza.
-    assert academy_repo.upsert_fsrs_card_cas(
-        uid, second, expected_difficulty=5.0
-    ) is False
+    assert (
+        academy_repo.upsert_fsrs_card_cas(uid, first, expected_version=0) is True
+    )
+    # La segunda parte de la MISMA base ya obsoleta (versión 0): el CAS la rechaza.
+    assert (
+        academy_repo.upsert_fsrs_card_cas(uid, second, expected_version=0) is False
+    )
     card = academy_repo.get_fsrs_card(uid, "lexicon", "bank")
     assert card["difficulty"] == pytest.approx(5.6, abs=0.001)
-    # Reintento con la carta fresca: la segunda evidencia SÍ se cobra.
+    # Reintento con la carta fresca (versión 1): la segunda evidencia SÍ se cobra.
     retry = fsrs.apply_difficulty_evidence(card, source="listening-evidence", now=now)
-    assert academy_repo.upsert_fsrs_card_cas(
-        uid, retry, expected_difficulty=5.6
-    ) is True
+    assert (
+        academy_repo.upsert_fsrs_card_cas(uid, retry, expected_version=1) is True
+    )
     card = academy_repo.get_fsrs_card(uid, "lexicon", "bank")
     assert card["difficulty"] == pytest.approx(6.2, abs=0.001)
 

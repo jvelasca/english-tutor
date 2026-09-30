@@ -100,6 +100,12 @@ class ListeningAnswerRequest(BaseModel):
     attempt_number: int = Field(default=1, ge=1)
     hint_used: bool = False
     solution_shown: bool = False
+    # V3.93.1: UUID que el cliente genera por INTENTO y reutiliza en el reintento
+    # HTTP del mismo intento (doble toque, reintento de red). Es la identidad con
+    # la que el backend deduplica el intento COMPLETO (fila + cola + evidencia),
+    # no solo el ledger. Aditivo con default '': un cliente antiguo conserva el
+    # comportamiento anterior (sin dedup).
+    attempt_id: str = ""
 
 
 class ListeningDifficultyEvidence(BaseModel):

@@ -1636,6 +1636,10 @@ export interface ListeningSupportMetadata {
   attemptNumber?: number;
   hintUsed?: boolean;
   solutionShown?: boolean;
+  // V3.93.1: UUID del INTENTO, generado por el cliente y reutilizado en el
+  // reintento HTTP del mismo intento. Identidad con la que el backend deduplica
+  // el intento completo (fila + cola + evidencia).
+  attemptId?: string;
 }
 
 export interface ListeningAnswerResponse {

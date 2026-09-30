@@ -183,14 +183,22 @@ def classify_sense_evidence(
             continue
         others.append(sense)
 
-    # Se evalúa cada ocurrencia y gana la que más señal léxica reúne (empate: la
-    # primera, que es determinista por el orden de `unit_positions`).
+    # Se evalúa cada ocurrencia y gana la MÁS DISCRIMINATIVA (V3.93.1), no la que
+    # más solapa en total. Antes pesaba `declared + other`, así que una aparición
+    # ambigua (margen 0) podía empatar y ganar a otra inequívoca solo por sumar
+    # más solapamiento. Peso: (¿discrimina?, margen, solape declarado, posición).
+    # Así una ocurrencia con veredicto claro vence a una ambigua, y a igualdad de
+    # margen se prefiere la que apoya la acepción declarada. Desempate estable:
+    # la primera (orden de `unit_positions`).
     best: dict | None = None
-    best_weight: tuple[int, int] | None = None
+    best_weight: tuple[int, int, int, int] | None = None
     for index in positions:
         signal = _evaluate_position(tokens, index, normalized, declared_gloss, others)
+        margin = abs(signal["declared_overlap"] - signal["best_other_overlap"])
         weight = (
-            signal["declared_overlap"] + signal["best_other_overlap"],
+            1 if margin > 0 else 0,
+            margin,
+            signal["declared_overlap"],
             -index,
         )
         if best_weight is None or weight > best_weight:

@@ -5,8 +5,77 @@ import json
 import uuid
 from contextlib import closing
 
+from repositories import academy as academy_repo
 from repositories.db import _conn, _now
 from repositories.users import get_user
+from services import listening_review
+
+# V3.93.1: columnas del intento + `attempt_id`. La lista se comparte entre
+# `record_attempt` (producción y llamadores legacy) y `record_answer_event`
+# (intento + cola en UNA transacción).
+_ATTEMPT_INSERT_SQL = (
+    "INSERT INTO listening_attempts "
+    "(user_id, question_id, answer_index, correct, skill, difficulty, "
+    "response_time_ms, replay_count, topic, realized_difficulty, "
+    "task_type, score, layer, speed_used, stage, transcript_used, "
+    "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
+    "word_breakdown_json, outcome, attempt_id, created_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+    "?, ?, ?)"
+)
+
+
+def _attempt_values(
+    user_id: str,
+    question_id: str,
+    answer_index: int,
+    correct: bool,
+    skill: str,
+    difficulty: int,
+    response_time_ms: int | None,
+    replay_count: int,
+    topic: str,
+    realized_difficulty: int,
+    task_type: str,
+    score: float | None,
+    layer: str,
+    speed_used: str,
+    stage: str,
+    transcript_used: str,
+    segments_replayed: int,
+    shadowing_duration_ms: int | None,
+    shadowing_speech_rate: float | None,
+    word_breakdown: dict | None,
+    outcome: str,
+    attempt_id: str,
+    now: str,
+) -> tuple:
+    """Valores del INSERT del intento, en el orden de `_ATTEMPT_INSERT_SQL`."""
+    return (
+        user_id,
+        question_id,
+        answer_index,
+        int(correct),
+        skill,
+        difficulty,
+        response_time_ms,
+        replay_count,
+        topic,
+        realized_difficulty,
+        task_type,
+        score,
+        layer,
+        speed_used,
+        stage,
+        transcript_used,
+        segments_replayed,
+        shadowing_duration_ms,
+        shadowing_speech_rate,
+        json.dumps(word_breakdown) if word_breakdown is not None else None,
+        outcome,
+        attempt_id,
+        now,
+    )
 
 
 def record_attempt(
@@ -31,6 +100,7 @@ def record_attempt(
     shadowing_speech_rate: float | None = None,
     word_breakdown: dict | None = None,
     outcome: str = "",
+    attempt_id: str = "",
 ) -> bool:
     """Persiste un intento de listening para un usuario existente.
 
@@ -62,19 +132,12 @@ def record_attempt(
         return False
     with closing(_conn()) as conn, conn:
         conn.execute(
-            "INSERT INTO listening_attempts "
-            "(user_id, question_id, answer_index, correct, skill, difficulty, "
-            "response_time_ms, replay_count, topic, realized_difficulty, "
-            "task_type, score, layer, speed_used, stage, transcript_used, "
-            "segments_replayed, shadowing_duration_ms, shadowing_speech_rate, "
-            "word_breakdown_json, outcome, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "?, ?)",
-            (
+            _ATTEMPT_INSERT_SQL,
+            _attempt_values(
                 user_id,
                 question_id,
                 answer_index,
-                int(correct),
+                correct,
                 skill,
                 difficulty,
                 response_time_ms,
@@ -90,8 +153,9 @@ def record_attempt(
                 segments_replayed,
                 shadowing_duration_ms,
                 shadowing_speech_rate,
-                json.dumps(word_breakdown) if word_breakdown is not None else None,
+                word_breakdown,
                 outcome,
+                attempt_id,
                 _now(),
             ),
         )
@@ -343,6 +407,63 @@ _QUEUE_COLUMNS = (
     "next_review_at, priority, state, created_at, updated_at"
 )
 
+# V3.93.1: el upsert de la cola se comparte entre `enqueue_failure` (su propia
+# transacción) y `record_answer_event` (dentro de la transacción del intento).
+_QUEUE_UPSERT_SQL = (
+    "INSERT INTO listening_review_queue "
+    "(user_id, question_id, level, skill, task_type, fail_count, "
+    "last_failed_at, next_review_at, priority, state, created_at, "
+    "updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?) "
+    "ON CONFLICT(user_id, question_id) DO UPDATE SET "
+    "level = excluded.level, "
+    "skill = excluded.skill, "
+    "task_type = excluded.task_type, "
+    "fail_count = excluded.fail_count, "
+    "last_failed_at = excluded.last_failed_at, "
+    "next_review_at = excluded.next_review_at, "
+    "priority = excluded.priority, "
+    "state = 'pending', "
+    "updated_at = excluded.updated_at"
+)
+
+
+def _upsert_queue(
+    conn,
+    user_id: str,
+    question_id: str,
+    *,
+    level: str,
+    skill: str,
+    task_type: str,
+    fail_count: int,
+    next_review_at: str,
+    priority: float,
+    now: str,
+) -> None:
+    """Upsert de la cola de repaso sobre una conexión DADA (V3.93.1).
+
+    No abre conexión ni transacción: eso lo gobierna el que llama. Existe para que
+    el incremento de `fail_count` pueda vivir dentro de la MISMA transacción que
+    inserta el intento (sin ventana de read-compute-write entre ambas).
+    """
+    conn.execute(
+        _QUEUE_UPSERT_SQL,
+        (
+            user_id,
+            question_id,
+            level,
+            skill,
+            task_type,
+            max(1, int(fail_count)),
+            now,
+            next_review_at,
+            float(priority),
+            now,
+            now,
+        ),
+    )
+
 
 def enqueue_failure(
     user_id: str,
@@ -368,37 +489,176 @@ def enqueue_failure(
         return False
     now = _now()
     with closing(_conn()) as conn, conn:
-        conn.execute(
-            "INSERT INTO listening_review_queue "
-            "(user_id, question_id, level, skill, task_type, fail_count, "
-            "last_failed_at, next_review_at, priority, state, created_at, "
-            "updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?) "
-            "ON CONFLICT(user_id, question_id) DO UPDATE SET "
-            "level = excluded.level, "
-            "skill = excluded.skill, "
-            "task_type = excluded.task_type, "
-            "fail_count = excluded.fail_count, "
-            "last_failed_at = excluded.last_failed_at, "
-            "next_review_at = excluded.next_review_at, "
-            "priority = excluded.priority, "
-            "state = 'pending', "
-            "updated_at = excluded.updated_at",
-            (
-                user_id,
-                question_id,
-                level,
-                skill,
-                task_type,
-                max(1, int(fail_count)),
-                now,
-                next_review_at,
-                float(priority),
-                now,
-                now,
-            ),
+        _upsert_queue(
+            conn,
+            user_id,
+            question_id,
+            level=level,
+            skill=skill,
+            task_type=task_type,
+            fail_count=fail_count,
+            next_review_at=next_review_at,
+            priority=priority,
+            now=now,
         )
     return True
+
+
+def record_answer_event(
+    user_id: str,
+    question_id: str,
+    answer_index: int,
+    correct: bool,
+    *,
+    skill: str = "",
+    difficulty: int = 1,
+    response_time_ms: int | None = None,
+    replay_count: int = 0,
+    topic: str = "",
+    realized_difficulty: int = 0,
+    task_type: str = "mcq",
+    score: float | None = None,
+    layer: str = "",
+    speed_used: str = "normal",
+    stage: str = "",
+    transcript_used: str = "",
+    segments_replayed: int = 0,
+    shadowing_duration_ms: int | None = None,
+    shadowing_speech_rate: float | None = None,
+    word_breakdown: dict | None = None,
+    outcome: str = "",
+    attempt_id: str = "",
+    level: str = "",
+) -> dict | None:
+    """Inserta el intento y actualiza la cola de repaso EN UNA transacción (V3.93.1).
+
+    Es la unidad atómica del intento. Antes, `record_attempt` insertaba sin dedup y
+    `_sync_review_queue` re-incrementaba `fail_count` con un read-compute-write sin
+    CAS: un doble POST del MISMO intento dejaba 2 intentos y 2 fallos con 1 evidencia,
+    y dos fallos concurrentes perdían un incremento. Aquí:
+
+    - el intento se deduplica por `attempt_id` (UUID del cliente, reutilizado en el
+      reintento HTTP) con comprobación DENTRO del write lock (`BEGIN IMMEDIATE`);
+    - si el intento es NUEVO, se lee `fail_count`, se calcula el plan
+      (`services.listening_review.schedule`) y se actualiza la cola en la MISMA
+      transacción: el read-compute-write queda serializado por el lock;
+    - si el intento YA existía (reintento), no se inserta ni se toca la cola.
+
+    Un `attempt_id` vacío (llamadores legacy / tests) NUNCA deduplica: se comporta
+    como V3.92 (inserta y encola). Devuelve `{"inserted", "fail_count", "attempt"}`
+    o `None` si el usuario no existe.
+    """
+    if get_user(user_id) is None:
+        return None
+    now = _now()
+    conn = _conn()
+    try:
+        # `isolation_level=None` desactiva la gestión implícita de transacciones de
+        # sqlite3 para gobernar el `BEGIN IMMEDIATE` a mano (toma el write lock ya).
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            existing_id = None
+            if attempt_id:
+                row = conn.execute(
+                    "SELECT id FROM listening_attempts "
+                    "WHERE user_id = ? AND attempt_id = ?",
+                    (user_id, attempt_id),
+                ).fetchone()
+                existing_id = row["id"] if row is not None else None
+            if existing_id is not None:
+                # Reintento del MISMO intento: NO se re-inserta ni se re-cuenta.
+                fail_count = _read_queue_fail_count(conn, user_id, question_id)
+                conn.execute("COMMIT")
+                return {
+                    "inserted": False,
+                    "fail_count": fail_count,
+                    "attempt": _get_attempt(conn, existing_id),
+                }
+            cursor = conn.execute(
+                _ATTEMPT_INSERT_SQL,
+                _attempt_values(
+                    user_id,
+                    question_id,
+                    answer_index,
+                    correct,
+                    skill,
+                    difficulty,
+                    response_time_ms,
+                    replay_count,
+                    topic,
+                    realized_difficulty,
+                    task_type,
+                    score,
+                    layer,
+                    speed_used,
+                    stage,
+                    transcript_used,
+                    segments_replayed,
+                    shadowing_duration_ms,
+                    shadowing_speech_rate,
+                    word_breakdown,
+                    outcome,
+                    attempt_id,
+                    now,
+                ),
+            )
+            attempt_row_id = cursor.lastrowid
+            if correct:
+                # Acertar la frase la saca de la cola (es la forma natural de
+                # repasarla); el intento queda registrado igual.
+                conn.execute(
+                    "DELETE FROM listening_review_queue "
+                    "WHERE user_id = ? AND question_id = ?",
+                    (user_id, question_id),
+                )
+                fail_count = 0
+            else:
+                prev = _read_queue_fail_count(conn, user_id, question_id)
+                fail_count = prev + 1
+                plan = listening_review.schedule(fail_count, skill=skill)
+                _upsert_queue(
+                    conn,
+                    user_id,
+                    question_id,
+                    level=level,
+                    skill=skill,
+                    task_type=task_type,
+                    fail_count=plan["fail_count"],
+                    next_review_at=plan["next_review_at"],
+                    priority=plan["priority"],
+                    now=now,
+                )
+                fail_count = int(plan["fail_count"])
+            conn.execute("COMMIT")
+            return {
+                "inserted": True,
+                "fail_count": fail_count,
+                "attempt": _get_attempt(conn, attempt_row_id),
+            }
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+
+
+def _read_queue_fail_count(conn, user_id: str, question_id: str) -> int:
+    """`fail_count` actual de una frase en la cola (0 si no está encolada)."""
+    row = conn.execute(
+        "SELECT fail_count FROM listening_review_queue "
+        "WHERE user_id = ? AND question_id = ?",
+        (user_id, question_id),
+    ).fetchone()
+    return int(row["fail_count"]) if row is not None else 0
+
+
+def _get_attempt(conn, attempt_id_row: int) -> dict | None:
+    """Fila completa de un intento por su id de tabla (para la respuesta)."""
+    row = conn.execute(
+        "SELECT * FROM listening_attempts WHERE id = ?", (attempt_id_row,)
+    ).fetchone()
+    return dict(row) if row is not None else None
 
 
 def get_queue_entry(user_id: str, question_id: str) -> dict | None:
@@ -502,23 +762,84 @@ def queue_fail_counts(user_id: str) -> dict[str, int]:
 _EVIDENCE_COLUMNS = (
     "id, user_id, question_id, word, fail_count, difficulty_before, "
     "difficulty_after, due_at, created_at, evidence_key, sense_key, "
-    "sense_match, sense_reason"
+    "sense_match, sense_reason, attempt_id"
+)
+
+_EVIDENCE_INSERT_SQL = (
+    "INSERT INTO listening_difficulty_evidence "
+    "(user_id, question_id, word, fail_count, difficulty_before, "
+    "difficulty_after, due_at, created_at, evidence_key, sense_key, "
+    "sense_match, sense_reason, attempt_id) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT DO NOTHING"
 )
 
 
 def evidence_key(
-    user_id: str, question_id: str, word: str, attempt_number: int = 1
+    user_id: str,
+    question_id: str,
+    word: str,
+    attempt_number: int = 1,
+    attempt_id: str = "",
 ) -> str:
-    """Clave de idempotencia de una evidencia (V3.93, pura).
+    """Clave de idempotencia de una evidencia (V3.93, ampliada en V3.93.1).
 
-    Un mismo intento (mismo `attempt_number`) de la misma frase sobre la misma
-    palabra es UN suceso: una repetición del cliente —doble toque, reintento de
-    red— no puede volver a sumar dificultad. Dos intentos DISTINTOS (1 y 2) sí
-    son dos sucesos y suman dos veces: eso no es un duplicado, es el alumno
-    fallando dos veces.
+    Un mismo INTENTO de la misma frase sobre la misma palabra es UN suceso: una
+    repetición del cliente —doble toque, reintento de red— no puede volver a sumar
+    dificultad.
+
+    V3.93.1: la identidad del intento es `attempt_id` (UUID del cliente, reutilizado
+    en el reintento HTTP). Si no llega (`attempt_id` vacío, llamadores legacy) se
+    conserva la clave por `attempt_number` de V3.93. Se usa `attempt_id` y no
+    `attempt_number` porque este se reinicia por carga de pregunta y colapsaría
+    reintentos legítimos posteriores de la misma frase.
     """
     normalized = str(word or "").strip().lower()
-    return f"{user_id}:{question_id}:{normalized}:{max(1, int(attempt_number))}"
+    ident = str(attempt_id or "").strip() or str(max(1, int(attempt_number)))
+    return f"{user_id}:{question_id}:{normalized}:{ident}"
+
+
+def _insert_evidence(
+    conn,
+    *,
+    user_id: str,
+    question_id: str,
+    word: str,
+    fail_count: int,
+    difficulty_before: float,
+    difficulty_after: float,
+    due_at: str,
+    attempt_number: int,
+    attempt_id: str,
+    sense_key: str,
+    sense_match: str,
+    sense_reason: str,
+) -> bool:
+    """INSERT de la evidencia sobre una conexión DADA (V3.93.1).
+
+    `ON CONFLICT DO NOTHING` con el índice único parcial sobre `evidence_key`:
+    devuelve `True` solo si insertó de verdad (`False` = duplicado del mismo
+    intento). No gobierna transacción: eso lo decide el que llama.
+    """
+    cursor = conn.execute(
+        _EVIDENCE_INSERT_SQL,
+        (
+            user_id,
+            question_id,
+            str(word or "").strip().lower(),
+            max(1, int(fail_count)),
+            float(difficulty_before),
+            float(difficulty_after),
+            due_at,
+            _now(),
+            evidence_key(user_id, question_id, word, attempt_number, attempt_id),
+            str(sense_key or ""),
+            str(sense_match or ""),
+            str(sense_reason or ""),
+            str(attempt_id or ""),
+        ),
+    )
+    return cursor.rowcount > 0
 
 
 def record_difficulty_evidence(
@@ -531,52 +852,120 @@ def record_difficulty_evidence(
     difficulty_after: float = 0.0,
     due_at: str = "",
     attempt_number: int = 1,
+    attempt_id: str = "",
     sense_key: str = "",
     sense_match: str = "",
     sense_reason: str = "",
 ) -> bool:
-    """Registra una subida de dificultad de `word` causada por `question_id`.
+    """Registra la evidencia SOLO en el ledger (sin tocar la carta FSRS).
 
-    Devuelve `True` solo si la fila se ha INSERTADO de verdad. Devuelve `False`
-    si el usuario no existe **o** si ya había una evidencia con la misma
-    `evidence_key` (mismo intento): en ese caso la llamada es un NO-OP
-    idempotente y el que llama NO debe volver a subir la dificultad.
+    Se conserva para llamadores que solo necesitan el rastro. **El puente de
+    Listening usa `claim_evidence_and_write_card`**, que escribe evidencia y carta
+    en la MISMA transacción: llamar a esta función por separado reintroduce la
+    ventana de desincronización que V3.93.1 cierra.
 
-    V3.93: deja de ser «append-only sin dedup» y pasa a ser idempotente por
-    intento. La lectura honesta se conserva: dos intentos distintos de la misma
-    palabra en la misma frase siguen siendo DOS evidencias (la carta, además, se
-    acota sola: su dificultad está topada en 10).
+    Devuelve `True` solo si la fila se ha INSERTADO de verdad. `False` si el usuario
+    no existe o si ya había una evidencia con la misma `evidence_key`.
 
-    V3.93 (dark launch sense-aware): las columnas `sense_key`/`sense_match`/
-    `sense_reason` guardan el veredicto del Sense Resolver para esa ocurrencia.
-    Son **informativas**: esta release NO cambia si la evidencia se genera.
+    V3.93 (dark launch sense-aware): `sense_key`/`sense_match`/`sense_reason`
+    guardan el veredicto del Sense Resolver para esa ocurrencia; son informativos.
     """
     if get_user(user_id) is None:
         return False
     with closing(_conn()) as conn, conn:
-        cursor = conn.execute(
-            "INSERT INTO listening_difficulty_evidence "
-            "(user_id, question_id, word, fail_count, difficulty_before, "
-            "difficulty_after, due_at, created_at, evidence_key, sense_key, "
-            "sense_match, sense_reason) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT DO NOTHING",
-            (
-                user_id,
-                question_id,
-                str(word or "").strip().lower(),
-                max(1, int(fail_count)),
-                float(difficulty_before),
-                float(difficulty_after),
-                due_at,
-                _now(),
-                evidence_key(user_id, question_id, word, attempt_number),
-                str(sense_key or ""),
-                str(sense_match or ""),
-                str(sense_reason or ""),
-            ),
+        return _insert_evidence(
+            conn,
+            user_id=user_id,
+            question_id=question_id,
+            word=word,
+            fail_count=fail_count,
+            difficulty_before=difficulty_before,
+            difficulty_after=difficulty_after,
+            due_at=due_at,
+            attempt_number=attempt_number,
+            attempt_id=attempt_id,
+            sense_key=sense_key,
+            sense_match=sense_match,
+            sense_reason=sense_reason,
         )
-        return cursor.rowcount > 0
+
+
+def claim_evidence_and_write_card(
+    user_id: str,
+    question_id: str,
+    word: str,
+    card: dict,
+    *,
+    expected_version: int,
+    fail_count: int = 1,
+    difficulty_before: float = 0.0,
+    difficulty_after: float = 0.0,
+    due_at: str = "",
+    attempt_number: int = 1,
+    attempt_id: str = "",
+    sense_key: str = "",
+    sense_match: str = "",
+    sense_reason: str = "",
+) -> str:
+    """Reclama la evidencia Y escribe la carta FSRS en UNA transacción (V3.93.1).
+
+    Es la unidad atómica del puente Listening → FSRS. Cierra el P0 de V3.93: antes
+    `record_difficulty_evidence` (su propia transacción) y `upsert_fsrs_card_cas`
+    (otra) eran independientes, así que un CAS que agotaba los reintentos dejaba una
+    fila de evidencia sin FSRS y la idempotencia de `evidence_key` impedía recuperar
+    esa señal.
+
+    Secuencia dentro de `BEGIN IMMEDIATE`:
+
+    1. reclama la clave (`_insert_evidence`, `ON CONFLICT DO NOTHING`);
+    2. si ya existía → ROLLBACK y `"duplicate"` (el intento ya estaba aplicado);
+    3. escribe la carta con CAS de fila completa (`write_fsrs_card_cas`);
+    4. si el CAS no escribe → **ROLLBACK** (no queda fila y la clave se libera) y
+       `"conflict"` (el que llama debe releer la carta y recalcular);
+    5. si todo va bien → COMMIT y `"ok"`.
+
+    Nunca deja evidencia sin carta ni carta sin evidencia. Devuelve uno de
+    `"ok"`, `"duplicate"`, `"conflict"`, `"no_user"`.
+    """
+    if get_user(user_id) is None:
+        return "no_user"
+    conn = _conn()
+    try:
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            inserted = _insert_evidence(
+                conn,
+                user_id=user_id,
+                question_id=question_id,
+                word=word,
+                fail_count=fail_count,
+                difficulty_before=difficulty_before,
+                difficulty_after=difficulty_after,
+                due_at=due_at,
+                attempt_number=attempt_number,
+                attempt_id=attempt_id,
+                sense_key=sense_key,
+                sense_match=sense_match,
+                sense_reason=sense_reason,
+            )
+            if not inserted:
+                conn.execute("ROLLBACK")
+                return "duplicate"
+            wrote = academy_repo.write_fsrs_card_cas(
+                conn, user_id, card, expected_version=expected_version
+            )
+            if not wrote:
+                conn.execute("ROLLBACK")
+                return "conflict"
+            conn.execute("COMMIT")
+            return "ok"
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+
 
 
 def list_difficulty_evidence(user_id: str, day: str = "") -> list[dict]:

@@ -315,6 +315,7 @@ async def submit_answer(
     attempt_number: int = 1,
     hint_used: bool = False,
     solution_shown: bool = False,
+    attempt_id: str = "",
 ) -> dict | None:
     """Evalúa y persiste la respuesta. Devuelve None si la pregunta no existe.
 
@@ -353,18 +354,22 @@ async def submit_answer(
         solution_shown=solution_shown,
     )
     skill = question.get("skill", "")
-    await run_in_threadpool(
-        listening_repo.record_attempt,
+    # V3.93.1: intento + cola de repaso en UNA transacción, idempotente por
+    # `attempt_id`. Repetir el mismo intento (reintento de red, doble toque) no
+    # inserta otra fila ni vuelve a incrementar `fail_count`; la evidencia se
+    # reclama después (idempotente por la misma clave).
+    event = await run_in_threadpool(
+        listening_repo.record_answer_event,
         user_id,
         question_id,
         answer_index,
         correct,
-        skill,
-        difficulty,
-        response_time_ms,
-        replay_count,
-        question.get("topic", ""),
-        realized,
+        skill=skill,
+        difficulty=difficulty,
+        response_time_ms=response_time_ms,
+        replay_count=replay_count,
+        topic=question.get("topic", ""),
+        realized_difficulty=realized,
         task_type=task_type,
         layer=skill_layer(skill) or "",
         speed_used=speed_used,
@@ -373,10 +378,12 @@ async def submit_answer(
         segments_replayed=segments_replayed,
         word_breakdown=word_breakdown,
         outcome=outcome,
+        attempt_id=attempt_id,
+        level=question.get("level", ""),
     )
-    fail_count = await _sync_review_queue(
-        user_id, question_id, question, correct, skill, task_type
-    )
+    if event is None:
+        return None
+    fail_count = int(event["fail_count"])
     evidence = (
         {"words": [], "count": 0}
         if fail_count == 0
@@ -386,6 +393,7 @@ async def submit_answer(
             question,
             fail_count=fail_count,
             attempt_number=attempt_number,
+            attempt_id=attempt_id,
         )
     )
     return {
@@ -418,6 +426,7 @@ async def _apply_difficulty_evidence(
     *,
     fail_count: int = 1,
     attempt_number: int = 1,
+    attempt_id: str = "",
 ) -> dict:
     """Puente Listening → FSRS: el fallo sube la dificultad de las palabras suyas.
 
@@ -443,6 +452,12 @@ async def _apply_difficulty_evidence(
     carta (una repetición del mismo intento no vuelve a sumar) y la carta se
     escribe con control de concurrencia optimista (dos evidencias simultáneas
     suman las DOS en vez de pisarse).
+
+    V3.93.1 (atomicidad): el claim y el CAS de la carta van en la MISMA
+    transacción (`claim_evidence_and_write_card`): nunca queda una evidencia
+    registrada sin su subida de FSRS. Si el CAS no escribe, la transacción se
+    revierte (no queda fila y la clave se libera) y se reintenta con la carta
+    fresca.
 
     Devuelve `{"words": [...], "count": n}`; `count` es el número de cartas
     tocadas, no el de coincidencias léxicas. Nunca lanza hacia el cliente: si algo
@@ -482,34 +497,50 @@ async def _apply_difficulty_evidence(
         verdict = sense_context.classify_sense_evidence(
             word, text, senses.get(word), senses=()
         )
-        before = float(card.get("difficulty") or 5.0)
-        updated = fsrs.apply_difficulty_evidence(
-            card, source=listening_bridge.SOURCE, now=now
-        )
-        if updated is None:
-            continue
-        after = float(updated.get("difficulty") or before)
-        claimed = await run_in_threadpool(
-            listening_repo.record_difficulty_evidence,
-            user_id,
-            question_id,
-            word,
-            fail_count=fail_count,
-            difficulty_before=before,
-            difficulty_after=after,
-            due_at=updated.get("due_at") or "",
-            attempt_number=attempt_number,
-            sense_key=verdict["declared_key"],
-            sense_match=verdict["match"],
-            sense_reason=verdict["reason"],
-        )
-        if not claimed:
-            # Este intento ya estaba registrado: NO se vuelve a subir la carta.
-            continue
-        saved = await _persist_card(user_id, word, card, updated, now=now)
-        if saved is None:
-            continue
-        words.append(word)
+        # V3.93.1: el claim de la evidencia y el CAS de la carta van en UNA sola
+        # transacción (`claim_evidence_and_write_card`): o ambas cosas, o ninguna.
+        # `duplicate` = el intento ya estaba aplicado (no-op). `conflict` = otro
+        # escritor cambió la carta: se RELEE y se recalcula la subida sobre el
+        # valor fresco (hasta `_CARD_WRITE_ATTEMPTS`) conservando el CAS de V3.93.
+        for _ in range(_CARD_WRITE_ATTEMPTS):
+            before = float(card.get("difficulty") or 5.0)
+            expected_version = int(card.get("version") or 0)
+            updated = fsrs.apply_difficulty_evidence(
+                card, source=listening_bridge.SOURCE, now=now
+            )
+            if updated is None:
+                break
+            after = float(updated.get("difficulty") or before)
+            result = await run_in_threadpool(
+                listening_repo.claim_evidence_and_write_card,
+                user_id,
+                question_id,
+                word,
+                updated,
+                expected_version=expected_version,
+                fail_count=fail_count,
+                difficulty_before=before,
+                difficulty_after=after,
+                due_at=updated.get("due_at") or "",
+                attempt_number=attempt_number,
+                attempt_id=attempt_id,
+                sense_key=verdict["declared_key"],
+                sense_match=verdict["match"],
+                sense_reason=verdict["reason"],
+            )
+            if result == "ok":
+                words.append(word)
+                break
+            if result in ("duplicate", "no_user"):
+                # El intento ya estaba aplicado (o no hay usuario): no se reintenta.
+                break
+            # "conflict": relevo la carta y recalculó sobre el valor fresco.
+            fresh = await run_in_threadpool(
+                academy_repo.get_fsrs_card, user_id, "lexicon", word
+            )
+            if fresh is None:
+                break
+            card = fresh
     return {"words": words, "count": len(words)}
 
 
@@ -517,81 +548,6 @@ async def _apply_difficulty_evidence(
 # (el mismo alumno fallando la misma frase desde dos pestañas); tres intentos
 # sobran y acotan el peor caso sin bucle infinito.
 _CARD_WRITE_ATTEMPTS = 3
-
-
-async def _persist_card(
-    user_id: str, word: str, card: dict, updated: dict, *, now: str
-) -> dict | None:
-    """Escribe la carta con CAS y reintentos acotados (V3.93).
-
-    `card` es lo leído y `updated` la subida calculada. Si otro escritor cambió
-    la dificultad, el CAS no escribe, se RELEE y se recalcula la subida sobre el
-    valor fresco (hasta `_CARD_WRITE_ATTEMPTS`): así dos evidencias simultáneas
-    suman las dos en vez de que la segunda pise a la primera.
-    """
-    for _ in range(_CARD_WRITE_ATTEMPTS):
-        expected = float(card.get("difficulty") or 5.0)
-        ok = await run_in_threadpool(
-            academy_repo.upsert_fsrs_card_cas,
-            user_id,
-            updated,
-            expected_difficulty=expected,
-        )
-        if ok:
-            return updated
-        fresh = await run_in_threadpool(
-            academy_repo.get_fsrs_card, user_id, "lexicon", word
-        )
-        if fresh is None:
-            return None
-        card = fresh
-        updated = fsrs.apply_difficulty_evidence(
-            card, source=listening_bridge.SOURCE, now=now
-        )
-        if updated is None:
-            return None
-    return None
-
-
-async def _sync_review_queue(
-    user_id: str,
-    question_id: str,
-    question: dict,
-    correct: bool,
-    skill: str,
-    task_type: str,
-) -> int:
-    """Mantiene la cola de repaso coherente con el desenlace del intento.
-
-    Un fallo encola (incrementando `fail_count` si ya estaba); un acierto saca la
-    frase de la cola, porque acertarla es la forma natural de «repasarla». Se
-    ejecuta en el threadpool: el repositorio toca SQLite.
-
-    Devuelve el `fail_count` ACUMULADO de la frase (`0` si el intento fue un
-    acierto y la frase salió de la cola). V3.92: ese número es también la
-    evidencia con la que el puente hacia FSRS declara la dificultad, así que se
-    calcula UNA vez aquí y se comparte en vez de releer la cola dos veces.
-    """
-    if correct:
-        await run_in_threadpool(
-            listening_repo.mark_queue_reviewed, user_id, question_id
-        )
-        return 0
-    counts = await run_in_threadpool(listening_repo.queue_fail_counts, user_id)
-    fail_count = counts.get(question_id, 0) + 1
-    plan = listening_review.schedule(fail_count, skill=skill)
-    await run_in_threadpool(
-        listening_repo.enqueue_failure,
-        user_id,
-        question_id,
-        level=question.get("level", ""),
-        skill=skill,
-        task_type=task_type,
-        fail_count=plan["fail_count"],
-        next_review_at=plan["next_review_at"],
-        priority=plan["priority"],
-    )
-    return int(plan["fail_count"])
 
 
 async def submit_production(

@@ -519,6 +519,10 @@ def init_db() -> None:
                 -- la clave de idempotencia del intento (una repetición del MISMO
                 -- intento no vuelve a sumar). Todo aditivo con DEFAULT ''.
                 evidence_key TEXT NOT NULL DEFAULT '',
+                -- V3.93.1: `attempt_id` (UUID del cliente) forma parte de la
+                -- clave de idempotencia (`user:frase:palabra:attempt_id`). Aditiva
+                -- con default '': las filas legacy quedan sin id y no colisionan.
+                attempt_id TEXT NOT NULL DEFAULT '',
                 sense_key TEXT NOT NULL DEFAULT '',
                 sense_match TEXT NOT NULL DEFAULT '',
                 sense_reason TEXT NOT NULL DEFAULT '',
@@ -967,6 +971,12 @@ def init_db() -> None:
                 last_grade INTEGER,
                 why TEXT NOT NULL DEFAULT '',
                 fsrs_version TEXT NOT NULL DEFAULT '',
+                -- V3.93.1: versión de fila para escritura optimista de FILA
+                -- COMPLETA. El CAS de V3.93 comparaba solo `difficulty`, así que
+                -- un repaso FSRS legítimo que cambiara `reps`/`stability` sin
+                -- mover `difficulty` podía ser sobrescrito. Con `version`, toda
+                -- escritura optimista exige `WHERE version = ?`.
+                version INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (user_id, target_type, target_id),
@@ -1476,6 +1486,26 @@ def init_db() -> None:
                     f"{column} TEXT NOT NULL DEFAULT ''"
                 )
 
+        # V3.93.1: la identidad del intento (`attempt_id`) entra en la evidencia
+        # para que la clave de idempotencia no dependa de `attempt_number`.
+        if "attempt_id" not in evidence_cols:
+            conn.execute(
+                "ALTER TABLE listening_difficulty_evidence ADD COLUMN "
+                "attempt_id TEXT NOT NULL DEFAULT ''"
+            )
+
+        # V3.93.1 (CAS de fila completa): `fsrs_cards.version` habilita la
+        # escritura optimista sobre TODA la fila (antes solo se comparaba
+        # `difficulty`). Aditiva con DEFAULT 0: una BD anterior se abre sin migrar
+        # datos y todas sus cartas parten de la versión 0.
+        fsrs_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(fsrs_cards)")
+        }
+        if "version" not in fsrs_cols:
+            conn.execute(
+                "ALTER TABLE fsrs_cards ADD COLUMN version INTEGER NOT NULL DEFAULT 0"
+            )
+
         # V3.35: `event_role` clasifica cada evento de `learning_events` como
         # evidencia, telemetría o señal informativa. Antes la tabla mezclaba
         # señales heterogéneas (una pregunta de Recognition informativa convivía
@@ -1803,6 +1833,20 @@ def init_db() -> None:
                 "NOT NULL DEFAULT ''"
             )
 
+        # Migración idempotente V3.93.1 (idempotencia del intento COMPLETO):
+        # `attempt_id` es la clave del intento que DECLARA el cliente (UUID),
+        # reutilizada en el reintento HTTP del MISMO intento. Permite que
+        # `record_answer_event` deduplique a la vez el intento y su efecto en la
+        # cola de repaso, sin depender de `attempt_number` (que se reinicia por
+        # carga de pregunta y colapsaría reintentos legítimos posteriores). Aditiva
+        # con default '': los intentos legacy quedan sin clave y no colisionan con
+        # el índice único PARCIAL.
+        if "attempt_id" not in listening_cols:
+            conn.execute(
+                "ALTER TABLE listening_attempts ADD COLUMN attempt_id TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_message_id "
             "ON messages(conversation_id, message_id)"
@@ -1850,6 +1894,15 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_listening_evidence_key "
             "ON listening_difficulty_evidence(evidence_key) "
             "WHERE evidence_key <> ''"
+        )
+        # V3.93.1: el `attempt_id` del cliente identifica UN intento. Índice único
+        # PARCIAL: solo las filas con clave participan (las legacy quedan en '' y
+        # no colisionan), así que la dedup del intento empieza a aplicar sin
+        # migrar ni borrar nada.
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_listening_attempt_id "
+            "ON listening_attempts(user_id, attempt_id) "
+            "WHERE attempt_id <> ''"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "

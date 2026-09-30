@@ -263,6 +263,12 @@ export function ListeningPractice({
     null,
   );
   const recordingStartedAtRef = useRef(0);
+  // V3.93.1: identidad del INTENTO para la idempotencia del intento completo.
+  // Se genera un UUID por contexto `pregunta:attemptCount` y se REUTILIZA si el
+  // mismo intento se reenvía (reintento de red, doble toque). Se limpia al cargar
+  // otra pregunta, de modo que un intento posterior de la misma frase (por
+  // ejemplo re-servida desde la cola de repaso) recibe un id nuevo.
+  const attemptIdRef = useRef<{ key: string; id: string } | null>(null);
   const [stats, setStats] = useState<ListeningStats | null>(null);
   const [diagnostic, setDiagnostic] = useState<ListeningDiagnostic | null>(null);
   // AudioController 4.0 (V3.28): único elemento de audio para el audio de
@@ -464,12 +470,19 @@ export function ListeningPractice({
    * no política: el tope lo fija el backend. */
   function supportOpts(): ListeningSupportMetadata | undefined {
     if (!question || !flowState) return undefined;
+    const key = `${question.id}:${flowState.attemptCount}`;
+    if (attemptIdRef.current?.key !== key) {
+      attemptIdRef.current = { key, id: crypto.randomUUID() };
+    }
     return {
       layer: question.layer ?? undefined,
       speedUsed: variant,
       stage: flowState.stage ?? undefined,
       transcriptUsed: flowState.transcript,
       attemptNumber: flowState.attemptCount + 1,
+      // V3.93.1: mismo UUID mientras el intento no cambia → el backend entiende
+      // el reenvío como el MISMO intento y no duplica fila/cola/evidencia.
+      attemptId: attemptIdRef.current.id,
     };
   }
 
@@ -586,6 +599,8 @@ export function ListeningPractice({
     try {
       const next = await getListeningQuestion(userId, level, mode);
       setQuestion(next);
+      // V3.93.1: nueva pregunta ⇒ nuevo intento ⇒ nuevo `attempt_id`.
+      attemptIdRef.current = null;
       // El micro-flujo arranca cuando el backend sirvió `flow` (adaptativo,
       // nivel y drill); el repaso mastered (compacto) no lo usa.
       setFlowState(hasFlow(next) ? initialFlow(next) : null);

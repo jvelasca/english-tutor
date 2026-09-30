@@ -124,6 +124,7 @@ async def answer(
         body.attempt_number,
         body.hint_used,
         body.solution_shown,
+        body.attempt_id,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
