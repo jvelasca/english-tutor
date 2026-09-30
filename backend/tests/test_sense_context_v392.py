@@ -95,14 +95,35 @@ def test_tokens_of_is_public_and_tolerant():
 # --- Sense Resolver: matriz matched / mismatch / ambiguous ------------------
 
 
-def test_river_phrase_on_a_financial_sense_is_mismatch():
+def test_river_phrase_with_strong_overlap_is_a_proven_mismatch():
+    """Dos tokens de la alternativa (`river`, `side`) prueban un mismatch (V3.94.1)."""
     verdict = sc.classify_sense_evidence(
-        "bank", "We sat on the bank of the river", FINANCE, senses=[FINANCE, RIVER]
+        "bank",
+        "We sat on the bank of the river side",
+        FINANCE,
+        senses=[FINANCE, RIVER],
     )
     assert verdict["match"] == sc.SENSE_MISMATCH
     assert verdict["declared_overlap"] == 0
-    assert verdict["best_other_overlap"] == 1
+    assert verdict["best_other_overlap"] == 2
+    assert verdict["mismatch_strength"] == sc.MISMATCH_PROVEN
     assert verdict["reason"] == sc.REASON_GLOSS_OTHER
+
+
+def test_single_token_toward_another_sense_is_possible_not_proven():
+    """Un solo token es señal DÉBIL: no prueba un mismatch (V3.94.1).
+
+    Antes de V3.94.1 un único token (`river`) suprimía la evidencia. Ahora es un
+    posible mismatch: se declara `ambiguous` y la evidencia se CONSERVA —la regla
+    es ASIMÉTRICA porque un mismatch quita evidencia y exige prueba—.
+    """
+    verdict = sc.classify_sense_evidence(
+        "bank", "We sat on the bank of the river", FINANCE, senses=[FINANCE, RIVER]
+    )
+    assert verdict["match"] == sc.SENSE_AMBIGUOUS
+    assert verdict["best_other_overlap"] == 1
+    assert verdict["mismatch_strength"] == sc.MISMATCH_POSSIBLE
+    assert verdict["reason"] == sc.REASON_GLOSS_OTHER_WEAK
 
 
 def test_financial_context_is_matched_by_gloss_overlap():

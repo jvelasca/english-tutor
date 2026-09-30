@@ -2525,6 +2525,46 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.94.1 — El sentido se resuelve SIEMPRE (también en cartas fuertes) y el `mismatch` solo se declara con PRUEBA · 2026-10-01
+
+> **Naturaleza:** patch de la política **ENFORCE** de SENSE-CONTEXT-01. Cambia la
+> **etiqueta** que el resolver persiste (y por tanto `possible_mismatch`), pero **no**
+> toca el FSRS de las cartas fuertes. Detalle en `release-notes-v3.94.1.md`.
+
+### Qué cierra (deja de ser deuda)
+
+- **P1 — El resolver deja de estar subordinado al filtro de cartas débiles.** V3.94
+  iteraba `listening_bridge.select_targets(...)`, que **descarta** las cartas no débiles
+  **antes** de resolver: una acepción nueva en una palabra **fuerte** (`difficulty < 6.0`)
+  era invisible y `new_sense_exposure` quedaba a **0**. Ahora se resuelve el sentido para
+  **TODAS** las coincidencias; en una carta fuerte se **registra** la exposición
+  (`difficulty_before == difficulty_after`) **sin** tocar FSRS.
+- **`mismatch` exige PRUEBA (asimétrico).** `PROVEN_OTHER_OVERLAP = 2`: un `mismatch` es
+  probado solo con **≥2** tokens de la alternativa (`gloss:other`) o contradicción de rol
+  **FUERTE** (`role:other`). **Un** token pasa a `ambiguous` (`gloss:other:weak`,
+  `mismatch_strength="possible"`) y **conserva** la evidencia. `allows_difficulty_evidence`
+  no cambia (`match != mismatch`) y ahora «mismatch» y «probado» coinciden.
+- **El contador `possible_mismatch`.** `scripts/sense_shadow_report.py` desglosa los
+  `gloss:other:weak` para poder decidir con volumen.
+- **`tsconfig.json`:** se retira `"baseUrl": "."` (redundante con `paths`).
+- **Revisión externa:** Bugbot **1 hallazgo bajo** —el desempate `role:declared` podía
+  etiquetar `matched` un único token hacia otra acepción y el contador no lo veía—
+  **corregido** (`role:declared` exige `best_other_overlap <= declared_overlap`); Security
+  Review **sin hallazgos**.
+
+### Sigue abierto (V3.95+)
+
+Igual que V3.94.0: **cartas FSRS por acepción** (`sense_id` estable emitido por el
+generador), `MAX_MATCHES` por relevancia, **poda del ledger**, revisión de la política
+`declared:none` con datos y consumo de `new_sense_exposure` en la UI si los datos lo
+justifican. **Los ocho gates humanos siguen `pending`** y `validation-evidence.json` sigue
+sin existir.
+
+**Honestidad registrada aquí.** Endurecer cambia el caso canónico de **un token**
+(`«...of the river»`) de `mismatch` a `ambiguous`: **conserva** la evidencia de dificultad y
+queda **medible** como `possible_mismatch`. El ledger sigue a **0 filas**, así que la
+política sigue siendo **decisión declarada, no medición**.
+
 ## V3.94.0 — ENFORCE: el Sense Resolver decide y la evidencia de Listening deja de ser lemma-based · 2026-09-30
 
 > **Naturaleza:** cierre de la fase **ENFORCE** de SENSE-CONTEXT-01, la que V3.93 dejó

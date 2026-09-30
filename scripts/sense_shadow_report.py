@@ -21,6 +21,9 @@ Qué mide:
    y qué se suprimiría, aplicando la MISMA `allows_difficulty_evidence` que decide en
    producción. Desde V3.94 solo un `mismatch` PROBADO suprime; `declared:none` y
    `ambiguous` se conservan. Es una proyección sobre lo ya registrado, no una promesa.
+   V3.94.1 añade el contador `possible_mismatch` (`gloss:other:weak`, un solo token):
+   señales a favor de otra acepción que NO suprimen evidencia, para medir cuántos
+   falsos positivos habría producido el umbral anterior.
 
 El script es de LECTURA: abre SQLite en modo `mode=ro` (con repliegue si el WAL lo
 impide) y no ejecuta ningún `INSERT`, `UPDATE` ni `DELETE`.
@@ -53,7 +56,7 @@ DEFAULT_DB = ROOT / "backend" / "data" / "tutor.db"
 # decide en producción: una copia local podría desviarse de la verdad y proyectar
 # algo que la app no hace.
 sys.path.insert(0, str(ROOT / "backend"))
-from services.sense_context import allows_difficulty_evidence
+from services.sense_context import REASON_GLOSS_OTHER_WEAK, allows_difficulty_evidence
 
 TABLE = "listening_difficulty_evidence"
 VERDICTS = ("matched", "mismatch", "ambiguous")
@@ -107,6 +110,9 @@ def _report(conn: sqlite3.Connection) -> dict:
         "declared_sense": declared,
         "by_match": by_match,
         "by_reason": dict(sorted(by_reason.items(), key=lambda item: -item[1])),
+        # V3.94.1: posibles mismatch (`gloss:other:weak`, un solo token) que NO
+        # suprimen evidencia. Se cuentan aparte para medir falsos positivos evitados.
+        "possible_mismatch": by_reason.get(REASON_GLOSS_OTHER_WEAK, 0),
         "enforce_kept": kept,
         "enforce_suppressed": with_verdict - kept,
     }
@@ -127,6 +133,12 @@ def _print_report(report: dict) -> None:
         print("\nRazones dentro de mismatch/ambiguous:")
         for reason, count in report["by_reason"].items():
             print(f"  {reason:<18} {count:>7}  ({_pct(count, with_verdict)})")
+    possible = report.get("possible_mismatch", 0)
+    if possible:
+        print(
+            f"\nPosibles mismatch (gloss:other:weak, 1 token): {possible}"
+            f"  ({_pct(possible, with_verdict)})"
+        )
     kept = report["enforce_kept"]
     suppressed = report["enforce_suppressed"]
     print("\nProyección ENFORCE (política V3.94: solo un `mismatch` probado suprime):")
@@ -192,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
                 "declared_sense": 0,
                 "by_match": {},
                 "by_reason": {},
+                "possible_mismatch": 0,
                 "enforce_kept": 0,
                 "enforce_suppressed": 0,
             }

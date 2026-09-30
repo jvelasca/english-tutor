@@ -197,3 +197,126 @@ def test_day_metrics_separates_exposures_from_difficulty():
     assert metrics["difficulty_evidence"] == 2
     assert metrics["words_flagged"] == 2
     assert metrics["sense_exposures"] == 1
+
+
+# --- V3.94.1: el sentido se resuelve SIEMPRE, también en cartas fuertes ------
+
+
+def _make_card_strong(user_id: str, word: str, difficulty: float = 4.0) -> None:
+    """Convierte la carta de `word` en una carta DOMINADA (review, dificultad baja)."""
+    card = academy_repo.get_fsrs_card(user_id, "lexicon", word)
+    assert card is not None
+    card["state"] = "review"
+    card["difficulty"] = difficulty
+    academy_repo.upsert_fsrs_card(user_id, card)
+
+
+def test_strong_card_exposes_a_new_sense_without_touching_fsrs(monkeypatch, tmp_path):
+    """P1 de V3.94.1: una palabra FUERTE con otra acepción ya no es invisible.
+
+    Antes, `select_targets()` descartaba la carta fuerte ANTES de resolver el
+    sentido, así que `palabra fuerte + sentido nuevo` daba FSRS intacto Y
+    `new_sense_exposure = 0`. Ahora se resuelve siempre: la carta sigue intacta
+    (no se castiga un dominio demostrado) pero la exposición SÍ se registra.
+    """
+    uid = _setup(monkeypatch, tmp_path)
+    q = _receptive_question()
+    word = _phrase_word(q)
+    text = listening_svc.audio_text(q)
+    _seed_word(uid, word, {"lemma": word, "pos": "noun", "gloss": "zzz unrelated"})
+    _seed_alternatives(word, [{"pos": "noun", "gloss": text}])
+    _make_card_strong(uid, word, difficulty=4.0)
+    with TestClient(app) as client:
+        body = _fail(client, uid, q, attempt_id="strong-1").json()
+    assert body["new_sense_exposure"]["words"] == [word]
+    assert body["new_sense_exposure"]["count"] == 1
+    assert body["difficulty_evidence"]["count"] == 0
+    assert _difficulty(uid, word) == pytest.approx(4.0, abs=0.001)  # NO se tocó
+    rows = listening_repo.list_difficulty_evidence(uid)
+    assert len(rows) == 1
+    assert rows[0]["sense_match"] == "mismatch"
+    assert rows[0]["difficulty_before"] == rows[0]["difficulty_after"] == 4.0
+
+
+def test_strong_card_with_the_learned_sense_is_not_touched(monkeypatch, tmp_path):
+    """Una carta fuerte en su PROPIA acepción conserva su dominio (sin evidencia).
+
+    Complemento del anterior: resolver SIEMPRE el sentido no puede convertirse en
+    castigar una carta fuerte solo porque su palabra aparece en una frase fallada.
+    """
+    uid = _setup(monkeypatch, tmp_path)
+    q = _receptive_question()
+    word = _phrase_word(q)
+    text = listening_svc.audio_text(q)
+    _seed_word(uid, word, {"lemma": word, "pos": "noun", "gloss": text})
+    _seed_alternatives(word, [{"pos": "noun", "gloss": "zzz unrelated"}])
+    _make_card_strong(uid, word, difficulty=4.0)
+    with TestClient(app) as client:
+        body = _fail(client, uid, q, attempt_id="strong-2").json()
+    assert body["difficulty_evidence"]["count"] == 0
+    assert body["new_sense_exposure"]["count"] == 0
+    assert _difficulty(uid, word) == pytest.approx(4.0, abs=0.001)
+    assert listening_repo.list_difficulty_evidence(uid) == []
+
+
+def test_pedagogical_cycle_from_learning_to_a_second_sense(monkeypatch, tmp_path):
+    """Secuencia completa de SENSE-CONTEXT-01 (V3.94.1).
+
+    1. El alumno falla la frase en su ACEPCIÓN APRENDIDA → la carta sube y NO hay
+       exposición (`matched`).
+    2. La frase usa OTRA acepción → `mismatch` probado: la carta NO sube y se
+       registra la exposición.
+    3. Repetir el MISMO intento no vuelve a exponer (idempotencia).
+    4. El alumno declara/APRENDE esa segunda acepción → la siguiente evidencia
+       vuelve a ser de dificultad y deja de ser «sentido nuevo».
+    """
+    uid = _setup(monkeypatch, tmp_path)
+    q = _receptive_question()
+    word = _phrase_word(q)
+    text = listening_svc.audio_text(q)
+    # La frase entera es la glosa que la representa (garantiza solape fuerte).
+    matched_sense = {"lemma": word, "pos": "noun", "gloss": text}
+    other_sense = {"lemma": word, "pos": "noun", "gloss": "zzz unrelated"}
+    _seed_word(uid, word, matched_sense)  # 1) acepción aprendida = la de la frase
+    _seed_alternatives(word, [{"pos": "noun", "gloss": "zzz unrelated"}])
+    with TestClient(app) as client:
+        first = _fail(client, uid, q, attempt_id="cyc-1").json()
+        d1 = _difficulty(uid, word)
+        # 2) La frase pasa a usarse en OTRA acepción (giro declarado del léxico).
+        with closing(db._conn()) as conn, conn:
+            conn.execute(
+                "UPDATE vocabulary SET sense_json = ? WHERE user_id = ? AND word = ?",
+                (json.dumps(other_sense), uid, word),
+            )
+        # La caché ahora conoce la acepción que la frase SÍ expresa.
+        _seed_alternatives(word, [{"pos": "noun", "gloss": text}])
+        second = _fail(client, uid, q, attempt_id="cyc-2").json()
+        d2 = _difficulty(uid, word)
+        # 3) Idempotencia: el mismo intento no reexpone.
+        repeated = _fail(client, uid, q, attempt_id="cyc-2").json()
+        # 4) El alumno aprende la segunda acepción → vuelve a ser dificultad.
+        with closing(db._conn()) as conn, conn:
+            conn.execute(
+                "UPDATE vocabulary SET sense_json = ? WHERE user_id = ? AND word = ?",
+                (json.dumps(matched_sense), uid, word),
+            )
+        fourth = _fail(client, uid, q, attempt_id="cyc-3").json()
+        d4 = _difficulty(uid, word)
+
+    # 1) Matched: evidencia normal, sin exposición.
+    assert first["difficulty_evidence"]["count"] == 1
+    assert first["new_sense_exposure"]["count"] == 0
+    assert d1 == pytest.approx(5.6, abs=0.001)
+    # 2) Mismatch PROBADO: la carta no sube y se expone.
+    assert second["difficulty_evidence"]["count"] == 0
+    assert second["new_sense_exposure"]["words"] == [word]
+    assert d2 == pytest.approx(5.6, abs=0.001)
+    # 3) Idempotente.
+    assert repeated["new_sense_exposure"]["count"] == 0
+    # 4) Declarada la segunda acepción: vuelve a ser dificultad, sin exposición.
+    assert fourth["difficulty_evidence"]["count"] == 1
+    assert fourth["new_sense_exposure"]["count"] == 0
+    assert d4 == pytest.approx(6.2, abs=0.001)
+    matches = [r["sense_match"] for r in listening_repo.list_difficulty_evidence(uid)]
+    assert matches == ["matched", "mismatch", "matched"]
+

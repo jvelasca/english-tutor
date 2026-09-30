@@ -460,6 +460,13 @@ async def _apply_difficulty_evidence(
     (`alternatives_index`) para que `mismatch` sea ALCANZABLE: sin ellas la política
     no podría actuar.
 
+    V3.94.1 (resolver SIEMPRE): el sentido se resuelve para **todas** las palabras
+    emparejadas, no solo para las cartas débiles (`select_targets()` filtraba antes
+    de resolver y hacía invisible una acepción nueva en una palabra fuerte). Una
+    carta fuerte: (a) si el veredicto es `mismatch` PROBADO, registra la exposición
+    sin tocar FSRS; (b) si no, conserva su dominio y no recibe evidencia de
+    dificultad. Es decir, se separa «resolver el sentido» de «escribir la carta».
+
     V3.93 (robustez): el ledger reclama la clave del intento ANTES de tocar la
     carta (una repetición del mismo intento no vuelve a sumar) y la carta se
     escribe con control de concurrencia optimista (dos evidencias simultáneas
@@ -503,9 +510,9 @@ async def _apply_difficulty_evidence(
     now = datetime.now(timezone.utc).isoformat()
     words: list[str] = []
     exposures: list[str] = []
-    for target in listening_bridge.select_targets(matches, cards):
+    for target in matches:
         word = target["word"]
-        card = target["card"]
+        card = cards.get(word)
         verdict = sense_context.classify_sense_evidence(
             word, text, senses.get(word), senses=alternatives.get(word, ())
         )
@@ -532,6 +539,14 @@ async def _apply_difficulty_evidence(
             )
             if inserted:
                 exposures.append(word)
+            continue
+        if not listening_bridge.is_weak_card(card):
+            # V3.94.1: el sentido se resuelve SIEMPRE (arriba), pero una carta fuerte
+            # (review, dificultad baja) NO recibe evidencia de dificultad por no
+            # entender una frase: sería castigar un dominio ya demostrado. Antes esto
+            # lo decidía `select_targets()` y la carta fuerte nunca llegaba al
+            # resolver, así que una acepción NUEVA en una palabra fuerte era
+            # invisible. Ahora se resuelve el sentido y solo se omite la escritura.
             continue
         if card is None:
             card = fsrs.empty_card(
