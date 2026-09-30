@@ -2565,6 +2565,20 @@ sin existir.
 queda **medible** como `possible_mismatch`. El ledger sigue a **0 filas**, así que la
 política sigue siendo **decisión declarada, no medición**.
 
+### Estado de publicación (verificado el 2026-10-01)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.94.1` | **publicado** (`refs/tags/v3.94.1` en `origin`) → objeto tag `249c97c`, que desreferencia a **`522da44`** |
+| GitHub Release `v3.94.1` | https://github.com/jvelasca/english-tutor/releases/tag/v3.94.1 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `522da44` (v3.94.1) | `success` — runs **`36788079540`** (push a `main`) y **`36787105604`** (PR #24), **12/12 jobs en verde** cada uno |
+| Orden tag/CI | el verde de la PR precedió al tag: la evidencia queda anclada al commit etiquetado |
+| `main` vs `origin/main` | al día en `522da44` (**fast-forward** desde `01e2048`, sin merge commit) |
+| PR #24 | **MERGED** (GitHub la marcó al detectar su commit en `main`) |
+| Rama `release/v3.94.1` | **conservada** como referencia de la auditoría (no borrada) |
+| Revisión externa del diff | **hecha ANTES del commit**: Bugbot 1 hallazgo bajo (corregido) y Security Review sin hallazgos |
+| Encargo de auditoría de V3.94.1 | **pendiente**: el gerente la envía a auditoría externa tras esta publicación |
+
 ## V3.94.0 — ENFORCE: el Sense Resolver decide y la evidencia de Listening deja de ser lemma-based · 2026-09-30
 
 > **Naturaleza:** cierre de la fase **ENFORCE** de SENSE-CONTEXT-01, la que V3.93 dejó
