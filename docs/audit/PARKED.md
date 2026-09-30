@@ -2569,6 +2569,19 @@ en vez de por orden de aparición, **poda del ledger**, la **revisión de la pol
 ni de cuánto se suprimiría. La política se adoptó como **decisión mínima** —quitar solo lo
 que se puede **probar**— y su revisión está explícitamente aparcada a que haya volumen.
 
+### Estado de publicación (verificado el 2026-09-30)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.94.0` | **publicado** (`refs/tags/v3.94.0` en `origin`) → objeto tag `e6a9925`, que desreferencia a **`7e11c01`** |
+| GitHub Release `v3.94.0` | https://github.com/jvelasca/english-tutor/releases/tag/v3.94.0 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `7e11c01` (v3.94.0) | `success` — runs **`36761755048`** (PR #21) y **`36762898551`** (push a `main`), **12/12 jobs en verde** cada uno |
+| Orden tag/CI | el tag se creó **DESPUÉS** del verde de `7e11c01`: la evidencia queda anclada al commit etiquetado **y** la etiqueta llegó con el verde ya emitido |
+| `main` vs `origin/main` | al día en `7e11c01` (**fast-forward** desde `fc361f9`, sin merge commit) |
+| PR #21 | **MERGED** (GitHub la marcó al detectar su commit en `main`) |
+| Rama `release/v3.94.0` | **conservada** como referencia de la auditoría (no borrada) |
+| Encargo de auditoría de V3.94.0 | **pendiente**: el gerente la envía a auditoría externa tras esta publicación |
+
 ## V3.93.x — La fase sense-aware se publica: v3.93.0 (dark launch), v3.93.1 (atomicidad) y v3.93.2 (idempotencia en producción) · 2026-09-30
 
 > **Naturaleza:** cierre y **publicación** de la fase V3.93 (auditoría + diseño en
