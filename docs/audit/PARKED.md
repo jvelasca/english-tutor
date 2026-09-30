@@ -2574,12 +2574,13 @@ relevancia, poda del ledger y cartas FSRS por acepción. **Los ocho gates humano
 | Rama `release/v3.93.0` | **conservada** como referencia de la auditoría (no borrada) |
 | Encargo de auditoría de V3.93.x | **no existe** todavía |
 
-**Aviso de anclaje (hueco preexistente, NO de esta fase):** `v3.92.0` tiene **tag anotado
-pero NO tiene GitHub Release** (`gh release view v3.92.0` → *release not found*) y su sección
-de este documento **no tenía tabla de publicación**. Consecuencia: la *Latest* pasó de
-`v3.91.0` a `v3.93.2` **saltándose** `v3.92.0`. El ancla de esa release es su **tag**
-(`refs/tags/v3.92.0` → `fa2a15a`), que existe y ha viajado en `main` todo el tiempo; lo que
-falta es la **Release pública** y el registro. **Queda declarado, no arreglado.**
+**Aviso de anclaje (declarado aquí, CERRADO en la misma sesión).** Al publicar esta fase se
+detectó que `v3.92.0` tenía **tag anotado pero SIN GitHub Release** y que ese tag existía
+**solo en local** (nunca se empujó a `origin`: remotos 101 vs locales 102). Consecuencia: la
+*Latest* pasó de `v3.91.0` a `v3.93.2` **saltándose** `v3.92.0`. **Se cerró el 2026-09-30**:
+el tag se publicó (`refs/tags/v3.92.0` → `fa2a15a`) y se creó su Release —**no** *draft*,
+**no** *prerelease*, **no** *Latest*— con su registro en `§V3.92.0`. La *Latest* se mantiene
+en `v3.93.2` **a propósito** (es la más reciente).
 
 ## V3.92.0 — El fallo de Listening pasa a ser evidencia de dificultad y el circuito pedagógico se cierra · 2026-09-29
 
@@ -2644,6 +2645,11 @@ falta es la **Release pública** y el registro. **Queda declarado, no arreglado.
 | Playwright (Listening, Home, Diccionario, 3 breakpoints) | `integratedCircuitV392` (nuevo) y rutas tocadas en verde |
 | `validation_gate.py auto --require-dist` | **10/10** (8 gates) |
 | `check_release_consistency` | OK en los **6 orígenes** (`3.92.0`) |
+| Tag anotado `v3.92.0` | **publicado** (`refs/tags/v3.92.0` en `origin`) → commit `fa2a15a`, pero **TARDÍO**: el tag existía **solo en local** y se empujó el **2026-09-30**, no con la release |
+| GitHub Release | https://github.com/jvelasca/english-tutor/releases/tag/v3.92.0 — **no** *draft*, **no** *prerelease*; **NO** *Latest* (la más reciente es `v3.93.2`) |
+| CI sobre `fa2a15a` | `success` — run `36588951539`, **12/12 jobs en verde** |
+| Orden tag/CI | el CI era verde **antes** de que existiera tag, pero el **ancla quedó sin publicar**: es el hueco que `§V3.93.x` declara y **este registro cierra** (2026-09-30) |
+| `main` vs `origin/main` | `fa2a15a` es **ancestro** del `main` actual: su código viajó en `main` todo el tiempo; lo que faltaba era el ancla pública, no el código |
 
 ### Sigue abierto o aparcado (deuda declarada)
 
