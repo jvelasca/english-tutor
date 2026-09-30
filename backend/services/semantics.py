@@ -582,3 +582,74 @@ def semantic_adequacy(
     """
     return _adequacy(word, text, senses=senses, pos=pos)
 
+
+# ---------------------------------------------------------------------------
+# SENSE-CONTEXT-01 (V3.92+, diseño): IDENTIDAD de acepción.
+#
+# V3.92 hizo que la acepción ELEGIDA viajara del diccionario al léxico
+# (`vocabulary.sense_json` con `{term, pos, gloss, lemma, source, domain}`), pero
+# sin una identidad ESTABLE no se puede decir «esta evidencia de Listening es de
+# ESTA acepción» ni comparar dos sentidos entre sí. Estas funciones dan esa
+# identidad, puras y deterministas, y NO cambian ningún camino existente: el
+# `listening_bridge` todavía no las usa (frontera declarada de la fase).
+#
+# LÍMITE HONESTO: la clave es CONTENT-ADDRESSED (incluye la glosa normalizada), así
+# que un bump de `GENERATOR_VERSION` que reescriba la glosa produce una clave
+# nueva. Es la deuda declarada de esta fase; resolverla exigiría un `sense_id`
+# emitido por el generador y persistido, que es trabajo de V3.93+.
+# ---------------------------------------------------------------------------
+
+_SENSE_FIELD_SEPARATOR = "|"
+_SENSE_TEXT_MAX = 300
+
+
+def tokens_of(text: object) -> list[str]:
+    """Tokens alfabéticos normalizados de un texto (V3.92+, pura).
+
+    Mismo tokenizador que el resto del módulo (`_TOKEN_RE`), expuesto como
+    función pública para que el Sense Resolver pueda calcular ventanas de
+    contexto sin importar un privado. Nunca lanza.
+    """
+    return _tokens(text)
+
+
+def normalize_sense_text(value: object, *, limit: int = _SENSE_TEXT_MAX) -> str:
+    """Normaliza un campo de acepción para compararlo (V3.92+, pura).
+
+    Minúsculas, espacios colapsados y recorte de longitud. Un valor ausente o no
+    textual devuelve `""`. Nunca lanza.
+    """
+    text = " ".join(str(value or "").lower().split())
+    return text[: max(0, int(limit))]
+
+
+def _sense_field(value: object) -> str:
+    """Campo de `sense_key` con el separador neutralizado (V3.92+, pura).
+
+    `sense_key` une campos con `|`; un valor que contuviera `|` podría fingir ser
+    otro campo (`lemma="bank|noun"` vs `lemma="bank", pos="noun"`). Se sustituye
+    por un espacio para que la frontera entre campos no sea falsificable. Nota de
+    la revisión de seguridad de SENSE-CONTEXT-01; no cambia ninguna clave con
+    entradas normales.
+    """
+    return normalize_sense_text(value).replace(_SENSE_FIELD_SEPARATOR, " ")
+
+
+def sense_key(sense: object) -> str:
+    """Identidad determinista de una acepción (V3.92+, pura).
+
+    `lemma + familia POS + dominio + glosa normalizada`, unidos por `|`. El `lemma`
+    cae a `term` cuando no se declaró. Una acepción sin NINGÚN campo útil (sin
+    lema, POS, dominio ni glosa) devuelve `""`: «no consta» y «consta vacío» no
+    son lo mismo, igual que en el alta. Nunca lanza.
+    """
+    if not isinstance(sense, dict):
+        return ""
+    lemma = _sense_field(sense.get("lemma")) or _sense_field(sense.get("term"))
+    family = _sense_field(pos_family(sense.get("pos")))
+    domain = _sense_field(sense.get("domain"))
+    gloss = _sense_field(sense.get("gloss"))
+    if not (lemma or family or domain or gloss):
+        return ""
+    return _SENSE_FIELD_SEPARATOR.join((lemma, family, domain, gloss))
+

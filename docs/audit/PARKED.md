@@ -2595,6 +2595,46 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
   aparezcan en la frase servida; el E2E usa mocks deterministas para no depender del banco real.
 - **Los ocho gates humanos siguen `pending`** y `docs/audit/validation-evidence.json` sigue sin existir.
 
+## SENSE-CONTEXT-01 — la evidencia de Listening distingue la palabra de la acepción: diseño aprobado y deuda declarada · 2026-09-29
+
+> **Naturaleza:** fase de **auditoría + diseño**, **NO** release de producto. No toca
+> comportamiento: V3.92.0 sigue exactamente igual. Dossier:
+> `docs/audit/SENSE-CONTEXT-01.md`. Los **ocho gates siguen `pending`** y
+> `docs/audit/validation-evidence.json` sigue sin existir.
+
+### Hallazgo central (confirmado con QA real de este árbol)
+
+V3.92 persiste la acepción y la sirve en el léxico, pero el circuito
+**Listening → FSRS es lemma-based**: `services/listening_bridge.py` empareja por
+`word`/`lemma` e **ignora** `sense`. `services/semantics.py` ya sabe resolver el
+sentido (`select_sense`/`sense_fit`), pero **nadie lo llama desde el puente**. Caso
+reproducible: acepción financiera de `bank` + «We sat on the bank of the river» →
+`match_units` devuelve `bank` y **sí** se genera evidencia.
+
+### Diseñado y fijado con tests (no cableado)
+
+- **Identidad:** `semantics.sense_key` (`lemma|familia_pos|dominio|glosa`), pura y
+  aditiva. Un `sense_key` nulo/'' se lee como «no consta» → `ambiguous`.
+- **Resolver:** `services/sense_context.py` (puro, **sin cablear**), con la matriz
+  `matched`/`mismatch`/`ambiguous`; `mismatch` y `ambiguous` **nunca** penalizan.
+  Un test garantiza que ningún camino de producción lo importa todavía.
+- **Contrato:** categoría **Contract E2E** (`backend/tests/test_contract_v392.py`
+  + `frontend/src/api/contract.test.ts`) que fija la forma exacta del borde.
+
+### Deuda que abre esta fase (V3.93+)
+
+- **Cablear** el resolver en el puente y el ledger (romper a propósito los tests de
+  caracterización de V3.92).
+- **Idempotencia/dedup** del ledger: H8 (el mismo fallo repetido suma `+0.6` cada
+  vez) y H7 (read-compute-write → *lost update*).
+- **`sense_id` emitido por el generador**: `sense_key` es *content-addressed* y un
+  bump de `GENERATOR_VERSION` que reescriba la glosa cambia la clave.
+- **H12:** dos sentidos del **mismo POS** sin pistas léxicas son irresolubles → el
+  resolver debe responder `ambiguous` y **no** inventar evidencia.
+- **`new_sense_exposure`** a partir de `mismatch`.
+- **`MAX_MATCHES` por relevancia** (hoy por orden de aparición) y
+  **`WEAK_DIFFICULTY = 6.0`** declarado en contrato o suavizado.
+
 ## V3.91.0 — El diccionario pasa a motor de sentidos y la inversa deja de barrer la tabla · 2026-09-29
 
 > Release **DE PRODUCTO** (minor) **CON backend y frontend**, **CON migración de BD aditiva e
