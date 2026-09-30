@@ -513,6 +513,15 @@ def init_db() -> None:
                 difficulty_after REAL NOT NULL DEFAULT 0,
                 due_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
+                -- V3.93 (dark launch sense-aware): la evidencia declara QUÉ
+                -- acepción se comprobó y qué dijo el Sense Resolver, pero SIN
+                -- cambiar todavía si la evidencia se genera. `evidence_key` es
+                -- la clave de idempotencia del intento (una repetición del MISMO
+                -- intento no vuelve a sumar). Todo aditivo con DEFAULT ''.
+                evidence_key TEXT NOT NULL DEFAULT '',
+                sense_key TEXT NOT NULL DEFAULT '',
+                sense_match TEXT NOT NULL DEFAULT '',
+                sense_reason TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
@@ -1449,6 +1458,24 @@ def init_db() -> None:
                 "NOT NULL DEFAULT ''"
             )
 
+        # V3.93 (dark launch sense-aware): la evidencia de Listening declara su
+        # clave de idempotencia (`evidence_key`) y el veredicto del Sense
+        # Resolver (`sense_key`/`sense_match`/`sense_reason`). Columnas ADITIVAS
+        # con DEFAULT '': una BD de V3.92 se abre sin migrar datos y sus filas
+        # viejas quedan en '' («sentido no comprobado», que es la verdad).
+        evidence_cols = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(listening_difficulty_evidence)"
+            )
+        }
+        for column in ("evidence_key", "sense_key", "sense_match", "sense_reason"):
+            if column not in evidence_cols:
+                conn.execute(
+                    f"ALTER TABLE listening_difficulty_evidence ADD COLUMN "
+                    f"{column} TEXT NOT NULL DEFAULT ''"
+                )
+
         # V3.35: `event_role` clasifica cada evento de `learning_events` como
         # evidencia, telemetría o señal informativa. Antes la tabla mezclaba
         # señales heterogéneas (una pregunta de Recognition informativa convivía
@@ -1815,6 +1842,14 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_listening_difficulty_evidence_user "
             "ON listening_difficulty_evidence(user_id, created_at)"
+        )
+        # V3.93: clave de idempotencia del intento. Índice PARCIAL: solo las filas
+        # con clave (las de V3.92 y anteriores quedan en '' y no participan), así
+        # que la dedup empieza a aplicar sin migrar ni borrar nada.
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_listening_evidence_key "
+            "ON listening_difficulty_evidence(evidence_key) "
+            "WHERE evidence_key <> ''"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_academy_evidence_user_id "

@@ -12,7 +12,7 @@ from repositories import db
 from repositories import listening as listening_repo
 from repositories import settings as settings_repo
 from repositories import vocabulary as vocabulary_repo
-from services import fsrs, listening_bridge, listening_review, tts
+from services import fsrs, listening_bridge, listening_review, sense_context, tts
 from services.audio_library import is_recorded, recorded_audio_path
 from services.auditory_profile import auditory_profile
 from services.curriculum import LISTENING_BANK_VERSION
@@ -381,7 +381,11 @@ async def submit_answer(
         {"words": [], "count": 0}
         if fail_count == 0
         else await _apply_difficulty_evidence(
-            user_id, question_id, question, fail_count=fail_count
+            user_id,
+            question_id,
+            question,
+            fail_count=fail_count,
+            attempt_number=attempt_number,
         )
     )
     return {
@@ -413,6 +417,7 @@ async def _apply_difficulty_evidence(
     question: dict,
     *,
     fail_count: int = 1,
+    attempt_number: int = 1,
 ) -> dict:
     """Puente Listening → FSRS: el fallo sube la dificultad de las palabras suyas.
 
@@ -428,6 +433,16 @@ async def _apply_difficulty_evidence(
       una frase. Una palabra sin carta la recibe aquí (es suya desde el alta) con
       la dificultad ya subida.
     - Ni un solo fallo más que una escritura por palabra y fallo.
+
+    V3.93 (dark launch sense-aware): además se consulta el Sense Resolver y su
+    veredicto (`match`/`reason`/`sense_key`) se REGISTRA en el ledger, pero **no**
+    decide nada todavía: qué palabras reciben evidencia sigue siendo exactamente
+    lo de V3.92. Es una medida, no una política; aplicarla es V3.94+.
+
+    V3.93 (robustez): el ledger reclama la clave del intento ANTES de tocar la
+    carta (una repetición del mismo intento no vuelve a sumar) y la carta se
+    escribe con control de concurrencia optimista (dos evidencias simultáneas
+    suman las DOS en vez de pisarse).
 
     Devuelve `{"words": [...], "count": n}`; `count` es el número de cartas
     tocadas, no el de coincidencias léxicas. Nunca lanza hacia el cliente: si algo
@@ -446,41 +461,96 @@ async def _apply_difficulty_evidence(
         "lexicon",
         [m["word"] for m in matches],
     )
+    senses = listening_bridge.sense_index(known)
     now = datetime.now(timezone.utc).isoformat()
     words: list[str] = []
     for target in listening_bridge.select_targets(matches, cards):
+        word = target["word"]
         card = target["card"]
         if card is None:
             card = fsrs.empty_card(
                 target_type="lexicon",
-                target_id=target["word"],
-                label=target["word"],
+                target_id=word,
+                label=word,
                 why=listening_bridge.SOURCE,
                 now=now,
             )
+        # Dark launch: el veredicto se registra, no decide. Sin alternativas
+        # conocidas (`senses=()`) `mismatch` todavía no puede dispararse; lo que
+        # sí se mide es cuánta evidencia se apoya en una acepción declarada
+        # (`matched`) y cuánta en una que nadie declaró (`ambiguous`).
+        verdict = sense_context.classify_sense_evidence(
+            word, text, senses.get(word), senses=()
+        )
+        before = float(card.get("difficulty") or 5.0)
         updated = fsrs.apply_difficulty_evidence(
             card, source=listening_bridge.SOURCE, now=now
         )
         if updated is None:
             continue
-        saved = await run_in_threadpool(
-            academy_repo.upsert_fsrs_card, user_id, updated
-        )
-        if saved is None:
-            continue
-        await run_in_threadpool(
+        after = float(updated.get("difficulty") or before)
+        claimed = await run_in_threadpool(
             listening_repo.record_difficulty_evidence,
             user_id,
             question_id,
-            target["word"],
+            word,
             fail_count=fail_count,
-            difficulty_before=float(card.get("difficulty") or 5.0),
-            difficulty_after=float(updated.get("difficulty") or 5.0),
+            difficulty_before=before,
+            difficulty_after=after,
             due_at=updated.get("due_at") or "",
+            attempt_number=attempt_number,
+            sense_key=verdict["declared_key"],
+            sense_match=verdict["match"],
+            sense_reason=verdict["reason"],
         )
-        words.append(target["word"])
+        if not claimed:
+            # Este intento ya estaba registrado: NO se vuelve a subir la carta.
+            continue
+        saved = await _persist_card(user_id, word, card, updated, now=now)
+        if saved is None:
+            continue
+        words.append(word)
     return {"words": words, "count": len(words)}
 
+
+# Reintentos del CAS antes de rendirse. La contención real es de dos escritores
+# (el mismo alumno fallando la misma frase desde dos pestañas); tres intentos
+# sobran y acotan el peor caso sin bucle infinito.
+_CARD_WRITE_ATTEMPTS = 3
+
+
+async def _persist_card(
+    user_id: str, word: str, card: dict, updated: dict, *, now: str
+) -> dict | None:
+    """Escribe la carta con CAS y reintentos acotados (V3.93).
+
+    `card` es lo leído y `updated` la subida calculada. Si otro escritor cambió
+    la dificultad, el CAS no escribe, se RELEE y se recalcula la subida sobre el
+    valor fresco (hasta `_CARD_WRITE_ATTEMPTS`): así dos evidencias simultáneas
+    suman las dos en vez de que la segunda pise a la primera.
+    """
+    for _ in range(_CARD_WRITE_ATTEMPTS):
+        expected = float(card.get("difficulty") or 5.0)
+        ok = await run_in_threadpool(
+            academy_repo.upsert_fsrs_card_cas,
+            user_id,
+            updated,
+            expected_difficulty=expected,
+        )
+        if ok:
+            return updated
+        fresh = await run_in_threadpool(
+            academy_repo.get_fsrs_card, user_id, "lexicon", word
+        )
+        if fresh is None:
+            return None
+        card = fresh
+        updated = fsrs.apply_difficulty_evidence(
+            card, source=listening_bridge.SOURCE, now=now
+        )
+        if updated is None:
+            return None
+    return None
 
 
 async def _sync_review_queue(

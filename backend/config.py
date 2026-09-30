@@ -46,7 +46,7 @@ DICTIONARY_WARMUP_MAX_WORDS = 60
 DICTIONARY_WARMUP_JOBS_KEPT = 20
 
 
-VERSION = "3.92.0"
+VERSION = "3.93.0"
 
 # Orígenes permitidos para CORS. El runtime de producto sirve UI y API desde el
 # mismo origen (`:8000`, V3.72), así que estos orígenes son el modo de desarrollo

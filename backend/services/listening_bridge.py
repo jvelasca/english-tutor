@@ -123,6 +123,26 @@ def match_units(text: object, known: object) -> list[dict]:
     return found
 
 
+def sense_index(known: object) -> dict[str, object]:
+    """`{palabra canónica: acepción declarada}` del léxico del alumno (V3.93, pura).
+
+    La acepción es la que el alumno eligió al dar de alta la palabra
+    (`sense_json`). Puede NO constar: en ese caso la palabra no aparece en el
+    índice y el Sense Resolver responde `ambiguous` (`declared:none`) en vez de
+    inventarle un sentido. Es la entrada honesta, y la razón de que el dark
+    launch mida cuánta evidencia se apoya en una acepción que nadie declaró.
+    """
+    index: dict[str, object] = {}
+    for row in known or ():
+        if not isinstance(row, dict):
+            continue
+        word = str(row.get("word") or "").strip().lower()
+        sense = row.get("sense")
+        if word and isinstance(sense, dict) and sense and word not in index:
+            index[word] = sense
+    return index
+
+
 def is_weak_card(card: object) -> bool:
     """¿La carta admite evidencia de dificultad? (ausente = sí, no hay dominio).
 

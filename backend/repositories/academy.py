@@ -1089,6 +1089,30 @@ def upsert_fsrs_card(user_id: str, card: dict) -> dict | None:
     return get_fsrs_card(user_id, card["target_type"], card["target_id"])
 
 
+def upsert_fsrs_card_cas(
+    user_id: str, card: dict, *, expected_difficulty: float
+) -> bool:
+    """Upsert de carta con control de concurrencia OPTIMISTA sobre `difficulty`.
+
+    V3.93. Escribe solo si la dificultad guardada sigue siendo la que el que
+    llama leyó (`expected_difficulty`); devuelve `False` si otro escritor se
+    adelantó, para que relea y vuelva a calcular. Es el arreglo del *lost update*
+    del read-compute-write de V3.92: sin esto, dos evidencias simultáneas
+    calculan la MISMA subida y la segunda pisa a la primera, y una de las dos
+    señales se pierde. Con esto, dos evidencias simultáneas suman las DOS.
+
+    Un alta nueva (sin conflicto) siempre escribe y devuelve `True`.
+    """
+    if get_user(user_id) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        cursor = conn.execute(
+            _FSRS_UPSERT_CAS_SQL,
+            _fsrs_row(user_id, card, _now()) + (float(expected_difficulty),),
+        )
+    return cursor.rowcount > 0
+
+
 _FSRS_CARD_COLUMNS = (
     "user_id, target_type, target_id, label, state, difficulty, "
     "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
@@ -1115,6 +1139,32 @@ _FSRS_UPSERT_SQL = (
     "why = excluded.why, "
     "fsrs_version = excluded.fsrs_version, "
     "updated_at = excluded.updated_at"
+)
+
+# V3.93: misma escritura, pero condicionada a la dificultad observada. El `WHERE`
+# del `DO UPDATE` convierte el upsert ciego en una escritura optimista: si la
+# carta cambió desde que se leyó, no pisa nada y `rowcount` queda en 0.
+_FSRS_UPSERT_CAS_SQL = (
+    "INSERT INTO fsrs_cards "
+    "(user_id, target_type, target_id, label, state, difficulty, "
+    "stability, reps, lapses, due_at, last_review_at, last_evidence_at, "
+    "last_grade, why, fsrs_version, created_at, updated_at) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    "ON CONFLICT(user_id, target_type, target_id) DO UPDATE SET "
+    "label = excluded.label, "
+    "state = excluded.state, "
+    "difficulty = excluded.difficulty, "
+    "stability = excluded.stability, "
+    "reps = excluded.reps, "
+    "lapses = excluded.lapses, "
+    "due_at = excluded.due_at, "
+    "last_review_at = excluded.last_review_at, "
+    "last_evidence_at = excluded.last_evidence_at, "
+    "last_grade = excluded.last_grade, "
+    "why = excluded.why, "
+    "fsrs_version = excluded.fsrs_version, "
+    "updated_at = excluded.updated_at "
+    "WHERE fsrs_cards.difficulty = ?"
 )
 
 

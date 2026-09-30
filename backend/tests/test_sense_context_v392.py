@@ -1,9 +1,8 @@
 """SENSE-CONTEXT-01 (diseño): identidad de acepción y resolución de sentido.
 
-Fija, con tests, el DISEÑO de la fase. Nada de esto está cableado a producción
-todavía (`test_sense_context_is_not_wired_into_production` lo garantiza), así que
-el esquema de V3.92 sigue intacto: estos tests son el criterio de aceptación de la
-implementación de V3.93+.
+Fija, con tests, el DISEÑO de la fase y su frontera de cableado. V3.93 lo consulta
+en modo DARK LAUNCH (`domain/listening.py` registra el veredicto pero NO decide):
+`test_sense_context_is_dark_launched_but_does_not_gate_evidence` lo garantiza.
 
 Qué se fija:
 
@@ -197,21 +196,24 @@ def test_classifier_is_total_with_junk():
 # --- Frontera de la fase: el resolver NO está cableado ----------------------
 
 
-def test_sense_context_is_not_wired_into_production():
-    """Mientras V3.92 siga siendo la versión publicada, el resolver es DISEÑO.
+def test_sense_context_is_dark_launched_but_does_not_gate_evidence():
+    """V3.93: el resolver se consulta en producción, pero SOLO para registrar.
 
-    Si algún camino de producción empieza a importar `sense_context`, este test
-    cae: obliga a que el cableado llegue con su propia release y sus propias
-    pruebas, en vez de colarse como cambio silencioso de comportamiento.
+    El único importador de producción es `domain/listening.py`, y allí el veredicto
+    NO filtra: no se llama a `allows_difficulty_evidence`. Si alguien importa el
+    resolver en otro sitio o usa la política para decidir evidencia, este test cae:
+    el cambio de comportamiento (enforce) tendrá que llegar con su propia release.
     """
     backend = Path(__file__).resolve().parents[1]
     skip = {"tests", ".venv", "__pycache__", "data"}
-    offenders = []
+    importers = []
     for path in backend.rglob("*.py"):
         if path.name == "sense_context.py":
             continue
         if skip & set(path.relative_to(backend).parts):
             continue
         if "sense_context" in path.read_text(encoding="utf-8"):
-            offenders.append(str(path.relative_to(backend)))
-    assert offenders == []
+            importers.append(path.relative_to(backend).as_posix())
+    assert importers == ["domain/listening.py"]
+    listening = (backend / "domain" / "listening.py").read_text(encoding="utf-8")
+    assert "allows_difficulty_evidence" not in listening

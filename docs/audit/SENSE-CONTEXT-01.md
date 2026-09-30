@@ -7,8 +7,14 @@
 > (`sense_key`, Sense Resolver y matriz `matched`/`mismatch`/`ambiguous`) fijado con
 > tests de aceptación, y (c) el registro honesto de lo que queda **deferido** a
 > V3.93+.
-> **Estado:** V3.92.0 (`3.92.0`). Los ocho gates humanos siguen `pending`;
+> **Estado:** **APROBADO el 2026-09-30** y fusionado a `main` (`87f463c`). El
+> diseño de §6–§9 es el contrato de **V3.93+**: su implementación ya está
+> desbloqueada. Los ocho gates humanos siguen `pending`;
 > `docs/audit/validation-evidence.json` sigue sin existir.
+>
+> **Aprobación (2026-09-30):** el gerente aprueba el diseño y autoriza arrancar
+> **V3.93**. Lo deferido en §11 deja de estar bloqueado; el orden de ejecución lo
+> fija el plan de V3.93.
 
 ---
 
@@ -332,7 +338,7 @@ puerta de V4.0 es `8/8` con evidencia del mismo árbol.
 
 ---
 
-## 11 · Deferido (V3.93+, solo tras aprobar este diseño)
+## 11 · Deferido (V3.93+ — **desbloqueado el 2026-09-30 tras aprobar este diseño**)
 
 - Cablear el Sense Resolver en `listening_bridge` y en el ledger (romper
   deliberadamente los tests de caracterización de §9).

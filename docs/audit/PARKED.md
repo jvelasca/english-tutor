@@ -2601,6 +2601,18 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 > comportamiento: V3.92.0 sigue exactamente igual. Dossier:
 > `docs/audit/SENSE-CONTEXT-01.md`. Los **ocho gates siguen `pending`** y
 > `docs/audit/validation-evidence.json` sigue sin existir.
+>
+> **APROBADO el 2026-09-30** y fusionado a `main` (`87f463c`). Los puntos de
+> «Deuda que abre esta fase» pasan a ser el **backlog de V3.93**; el diseño
+> (§6–§9 del dossier) es su contrato.
+>
+> **V3.93.0 (2026-09-30): DARK LAUNCH entregado.** El resolver queda **cableado
+> pero sin decidir**: `domain/listening.py` registra `sense_key`/`sense_match`/
+> `sense_reason` en el ledger y **no** llama a `allows_difficulty_evidence`. Se
+> cierran además la **idempotencia por intento** (`evidence_key` + índice único
+> parcial) y el **lost update** (`upsert_fsrs_card_cas`). La fase **ENFORCE**
+> (aplicar la política) y la decisión sobre `declared:none` siguen **abiertas**;
+> ver `release-notes-v3.93.0.md`.
 
 ### Hallazgo central (confirmado con QA real de este árbol)
 
@@ -2611,13 +2623,15 @@ sentido (`select_sense`/`sense_fit`), pero **nadie lo llama desde el puente**. C
 reproducible: acepción financiera de `bank` + «We sat on the bank of the river» →
 `match_units` devuelve `bank` y **sí** se genera evidencia.
 
-### Diseñado y fijado con tests (no cableado)
+### Diseñado y fijado con tests (cableado en V3.93 en modo dark launch)
 
 - **Identidad:** `semantics.sense_key` (`lemma|familia_pos|dominio|glosa`), pura y
   aditiva. Un `sense_key` nulo/'' se lee como «no consta» → `ambiguous`.
-- **Resolver:** `services/sense_context.py` (puro, **sin cablear**), con la matriz
+- **Resolver:** `services/sense_context.py` (puro), con la matriz
   `matched`/`mismatch`/`ambiguous`; `mismatch` y `ambiguous` **nunca** penalizan.
-  Un test garantiza que ningún camino de producción lo importa todavía.
+  **V3.93 lo consulta en dark launch** (registra el veredicto, no decide) y un test
+  sigue garantizando que **ningún** camino de producción llama a la política
+  (`allows_difficulty_evidence`).
 - **Contrato:** categoría **Contract E2E** (`backend/tests/test_contract_v392.py`
   + `frontend/src/api/contract.test.ts`) que fija la forma exacta del borde.
 

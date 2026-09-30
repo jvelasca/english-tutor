@@ -501,8 +501,24 @@ def queue_fail_counts(user_id: str) -> dict[str, int]:
 
 _EVIDENCE_COLUMNS = (
     "id, user_id, question_id, word, fail_count, difficulty_before, "
-    "difficulty_after, due_at, created_at"
+    "difficulty_after, due_at, created_at, evidence_key, sense_key, "
+    "sense_match, sense_reason"
 )
+
+
+def evidence_key(
+    user_id: str, question_id: str, word: str, attempt_number: int = 1
+) -> str:
+    """Clave de idempotencia de una evidencia (V3.93, pura).
+
+    Un mismo intento (mismo `attempt_number`) de la misma frase sobre la misma
+    palabra es UN suceso: una repetición del cliente —doble toque, reintento de
+    red— no puede volver a sumar dificultad. Dos intentos DISTINTOS (1 y 2) sí
+    son dos sucesos y suman dos veces: eso no es un duplicado, es el alumno
+    fallando dos veces.
+    """
+    normalized = str(word or "").strip().lower()
+    return f"{user_id}:{question_id}:{normalized}:{max(1, int(attempt_number))}"
 
 
 def record_difficulty_evidence(
@@ -514,22 +530,37 @@ def record_difficulty_evidence(
     difficulty_before: float = 0.0,
     difficulty_after: float = 0.0,
     due_at: str = "",
+    attempt_number: int = 1,
+    sense_key: str = "",
+    sense_match: str = "",
+    sense_reason: str = "",
 ) -> bool:
     """Registra una subida de dificultad de `word` causada por `question_id`.
 
-    Devuelve False si el usuario no existe. No deduplica: dos fallos distintos de
-    la misma palabra en la misma frase son DOS evidencias, y contarlas es la
-    lectura honesta (la carta, en cambio, se acota sola: su dificultad está
-    topada en 10).
+    Devuelve `True` solo si la fila se ha INSERTADO de verdad. Devuelve `False`
+    si el usuario no existe **o** si ya había una evidencia con la misma
+    `evidence_key` (mismo intento): en ese caso la llamada es un NO-OP
+    idempotente y el que llama NO debe volver a subir la dificultad.
+
+    V3.93: deja de ser «append-only sin dedup» y pasa a ser idempotente por
+    intento. La lectura honesta se conserva: dos intentos distintos de la misma
+    palabra en la misma frase siguen siendo DOS evidencias (la carta, además, se
+    acota sola: su dificultad está topada en 10).
+
+    V3.93 (dark launch sense-aware): las columnas `sense_key`/`sense_match`/
+    `sense_reason` guardan el veredicto del Sense Resolver para esa ocurrencia.
+    Son **informativas**: esta release NO cambia si la evidencia se genera.
     """
     if get_user(user_id) is None:
         return False
     with closing(_conn()) as conn, conn:
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO listening_difficulty_evidence "
             "(user_id, question_id, word, fail_count, difficulty_before, "
-            "difficulty_after, due_at, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "difficulty_after, due_at, created_at, evidence_key, sense_key, "
+            "sense_match, sense_reason) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT DO NOTHING",
             (
                 user_id,
                 question_id,
@@ -539,9 +570,13 @@ def record_difficulty_evidence(
                 float(difficulty_after),
                 due_at,
                 _now(),
+                evidence_key(user_id, question_id, word, attempt_number),
+                str(sense_key or ""),
+                str(sense_match or ""),
+                str(sense_reason or ""),
             ),
         )
-    return True
+        return cursor.rowcount > 0
 
 
 def list_difficulty_evidence(user_id: str, day: str = "") -> list[dict]:

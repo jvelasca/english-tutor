@@ -1,9 +1,11 @@
 """Sense Resolver del puente Listening → evidencia (SENSE-CONTEXT-01, DISEÑO).
 
-**Estado: prototipo PURO y NO cableado.** Este módulo NO lo importa ningún camino
-de producción todavía (lo fija `tests/test_sense_context_v392.py`): es el diseño
-ejecutable de la fase, para que la implementación de V3.93+ sea un cambio de
-contrato revisable y no una idea en prosa.
+**Estado: PURO, cableado en DARK LAUNCH (V3.93).** `domain/listening.py` lo consulta
+al registrar evidencia y guarda el veredicto, pero NO lo usa para decidir: qué
+evidencia se genera sigue siendo exactamente lo de V3.92 (lo fija `tests/
+test_sense_context_v392.py::test_sense_context_is_dark_launched_but_does_not_gate_
+evidence`). Aplicar la política (`allows_difficulty_evidence`) es la fase ENFORCE
+(V3.94+).
 
 El problema que resuelve, medido en V3.92: `listening_bridge` empareja por
 `word`/`lemma`, así que una frase de «orilla» genera evidencia de dificultad sobre
