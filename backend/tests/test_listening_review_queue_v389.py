@@ -349,6 +349,24 @@ def test_defer_endpoint_postpones_entry(monkeypatch, tmp_path):
     assert r.json()["state"] == "deferred"
 
 
+def test_due_deferred_returns_to_the_pending_queue(monkeypatch, tmp_path):
+    """«Repasar después» reaparece cuando llega la fecha; antes se quedaba fuera."""
+    uid = _setup(monkeypatch, tmp_path)
+    listening_repo.enqueue_failure(
+        uid, "c001", level="A1", skill="gist",
+        next_review_at="2099-01-01T00:00:00+00:00", priority=3.0,
+    )
+    listening_repo.defer_queue_entry(uid, "c001", "2000-01-01T00:00:00+00:00")
+    with TestClient(app) as client:
+        r = client.get("/api/listening/review-queue", params={"user_id": uid})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["pending"] == 1
+    assert body["due"] == 1
+    assert body["entries"][0]["question_id"] == "c001"
+    assert body["entries"][0]["state"] == "pending"
+
+
 def test_defer_unknown_entry_is_404(monkeypatch, tmp_path):
     uid = _setup(monkeypatch, tmp_path)
     with TestClient(app) as client:

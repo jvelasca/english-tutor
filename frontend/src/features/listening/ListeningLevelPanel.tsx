@@ -84,10 +84,13 @@ export function ListeningLevelPanel({
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
     setData(null);
     setError(false);
+  }, [userId, level]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
     const uid = userId;
     void (async () => {
       try {
@@ -186,12 +189,12 @@ export function ListeningLevelPanel({
         )}
       </div>
 
-      {reviewPending > 0 && (
+      {failedIds.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
           <span className="font-medium text-warning">
             {t("listening.review.pending").replace(
               "{count}",
-              String(reviewPending),
+              String(failedIds.length),
             )}
           </span>
           <Button
@@ -199,12 +202,18 @@ export function ListeningLevelPanel({
             variant="outline"
             size="sm"
             className="min-h-8 gap-2"
-            disabled={failedIds.length === 0}
+            disabled={disabled}
             onClick={() => onDrillFailed(level, failedIds)}
           >
             {t("listening.review.open")}
           </Button>
         </div>
+      )}
+
+      {failedIds.length === 0 && reviewPending > 0 && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("listening.review.cleared")}
+        </p>
       )}
 
       {data.completed && routeState === "functional" && (
@@ -388,17 +397,19 @@ export function ListeningLevelPanel({
       })}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-        <Button
-          type="button"
-          className="min-h-9"
-          onClick={() => onDrillFailed(level, failedIds)}
-          disabled={disabled || data.failed === 0}
-        >
-          {t("listening.repeatFailed").replace(
-            "{count}",
-            String(data.failed),
-          )}
-        </Button>
+        {data.failed > 0 && (
+          <Button
+            type="button"
+            className="min-h-9"
+            onClick={() => onDrillFailed(level, failedIds)}
+            disabled={disabled}
+          >
+            {t("listening.repeatFailed").replace(
+              "{count}",
+              String(data.failed),
+            )}
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
@@ -413,7 +424,7 @@ export function ListeningLevelPanel({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant={data.failed === 0 ? "default" : "outline"}
           className="min-h-9"
           onClick={() => onPracticeLevel(level, data.total)}
           disabled={disabled}

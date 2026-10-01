@@ -2291,6 +2291,38 @@ def route_competence(attempt_rows: list[dict]) -> list[dict]:
     return result
 
 
+def listening_route_projection(level: str, attempt_rows: list[dict]) -> dict:
+    """Ruta de práctica de un nivel, para mostrarla en Formación (Constitución §2.3).
+
+    Es la misma lectura que `route_competence` de ese nivel, reducida a lo que
+    la unidad de listening necesita: estado, cobertura y si la puerta de ruta
+    está superada. No decide el gating del curso ni certifica el CEFR: quien
+    la pinta solo informa. Un nivel fuera de `LEVEL_ORDER` queda `not_started`
+    con banco vacío, sin inventar una ruta.
+    """
+    code = str(level or "").strip().upper()
+    routes = {row["level"]: row for row in route_competence(attempt_rows)}
+    route = routes.get(code)
+    if route is None:
+        return {
+            "level": code,
+            "state": "not_started",
+            "mastered": 0,
+            "total": 0,
+            "coverage_pct": 0.0,
+            "passed": False,
+        }
+    gate = route["gate"]
+    return {
+        "level": route["level"],
+        "state": route["state"],
+        "mastered": gate["mastered"],
+        "total": gate["total"],
+        "coverage_pct": gate["coverage_pct"],
+        "passed": bool(gate["passed"]),
+    }
+
+
 def resilience_dimensions(question: dict) -> list[str]:
     """Dimensiones de resiliencia que el audio *realizado* del ítem ejercita.
 

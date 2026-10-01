@@ -890,8 +890,9 @@ async def get_review_queue(user_id: str, only_due: bool = False) -> dict:
     prioridad (mayor primero) y declara, por frase, cuántas veces se falló y
     cuándo toca repasarla. Con `only_due=True` solo se sirven las vencidas.
     """
-    rows = await run_in_threadpool(listening_repo.list_queue, user_id)
     now = listening_review.now_iso()
+    await run_in_threadpool(listening_repo.promote_due_deferred, user_id, now)
+    rows = await run_in_threadpool(listening_repo.list_queue, user_id)
     entries = [
         {
             "question_id": row["question_id"],

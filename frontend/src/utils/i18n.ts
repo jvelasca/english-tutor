@@ -281,6 +281,14 @@ const STRINGS: Record<string, Entry> = {
     es: "Al terminar esta unidad serás capaz de…",
   },
   "course.sections": { en: "Unit sections", es: "Secciones de la unidad" },
+  "course.listeningRoute": {
+    en: "Listening practice route {level}",
+    es: "Ruta de listening {level}",
+  },
+  "course.listeningRouteNote": {
+    en: "This is the same route you practise in Learn. It does not unlock the next course level and it is not a CEFR certificate.",
+    es: "Es la misma ruta que practicas en Aprender. No desbloquea el siguiente nivel del curso y no es un certificado CEFR.",
+  },
   "course.needsContent": { en: "needs content", es: "sin contenido" },
   "course.unitMastered": { en: "Unit mastered", es: "Unidad dominada" },
   "course.masteryGate": { en: "Mastery gate", es: "Puerta de dominio" },
@@ -3722,12 +3730,12 @@ const STRINGS: Record<string, Entry> = {
     es: "Drill de falladas · nivel {level} · {done}/{total} dominadas",
   },
   "listening.drillDone": {
-    en: "You mastered all {total} failed phrases of level {level}!",
-    es: "¡Has dominado las {total} frases falladas del nivel {level}!",
+    en: "Failed round of level {level} finished ({total}). To move forward, practise new phrases.",
+    es: "Ronda de falladas del nivel {level} terminada ({total}). Para avanzar, practica frases nuevas.",
   },
   "listening.drillFinish": {
-    en: "Finish practice",
-    es: "Terminar práctica",
+    en: "Continue with new phrases",
+    es: "Seguir con frases nuevas",
   },
   "listening.levelStates.failed": {
     en: "Failed ({count})",
@@ -3916,6 +3924,14 @@ const STRINGS: Record<string, Entry> = {
     en: "Open a level to review them",
     es: "Abre un nivel para repasarlas",
   },
+  "listening.review.notDueYet": {
+    en: "Not due yet. You can keep practising new phrases in the meantime.",
+    es: "Aún no toca. Mientras, puedes seguir con frases nuevas.",
+  },
+  "listening.review.cleared": {
+    en: "Nothing left to review right now. The route moves forward when you practise new phrases.",
+    es: "Ahora no hay nada que repasar. La ruta avanza al practicar frases nuevas.",
+  },
   "listening.flow.showTranscript": {
     en: "Show transcript",
     es: "Ver transcripción",
@@ -3927,6 +3943,10 @@ const STRINGS: Record<string, Entry> = {
   "listening.flow.shadowingTitle": {
     en: "Repeat out loud (shadowing)",
     es: "Repite en voz alta (shadowing)",
+  },
+  "listening.flow.shadowingOffer": {
+    en: "Repeat out loud (optional)",
+    es: "Repetir en voz alta (opcional)",
   },
   "listening.flow.shadowingHint": {
     en: "Play the audio and repeat each sentence out loud, imitating rhythm and intonation.",

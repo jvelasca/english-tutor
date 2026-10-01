@@ -138,7 +138,11 @@ from services.curriculum import (
     next_level_id,
 )
 from services.interaction import interaction_evidence
-from services.listening import listening_diagnostic, route_competence
+from services.listening import (
+    listening_diagnostic,
+    listening_route_projection,
+    route_competence,
+)
 from services.listening_bridge import SOURCE as LISTENING_BRIDGE_SOURCE
 from services.mastery import mastery_records
 
@@ -411,8 +415,15 @@ async def get_course_map(level_id: str, user_id: str) -> CourseMapOut | None:
         lv, objective_scores, objective_attempts
     )
     profile = await _annotated_profile(user_id, lv)
+    listening_attempts = await run_in_threadpool(
+        listening_repo.list_attempts, user_id
+    )
+    # Misma ruta que Aprender, solo lectura: no entra en mastered ni en el
+    # gating (Constitución §2.3).
+    route = listening_route_projection(lv.level, listening_attempts)
     return CourseMapOut(
-        **course_svc.course_map(lv, mastered, attempts, profile=profile)
+        **course_svc.course_map(lv, mastered, attempts, profile=profile),
+        listening_route=route,
     )
 
 

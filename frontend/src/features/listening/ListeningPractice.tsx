@@ -104,6 +104,7 @@ import { cn } from "../../lib/utils";
 // Micro-flujo por ítem (V3.27, Listening Engine 4.0): máquina de presentación
 // que ejecuta el contrato `flow` + `transcript_policy` servido por el backend.
 import {
+  advancePastOptionalShadowing,
   advanceToNext,
   completeShadowing,
   completeStageWithAnswer,
@@ -114,6 +115,7 @@ import {
   hasFlow,
   initialFlow,
   isProductionFlow,
+  optionalShadowingFollows,
   revealFull,
   retriesRemain,
   scaleWordTimings,
@@ -310,11 +312,16 @@ export function ListeningPractice({
   const [reviewPending, setReviewPending] = useState(0);
   const [reviewDue, setReviewDue] = useState(0);
   const [reviewByLevel, setReviewByLevel] = useState<Record<string, number>>({});
+  // El panel de nivel no se entera solo de un acierto: sin esto «Repaso pendiente»
+  // se queda en el número viejo cuando la frase ya salió de las falladas.
+  const [itemsNonce, setItemsNonce] = useState(0);
   // Micro-flujo por ítem (V3.27, V3.28 Listening Engine 4.0): estado de la
   // máquina de presentación. Se activa cuando la pregunta trae `flow` del
   // backend: rutas adaptativa, por nivel (`level`) y drill (`failed`). Solo el
   // repaso `mastered` sigue en modo compacto (sin flow, decisión V3.28).
   const [flowState, setFlowState] = useState<MicroFlowState | null>(null);
+  // Repetir en voz alta vive en la misma revisión: no abre otra pantalla.
+  const [repeatAloud, setRepeatAloud] = useState(false);
   // Voz TTS real del perfil y segunda voz (V3.75.5). El store de acentos vive en
   // `useVoiceChoice`: él lee el catálogo una sola vez para toda la app, así que la
   // etiqueta de voz, el selector del «...» y el altavoz de repetición ven lo
@@ -533,19 +540,18 @@ export function ListeningPractice({
     if (micro?.stage === "while1") continueStage();
   }
 
-  /** Desde el resultado en `post` avanza al siguiente paso (shadowing) o, si el
-   * flujo terminó, carga la siguiente pregunta. */
+  /** Desde la revisión, «Siguiente» cierra el ítem.
+   *
+   * El shadowing opcional no es un segundo paso: si se puede saltar, se salta.
+   * Solo un shadowing obligatorio deja otra pantalla. */
   function continueFromResult() {
     if (!micro || !flowState) {
       void load();
       return;
     }
-    if (flowState.stepIndex + 1 < flowSteps.length) {
-      setFlowState(advanceToNext(flowState, flowSteps));
-    } else {
-      setFlowState(null);
-      void load();
-    }
+    const next = advancePastOptionalShadowing(flowState, flowSteps);
+    setFlowState(next.finished ? null : next);
+    if (next.finished) void load();
   }
 
   /** Termina la etapa de shadowing libre y avanza. */
@@ -618,6 +624,7 @@ export function ListeningPractice({
     try {
       const next = await getListeningQuestion(userId, level, mode);
       setQuestion(next);
+      setRepeatAloud(false);
       // V3.93.1: nueva pregunta ⇒ nuevo intento ⇒ nuevo `attempt_id`.
       attemptIdRef.current = null;
       productionAttemptIdRef.current = null;
@@ -662,7 +669,10 @@ export function ListeningPractice({
     setExpandedLevel(selectedLevel ?? null);
     // `selectedLevel ?? null` explícito: el cierre aún conserva la `session`
     // vieja en el closure y sin override `load()` seguiría pidiendo frases del
-    // nivel que se abandona.
+    // nivel que se abandona. Al salir, la cola y el panel tienen que coincidir
+    // con lo que acaba de acertar (un acierto saca la frase de la cola).
+    setItemsNonce((n) => n + 1);
+    void refreshReviewQueue();
     void load(selectedLevel ?? null, "all");
   }
 
@@ -947,8 +957,11 @@ async function choose(index: number) {
     applySessionOutcome(question.id, res.correct);
     onAttempt();
     void refreshStats();
-    // V3.89: un fallo entra en la cola de repaso; refresca el contador visible.
-    if (!res.correct) void refreshReviewQueue();
+    // Un fallo entra en la cola; un acierto la saca. El contador tiene que
+    // moverse en los dos casos, si no «Repaso pendiente» se queda con el
+    // número viejo cuando el botón de repasar ya no tiene frases.
+    setItemsNonce((n) => n + 1);
+    void refreshReviewQueue();
   } catch (e) {
     // Fallo de red o timeout: se muestra el error y la opción de saltar a la
     // siguiente, para que la pantalla nunca se quede sin salida.
@@ -1203,6 +1216,11 @@ async function submitDictation() {
               <span className="text-muted-foreground">
                 · {t("listening.review.openPanel")}
               </span>
+              {reviewDue === 0 && (
+                <span className="basis-full text-muted-foreground">
+                  {t("listening.review.notDueYet")}
+                </span>
+              )}
             </div>
           )}
 
@@ -1311,10 +1329,10 @@ async function submitDictation() {
                   {t("listening.transcribed")}: {transcribedText}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2">
                 <Button
                   type="button"
-                  className="min-h-10 gap-2"
+                  className="min-h-12 w-full gap-2"
                   onClick={finishShadowingStage}
                 >
                   {t("listening.flow.shadowingDone")}
@@ -1322,8 +1340,8 @@ async function submitDictation() {
                 {flowSteps[micro.stepIndex]?.allow_skip && (
                   <Button
                     type="button"
-                    variant="outline"
-                    className="min-h-10 gap-2"
+                    variant="ghost"
+                    className="min-h-11 w-full gap-2"
                     onClick={skipShadowingStage}
                   >
                     {t("listening.flow.skipStage")}
@@ -1758,11 +1776,16 @@ async function submitDictation() {
             </Card>
           )}
 
+          {/* En el móvil la acción va antes que la transcripción: el pulgar
+              acaba de tocar una opción y lo siguiente tiene que ser «Siguiente»,
+              no otra pantalla. */}
+          <div className="flex flex-col gap-3">
           {/* Transcript dinámico (V3.28/V3.29): karaoke palabra a palabra cuando
               el backend sirve `wordTimings` (sidecar word_alignment_proxy);
               si no, sync grueso de frase. `transcriptVisible` cubre el flujo
               receptivo (hidden/partial/full) y la revelación completa tras un
               resultado de producción (dictado/shadowing). */}
+          <div className="order-2 empty:hidden">
           {question &&
             transcriptVisible !== "hidden" &&
             micro?.stage !== "shadowing" &&
@@ -1782,7 +1805,9 @@ async function submitDictation() {
                 currentTime={audioTime}
               />
             ) : null)}
+          </div>
 
+          <div className="order-1 flex flex-col gap-3 empty:hidden">
           {(result || productionResult) &&
             !(micro?.stage === "shadowing") &&
             !(result && !result.correct && micro?.stage === "while2") && (
@@ -1808,13 +1833,60 @@ async function submitDictation() {
               }
               footer={
                 micro?.stage === "post" ? (
-                  <Button
-                    type="button"
-                    className="min-h-10 gap-2"
-                    onClick={continueFromResult}
-                  >
-                    {t("listening.flow.continue")}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      className="min-h-12 w-full gap-2"
+                      onClick={continueFromResult}
+                      disabled={recording || processing}
+                    >
+                      {t("listening.next")}
+                    </Button>
+                    {optionalShadowingFollows(micro, flowSteps) && !repeatAloud && (
+                      <button
+                        type="button"
+                        className="min-h-11 w-full text-sm font-medium text-muted-foreground"
+                        onClick={() => setRepeatAloud(true)}
+                      >
+                        {t("listening.flow.shadowingOffer")}
+                      </button>
+                    )}
+                    {repeatAloud && (
+                      <div className="flex flex-col gap-2 border-t border-border pt-2">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {t("listening.flow.shadowingHint")}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant={recording ? "destructive" : "outline"}
+                            className="min-h-11 gap-2"
+                            onClick={toggleRecording}
+                            disabled={!userId || !!productionResult || processing}
+                          >
+                            {processing ? (
+                              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                            ) : recording ? (
+                              <Square className="size-4" aria-hidden="true" />
+                            ) : (
+                              <Mic className="size-4" aria-hidden="true" />
+                            )}
+                            {processing
+                              ? t("listening.evaluating")
+                              : recording
+                                ? t("listening.stop")
+                                : t("listening.flow.recordShadowing")}
+                          </Button>
+                          {recordingUrl && (
+                            <RecordingPlayButton
+                              src={recordingUrl}
+                              label={t("listening.flow.playRecording")}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : session ? (
                   isSessionFinished(session) ? (
                     <Button
@@ -2036,11 +2108,11 @@ async function submitDictation() {
                     )}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2">
                   {retriesRemain(micro, flowPolicy) && (
                     <Button
                       type="button"
-                      className="min-h-10 gap-2"
+                      className="min-h-12 w-full gap-2"
                       onClick={retryQuestion}
                     >
                       <RefreshCw className="size-4" aria-hidden="true" />
@@ -2050,7 +2122,7 @@ async function submitDictation() {
                   <Button
                     type="button"
                     variant={retriesRemain(micro, flowPolicy) ? "outline" : "default"}
-                    className="min-h-10 gap-2"
+                    className="min-h-12 w-full gap-2"
                     onClick={continueAfterFailure}
                   >
                     <ArrowRight className="size-4" aria-hidden="true" />
@@ -2059,7 +2131,7 @@ async function submitDictation() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-10 gap-2"
+                    className="min-h-12 w-full gap-2"
                     onClick={() => void deferFailure()}
                   >
                     <Clock className="size-4" aria-hidden="true" />
@@ -2070,7 +2142,7 @@ async function submitDictation() {
                       <Button
                         type="button"
                         variant="ghost"
-                        className="min-h-10 gap-2"
+                        className="min-h-12 w-full gap-2"
                         onClick={showTranscriptNow}
                       >
                         {t("listening.flow.showTranscript")}
@@ -2114,6 +2186,8 @@ async function submitDictation() {
                 )}
               </Card>
             )}
+          </div>
+          </div>
 
           {stats && (
             <Card className="relative gap-4 p-5">
@@ -2424,7 +2498,7 @@ async function submitDictation() {
                         void startAddPractice(level, count)
                       }
                       extrasJob={extrasJobs[expandedLevel] ?? null}
-                      refreshNonce={extrasNonce}
+                      refreshNonce={extrasNonce + itemsNonce}
                       reviewPending={reviewByLevel[expandedLevel] ?? 0}
                     />
                   </div>
