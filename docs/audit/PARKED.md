@@ -2533,11 +2533,11 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 > fuerte deja fila sin tocar FSRS y esa fila no entra en los dos contadores
 > del día. El corpus (95 frases, 15 familias) fija `resolver_expected` en CI.
 > El `gold` humano discrepa en `bank-07`, `bank-08`, `bank-10` y `run-07`.
-> **Publicación:** el tag espera al verde de la CI. Esta sección no lo
-> adelanta.
+> **Publicación:** ver la tabla al final de esta sección.
 
 ### Sigue aparcado (no es trabajo de V3.94.2)
 
+- **Dos `mismatch` probados hacia sentidos alternativos distintos (P1 semántico, V3.95).** V3.94.2 deja el agregado en `mismatch`. Si las dos apariciones prueban el **mismo** sentido alternativo, es una exposición: lo fija `test_two_proven_mismatches_stay_a_mismatch`. Si prueban sentidos **distintos**, el agregado también se queda en `mismatch`. `best_other_key` no sale de `sense_context.py`; el ledger guarda la acepción declarada, `sense_match` y `sense_reason`. `new_sense_exposure = 1` es una palabra y un intento (`user:question:word:attempt`), no la identidad de un sentido. Copiar `occurrence:split` subiría la carta débil en una frase que no es el sentido aprendido y desharía ENFORCE. Cuando una fila signifique «enseña este sentido», hará falta una razón distinta con esta política: el mismo `best_other_key` sigue siendo `mismatch` y exposición; varios `best_other_key` no vacíos no son exposición y no mueven FSRS, ni en carta débil ni en carta fuerte. Sin columna nueva y sin persistir `occurrences`.
 - **`sense_id` estable y sentido nuevo pedagógico (V3.95).** Sin identificador
   estable no hay dos evidencias por acepción ni FSRS por sentido.
 - **FSRS por acepción (V3.96).** Sigue una carta por lema.
@@ -2552,6 +2552,19 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
   sigue sin existir.
 - **El ledger de producción** sigue sin volumen. El corpus mide el software,
   no la política con alumnos.
+
+### Estado de publicación (verificado el 2026-10-01)
+
+| Comprobación | Resultado |
+|---|---|
+| Tag anotado `v3.94.2` | **publicado** (`refs/tags/v3.94.2` en `origin`) → objeto tag `e918493`, que desreferencia a **`5ce978a`** |
+| GitHub Release `v3.94.2` | https://github.com/jvelasca/english-tutor/releases/tag/v3.94.2 — **no** *draft*, **no** *prerelease*, **Latest** |
+| CI sobre `5ce978a` (v3.94.2) | `success` — runs **`36827963629`** (push a `main`) y **`36826422137`** (PR #26), **12/12 jobs en verde** cada uno |
+| Orden tag/CI | el verde de la PR precedió al tag: la evidencia queda anclada al commit etiquetado |
+| `main` vs `origin/main` | al día en `5ce978a` (**fast-forward** desde `aebcdc3`, sin merge commit) |
+| PR #26 | **MERGED** |
+| Rama `release/v3.94.2` | **conservada** como referencia de la auditoría (no borrada) |
+| P1 de dos sentidos alternativos | **aparcado**: el agregado sigue en `mismatch`; la razón distinta espera a V3.95 y no copia la política del `split` |
 
 ## V3.94.1 — El sentido se resuelve SIEMPRE (también en cartas fuertes) y el `mismatch` solo se declara con PRUEBA · 2026-10-01
 
