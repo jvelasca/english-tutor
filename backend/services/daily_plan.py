@@ -178,6 +178,9 @@ def day_metrics(
     - `sense_exposures` (V3.94, ENFORCE): cuántas filas son una exposición a un
       sentido NUEVO (veredicto `mismatch`). NO subieron ninguna carta, así que no
       se cuentan como dificultad: el ledger las guarda y aquí se separan.
+    - `occurrence:split` sin cambio de dificultad (V3.94.2, carta fuerte): la fila
+      existe para medir el conflicto, pero no es dificultad ni exposición. Una
+      carta débil con la misma razón SÍ sube y cuenta como dificultad.
     """
     by_kind: dict[str, int] = {}
     by_skill: dict[str, int] = {}
@@ -198,10 +201,20 @@ def day_metrics(
     evidence = rows_on_day(evidence_rows, day)
     bridge = rows_on_day(list(bridge_rows or []), day)
     # V3.94 (ENFORCE): el ledger guarda también las filas `mismatch`, que registran
-    # una acepción DISTINTA y NO subieron la dificultad de ninguna carta (viajan con
-    # `difficulty_before == difficulty_after`). Contarlas como dificultad mentiría:
-    # aquí se separan de las que sí aplicaron evidencia.
-    applied = [r for r in bridge if str(r.get("sense_match") or "") != "mismatch"]
+    # una acepción DISTINTA y NO subieron la dificultad de ninguna carta. Contarlas
+    # como dificultad mentiría.
+    # V3.94.2: un `occurrence:split` de carta fuerte también viaja con
+    # `difficulty_before == difficulty_after`, pero NO es exposición. Si se contara
+    # como el resto de lo que no es `mismatch`, inflaría la dificultad. Queda fuera
+    # de los dos contadores. El informe de sombra lo cuenta por la razón.
+    exposures = [
+        row for row in bridge if str(row.get("sense_match") or "") == "mismatch"
+    ]
+    applied = [
+        row
+        for row in bridge
+        if str(row.get("sense_match") or "") != "mismatch" and not _is_split_noop(row)
+    ]
     correct = [1.0 if r.get("correct") else 0.0 for r in listening]
     results = [float(r.get("result") or 0.0) for r in evidence]
     pooled = correct + results
@@ -227,11 +240,28 @@ def day_metrics(
             {str(r.get("word") or "") for r in applied if r.get("word")}
         ),
         # V3.94 (ENFORCE): exposiciones a un sentido nuevo. NO son dificultad —no
-        # subieron ninguna carta—, así que se publican aparte.
-        "sense_exposures": len(bridge) - len(applied),
+        # subieron ninguna carta—, así que se publican aparte. Un split sin cambio
+        # de dificultad no entra aquí: no es `mismatch`.
+        "sense_exposures": len(exposures),
         "by_kind": by_kind,
         "by_skill": by_skill,
     }
+
+
+def _is_split_noop(row: dict) -> bool:
+    """¿Fila de conflicto que no movió la dificultad? (V3.94.2, pura).
+
+    Solo el `occurrence:split` de una carta fuerte: `before == after`. Una carta
+    débil con la misma razón sí sube y no es un no-op. Sin las dos cifras no se
+    inventa el no-op (las filas antiguas del test no las traen).
+    """
+    if str(row.get("sense_reason") or "") != "occurrence:split":
+        return False
+    before = row.get("difficulty_before")
+    after = row.get("difficulty_after")
+    if before is None or after is None:
+        return False
+    return float(before) == float(after)
 
 
 def goal_progress(

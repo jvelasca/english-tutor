@@ -467,6 +467,12 @@ async def _apply_difficulty_evidence(
     sin tocar FSRS; (b) si no, conserva su dominio y no recibe evidencia de
     dificultad. Es decir, se separa «resolver el sentido» de «escribir la carta».
 
+    V3.94.2 (ocurrencias en conflicto): si la misma palabra aparece con un
+    `mismatch` probado y con otro veredicto, el agregado es `occurrence:split`.
+    No es exposición. Una carta débil sigue recibiendo la subida (la duda no
+    resta). Una carta fuerte deja fila en el ledger con la dificultad intacta,
+    para que el conflicto sea medible, y no toca FSRS.
+
     V3.93 (robustez): el ledger reclama la clave del intento ANTES de tocar la
     carta (una repetición del mismo intento no vuelve a sumar) y la carta se
     escribe con control de concurrencia optimista (dos evidencias simultáneas
@@ -539,6 +545,28 @@ async def _apply_difficulty_evidence(
             )
             if inserted:
                 exposures.append(word)
+            continue
+        if sense_context.is_occurrence_split(verdict) and not (
+            listening_bridge.is_weak_card(card)
+        ):
+            # V3.94.2: conflicto de ocurrencias en una carta FUERTE. No es una
+            # exposición (no se fabrica la acepción nueva) ni un castigo del
+            # dominio. La fila queda, con la dificultad intacta, para contarla.
+            base = float((card or {}).get("difficulty") or 5.0)
+            await run_in_threadpool(
+                listening_repo.record_difficulty_evidence,
+                user_id,
+                question_id,
+                word,
+                fail_count=fail_count,
+                difficulty_before=base,
+                difficulty_after=base,
+                attempt_number=attempt_number,
+                attempt_id=attempt_id,
+                sense_key=verdict["declared_key"],
+                sense_match=verdict["match"],
+                sense_reason=verdict["reason"],
+            )
             continue
         if not listening_bridge.is_weak_card(card):
             # V3.94.1: el sentido se resuelve SIEMPRE (arriba), pero una carta fuerte

@@ -24,9 +24,10 @@ Taxonomía (`MATCHES`), conservadora por diseño:
   alternativa, o un desempate gramatical fuerte) → NO se penaliza la acepción
   aprendida; el fallo se registra como `new_sense_exposure` (V3.94).
 - `ambiguous` — no se puede decidir, **incluida la señal DÉBIL a favor de otra
-  acepción** (un solo token: `gloss:other:weak`) → **CONSERVA la evidencia**
-  (decisión de V3.94): la duda no RESTA evidencia igual que no la FABRICA, y en
-  `declared:none` / `alternatives:none` no hay NADA que contradecir.
+  acepción** (un solo token: `gloss:other:weak`) y el **conflicto de ocurrencias**
+  (`occurrence:split`, V3.94.2) → **CONSERVA la evidencia** (decisión de V3.94):
+  la duda no RESTA evidencia igual que no la FABRICA, y en `declared:none` /
+  `alternatives:none` no hay NADA que contradecir.
 
 Regla dura: `matched` EXIGE solapamiento léxico positivo o un desempate
 gramatical con alternativas declaradas. `mismatch` NO se declara con una señal
@@ -83,6 +84,10 @@ REASON_ROLE_DECLARED = "role:declared"
 REASON_ROLE_OTHER = "role:other"
 REASON_TIE = "tie"
 REASON_NO_ALTERNATIVES = "alternatives:none"
+# La misma palabra aparece con un mismatch PROBADO y con otro veredicto en la
+# misma frase. No se hereda el de mayor margen: la duda queda observable y no
+# se convierte en `new_sense_exposure` (V3.94.2).
+REASON_OCCURRENCE_SPLIT = "occurrence:split"
 
 
 def _sense_gloss(sense: object) -> str:
@@ -112,6 +117,18 @@ def is_new_sense_exposure(verdict: object) -> bool:
     return isinstance(verdict, dict) and verdict.get("match") == SENSE_MISMATCH
 
 
+def is_occurrence_split(verdict: object) -> bool:
+    """¿La frase usa la palabra en sentidos que no se pueden colapsar? (pura).
+
+    V3.94.2: un `mismatch` probado en una ocurrencia y otro veredicto en otra no
+    se heredan como etiqueta única de la palabra. El agregado es `ambiguous` con
+    razón `occurrence:split`. No es `new_sense_exposure` y no suprime evidencia.
+    """
+    return (
+        isinstance(verdict, dict) and verdict.get("reason") == REASON_OCCURRENCE_SPLIT
+    )
+
+
 def allows_difficulty_evidence(verdict: object) -> bool:
     """¿La evidencia de dificultad se aplica a la carta? (ENFORCE V3.94; pura y total).
 
@@ -123,11 +140,12 @@ def allows_difficulty_evidence(verdict: object) -> bool:
 
     - `matched`: hay evidencia léxica de que el contexto es la acepción aprendida;
     - `ambiguous` (`declared:none`, `alternatives:none`, `gloss:other:weak`, `tie`,
-      `occurrence:none`): NO hay prueba de una acepción distinta. La duda no RESTA
-      evidencia igual que no la FABRICA; y en `declared:none` (palabra sin acepción
-      declarada) o `alternatives:none` (palabra monosémica conocida) no hay NADA que
-      contradecir. En `gloss:other:weak` SÍ hay una señal a favor de otra acepción,
-      pero DÉBIL (un solo token): un posible mismatch NO basta para suprimir;
+      `occurrence:none`, `occurrence:split`): NO hay prueba de que LA PALABRA, en
+      conjunto, sea una acepción distinta. La duda no RESTA evidencia igual que no
+      la FABRICA. En `occurrence:split` una ocurrencia sí está probada y otra no:
+      colapsar a `mismatch` castigaría el sentido conocido o fabricaría una
+      exposición. En `gloss:other:weak` la señal es DÉBIL (un solo token): un
+      posible mismatch NO basta para suprimir;
     - sin veredicto (`None`): se comporta como antes de V3.94 (conserva).
 
     **Decisión declarada, no medición.** El diseño de SENSE-CONTEXT-01 proponía «solo
@@ -172,6 +190,58 @@ def _evaluate_position(
     }
 
 
+def _classify_signal(
+    signal: dict,
+    *,
+    has_others: bool,
+    declared_family: str,
+) -> dict:
+    """Veredicto de UNA ocurrencia, con la regla asimétrica de V3.94.1 (pura)."""
+    declared_overlap = signal["declared_overlap"]
+    best_other_overlap = signal["best_other_overlap"]
+    role = signal["role"]
+    strength = signal["strength"]
+    declared_family_matches = (
+        bool(role) and bool(declared_family) and declared_family == role
+    )
+    other_family_matches = bool(signal["other_family_matches"])
+    mismatch_strength = ""
+    if declared_overlap > best_other_overlap:
+        match, reason = SENSE_MATCHED, REASON_GLOSS_DECLARED
+    elif best_other_overlap >= PROVEN_OTHER_OVERLAP and (
+        best_other_overlap > declared_overlap
+    ):
+        match, reason = SENSE_MISMATCH, REASON_GLOSS_OTHER
+        mismatch_strength = MISMATCH_PROVEN
+    elif not has_others:
+        match, reason = SENSE_AMBIGUOUS, REASON_NO_ALTERNATIVES
+    elif (
+        declared_family_matches
+        and not other_family_matches
+        and best_other_overlap <= declared_overlap
+    ):
+        match, reason = SENSE_MATCHED, REASON_ROLE_DECLARED
+    elif other_family_matches and not declared_family_matches and strength == _STRONG:
+        match, reason = SENSE_MISMATCH, REASON_ROLE_OTHER
+        mismatch_strength = MISMATCH_PROVEN
+    elif best_other_overlap > declared_overlap:
+        match, reason = SENSE_AMBIGUOUS, REASON_GLOSS_OTHER_WEAK
+        mismatch_strength = MISMATCH_POSSIBLE
+    else:
+        match, reason = SENSE_AMBIGUOUS, REASON_TIE
+    return {
+        "index": signal["index"],
+        "match": match,
+        "reason": reason,
+        "mismatch_strength": mismatch_strength,
+        "declared_overlap": declared_overlap,
+        "best_other_overlap": best_other_overlap,
+        "best_other_key": signal["best_other_key"],
+        "role": role,
+        "strength": strength,
+    }
+
+
 def classify_sense_evidence(
     word: object,
     text: object,
@@ -188,9 +258,13 @@ def classify_sense_evidence(
     `pos` es la POS global de la entrada, como respaldo de familia.
 
     Devuelve `{match, word, declared_key, declared_overlap, best_other_overlap,
-    best_other_key, role, strength, mismatch_strength, reason}`. `mismatch_strength`
-    es `"proven"` (único que suprime evidencia), `"possible"` o `""`. Pura y total:
-    entrada rara o sin datos útiles devuelve `ambiguous`; nunca lanza.
+    best_other_key, role, strength, mismatch_strength, reason, occurrences}`.
+    `mismatch_strength` es `"proven"` (único que suprime evidencia), `"possible"`
+    o `""`. `occurrences` es el veredicto de cada aparición, en orden. Si una
+    aparición es `mismatch` probado y otra no, la palabra NO hereda el de mayor
+    margen: el agregado es `ambiguous` / `occurrence:split` (V3.94.2). Los
+    solapes del agregado siguen siendo los de la ocurrencia más discriminativa.
+    Pura y total: entrada rara o sin datos útiles devuelve `ambiguous`; nunca lanza.
     """
     normalized = str(word or "").strip().lower()
     declared_key = sense_key(declared)
@@ -205,6 +279,7 @@ def classify_sense_evidence(
         "strength": "",
         "mismatch_strength": "",
         "reason": REASON_DECLARED_NONE,
+        "occurrences": [],
     }
     if not declared_key:
         return base
@@ -236,85 +311,59 @@ def classify_sense_evidence(
             continue
         others.append(sense)
 
-    # Se evalúa cada ocurrencia y gana la MÁS DISCRIMINATIVA (V3.93.1), no la que
-    # más solapa en total. Antes pesaba `declared + other`, así que una aparición
-    # ambigua (margen 0) podía empatar y ganar a otra inequívoca solo por sumar
-    # más solapamiento. Peso: (¿discrimina?, margen, solape declarado, posición).
-    # Así una ocurrencia con veredicto claro vence a una ambigua, y a igualdad de
-    # margen se prefiere la que apoya la acepción declarada. Desempate estable:
-    # la primera (orden de `unit_positions`).
+    # Se evalúa cada ocurrencia y, si no hay conflicto, gana la MÁS DISCRIMINATIVA
+    # (V3.93.1), no la que más solapa en total. Antes pesaba `declared + other`,
+    # así que una aparición ambigua (margen 0) podía empatar y ganar a otra
+    # inequívoca solo por sumar más solapamiento. Peso: (¿discrimina?, margen,
+    # solape declarado, posición). A igualdad de margen se prefiere la que apoya
+    # la acepción declarada. Desempate estable: la primera (`unit_positions`).
+    #
+    # V3.94.2: si una ocurrencia es `mismatch` PROBADO y otra no, no se hereda
+    # ese ganador. El fallo de Listening es de la frase, no de una aparición, y
+    # colapsar a `mismatch` suprimiría la carta conocida y fabricaría una
+    # exposición. El agregado queda en `occurrence:split`.
+    occurrences: list[dict] = []
     best: dict | None = None
     best_weight: tuple[int, int, int, int] | None = None
     for index in positions:
         signal = _evaluate_position(tokens, index, normalized, declared_gloss, others)
-        margin = abs(signal["declared_overlap"] - signal["best_other_overlap"])
+        signal["index"] = index
+        classified = _classify_signal(
+            signal, has_others=bool(others), declared_family=declared_family
+        )
+        occurrences.append(classified)
+        margin = abs(classified["declared_overlap"] - classified["best_other_overlap"])
         weight = (
             1 if margin > 0 else 0,
             margin,
-            signal["declared_overlap"],
+            classified["declared_overlap"],
             -index,
         )
         if best_weight is None or weight > best_weight:
             best_weight = weight
-            best = signal
+            best = classified
     assert best is not None  # `positions` no está vacío
 
-    declared_overlap = best["declared_overlap"]
-    best_other_overlap = best["best_other_overlap"]
-    role = best["role"]
-    strength = best["strength"]
-    declared_family_matches = (
-        bool(role) and bool(declared_family) and declared_family == role
-    )
-    other_family_matches = bool(best["other_family_matches"])
-
-    mismatch_strength = ""
-    if declared_overlap > best_other_overlap:
-        match, reason = SENSE_MATCHED, REASON_GLOSS_DECLARED
-    elif best_other_overlap >= PROVEN_OTHER_OVERLAP and (
-        best_other_overlap > declared_overlap
-    ):
-        # Prueba FUERTE por solapamiento: dos o más tokens de la alternativa en la
-        # ventana. Solo aquí un `mismatch` es PROBADO (suprime la evidencia).
-        match, reason = SENSE_MISMATCH, REASON_GLOSS_OTHER
-        mismatch_strength = MISMATCH_PROVEN
-    elif not others:
-        # Sin alternativas conocidas no se puede confirmar que el uso sea el
-        # aprendido: no se fabrica un «matched».
-        match, reason = SENSE_AMBIGUOUS, REASON_NO_ALTERNATIVES
-    elif (
-        declared_family_matches
-        and not other_family_matches
-        and best_other_overlap <= declared_overlap
-    ):
-        # Desempate gramatical a favor de la familia declarada. V3.94.1 lo exige
-        # SOLO si no hay señal léxica DÉBIL a favor de otra acepción: con
-        # `other_overlap > declared_overlap` el caso baja a `possible` (abajo), para
-        # no etiquetar de `matched` una señal real a favor del otro sentido.
-        match, reason = SENSE_MATCHED, REASON_ROLE_DECLARED
-    elif other_family_matches and not declared_family_matches and strength == _STRONG:
-        match, reason = SENSE_MISMATCH, REASON_ROLE_OTHER
-        mismatch_strength = MISMATCH_PROVEN
-    elif best_other_overlap > declared_overlap:
-        # Señal DÉBIL a favor de otra acepción (un solo token): es un posible
-        # mismatch, NO probado. Se declara `ambiguous` y se CONSERVA la evidencia;
-        # solo el mismatch probado suprime (asimetría pedida por V3.94.1).
-        match, reason = SENSE_AMBIGUOUS, REASON_GLOSS_OTHER_WEAK
+    proven = any(item["match"] == SENSE_MISMATCH for item in occurrences)
+    mixed = proven and any(item["match"] != SENSE_MISMATCH for item in occurrences)
+    if mixed:
+        match, reason = SENSE_AMBIGUOUS, REASON_OCCURRENCE_SPLIT
         mismatch_strength = MISMATCH_POSSIBLE
     else:
-        # Empate léxico y la gramática no separa (p. ej. dos sentidos nominales):
-        # es exactamente el caso que NO se debe inventar.
-        match, reason = SENSE_AMBIGUOUS, REASON_TIE
+        match = best["match"]
+        reason = best["reason"]
+        mismatch_strength = best["mismatch_strength"]
 
     return {
         "match": match,
         "word": normalized,
         "declared_key": declared_key,
-        "declared_overlap": declared_overlap,
-        "best_other_overlap": best_other_overlap,
+        "declared_overlap": best["declared_overlap"],
+        "best_other_overlap": best["best_other_overlap"],
         "best_other_key": best["best_other_key"],
-        "role": role,
-        "strength": strength,
+        "role": best["role"],
+        "strength": best["strength"],
         "mismatch_strength": mismatch_strength,
         "reason": reason,
+        "occurrences": occurrences,
     }

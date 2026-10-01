@@ -19,6 +19,7 @@ import { expectNoHorizontalOverflow } from "./layoutHelper";
 
 const ROUTES = [
   { id: "home", url: "/" },
+  { id: "course", url: "/#/formacion" },
   { id: "learn", url: "/#/aprender" },
   { id: "listening", url: "/#/aprender/listening" },
   { id: "speaking", url: "/#/aprender/speaking" },

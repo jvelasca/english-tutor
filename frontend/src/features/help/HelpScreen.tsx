@@ -75,12 +75,12 @@ export function HelpScreen() {
   const { t } = useI18n();
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
+    <div className="mx-auto w-full min-w-0 max-w-3xl px-4 py-6 sm:py-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight break-words text-foreground sm:text-3xl">
           {t("help.title")}
         </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm break-words text-muted-foreground">
           {t("help.subtitle")}
         </p>
       </header>
@@ -97,12 +97,12 @@ export function HelpScreen() {
           {group.items.map((item) => (
             <article
               key={item.titleKey}
-              className="rounded-xl border border-border bg-card p-4"
+              className="min-w-0 rounded-xl border border-border bg-card p-4"
             >
-              <h3 className="text-base font-semibold text-foreground">
+              <h3 className="text-base font-semibold break-words text-foreground">
                 {t(item.titleKey)}
               </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
                 {t(item.bodyKey)}
               </p>
               {item.doc && (
@@ -126,19 +126,19 @@ export function HelpScreen() {
           aunque no haya nada escuchando en el puerto. */}
       <section
         aria-label={t("help.author")}
-        className="mt-6 rounded-xl border border-border bg-card p-4"
+        className="mt-6 min-w-0 rounded-xl border border-border bg-card p-4"
       >
-        <h2 className="text-base font-semibold text-foreground">
+        <h2 className="text-base font-semibold break-words text-foreground">
           {t("help.author")}
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
           {t("help.authorBody")}
         </p>
-        <p className="mt-2 text-sm font-semibold text-foreground">
+        <p className="mt-2 text-sm font-semibold break-words text-foreground">
           {AUTHOR_NAME}
         </p>
         <a
-          className="mt-0.5 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline"
+          className="mt-0.5 inline-block max-w-full text-sm font-medium break-all text-primary underline-offset-2 hover:underline"
           href={`mailto:${AUTHOR_EMAIL}`}
         >
           {AUTHOR_EMAIL}

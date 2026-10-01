@@ -23,7 +23,9 @@ Qué mide:
    `ambiguous` se conservan. Es una proyección sobre lo ya registrado, no una promesa.
    V3.94.1 añade el contador `possible_mismatch` (`gloss:other:weak`, un solo token):
    señales a favor de otra acepción que NO suprimen evidencia, para medir cuántos
-   falsos positivos habría producido el umbral anterior.
+   falsos positivos habría producido el umbral anterior. V3.94.2 añade
+   `occurrence_split` (`occurrence:split`): la misma palabra con un mismatch
+   probado y otro veredicto en la misma frase. Tampoco suprime.
 
 El script es de LECTURA: abre SQLite en modo `mode=ro` (con repliegue si el WAL lo
 impide) y no ejecuta ningún `INSERT`, `UPDATE` ni `DELETE`.
@@ -56,7 +58,11 @@ DEFAULT_DB = ROOT / "backend" / "data" / "tutor.db"
 # decide en producción: una copia local podría desviarse de la verdad y proyectar
 # algo que la app no hace.
 sys.path.insert(0, str(ROOT / "backend"))
-from services.sense_context import REASON_GLOSS_OTHER_WEAK, allows_difficulty_evidence
+from services.sense_context import (  # noqa: E402
+    REASON_GLOSS_OTHER_WEAK,
+    REASON_OCCURRENCE_SPLIT,
+    allows_difficulty_evidence,
+)
 
 TABLE = "listening_difficulty_evidence"
 VERDICTS = ("matched", "mismatch", "ambiguous")
@@ -113,6 +119,8 @@ def _report(conn: sqlite3.Connection) -> dict:
         # V3.94.1: posibles mismatch (`gloss:other:weak`, un solo token) que NO
         # suprimen evidencia. Se cuentan aparte para medir falsos positivos evitados.
         "possible_mismatch": by_reason.get(REASON_GLOSS_OTHER_WEAK, 0),
+        # V3.94.2: conflicto de ocurrencias. Tampoco suprime (`allows` sigue true).
+        "occurrence_split": by_reason.get(REASON_OCCURRENCE_SPLIT, 0),
         "enforce_kept": kept,
         "enforce_suppressed": with_verdict - kept,
     }
@@ -138,6 +146,12 @@ def _print_report(report: dict) -> None:
         print(
             f"\nPosibles mismatch (gloss:other:weak, 1 token): {possible}"
             f"  ({_pct(possible, with_verdict)})"
+        )
+    splits = report.get("occurrence_split", 0)
+    if splits:
+        print(
+            f"Conflictos de ocurrencia (occurrence:split): {splits}"
+            f"  ({_pct(splits, with_verdict)})"
         )
     kept = report["enforce_kept"]
     suppressed = report["enforce_suppressed"]
@@ -205,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
                 "by_match": {},
                 "by_reason": {},
                 "possible_mismatch": 0,
+                "occurrence_split": 0,
                 "enforce_kept": 0,
                 "enforce_suppressed": 0,
             }

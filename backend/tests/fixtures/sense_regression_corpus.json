@@ -1,0 +1,3057 @@
+{
+  "version": "3.94.2",
+  "items": [
+    {
+      "id": "bank-01",
+      "lemma": "bank",
+      "sentence": "I put my money in the bank.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "bank-02",
+      "lemma": "bank",
+      "sentence": "The bank keeps my money safe.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "bank-03",
+      "lemma": "bank",
+      "sentence": "On the river side, the bank was covered in mud.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "bank-04",
+      "lemma": "bank",
+      "sentence": "The bank had a river side of stones.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "bank-05",
+      "lemma": "bank",
+      "sentence": "The bank was closed.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "bank-06",
+      "lemma": "bank",
+      "sentence": "The bank seemed quiet today.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "charge-01",
+      "lemma": "charge",
+      "sentence": "The charge had a high price.",
+      "declared": {
+        "lemma": "charge",
+        "pos": "noun",
+        "gloss": "a price or fee",
+        "domain": "commerce"
+      },
+      "alternatives": [
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a price or fee",
+          "domain": "commerce"
+        },
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a formal accusation in court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "charge-02",
+      "lemma": "charge",
+      "sentence": "The charge included a fee.",
+      "declared": {
+        "lemma": "charge",
+        "pos": "noun",
+        "gloss": "a price or fee",
+        "domain": "commerce"
+      },
+      "alternatives": [
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a price or fee",
+          "domain": "commerce"
+        },
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a formal accusation in court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "charge-03",
+      "lemma": "charge",
+      "sentence": "The charge was a formal accusation.",
+      "declared": {
+        "lemma": "charge",
+        "pos": "noun",
+        "gloss": "a price or fee",
+        "domain": "commerce"
+      },
+      "alternatives": [
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a price or fee",
+          "domain": "commerce"
+        },
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a formal accusation in court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "charge-04",
+      "lemma": "charge",
+      "sentence": "The charge reached a court accusation.",
+      "declared": {
+        "lemma": "charge",
+        "pos": "noun",
+        "gloss": "a price or fee",
+        "domain": "commerce"
+      },
+      "alternatives": [
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a price or fee",
+          "domain": "commerce"
+        },
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a formal accusation in court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "charge-05",
+      "lemma": "charge",
+      "sentence": "The charge was sudden.",
+      "declared": {
+        "lemma": "charge",
+        "pos": "noun",
+        "gloss": "a price or fee",
+        "domain": "commerce"
+      },
+      "alternatives": [
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a price or fee",
+          "domain": "commerce"
+        },
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a formal accusation in court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "charge-06",
+      "lemma": "charge",
+      "sentence": "The charge seemed quiet today.",
+      "declared": {
+        "lemma": "charge",
+        "pos": "noun",
+        "gloss": "a price or fee",
+        "domain": "commerce"
+      },
+      "alternatives": [
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a price or fee",
+          "domain": "commerce"
+        },
+        {
+          "lemma": "charge",
+          "pos": "noun",
+          "gloss": "a formal accusation in court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "right-01",
+      "lemma": "right",
+      "sentence": "The right answer was correct.",
+      "declared": {
+        "lemma": "right",
+        "pos": "noun",
+        "gloss": "correct or true",
+        "domain": "evaluation"
+      },
+      "alternatives": [
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "correct or true",
+          "domain": "evaluation"
+        },
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "the direction opposite of left",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "right-02",
+      "lemma": "right",
+      "sentence": "The right claim was true.",
+      "declared": {
+        "lemma": "right",
+        "pos": "noun",
+        "gloss": "correct or true",
+        "domain": "evaluation"
+      },
+      "alternatives": [
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "correct or true",
+          "domain": "evaluation"
+        },
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "the direction opposite of left",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "right-03",
+      "lemma": "right",
+      "sentence": "The right was the opposite direction.",
+      "declared": {
+        "lemma": "right",
+        "pos": "noun",
+        "gloss": "correct or true",
+        "domain": "evaluation"
+      },
+      "alternatives": [
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "correct or true",
+          "domain": "evaluation"
+        },
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "the direction opposite of left",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "right-04",
+      "lemma": "right",
+      "sentence": "The right pointed left opposite the path.",
+      "declared": {
+        "lemma": "right",
+        "pos": "noun",
+        "gloss": "correct or true",
+        "domain": "evaluation"
+      },
+      "alternatives": [
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "correct or true",
+          "domain": "evaluation"
+        },
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "the direction opposite of left",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "right-05",
+      "lemma": "right",
+      "sentence": "The right was sudden.",
+      "declared": {
+        "lemma": "right",
+        "pos": "noun",
+        "gloss": "correct or true",
+        "domain": "evaluation"
+      },
+      "alternatives": [
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "correct or true",
+          "domain": "evaluation"
+        },
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "the direction opposite of left",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "right-06",
+      "lemma": "right",
+      "sentence": "The right seemed quiet today.",
+      "declared": {
+        "lemma": "right",
+        "pos": "noun",
+        "gloss": "correct or true",
+        "domain": "evaluation"
+      },
+      "alternatives": [
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "correct or true",
+          "domain": "evaluation"
+        },
+        {
+          "lemma": "right",
+          "pos": "noun",
+          "gloss": "the direction opposite of left",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "match-01",
+      "lemma": "match",
+      "sentence": "The match was a sports contest.",
+      "declared": {
+        "lemma": "match",
+        "pos": "noun",
+        "gloss": "a sports contest between teams",
+        "domain": "sport"
+      },
+      "alternatives": [
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a sports contest between teams",
+          "domain": "sport"
+        },
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a small stick for lighting fire",
+          "domain": "tool"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "match-02",
+      "lemma": "match",
+      "sentence": "The match gathered both teams.",
+      "declared": {
+        "lemma": "match",
+        "pos": "noun",
+        "gloss": "a sports contest between teams",
+        "domain": "sport"
+      },
+      "alternatives": [
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a sports contest between teams",
+          "domain": "sport"
+        },
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a small stick for lighting fire",
+          "domain": "tool"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "match-03",
+      "lemma": "match",
+      "sentence": "The match needed a lighting fire.",
+      "declared": {
+        "lemma": "match",
+        "pos": "noun",
+        "gloss": "a sports contest between teams",
+        "domain": "sport"
+      },
+      "alternatives": [
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a sports contest between teams",
+          "domain": "sport"
+        },
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a small stick for lighting fire",
+          "domain": "tool"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "match-04",
+      "lemma": "match",
+      "sentence": "The match was a fire stick.",
+      "declared": {
+        "lemma": "match",
+        "pos": "noun",
+        "gloss": "a sports contest between teams",
+        "domain": "sport"
+      },
+      "alternatives": [
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a sports contest between teams",
+          "domain": "sport"
+        },
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a small stick for lighting fire",
+          "domain": "tool"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "match-05",
+      "lemma": "match",
+      "sentence": "The match was sudden.",
+      "declared": {
+        "lemma": "match",
+        "pos": "noun",
+        "gloss": "a sports contest between teams",
+        "domain": "sport"
+      },
+      "alternatives": [
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a sports contest between teams",
+          "domain": "sport"
+        },
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a small stick for lighting fire",
+          "domain": "tool"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "match-06",
+      "lemma": "match",
+      "sentence": "The match seemed quiet today.",
+      "declared": {
+        "lemma": "match",
+        "pos": "noun",
+        "gloss": "a sports contest between teams",
+        "domain": "sport"
+      },
+      "alternatives": [
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a sports contest between teams",
+          "domain": "sport"
+        },
+        {
+          "lemma": "match",
+          "pos": "noun",
+          "gloss": "a small stick for lighting fire",
+          "domain": "tool"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "point-01",
+      "lemma": "point",
+      "sentence": "The point had a sharp tip.",
+      "declared": {
+        "lemma": "point",
+        "pos": "noun",
+        "gloss": "a sharp tip of an object",
+        "domain": "shape"
+      },
+      "alternatives": [
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a sharp tip of an object",
+          "domain": "shape"
+        },
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a unit of scoring in a game",
+          "domain": "sport"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "point-02",
+      "lemma": "point",
+      "sentence": "The point marked the object.",
+      "declared": {
+        "lemma": "point",
+        "pos": "noun",
+        "gloss": "a sharp tip of an object",
+        "domain": "shape"
+      },
+      "alternatives": [
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a sharp tip of an object",
+          "domain": "shape"
+        },
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a unit of scoring in a game",
+          "domain": "sport"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "point-03",
+      "lemma": "point",
+      "sentence": "The point was a scoring unit.",
+      "declared": {
+        "lemma": "point",
+        "pos": "noun",
+        "gloss": "a sharp tip of an object",
+        "domain": "shape"
+      },
+      "alternatives": [
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a sharp tip of an object",
+          "domain": "shape"
+        },
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a unit of scoring in a game",
+          "domain": "sport"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "point-04",
+      "lemma": "point",
+      "sentence": "The point decided the game scoring.",
+      "declared": {
+        "lemma": "point",
+        "pos": "noun",
+        "gloss": "a sharp tip of an object",
+        "domain": "shape"
+      },
+      "alternatives": [
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a sharp tip of an object",
+          "domain": "shape"
+        },
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a unit of scoring in a game",
+          "domain": "sport"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "point-05",
+      "lemma": "point",
+      "sentence": "The point was sudden.",
+      "declared": {
+        "lemma": "point",
+        "pos": "noun",
+        "gloss": "a sharp tip of an object",
+        "domain": "shape"
+      },
+      "alternatives": [
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a sharp tip of an object",
+          "domain": "shape"
+        },
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a unit of scoring in a game",
+          "domain": "sport"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "point-06",
+      "lemma": "point",
+      "sentence": "The point seemed quiet today.",
+      "declared": {
+        "lemma": "point",
+        "pos": "noun",
+        "gloss": "a sharp tip of an object",
+        "domain": "shape"
+      },
+      "alternatives": [
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a sharp tip of an object",
+          "domain": "shape"
+        },
+        {
+          "lemma": "point",
+          "pos": "noun",
+          "gloss": "a unit of scoring in a game",
+          "domain": "sport"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "light-01",
+      "lemma": "light",
+      "sentence": "The light had great brightness.",
+      "declared": {
+        "lemma": "light",
+        "pos": "noun",
+        "gloss": "brightness from the sun",
+        "domain": "optics"
+      },
+      "alternatives": [
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "brightness from the sun",
+          "domain": "optics"
+        },
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "not heavy in weight",
+          "domain": "measure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "light-02",
+      "lemma": "light",
+      "sentence": "The light came from the sun.",
+      "declared": {
+        "lemma": "light",
+        "pos": "noun",
+        "gloss": "brightness from the sun",
+        "domain": "optics"
+      },
+      "alternatives": [
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "brightness from the sun",
+          "domain": "optics"
+        },
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "not heavy in weight",
+          "domain": "measure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "light-03",
+      "lemma": "light",
+      "sentence": "The light had heavy weight today.",
+      "declared": {
+        "lemma": "light",
+        "pos": "noun",
+        "gloss": "brightness from the sun",
+        "domain": "optics"
+      },
+      "alternatives": [
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "brightness from the sun",
+          "domain": "optics"
+        },
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "not heavy in weight",
+          "domain": "measure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "light-04",
+      "lemma": "light",
+      "sentence": "The light felt heavy weight.",
+      "declared": {
+        "lemma": "light",
+        "pos": "noun",
+        "gloss": "brightness from the sun",
+        "domain": "optics"
+      },
+      "alternatives": [
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "brightness from the sun",
+          "domain": "optics"
+        },
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "not heavy in weight",
+          "domain": "measure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "light-05",
+      "lemma": "light",
+      "sentence": "The light was sudden.",
+      "declared": {
+        "lemma": "light",
+        "pos": "noun",
+        "gloss": "brightness from the sun",
+        "domain": "optics"
+      },
+      "alternatives": [
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "brightness from the sun",
+          "domain": "optics"
+        },
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "not heavy in weight",
+          "domain": "measure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "light-06",
+      "lemma": "light",
+      "sentence": "The light seemed quiet today.",
+      "declared": {
+        "lemma": "light",
+        "pos": "noun",
+        "gloss": "brightness from the sun",
+        "domain": "optics"
+      },
+      "alternatives": [
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "brightness from the sun",
+          "domain": "optics"
+        },
+        {
+          "lemma": "light",
+          "pos": "noun",
+          "gloss": "not heavy in weight",
+          "domain": "measure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "mean-01",
+      "lemma": "mean",
+      "sentence": "The mean remark was unkind.",
+      "declared": {
+        "lemma": "mean",
+        "pos": "noun",
+        "gloss": "unkind or cruel",
+        "domain": "manner"
+      },
+      "alternatives": [
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "unkind or cruel",
+          "domain": "manner"
+        },
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "an average value of numbers",
+          "domain": "math"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "mean-02",
+      "lemma": "mean",
+      "sentence": "The mean comment was cruel.",
+      "declared": {
+        "lemma": "mean",
+        "pos": "noun",
+        "gloss": "unkind or cruel",
+        "domain": "manner"
+      },
+      "alternatives": [
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "unkind or cruel",
+          "domain": "manner"
+        },
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "an average value of numbers",
+          "domain": "math"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "mean-03",
+      "lemma": "mean",
+      "sentence": "The mean was the average value.",
+      "declared": {
+        "lemma": "mean",
+        "pos": "noun",
+        "gloss": "unkind or cruel",
+        "domain": "manner"
+      },
+      "alternatives": [
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "unkind or cruel",
+          "domain": "manner"
+        },
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "an average value of numbers",
+          "domain": "math"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "mean-04",
+      "lemma": "mean",
+      "sentence": "The mean used the numbers value.",
+      "declared": {
+        "lemma": "mean",
+        "pos": "noun",
+        "gloss": "unkind or cruel",
+        "domain": "manner"
+      },
+      "alternatives": [
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "unkind or cruel",
+          "domain": "manner"
+        },
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "an average value of numbers",
+          "domain": "math"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "mean-05",
+      "lemma": "mean",
+      "sentence": "The mean was sudden.",
+      "declared": {
+        "lemma": "mean",
+        "pos": "noun",
+        "gloss": "unkind or cruel",
+        "domain": "manner"
+      },
+      "alternatives": [
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "unkind or cruel",
+          "domain": "manner"
+        },
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "an average value of numbers",
+          "domain": "math"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "mean-06",
+      "lemma": "mean",
+      "sentence": "The mean seemed quiet today.",
+      "declared": {
+        "lemma": "mean",
+        "pos": "noun",
+        "gloss": "unkind or cruel",
+        "domain": "manner"
+      },
+      "alternatives": [
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "unkind or cruel",
+          "domain": "manner"
+        },
+        {
+          "lemma": "mean",
+          "pos": "noun",
+          "gloss": "an average value of numbers",
+          "domain": "math"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "issue-01",
+      "lemma": "issue",
+      "sentence": "The issue was a hard problem.",
+      "declared": {
+        "lemma": "issue",
+        "pos": "noun",
+        "gloss": "a problem or topic",
+        "domain": "discussion"
+      },
+      "alternatives": [
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a problem or topic",
+          "domain": "discussion"
+        },
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a particular edition of a magazine",
+          "domain": "publishing"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "issue-02",
+      "lemma": "issue",
+      "sentence": "The issue became the topic.",
+      "declared": {
+        "lemma": "issue",
+        "pos": "noun",
+        "gloss": "a problem or topic",
+        "domain": "discussion"
+      },
+      "alternatives": [
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a problem or topic",
+          "domain": "discussion"
+        },
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a particular edition of a magazine",
+          "domain": "publishing"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "issue-03",
+      "lemma": "issue",
+      "sentence": "The issue was a magazine edition.",
+      "declared": {
+        "lemma": "issue",
+        "pos": "noun",
+        "gloss": "a problem or topic",
+        "domain": "discussion"
+      },
+      "alternatives": [
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a problem or topic",
+          "domain": "discussion"
+        },
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a particular edition of a magazine",
+          "domain": "publishing"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "issue-04",
+      "lemma": "issue",
+      "sentence": "The issue printed that magazine edition.",
+      "declared": {
+        "lemma": "issue",
+        "pos": "noun",
+        "gloss": "a problem or topic",
+        "domain": "discussion"
+      },
+      "alternatives": [
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a problem or topic",
+          "domain": "discussion"
+        },
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a particular edition of a magazine",
+          "domain": "publishing"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "issue-05",
+      "lemma": "issue",
+      "sentence": "The issue was sudden.",
+      "declared": {
+        "lemma": "issue",
+        "pos": "noun",
+        "gloss": "a problem or topic",
+        "domain": "discussion"
+      },
+      "alternatives": [
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a problem or topic",
+          "domain": "discussion"
+        },
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a particular edition of a magazine",
+          "domain": "publishing"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "issue-06",
+      "lemma": "issue",
+      "sentence": "The issue seemed quiet today.",
+      "declared": {
+        "lemma": "issue",
+        "pos": "noun",
+        "gloss": "a problem or topic",
+        "domain": "discussion"
+      },
+      "alternatives": [
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a problem or topic",
+          "domain": "discussion"
+        },
+        {
+          "lemma": "issue",
+          "pos": "noun",
+          "gloss": "a particular edition of a magazine",
+          "domain": "publishing"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "case-01",
+      "lemma": "case",
+      "sentence": "The case was a sturdy container.",
+      "declared": {
+        "lemma": "case",
+        "pos": "noun",
+        "gloss": "a container for carrying things",
+        "domain": "object"
+      },
+      "alternatives": [
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a container for carrying things",
+          "domain": "object"
+        },
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a legal matter before a court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "case-02",
+      "lemma": "case",
+      "sentence": "The case was useful for carrying.",
+      "declared": {
+        "lemma": "case",
+        "pos": "noun",
+        "gloss": "a container for carrying things",
+        "domain": "object"
+      },
+      "alternatives": [
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a container for carrying things",
+          "domain": "object"
+        },
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a legal matter before a court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "case-03",
+      "lemma": "case",
+      "sentence": "The case was a legal matter.",
+      "declared": {
+        "lemma": "case",
+        "pos": "noun",
+        "gloss": "a container for carrying things",
+        "domain": "object"
+      },
+      "alternatives": [
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a container for carrying things",
+          "domain": "object"
+        },
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a legal matter before a court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "case-04",
+      "lemma": "case",
+      "sentence": "The case reached the court matter.",
+      "declared": {
+        "lemma": "case",
+        "pos": "noun",
+        "gloss": "a container for carrying things",
+        "domain": "object"
+      },
+      "alternatives": [
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a container for carrying things",
+          "domain": "object"
+        },
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a legal matter before a court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "case-05",
+      "lemma": "case",
+      "sentence": "The case was sudden.",
+      "declared": {
+        "lemma": "case",
+        "pos": "noun",
+        "gloss": "a container for carrying things",
+        "domain": "object"
+      },
+      "alternatives": [
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a container for carrying things",
+          "domain": "object"
+        },
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a legal matter before a court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "case-06",
+      "lemma": "case",
+      "sentence": "The case seemed quiet today.",
+      "declared": {
+        "lemma": "case",
+        "pos": "noun",
+        "gloss": "a container for carrying things",
+        "domain": "object"
+      },
+      "alternatives": [
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a container for carrying things",
+          "domain": "object"
+        },
+        {
+          "lemma": "case",
+          "pos": "noun",
+          "gloss": "a legal matter before a court",
+          "domain": "law"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "change-01",
+      "lemma": "change",
+      "sentence": "The change was a few coins.",
+      "declared": {
+        "lemma": "change",
+        "pos": "noun",
+        "gloss": "coins of small value",
+        "domain": "money"
+      },
+      "alternatives": [
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "coins of small value",
+          "domain": "money"
+        },
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "the act of becoming different",
+          "domain": "process"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "change-02",
+      "lemma": "change",
+      "sentence": "The change had little value.",
+      "declared": {
+        "lemma": "change",
+        "pos": "noun",
+        "gloss": "coins of small value",
+        "domain": "money"
+      },
+      "alternatives": [
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "coins of small value",
+          "domain": "money"
+        },
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "the act of becoming different",
+          "domain": "process"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "change-03",
+      "lemma": "change",
+      "sentence": "The change meant becoming different.",
+      "declared": {
+        "lemma": "change",
+        "pos": "noun",
+        "gloss": "coins of small value",
+        "domain": "money"
+      },
+      "alternatives": [
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "coins of small value",
+          "domain": "money"
+        },
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "the act of becoming different",
+          "domain": "process"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "change-04",
+      "lemma": "change",
+      "sentence": "The change showed a different becoming.",
+      "declared": {
+        "lemma": "change",
+        "pos": "noun",
+        "gloss": "coins of small value",
+        "domain": "money"
+      },
+      "alternatives": [
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "coins of small value",
+          "domain": "money"
+        },
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "the act of becoming different",
+          "domain": "process"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "change-05",
+      "lemma": "change",
+      "sentence": "The change was sudden.",
+      "declared": {
+        "lemma": "change",
+        "pos": "noun",
+        "gloss": "coins of small value",
+        "domain": "money"
+      },
+      "alternatives": [
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "coins of small value",
+          "domain": "money"
+        },
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "the act of becoming different",
+          "domain": "process"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "change-06",
+      "lemma": "change",
+      "sentence": "The change seemed quiet today.",
+      "declared": {
+        "lemma": "change",
+        "pos": "noun",
+        "gloss": "coins of small value",
+        "domain": "money"
+      },
+      "alternatives": [
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "coins of small value",
+          "domain": "money"
+        },
+        {
+          "lemma": "change",
+          "pos": "noun",
+          "gloss": "the act of becoming different",
+          "domain": "process"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "break-01",
+      "lemma": "break",
+      "sentence": "The break was a short pause.",
+      "declared": {
+        "lemma": "break",
+        "pos": "noun",
+        "gloss": "a short pause from work",
+        "domain": "time"
+      },
+      "alternatives": [
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a short pause from work",
+          "domain": "time"
+        },
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a fracture in a bone",
+          "domain": "body"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "break-02",
+      "lemma": "break",
+      "sentence": "The break came after work.",
+      "declared": {
+        "lemma": "break",
+        "pos": "noun",
+        "gloss": "a short pause from work",
+        "domain": "time"
+      },
+      "alternatives": [
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a short pause from work",
+          "domain": "time"
+        },
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a fracture in a bone",
+          "domain": "body"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "break-03",
+      "lemma": "break",
+      "sentence": "The break was a bone fracture.",
+      "declared": {
+        "lemma": "break",
+        "pos": "noun",
+        "gloss": "a short pause from work",
+        "domain": "time"
+      },
+      "alternatives": [
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a short pause from work",
+          "domain": "time"
+        },
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a fracture in a bone",
+          "domain": "body"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "break-04",
+      "lemma": "break",
+      "sentence": "The break showed a fracture bone.",
+      "declared": {
+        "lemma": "break",
+        "pos": "noun",
+        "gloss": "a short pause from work",
+        "domain": "time"
+      },
+      "alternatives": [
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a short pause from work",
+          "domain": "time"
+        },
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a fracture in a bone",
+          "domain": "body"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "break-05",
+      "lemma": "break",
+      "sentence": "The break was sudden.",
+      "declared": {
+        "lemma": "break",
+        "pos": "noun",
+        "gloss": "a short pause from work",
+        "domain": "time"
+      },
+      "alternatives": [
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a short pause from work",
+          "domain": "time"
+        },
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a fracture in a bone",
+          "domain": "body"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "break-06",
+      "lemma": "break",
+      "sentence": "The break seemed quiet today.",
+      "declared": {
+        "lemma": "break",
+        "pos": "noun",
+        "gloss": "a short pause from work",
+        "domain": "time"
+      },
+      "alternatives": [
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a short pause from work",
+          "domain": "time"
+        },
+        {
+          "lemma": "break",
+          "pos": "noun",
+          "gloss": "a fracture in a bone",
+          "domain": "body"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "run-01",
+      "lemma": "run",
+      "sentence": "The run was moving quickly.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "run-02",
+      "lemma": "run",
+      "sentence": "The run left his foot sore.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "run-03",
+      "lemma": "run",
+      "sentence": "The run was a continuous series.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "run-04",
+      "lemma": "run",
+      "sentence": "The run opened with continuous performances.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "run-05",
+      "lemma": "run",
+      "sentence": "The run was sudden.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "run-06",
+      "lemma": "run",
+      "sentence": "The run seemed quiet today.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "set-01",
+      "lemma": "set",
+      "sentence": "The set was a matching group.",
+      "declared": {
+        "lemma": "set",
+        "pos": "noun",
+        "gloss": "a group of matching objects",
+        "domain": "collection"
+      },
+      "alternatives": [
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a group of matching objects",
+          "domain": "collection"
+        },
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a prepared stage for filming",
+          "domain": "cinema"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "set-02",
+      "lemma": "set",
+      "sentence": "The set held several objects.",
+      "declared": {
+        "lemma": "set",
+        "pos": "noun",
+        "gloss": "a group of matching objects",
+        "domain": "collection"
+      },
+      "alternatives": [
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a group of matching objects",
+          "domain": "collection"
+        },
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a prepared stage for filming",
+          "domain": "cinema"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "set-03",
+      "lemma": "set",
+      "sentence": "The set was a filming stage.",
+      "declared": {
+        "lemma": "set",
+        "pos": "noun",
+        "gloss": "a group of matching objects",
+        "domain": "collection"
+      },
+      "alternatives": [
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a group of matching objects",
+          "domain": "collection"
+        },
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a prepared stage for filming",
+          "domain": "cinema"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "set-04",
+      "lemma": "set",
+      "sentence": "The set used a prepared stage.",
+      "declared": {
+        "lemma": "set",
+        "pos": "noun",
+        "gloss": "a group of matching objects",
+        "domain": "collection"
+      },
+      "alternatives": [
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a group of matching objects",
+          "domain": "collection"
+        },
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a prepared stage for filming",
+          "domain": "cinema"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "set-05",
+      "lemma": "set",
+      "sentence": "The set was sudden.",
+      "declared": {
+        "lemma": "set",
+        "pos": "noun",
+        "gloss": "a group of matching objects",
+        "domain": "collection"
+      },
+      "alternatives": [
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a group of matching objects",
+          "domain": "collection"
+        },
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a prepared stage for filming",
+          "domain": "cinema"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "set-06",
+      "lemma": "set",
+      "sentence": "The set seemed quiet today.",
+      "declared": {
+        "lemma": "set",
+        "pos": "noun",
+        "gloss": "a group of matching objects",
+        "domain": "collection"
+      },
+      "alternatives": [
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a group of matching objects",
+          "domain": "collection"
+        },
+        {
+          "lemma": "set",
+          "pos": "noun",
+          "gloss": "a prepared stage for filming",
+          "domain": "cinema"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "turn-01",
+      "lemma": "turn",
+      "sentence": "The turn was his chance.",
+      "declared": {
+        "lemma": "turn",
+        "pos": "noun",
+        "gloss": "a chance to act in sequence",
+        "domain": "order"
+      },
+      "alternatives": [
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a chance to act in sequence",
+          "domain": "order"
+        },
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a change of direction",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "turn-02",
+      "lemma": "turn",
+      "sentence": "The turn followed the sequence.",
+      "declared": {
+        "lemma": "turn",
+        "pos": "noun",
+        "gloss": "a chance to act in sequence",
+        "domain": "order"
+      },
+      "alternatives": [
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a chance to act in sequence",
+          "domain": "order"
+        },
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a change of direction",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "turn-03",
+      "lemma": "turn",
+      "sentence": "The turn was a direction change.",
+      "declared": {
+        "lemma": "turn",
+        "pos": "noun",
+        "gloss": "a chance to act in sequence",
+        "domain": "order"
+      },
+      "alternatives": [
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a chance to act in sequence",
+          "domain": "order"
+        },
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a change of direction",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "turn-04",
+      "lemma": "turn",
+      "sentence": "The turn caused a direction change.",
+      "declared": {
+        "lemma": "turn",
+        "pos": "noun",
+        "gloss": "a chance to act in sequence",
+        "domain": "order"
+      },
+      "alternatives": [
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a chance to act in sequence",
+          "domain": "order"
+        },
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a change of direction",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "turn-05",
+      "lemma": "turn",
+      "sentence": "The turn was sudden.",
+      "declared": {
+        "lemma": "turn",
+        "pos": "noun",
+        "gloss": "a chance to act in sequence",
+        "domain": "order"
+      },
+      "alternatives": [
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a chance to act in sequence",
+          "domain": "order"
+        },
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a change of direction",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "turn-06",
+      "lemma": "turn",
+      "sentence": "The turn seemed quiet today.",
+      "declared": {
+        "lemma": "turn",
+        "pos": "noun",
+        "gloss": "a chance to act in sequence",
+        "domain": "order"
+      },
+      "alternatives": [
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a chance to act in sequence",
+          "domain": "order"
+        },
+        {
+          "lemma": "turn",
+          "pos": "noun",
+          "gloss": "a change of direction",
+          "domain": "space"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "play-01",
+      "lemma": "play",
+      "sentence": "The play was a dramatic work.",
+      "declared": {
+        "lemma": "play",
+        "pos": "noun",
+        "gloss": "a dramatic work for the theatre",
+        "domain": "theatre"
+      },
+      "alternatives": [
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "a dramatic work for the theatre",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "activity done for fun",
+          "domain": "leisure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "play-02",
+      "lemma": "play",
+      "sentence": "The play opened at the theatre.",
+      "declared": {
+        "lemma": "play",
+        "pos": "noun",
+        "gloss": "a dramatic work for the theatre",
+        "domain": "theatre"
+      },
+      "alternatives": [
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "a dramatic work for the theatre",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "activity done for fun",
+          "domain": "leisure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "matched",
+        "strength": "",
+        "reason": "gloss:declared"
+      },
+      "gold": "matched",
+      "note": ""
+    },
+    {
+      "id": "play-03",
+      "lemma": "play",
+      "sentence": "The play was fun activity.",
+      "declared": {
+        "lemma": "play",
+        "pos": "noun",
+        "gloss": "a dramatic work for the theatre",
+        "domain": "theatre"
+      },
+      "alternatives": [
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "a dramatic work for the theatre",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "activity done for fun",
+          "domain": "leisure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "play-04",
+      "lemma": "play",
+      "sentence": "The play became a fun activity.",
+      "declared": {
+        "lemma": "play",
+        "pos": "noun",
+        "gloss": "a dramatic work for the theatre",
+        "domain": "theatre"
+      },
+      "alternatives": [
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "a dramatic work for the theatre",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "activity done for fun",
+          "domain": "leisure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "mismatch",
+      "note": ""
+    },
+    {
+      "id": "play-05",
+      "lemma": "play",
+      "sentence": "The play was sudden.",
+      "declared": {
+        "lemma": "play",
+        "pos": "noun",
+        "gloss": "a dramatic work for the theatre",
+        "domain": "theatre"
+      },
+      "alternatives": [
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "a dramatic work for the theatre",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "activity done for fun",
+          "domain": "leisure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "play-06",
+      "lemma": "play",
+      "sentence": "The play seemed quiet today.",
+      "declared": {
+        "lemma": "play",
+        "pos": "noun",
+        "gloss": "a dramatic work for the theatre",
+        "domain": "theatre"
+      },
+      "alternatives": [
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "a dramatic work for the theatre",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "play",
+          "pos": "noun",
+          "gloss": "activity done for fun",
+          "domain": "leisure"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "ambiguous",
+      "note": ""
+    },
+    {
+      "id": "bank-07",
+      "lemma": "bank",
+      "sentence": "The bank approved the mortgage.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "",
+        "reason": "tie"
+      },
+      "gold": "matched",
+      "note": "La glosa financiera no contiene mortgage: ambiguous no es incomprensión."
+    },
+    {
+      "id": "bank-08",
+      "lemma": "bank",
+      "sentence": "The bank by the river was closed, but the bank approved my loan.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "possible",
+        "reason": "gloss:other:weak"
+      },
+      "gold": "split",
+      "note": "Límite conocido: un solo token de orilla no prueba el mismatch."
+    },
+    {
+      "id": "bank-09",
+      "lemma": "bank",
+      "sentence": "On the river side, the bank was covered in mud, but I put my money in the bank.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        }
+      ],
+      "resolver_expected": {
+        "match": "ambiguous",
+        "strength": "possible",
+        "reason": "occurrence:split"
+      },
+      "gold": "split",
+      "note": ""
+    },
+    {
+      "id": "bank-10",
+      "lemma": "bank",
+      "sentence": "The bank contacted the official organization.",
+      "declared": {
+        "lemma": "bank",
+        "pos": "noun",
+        "gloss": "a place where money is kept",
+        "domain": "finance"
+      },
+      "alternatives": [
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "a place where money is kept",
+          "domain": "finance"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "the side of a river",
+          "domain": "geography"
+        },
+        {
+          "lemma": "bank",
+          "pos": "noun",
+          "gloss": "an official organization",
+          "domain": "institution"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "ambiguous",
+      "note": "Glosa genérica: official y organization son incidentales, no el sentido."
+    },
+    {
+      "id": "run-07",
+      "lemma": "run",
+      "sentence": "The run passed a business operation.",
+      "declared": {
+        "lemma": "run",
+        "pos": "noun",
+        "gloss": "a spell of moving quickly on foot",
+        "domain": "motion"
+      },
+      "alternatives": [
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a spell of moving quickly on foot",
+          "domain": "motion"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "a continuous series of performances",
+          "domain": "theatre"
+        },
+        {
+          "lemma": "run",
+          "pos": "noun",
+          "gloss": "to manage a business operation",
+          "domain": "business"
+        }
+      ],
+      "resolver_expected": {
+        "match": "mismatch",
+        "strength": "proven",
+        "reason": "gloss:other"
+      },
+      "gold": "matched",
+      "note": "Glosa genérica: business y operation no convierten run en mismatch."
+    }
+  ]
+}

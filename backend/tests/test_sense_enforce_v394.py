@@ -197,6 +197,32 @@ def test_day_metrics_separates_exposures_from_difficulty():
     assert metrics["difficulty_evidence"] == 2
     assert metrics["words_flagged"] == 2
     assert metrics["sense_exposures"] == 1
+    # V3.94.2: el split de una carta fuerte (dificultad intacta) no es dificultad
+    # ni exposición. El de una carta débil sí subió y cuenta como dificultad.
+    bridge_rows.append(
+        {
+            "word": "bank",
+            "sense_match": "ambiguous",
+            "sense_reason": "occurrence:split",
+            "difficulty_before": 4.0,
+            "difficulty_after": 4.0,
+            "created_at": f"{day}T09:20:00",
+        }
+    )
+    bridge_rows.append(
+        {
+            "word": "charge",
+            "sense_match": "ambiguous",
+            "sense_reason": "occurrence:split",
+            "difficulty_before": 5.0,
+            "difficulty_after": 5.6,
+            "created_at": f"{day}T09:30:00",
+        }
+    )
+    metrics = daily_plan.day_metrics([], [], [], day, bridge_rows)
+    assert metrics["difficulty_evidence"] == 3
+    assert metrics["words_flagged"] == 3
+    assert metrics["sense_exposures"] == 1
 
 
 # --- V3.94.1: el sentido se resuelve SIEMPRE, también en cartas fuertes ------
@@ -319,4 +345,95 @@ def test_pedagogical_cycle_from_learning_to_a_second_sense(monkeypatch, tmp_path
     assert d4 == pytest.approx(6.2, abs=0.001)
     matches = [r["sense_match"] for r in listening_repo.list_difficulty_evidence(uid)]
     assert matches == ["matched", "mismatch", "matched"]
+
+
+# --- V3.94.2: ocurrencias en conflicto ---------------------------------------
+
+
+def _split_question() -> dict:
+    return {
+        "id": "q-split",
+        "transcript": (
+            "On the river side, the bank was covered in mud, "
+            "but I put my money in the bank."
+        ),
+    }
+
+
+def test_strong_card_records_a_split_without_fsrs_or_exposure(monkeypatch, tmp_path):
+    """Carta fuerte + dos sentidos: fila medible, sin castigo y sin exposición."""
+    import asyncio
+
+    from domain.listening import _apply_difficulty_evidence
+
+    uid = _setup(monkeypatch, tmp_path)
+    word = "bank"
+    _seed_word(
+        uid,
+        word,
+        {"lemma": word, "pos": "noun", "gloss": "a place where money is kept"},
+    )
+    _seed_alternatives(
+        word,
+        [
+            {"pos": "noun", "gloss": "a place where money is kept"},
+            {"pos": "noun", "gloss": "the side of a river"},
+        ],
+    )
+    _make_card_strong(uid, word, difficulty=4.0)
+    question = _split_question()
+
+    async def _once(attempt_id: str) -> dict:
+        return await _apply_difficulty_evidence(
+            uid, question["id"], question, attempt_id=attempt_id
+        )
+
+    body = asyncio.run(_once("split-strong"))
+    again = asyncio.run(_once("split-strong"))
+    assert body["new_sense_exposure"]["count"] == 0
+    assert body["count"] == 0
+    assert again["new_sense_exposure"]["count"] == 0
+    assert _difficulty(uid, word) == pytest.approx(4.0, abs=0.001)
+    rows = listening_repo.list_difficulty_evidence(uid)
+    assert len(rows) == 1
+    assert rows[0]["sense_match"] == "ambiguous"
+    assert rows[0]["sense_reason"] == "occurrence:split"
+    assert rows[0]["difficulty_before"] == rows[0]["difficulty_after"] == 4.0
+
+
+def test_weak_card_split_still_raises_difficulty(monkeypatch, tmp_path):
+    """La duda no resta: una carta débil en conflicto sigue subiendo."""
+    import asyncio
+
+    from domain.listening import _apply_difficulty_evidence
+
+    uid = _setup(monkeypatch, tmp_path)
+    word = "bank"
+    _seed_word(
+        uid,
+        word,
+        {"lemma": word, "pos": "noun", "gloss": "a place where money is kept"},
+    )
+    _seed_alternatives(
+        word,
+        [
+            {"pos": "noun", "gloss": "a place where money is kept"},
+            {"pos": "noun", "gloss": "the side of a river"},
+        ],
+    )
+    question = _split_question()
+    body = asyncio.run(
+        _apply_difficulty_evidence(
+            uid, question["id"], question, attempt_id="split-weak"
+        )
+    )
+    assert body["new_sense_exposure"]["count"] == 0
+    assert body["count"] == 1
+    assert body["words"] == [word]
+    assert _difficulty(uid, word) == pytest.approx(5.6, abs=0.001)
+    rows = listening_repo.list_difficulty_evidence(uid)
+    assert len(rows) == 1
+    assert rows[0]["sense_reason"] == "occurrence:split"
+    assert rows[0]["difficulty_before"] != rows[0]["difficulty_after"]
+
 

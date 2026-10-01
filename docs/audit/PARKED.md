@@ -2525,6 +2525,34 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.94.2 — Conflicto de ocurrencias y corpus de polisemia · 2026-10-01
+
+> **Naturaleza:** patch de la política ENFORCE. Una palabra con un `mismatch`
+> probado y otro veredicto en la misma frase agrega a `ambiguous` /
+> `occurrence:split`. No es `new_sense_exposure`. La carta débil sube; la
+> fuerte deja fila sin tocar FSRS y esa fila no entra en los dos contadores
+> del día. El corpus (95 frases, 15 familias) fija `resolver_expected` en CI.
+> El `gold` humano discrepa en `bank-07`, `bank-08`, `bank-10` y `run-07`.
+> **Publicación:** el tag espera al verde de la CI. Esta sección no lo
+> adelanta.
+
+### Sigue aparcado (no es trabajo de V3.94.2)
+
+- **`sense_id` estable y sentido nuevo pedagógico (V3.95).** Sin identificador
+  estable no hay dos evidencias por acepción ni FSRS por sentido.
+- **FSRS por acepción (V3.96).** Sigue una carta por lema.
+- **Pintar `new_sense_exposure` en el frontend.** El contrato existe; la UI
+  no lo muestra.
+- **Subir el umbral 2→3, puntuación compuesta o modelo.** El solape de glosa
+  no es confianza semántica. ENFORCE se queda conservador.
+- **La frase de la auditoría no parte el veredicto** con las glosas actuales
+  (`bank-08`). No se «arregla» cambiando glosas para forzar la etiqueta
+  humana.
+- **Los ocho gates humanos** siguen `pending`. `validation-evidence.json`
+  sigue sin existir.
+- **El ledger de producción** sigue sin volumen. El corpus mide el software,
+  no la política con alumnos.
+
 ## V3.94.1 — El sentido se resuelve SIEMPRE (también en cartas fuertes) y el `mismatch` solo se declara con PRUEBA · 2026-10-01
 
 > **Naturaleza:** patch de la política **ENFORCE** de SENSE-CONTEXT-01. Cambia la
