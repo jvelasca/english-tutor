@@ -251,6 +251,11 @@ completo.
   destreza, se requiere un mínimo de intentos (`minimum_attempts`). Un único acierto no domina.
 - El **gating curricular** se valida también en los endpoints de evaluación: solo se pueden
   evaluar, intentar o completar objetivos en estado `available` o `review` (nunca `locked`).
+- **Un dominio, dos puertas** (`docs/CONSTITUCION-PEDAGOGICA.md` §2.3): Aprender
+  no bloquea y Formación ordena. La ruta de Listening de un nivel se muestra en
+  la sección Listening de ese nivel en Formación. Mostrarla no mueve
+  `academy_objective_mastery`, no abre el siguiente nivel y no certifica. El
+  diccionario sigue siendo léxico, no un nivel CEFR.
 
 ## 22. Paneles del chat redimensionables y persistentes
 - En CHAT los tres paneles (conversaciones, zona central y Análisis) son **redimensionables** por

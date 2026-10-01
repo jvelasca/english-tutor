@@ -458,9 +458,14 @@ Qué vive en cada tarjeta (todo reutiliza componentes existentes):
 
 Reglas de APRENDER:
 
-- **Aquí no existe gating**: nada se bloquea, todo es explorable. Nada puntúa dominio de curso.
-- La **práctica libre genera evidencia** (envía respuestas/eventos) pero no avanza unidades del
-  curso; solo alimenta el modelo del alumno (repaso, recomendación, diagnóstico).
+- **Aquí no existe gating**: nada se bloquea, todo es explorable. Se puede
+  practicar B2 y volver a A1; al volver se sigue desde los intentos de ese nivel.
+- La **práctica libre genera evidencia** y no avanza unidades del curso ni
+  desbloquea el siguiente nivel formal. La ruta de Listening de un nivel sí se
+  **ve** en la sección Listening de Formación de ese mismo nivel (el mismo
+  `route_gate`): es hito de práctica, no certificado CEFR
+  (`docs/CONSTITUCION-PEDAGOGICA.md` §2.3). El resto alimenta el modelo del
+  alumno (repaso, recomendación, diagnóstico).
 - El CHAT deja de ser una sección raíz: "Conversar" vive aquí. Cuando la conversación es una lección
   del curso (lanzada desde Formación) la cabecera muestra el contexto del curso; cuando se entra
   desde Aprender es práctica libre. Es el **mismo workspace con distinta envoltura**, nunca dos

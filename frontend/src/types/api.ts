@@ -3220,6 +3220,16 @@ export interface CourseProgress {
   progress: number;
 }
 
+/** Ruta de práctica de Listening del nivel del curso. Informa; no desbloquea. */
+export interface ListeningRouteProjection {
+  level: string;
+  state: "not_started" | "developing" | "functional" | "demonstrated";
+  mastered: number;
+  total: number;
+  coverage_pct: number;
+  passed: boolean;
+}
+
 export interface CourseMap {
   level_id: string;
   level: string;
@@ -3228,6 +3238,7 @@ export interface CourseMap {
   units: CourseUnit[];
   position: CoursePosition;
   progress: CourseProgress;
+  listening_route?: ListeningRouteProjection | null;
 }
 
 export interface Enrollment {

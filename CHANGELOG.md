@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.94.3] — 2026-10-01
+
+**Formación muestra la ruta de Listening que ya se practica en Aprender, y el repaso de Listening deja de pedir dos toques para seguir.** Release de **PRODUCTO (patch)** **CON backend y CON frontend**, **SIN migración de BD**, **SIN endpoints nuevos** y **SIN cambio de contrato incompatible** (`CourseMap` gana `listening_route`, campo **aditivo**). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.**
+
+**(A) Una ruta, dos puertas.** La sección de Listening de Formación muestra el `route_gate` del mismo nivel (`listening_route`: nivel, estado, dominadas, total, cobertura, puerta). Verlo no mueve `academy_objective_mastery`, no abre el nivel siguiente y no certifica CEFR. Elegir B2 en Aprender no abre ni certifica B2 en Formación.
+
+**(B) El aviso de repaso y el botón miran lo mismo.** Un acierto saca la frase de la cola y refresca el contador; antes solo se refrescaba al fallar, así que «Repaso pendiente» se quedaba con el botón apagado. El botón cuenta las frases que siguen falladas. Si no queda ninguna, el avance es **Practicar** el nivel. «Repasar después» vuelve a `pending` cuando llega la fecha.
+
+**(C) Un acierto, un toque.** Tras una respuesta correcta, **Siguiente** cierra el ítem y salta el shadowing opcional. Repetir en voz alta queda en la misma revisión. En el móvil el resultado y el botón van antes que la transcripción, a ancho completo.
+
+**Verificación local:** `ruff` limpio en los ficheros tocados · `pytest` de curso, cola de repaso y sonda de telemetría **44/44** · `tsc --noEmit` limpio · `vitest` del micro-flujo **42/42**. El resto lo corre la CI. **Honestidad:** (i) el ledger de producción sigue sin volumen; la sonda corre sobre una BD temporal, no sobre `tutor.db`; (ii) el frontend **sigue sin pintar** `new_sense_exposure`; (iii) FSRS sigue **sin cartas por acepción**; (iv) los **ocho gates humanos siguen `pending`**. Detalle en `docs/releases/release-notes-v3.94.3.md`.
+
 ## [3.94.2] — 2026-10-01
 
 **Dos sentidos de la misma palabra en una frase dejan de colapsar en un único `mismatch`, y un corpus de polisemia fija en CI lo que el resolver hace frente a lo que diría un humano.** Release de **PRODUCTO (patch)** **CON backend y CON frontend** (la Ayuda parte los textos largos; el barrido responsive incluye Formación), **SIN migración de BD**, **SIN endpoints nuevos** y **SIN cambio de contrato incompatible** (`sense_match` sigue siendo `matched`/`mismatch`/`ambiguous`; la razón nueva es `occurrence:split`; `new_sense_exposure: {words, count}` conserva su forma). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**.

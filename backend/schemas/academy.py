@@ -187,6 +187,20 @@ class CourseProgressOut(BaseModel):
     progress: float
 
 
+class ListeningRouteProjectionOut(BaseModel):
+    """Ruta de práctica de Listening del nivel del curso (Constitución §2.3).
+
+    Informa. No desbloquea unidades ni certifica el nivel.
+    """
+
+    level: str
+    state: str
+    mastered: int
+    total: int
+    coverage_pct: float
+    passed: bool
+
+
 class CourseMapOut(BaseModel):
     level_id: str
     level: str
@@ -195,6 +209,7 @@ class CourseMapOut(BaseModel):
     units: list[CourseUnitOut]
     position: CoursePositionOut
     progress: CourseProgressOut
+    listening_route: ListeningRouteProjectionOut | None = None
 
 
 class NextObjectiveOut(BaseModel):
