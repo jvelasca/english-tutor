@@ -9,7 +9,7 @@
 ## Contexto
 
 La auditoría externa **Q** de V3.52.1
-([`docs/audit/Q-AUDITORIA-TOTAL-V352.md`](docs/audit/Q-AUDITORIA-TOTAL-V352.md))
+([`docs/audit/Q-AUDITORIA-TOTAL-V352.md`](../archive/audit/Q-AUDITORIA-TOTAL-V352.md))
 cerró con 🟢 **sin P0/P1** y dos P2 de calibración:
 
 - **P2-01:** la tabla declarada `CEFR_CAPACITY` afirmaba estar «calibrada con la

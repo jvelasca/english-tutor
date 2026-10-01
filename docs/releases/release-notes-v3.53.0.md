@@ -22,7 +22,7 @@ evolutivas y recomendó **no seguir parcheando `difficulty.py`**:
   global con `lexical` B2 y `syntax` A2.
 
 V3.53.0 cierra el **P1-02 diferido desde V3.52** con las Partes A y B del
-briefing [`agentes/v353-learner-skill-state.md`](agentes/v353-learner-skill-state.md),
+briefing [`agentes/v353-learner-skill-state.md`](../../agentes/v353-learner-skill-state.md),
 más el P3 del comentario obsoleto de B1.
 
 ## Cambios

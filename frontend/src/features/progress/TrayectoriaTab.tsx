@@ -20,8 +20,8 @@ interface TrayectoriaTabProps {
 
 /**
  * Trayectoria — la escalera CEFR como concepto "journey" (dominado/actual/
- * pendiente) en versión compacta, sin cabecera de página duplicada. Reutiliza
- * la lógica de JourneyScreen (cefr-ladder + student-model + course-map).
+ * pendiente) en versión compacta, sin cabecera de página duplicada. Combina
+ * cefr-ladder + student-model + course-map.
  */
 export function TrayectoriaTab({ userId, refreshKey }: TrayectoriaTabProps) {
   const { t } = useI18n();

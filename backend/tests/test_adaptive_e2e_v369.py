@@ -17,7 +17,7 @@ proceso son monotónicos, así que se afirma sobre **deltas**, nunca sobre valor
 absolutos.
 
 **Hallazgos que esta batería ya ha destapado** (declarados en la docstring de cada
-escenario y en `release-notes-v3.69.0.md`):
+escenario y en `docs/releases/release-notes-v3.69.0.md`):
 
 - **E01(a) · el arranque en frío NO tiene provenance.** Con un alumno sin ninguna
   celda medible, `decision_projection.has_comparable_capacity` es `False`, así que

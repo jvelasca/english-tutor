@@ -70,7 +70,7 @@ interface ProgressScreenProps {
 
 /**
  * MI PROGRESO (V3.1): pantalla de 5 pestañas accesibles que consolida
- * ProgressScreen, la escalera de JourneyScreen y los paneles de perfil que
+ * ProgressScreen, la escalera CEFR (pestaña Trayectoria) y los paneles de perfil que
  * vivían ocultos en el panel Analysis (UI_V3.1 §4.4 y §4.5).
  *
  * Cada pestaña es autónoma (fetches propios); la pantalla solo consulta el

@@ -16,7 +16,7 @@ existía**: hasta este lanzamiento la última etiqueta del repositorio era `v3.8
 así que el arreglo del gate `reduced-motion` (H2) y las pruebas visuales nuevas vivían
 en `main` **sin etiqueta**, y la deuda de honestidad de `release-notes-v3.83.0.md §5.1`
 seguía abierta. El propio informe
-[`docs/audit/AU-AUDITORIA-TOTAL-V383.md`](docs/audit/AU-AUDITORIA-TOTAL-V383.md) pedía
+[`docs/audit/AU-AUDITORIA-TOTAL-V383.md`](../audit/AU-AUDITORIA-TOTAL-V383.md) pedía
 un **`v3.83.1` quirúrgico de instrumento y honestidad**; esto es ese parche, publicado.
 
 ---
@@ -95,7 +95,7 @@ Una línea, y desaparece la contradicción. **No se reescribe el resto** de las 
 ## 4. H1 — deuda **aceptada**, no resuelta
 
 El informe `AU` (§5-H1) dictaminó que
-[`backend/domain/retention.py`](backend/domain/retention.py) devuelve `True` para un
+[`backend/domain/retention.py`](../../backend/domain/retention.py) devuelve `True` para un
 pack global:
 
 ```python
@@ -116,7 +116,7 @@ cliente que no sea la UI podría insertar una palabra en el catálogo de un pack
    estar intacto en el diff y abriría una revisión de `retention.py` con sus tests.
 
 Queda **aparcado como deuda `P2`** en
-[`docs/audit/AU-AUDITORIA-TOTAL-V383.md §12`](docs/audit/AU-AUDITORIA-TOTAL-V383.md),
+[`docs/audit/AU-AUDITORIA-TOTAL-V383.md §12`](../audit/AU-AUDITORIA-TOTAL-V383.md),
 con su recomendación viva (`return bool(owner) and owner == user_id` para la ingestión).
 **No se cierra por omisión:** mientras siga en el código, sigue declarada.
 

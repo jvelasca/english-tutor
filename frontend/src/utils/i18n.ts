@@ -299,7 +299,6 @@ const STRINGS: Record<string, Entry> = {
   "section.assessment": { en: "Assessment", es: "Evaluación" },
 
   // Learning Journey (V2.2)
-  "journey.title": { en: "Learning Journey", es: "Trayecto de aprendizaje" },
   "journey.subtitle": {
     en: "Your path through the CEFR levels",
     es: "Tu recorrido por los niveles CEFR",

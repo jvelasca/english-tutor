@@ -26,6 +26,9 @@ Qué mide:
    falsos positivos habría producido el umbral anterior. V3.94.2 añade
    `occurrence_split` (`occurrence:split`): la misma palabra con un mismatch
    probado y otro veredicto en la misma frase. Tampoco suprime.
+4. **Ejemplos** (opcional, `--examples N`): hasta N filas por razón de interés
+   (`gloss:other`, `role:other`, `gloss:other:weak`, `occurrence:split`) con la
+   transcripción de la pregunta, para revisar a mano el veredicto.
 
 El script es de LECTURA: abre SQLite en modo `mode=ro` (con repliegue si el WAL lo
 impide) y no ejecuta ningún `INSERT`, `UPDATE` ni `DELETE`.
@@ -35,6 +38,7 @@ Uso:
     python scripts/sense_shadow_report.py
     python scripts/sense_shadow_report.py --json
     python scripts/sense_shadow_report.py --db ruta/a/otra.db
+    python scripts/sense_shadow_report.py --examples 3 [--corpus ruta/corpus.json]
 
 Códigos de salida: 0 = informe emitido; 2 = no se pudo leer la BD.
 """
@@ -53,19 +57,28 @@ if hasattr(sys.stdout, "reconfigure"):
 # El script vive en <repo>/scripts/, así que la raíz es el padre de `scripts`.
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "backend" / "data" / "tutor.db"
+DEFAULT_CORPUS = ROOT / "backend" / "curriculum" / "listening_corpus.json"
 
 # La política de decisión vive en el BACKEND y este informe usa LA MISMA función que
 # decide en producción: una copia local podría desviarse de la verdad y proyectar
 # algo que la app no hace.
 sys.path.insert(0, str(ROOT / "backend"))
 from services.sense_context import (  # noqa: E402
+    REASON_GLOSS_OTHER,
     REASON_GLOSS_OTHER_WEAK,
     REASON_OCCURRENCE_SPLIT,
+    REASON_ROLE_OTHER,
     allows_difficulty_evidence,
 )
 
 TABLE = "listening_difficulty_evidence"
 VERDICTS = ("matched", "mismatch", "ambiguous")
+EXAMPLE_REASONS = (
+    REASON_GLOSS_OTHER,
+    REASON_ROLE_OTHER,
+    REASON_GLOSS_OTHER_WEAK,
+    REASON_OCCURRENCE_SPLIT,
+)
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
@@ -84,8 +97,15 @@ def _pct(part: int, whole: int) -> str:
     return f"{part * 100 / whole:.1f}%"
 
 
-def _report(conn: sqlite3.Connection) -> dict:
-    """Agrega el ledger por veredicto y proyecta la fase ENFORCE."""
+def _report(
+    conn: sqlite3.Connection,
+    examples: int = 0,
+    transcripts: dict[str, str] | None = None,
+) -> dict:
+    """Agrega el ledger por veredicto y proyecta la fase ENFORCE.
+
+    Con `examples > 0` añade la clave `examples` (ver `_examples`); con 0 no existe.
+    """
     rows = conn.execute(
         f"SELECT sense_match, sense_reason, sense_key FROM {TABLE}"
     ).fetchall()
@@ -109,7 +129,7 @@ def _report(conn: sqlite3.Connection) -> dict:
         if allows_difficulty_evidence({"match": match}):
             kept += 1
     with_verdict = total - without_verdict
-    return {
+    report = {
         "total": total,
         "with_verdict": with_verdict,
         "without_verdict": without_verdict,
@@ -124,6 +144,70 @@ def _report(conn: sqlite3.Connection) -> dict:
         "enforce_kept": kept,
         "enforce_suppressed": with_verdict - kept,
     }
+    if examples > 0:
+        report["examples"] = _examples(conn, examples, transcripts or {})
+    return report
+
+
+def _load_transcripts(corpus_path: Path) -> dict[str, str]:
+    """`id` → transcripción del corpus; vacío si el fichero falta o no se lee.
+
+    Replica `services.listening.audio_text` (`transcript`, si no `script`) sin
+    importar el servicio, que carga el banco entero al importarse.
+    """
+    try:
+        with corpus_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    transcripts: dict[str, str] = {}
+    for item in data.get("items", []) if isinstance(data, dict) else []:
+        qid = str(item.get("id") or "")
+        text = (item.get("transcript") or "").strip() or (
+            item.get("script") or ""
+        ).strip()
+        if qid and text:
+            transcripts[qid] = text
+    return transcripts
+
+
+def _examples(
+    conn: sqlite3.Connection, limit: int, transcripts: dict[str, str]
+) -> dict[str, list[dict]]:
+    """Hasta `limit` filas por razón de `EXAMPLE_REASONS`, las más recientes antes.
+
+    Una pregunta fuera del corpus (p. ej. el banco heredado) da `transcript=None`.
+    """
+    examples: dict[str, list[dict]] = {}
+    for reason in EXAMPLE_REASONS:
+        rows = conn.execute(
+            f"SELECT word, sense_key, sense_match, question_id FROM {TABLE} "
+            "WHERE sense_reason = ? ORDER BY rowid DESC LIMIT ?",
+            (reason, limit),
+        ).fetchall()
+        examples[reason] = [
+            {
+                "word": word,
+                "sense_key": sense_key,
+                "sense_match": sense_match,
+                "question_id": question_id,
+                "transcript": transcripts.get(str(question_id or "")),
+            }
+            for word, sense_key, sense_match, question_id in rows
+        ]
+    return examples
+
+
+def _print_examples(examples: dict[str, list[dict]]) -> None:
+    print("\nEjemplos por razón:")
+    for reason, items in examples.items():
+        print(f"  [{reason}] {len(items)} ejemplo(s)")
+        for item in items:
+            print(
+                f"    - {item['word']} ({item['sense_key'] or '—'}, "
+                f"{item['sense_match']}) en {item['question_id']}"
+            )
+            print(f"      «{item['transcript'] or 'transcripción no disponible'}»")
 
 
 def _print_report(report: dict) -> None:
@@ -165,6 +249,8 @@ def _print_report(report: dict) -> None:
         "evidencia igual que no la\nFABRICA). Como `mismatch` exige alternativas "
         "conocidas, sin volumen de estas la\nproyección ve poco que suprimir."
     )
+    if "examples" in report:
+        _print_examples(report["examples"])
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -186,7 +272,22 @@ def main(argv: list[str] | None = None) -> int:
         dest="as_json",
         help="Emite el informe como JSON (para CI o para volcar a un fichero).",
     )
+    parser.add_argument(
+        "--examples",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Lista hasta N filas por razón de interés (0 = desactivado).",
+    )
+    parser.add_argument(
+        "--corpus",
+        type=Path,
+        default=DEFAULT_CORPUS,
+        help=f"Corpus de Listening para las transcripciones (por defecto: "
+        f"{DEFAULT_CORPUS}).",
+    )
     args = parser.parse_args(argv)
+    transcripts = _load_transcripts(args.corpus) if args.examples > 0 else {}
 
     db_path: Path = args.db
     if not db_path.exists():
@@ -223,8 +324,10 @@ def main(argv: list[str] | None = None) -> int:
                 "enforce_kept": 0,
                 "enforce_suppressed": 0,
             }
+            if args.examples > 0:
+                report["examples"] = {reason: [] for reason in EXAMPLE_REASONS}
         else:
-            report = _report(conn)
+            report = _report(conn, args.examples, transcripts)
     except sqlite3.Error as exc:
         print(f"ERROR: fallo leyendo {db_path}: {exc}", file=sys.stderr)
         return 2

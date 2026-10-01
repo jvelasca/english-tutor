@@ -123,7 +123,7 @@ GATES: tuple[Gate, ...] = (
     Gate(
         id="launcher-windows",
         title="G3 · Launcher en Windows real",
-        protocol="release-notes-v3.73.0.md §Verificación (bloque C)",
+        protocol="docs/releases/release-notes-v3.73.0.md §Verificación (bloque C)",
         evidence=(
             "Inicio desde el launcher: HTTPS en :8000, navegador, micrófono, TTS, "
             "STT, chat y persistencia. Es el gate que el CI de Linux no puede dar."
@@ -143,7 +143,7 @@ GATES: tuple[Gate, ...] = (
     Gate(
         id="audio-stt-tts",
         title="G5 · STT/TTS con audio real",
-        protocol="release-notes-v3.73.0.md §Verificación",
+        protocol="docs/releases/release-notes-v3.73.0.md §Verificación",
         evidence=(
             "Grabación y transcripción reales, reproducción real y aviso de voz "
             "degradada con la voz realmente usada."

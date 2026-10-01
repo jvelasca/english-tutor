@@ -312,7 +312,7 @@ jobs:
   # (`continue-on-error`) a propósito: instalar `requirements-dev.txt` en Windows
   # depende de ruedas nativas (`piper-tts`, `faster-whisper`) que no se pueden
   # verificar desde Linux. El criterio de promoción a bloqueante está declarado en
-  # `release-notes-v3.73.0.md`: pasa a `continue-on-error: false` cuando acumule
+  # `docs/releases/release-notes-v3.73.0.md`: pasa a `continue-on-error: false` cuando acumule
   # runs verdes consecutivos.
   product-origin-windows:
     name: Product origin (Windows, informativo)

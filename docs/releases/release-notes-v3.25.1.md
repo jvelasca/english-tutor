@@ -15,7 +15,7 @@ aditivos). V3.26 queda para Listening + `novel` + retención longitudinal.**
 
 ### P1-01 — Certification gate real (ventana ≥7 días + ratio ≥0.90)
 
-`certification_gate` ([services/assessment_v2.py](backend/services/assessment_v2.py))
+`certification_gate` ([services/assessment_v2.py](../../backend/services/assessment_v2.py))
 deja de confiar en la mera presencia de filas `delayed` (que los emisores ya
 filtraban por ventana/ratio) y pasa a **verificar desde las propias filas** de
 `academy_evidence`:
@@ -38,7 +38,7 @@ filtraban por ventana/ratio) y pasa a **verificar desde las propias filas** de
   las ventanas opcionales `intervals_reached` (D+1/D+3/D+7/D+21).
 
 **Evidencia de cierre — los 6 tests negativos de la auditoría** (nuevos en
-[backend/tests/test_assessment_v2.py](backend/tests/test_assessment_v2.py)):
+[backend/tests/test_assessment_v2.py](../../backend/tests/test_assessment_v2.py)):
 
 | Caso | ¿Certifica? |
 | --- | --- |
@@ -51,7 +51,7 @@ filtraban por ventana/ratio) y pasa a **verificar desde las propias filas** de
 
 ### P1-02 — Agregación real por `lexical_unit` (aditiva)
 
-[backend/services/lexicon.py](backend/services/lexicon.py) gana dos funciones
+[backend/services/lexicon.py](../../backend/services/lexicon.py) gana dos funciones
 puras que agrupan las filas por `lexical_unit` **sin fundir las superficies**:
 
 - `units_from_rows(rows, now="")`: una entrada por unidad con sus superficies
@@ -66,15 +66,15 @@ puras que agrupan las filas por `lexical_unit` **sin fundir las superficies**:
 
 Exposición **aditiva** (contrato intacto): `LexiconOut` gana
 `units: list[LexicalUnitOut]`, `LexiconSummary` gana `units: dict` (opcional) en
-[backend/schemas/vocabulary.py](backend/schemas/vocabulary.py);
-[backend/domain/vocabulary.py](backend/domain/vocabulary.py) rellena ambos en
-`get_lexicon`; [frontend/src/types/api.ts](frontend/src/types/api.ts) los espeja
+[backend/schemas/vocabulary.py](../../backend/schemas/vocabulary.py);
+[backend/domain/vocabulary.py](../../backend/domain/vocabulary.py) rellena ambos en
+`get_lexicon`; [frontend/src/types/api.ts](../../frontend/src/types/api.ts) los espeja
 como opcionales. La UI no cambia: el diccionario sigue consumiendo
 `items`/`summary` por superficie.
 
 ### P1-03 — Support level como peso de la evidencia de dominio
 
-[backend/services/academy.py](backend/services/academy.py) gana
+[backend/services/academy.py](../../backend/services/academy.py) gana
 `SUPPORT_LEVEL_WEIGHTS` y `generalized_mastery_score` pondera cada `result` por
 el nivel de apoyo de su fila **antes** de promediar por `evidence_kind`:
 

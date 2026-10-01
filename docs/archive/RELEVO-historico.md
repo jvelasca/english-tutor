@@ -1,0 +1,7704 @@
+# Relevo — histórico (anterior a V3.94)
+
+> Notas de relevo de V3.93.2 hacia atrás, movidas literales desde
+> [`../RELEVO.md`](../RELEVO.md) el 2026-10-01. No describen el estado vigente:
+> pueden citar ficheros, versiones y decisiones ya superados.
+
+> **Nota (2026-09-30 · V3.93.2 — la idempotencia del intento alcanza la ruta de producción): release de ROBUSTEZ (patch) CON backend y frontend, SIN migración de BD (reutiliza `attempt_id` + índice único PARCIAL de V3.93.1), SIN endpoints nuevos y SIN cambio de contrato incompatible** (`attempt_id` es **aditivo** en `POST /api/listening/dictation` y `POST /api/listening/shadowing`). `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El P0-B quedaba a medias: faltaba la otra puerta.** V3.93.1 cerró la idempotencia en `POST /api/listening/answer`, pero `submit_production` (dictado/shadowing) seguía llamando a `listening_repo.record_attempt` directo (sin `attempt_id`, sin dedup): un doble POST del mismo dictado dejaba **2 filas** en `listening_attempts` e inflaba `GET /api/listening/diagnostic` y las métricas derivadas. Ahora pasa por `record_answer_event` con `attempt_id`. **(B) Sin cambio de comportamiento.** `record_answer_event` gana `sync_queue: bool = True`; producción llama con `sync_queue=False`, así que **no lee, no inserta ni borra** `listening_review_queue` (esa cola es de frases **receptivas** falladas, V3.89): un dictado fallado sigue sin encolarse y uno acertado no resuelve una frase receptiva encolada (`test_production_never_enqueues_failed_task`, `test_production_submit_does_not_disturb_existing_queue_entry`). **(C) UUID propio de producción.** El `attempt_id` receptivo cuelga del micro-flujo (`pregunta:attemptCount`), que en dictado/shadowing **no existe**; `ListeningPractice.tsx` usa un `productionAttemptIdRef` independiente que reutiliza el UUID mientras la pregunta no cambie y lo regenera al cargar otra. **QA:** `ruff check .` limpio · `pytest` **3465/3465** (3459 + **6 nuevos**) · `vitest` **1108/1108** (1106 + **2 nuevos**) · `tsc --noEmit` limpio · `check_release_consistency` OK en los **6 orígenes** (`3.93.2`). **Honestidad:** (i) es una **puerta secundaria** —no toca FSRS ni la cola de repaso—, así que su impacto es menor que el del P0-A/P0-B original; (ii) un `attempt_id` vacío (cliente legacy) conserva la semántica anterior (inserta siempre); (iii) los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.93.2.md`.
+>
+> **Estado de publicación (verificado el 2026-09-30).** Los **tres tags anotados de la fase V3.93** están **publicados** (`git ls-remote --tags origin` devuelve `refs/tags/v3.93.0`, `refs/tags/v3.93.1` y `refs/tags/v3.93.2`, que desreferencian a los commits de release **`91a272b`**, **`6de0553`** y **`04f6720`**) y sus **GitHub Release** están publicadas —**no** *draft*, **no** *prerelease*; `v3.93.2` marcada **Latest**— con las notas de `release-notes-v3.93.X.md`: https://github.com/jvelasca/english-tutor/releases/tag/v3.93.2 (y `.../v3.93.1`, `.../v3.93.0`). El **CI de cada commit etiquetado** es `success` con **12/12 jobs en verde**: run `36685289332` (`91a272b`), `36706167270` (`6de0553`) y `36710016587` + `36712763091` (`04f6720`, PR y push a `main`). **El invariante de orden se mantiene en las tres:** el tag se creó **después** del verde, así que la evidencia queda anclada al commit etiquetado **y** la etiqueta llegó con el verde ya emitido. `main` está **al día en `04f6720`** (fast-forward desde `fa2a15a`, sin merge commit), la **PR #20 quedó MERGED** y la rama `release/v3.93.0` **se conserva** como referencia de la auditoría. **Aviso de anclaje (declarado y cerrado el 2026-09-30):** `v3.92.0` tenía tag anotado **solo en local** (nunca empujado) y **sin** GitHub Release, así que la *Latest* saltaba de `v3.91.0` a `v3.93.2`; se publicó su tag **y** su Release en la misma sesión, y la *Latest* se mantiene en `v3.93.2` a propósito. Detalle en `docs/audit/PARKED.md §V3.93.x`.
+>
+> **Nota (2026-09-30 · V3.93.1 — el evento pedagógico de Listening pasa a ser transaccionalmente íntegro e idempotente): release de ROBUSTEZ (patch) CON backend y frontend, CON migración de BD ADITIVA e idempotente (columna `attempt_id` en `listening_attempts` + índice único PARCIAL; columna `version` en `fsrs_cards`; columna `attempt_id` en `listening_difficulty_evidence`), SIN endpoints nuevos y SIN cambio de contrato incompatible** (`difficulty_evidence: {words, count}` conserva su forma; `attempt_id` es aditivo en `POST /api/listening/answer`). `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) P0 — evidencia↔FSRS atómico.** V3.93 reclamaba la evidencia y DESPUÉS escribía la carta (dos transacciones): si el CAS agotaba los 3 reintentos quedaba una fila de evidencia sin FSRS y `evidence_key` impedía recuperarla. Nuevo `listening_repo.claim_evidence_and_write_card(...)` escribe claim y CAS en **UNA** transacción (`BEGIN IMMEDIATE`); si el CAS no escribe → **rollback** (sin fila, clave liberada) y `_apply_difficulty_evidence` relee y reintenta. O ambas cosas, o ninguna. **(B) P0 — intento idempotente.** `record_attempt` insertaba siempre y `_sync_review_queue` re-incrementaba `fail_count`; solo el ledger deduplicaba, así que un doble POST del mismo intento dejaba 2 intentos y 2 fallos con 1 evidencia. Nuevo `record_answer_event(...)` en UNA transacción `BEGIN IMMEDIATE`: inserta el intento con `ON CONFLICT(user_id, attempt_id) DO NOTHING` y solo si insertó actualiza la cola. La identidad es `attempt_id` (UUID que el cliente genera por intento y **reutiliza** en el reintento HTTP, regenerado al avanzar de intento); **no** se usa `attempt_number` porque se reinicia por carga de pregunta y colapsaría reintentos legítimos. **(C) P0 — cola sin lost update.** El read-compute-write de `fail_count` queda serializado por el write lock de `record_answer_event`: dos fallos simultáneos suman `2`. **(D) P1 — CAS de fila completa.** Nueva `fsrs_cards.version` (aditiva, `DEFAULT 0`); la escritura optimista es `... WHERE version = ?` con `version = version + 1` y protege `reps`/`stability` frente a un repaso FSRS concurrente que no mueva `difficulty` (el CAS de V3.93 solo miraba `difficulty`). **(E) P1 — resolver por discriminación.** `classify_sense_evidence` seleccionaba la ocurrencia por SUMA (`declared + other`) y podía elegir una ambigua existiendo otra inequívoca; ahora prioriza el MARGEN (`abs(declared - other)`) y el veredicto claro, sin cambiar la matriz ni la regla de no fabricar `matched`. **QA:** `ruff check .` limpio · `pytest` **3459/3459** (3450 + 9 nuevos) · `vitest` **1106/1106** · `tsc --noEmit` limpio · `check_release_consistency` OK en los **6 orígenes** (`3.93.1`) · migración aditiva verificada desde un árbol V3.92 (filas antiguas en `''` intactas, índice parcial). **Honestidad:** (i) Nada cambia para el alumno (la política sense-aware es V3.94+; el cambio de frontend es la señal técnica `attempt_id`); (ii) sin alternativas en esa ruta (`senses=()`), `mismatch` sigue sin poder dispararse; (iii) los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.93.1.md`.
+>
+> **Nota (2026-09-30 · V3.93.0 — la evidencia de Listening aprende a distinguir la palabra de la acepción SIN cambiar todavía qué evidencia se genera): release DE PRODUCTO (minor) CON backend y SIN frontend (conducta visible idéntica a V3.92), CON migración de BD ADITIVA e idempotente (cuatro columnas aditivas `evidence_key`/`sense_key`/`sense_match`/`sense_reason` en `listening_difficulty_evidence` + índice único PARCIAL sobre `evidence_key`), SIN endpoints nuevos y SIN cambio de contrato incompatible** (`difficulty_evidence: {words, count}` conserva su forma). `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El resolver se cablea, pero NO decide (DARK LAUNCH).** `domain/listening.py::_apply_difficulty_evidence` consulta `services.sense_context.classify_sense_evidence(word, frase, sense_json, senses=())` y **guarda** el veredicto (`sense_key`/`sense_match`/`sense_reason`) en el ledger, pero **no** llama a `allows_difficulty_evidence`: qué evidencia se genera sigue siendo **exactamente** lo de V3.92. Es una **medida** (decidir ENFORCE con datos es V3.94+), fijada por `test_sense_context_is_dark_launched_but_does_not_gate_evidence`. `listening_bridge.sense_index` reúne `{palabra: acepción declarada}` (una acepción ausente o vacía **no** entra). **(B) Idempotencia por intento (H8).** `evidence_key = usuario:frase:palabra:intento` con índice único parcial; la escritura reclama la clave ANTES de tocar la carta (`INSERT ... ON CONFLICT DO NOTHING`), así que repetir el MISMO `attempt_number` no suma y dos intentos distintos sí. **(C) El lost update, cerrado (H7).** `academy_repo.upsert_fsrs_card_cas(..., expected_difficulty=...)` escribe solo si la carta sigue en el valor leído (`DO UPDATE ... WHERE difficulty = ?`) y `_persist_card` relee y reintenta (hasta 3): dos evidencias simultáneas suman las **dos**. **(D) Instrumento.** `scripts/sense_shadow_report.py` (solo lectura) proyecta ENFORCE; el número a mirar antes de aplicar la política es `declared:none`. **QA:** `ruff check .` limpio · `pytest` **3450/3450** · `check_release_consistency` OK en los **6 orígenes** (`3.93.0`) · migración aditiva verificada desde un árbol V3.92. **Honestidad:** (i) Nada cambia para el alumno; (ii) sin alternativas en esa ruta (`senses=()`), `mismatch` todavía no puede dispararse; (iii) `sense_key` no se persiste en `sense_json` (V3.94+); (iv) los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.93.0.md`.
+>
+> **Nota (2026-09-29 · SENSE-CONTEXT-01: la evidencia de Listening distingue «conozco la palabra» de «conozco esta acepción» — AUDITORÍA + DISEÑO, no release):** fase de **auditoría profunda de V3.92 y diseño ejecutable**, **SIN cambios de comportamiento de producción** (V3.92.0 sigue intacto). QA real de este árbol: `ruff check .` limpio · `pytest` **3443/3443** (3408 base + **35 nuevos**) · `vitest run` **1106/1106** (112 ficheros; 1103 + 3) · `tsc --noEmit` limpio · `npm run build` correcto (bundle `3.92.0`); Playwright **no se re-ejecuta** (cero cambios de superficie de producto) y se conserva el baseline de V3.92 (127 passed · 32 skipped). **Revisión externa:** Bugbot **sin hallazgos** · Security Review **sin hallazgos** (una nota de identidad en `sense_key`, atendida neutralizando el separador por campo). **(A) El veredicto, confirmado y no opinado.** V3.92 persiste la acepción (`vocabulary.sense_json`) y la sirve en el léxico, pero el circuito **Listening → FSRS es lemma-based**: `services/listening_bridge.py` empareja por `word`/`lemma` e **ignora** `sense`, mientras `services/semantics.py` **ya sabe** resolver el sentido (`select_sense`/`sense_fit`) y **nadie lo llama desde el puente**. Evidencia reproducible: acepción **financiera** de `bank` + «We sat on the bank of the river» → `match_units` devuelve `bank` y **sí** se genera evidencia; `sense_fit` resuelve «The side of a river» (`sense_index: 1`). Es la **frontera declarada** (las notas de V3.92 ya decían «morfológico y por lemma, no semántico»), no un defecto oculto. **(B) Identidad de acepción, aditiva y pura.** `semantics.sense_key` = `lemma|familia_pos|dominio|glosa_normalizada` (minúsculas, espacios colapsados; cae de `lemma` a `term`; `''` = «no consta» ≠ «consta vacío»). No cambia el scoring, ni la cara B, ni el alta. **Límite declarado:** la clave es *content-addressed*, así que un bump de `GENERATOR_VERSION` que reescriba la glosa cambia la clave → la solución es un `sense_id` emitido por el generador (V3.93+). **(C) Sense Resolver, conservador y NO cableado.** Nuevo módulo **puro** `services/sense_context.py` (sin BD, sin reloj, sin FastAPI, sin LLM): `classify_sense_evidence(word, text, declared, *, senses, pos)` devuelve `matched`/`mismatch`/`ambiguous`. Reglas: `matched` **exige** solapamiento léxico positivo o un desempate gramatical entre **familias POS distintas**; `mismatch` exige una alternativa con evidencia léxica; todo lo demás es `ambiguous`. **`mismatch` y `ambiguous` nunca penalizan** (misma filosofía que `semantics.py`: la duda no se convierte en evidencia). **Desviación consciente del plan, declarada:** un contexto financiero **sin** solapamiento léxico («the bank approved my loan») cae a `ambiguous`, **no** a `matched`: se prefiere **perder evidencia** a **inventarla**. **H12 (nuevo):** dos sentidos del **mismo POS** sin pistas léxicas son **irresolubles** con la señal actual («The bank was closed.» → `ambiguous`). Un test (`test_sense_context_is_not_wired_into_production`) **falla si algún camino de producción importa el resolver**: el cableado tendrá su propia release. **(D) Contract E2E, categoría nueva y permanente.** El fallo real que V3.92 arregló (backend en **snake_case** `transcript_policy`/`sentence_timings`/`word_timings`, cliente en **camelCase** → `undefined`) llevaba versiones oculto porque **cada lado probaba su propia forma**. Ahora `backend/tests/test_contract_v392.py` fija la forma exacta de los 4 endpoints y la cadena E2E Listening → FSRS → Plan diario → `retention/due`, y `frontend/src/api/contract.test.ts` consume **el mismo** payload por el borde real (`getListeningQuestion`/`addVocabularyItem`). **(E) Robustez caracterizada, no arreglada.** H7 (*lost update*: dos cálculos desde la misma carta base → `5.6` en vez de `6.2`) y H8 (sin dedup: el mismo fallo repetido suma `+0.6` cada vez → 2 filas, `6.2`) quedan **fijados con tests** para que el arreglo de V3.93+ (idempotencia por `(user_id, question_id, word, attempt_number)` + escritura condicional) sea un cambio deliberado; la frontera `WEAK_DIFFICULTY = 6.0` (5.9 no recibe, 6.0 sí) también. **(F) Gates.** Se documenta el runbook y el formato de `validation-evidence.json` (`{status, notes, recorded_at, tree_version, head_sha, ci_run}`; `pass` **exige** `head_sha`; `--notes` obligatorio) **sin ejecutar ni cerrar ningún gate**: siguen los **ocho** `pending` y el fichero sigue sin existir. **(G) Deferido a V3.93+ (solo tras aprobar el diseño).** Cablear el resolver en puente y ledger; `new_sense_exposure`; dedup/*lost update*; `MAX_MATCHES` por relevancia; `sense_id` del generador; cartas FSRS por acepción. Todo el detalle, con la evidencia reproducible y los 13 hallazgos (H1–H13), en `docs/audit/SENSE-CONTEXT-01.md`; la deuda, en `docs/audit/PARKED.md §SENSE-CONTEXT-01`.
+>
+> **Nota (2026-09-29 · el fallo de Listening pasa a ser EVIDENCIA de dificultad y el circuito pedagógico se cierra): V3.92.0 — release DE PRODUCTO (minor) CON backend y frontend, CON migración de BD ADITIVA e idempotente (tabla append-only `listening_difficulty_evidence` + índice por `(user_id, created_at)`; columna aditiva `vocabulary.sense_json`), SIN endpoints nuevos y SIN cambio de contrato incompatible (los cuatro endpoints que cambian —`POST /api/listening/answer`, `POST /api/vocabulary/items`, `GET /api/vocabulary/lexicon`, `GET /api/academy/daily-plan`— crecen con campos ADITIVOS).** `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El fallo es evidencia, NO flashcard.** La frontera de V3.89 se respeta: lo que se falla es una **frase** y meterla en FSRS habría mezclado dos objetos pedagógicos. Pero el fallo **sí** dice algo sobre las palabras que ya estaban en esa frase, y esa señal se perdía. Nuevo módulo **puro** `services/listening_bridge.py` (`phrase_units`, `unit_index`, `match_units`, `is_weak_card`, `select_targets`): trocea la locución, descarta las **palabras vacías** (`GLOSS_STOPWORDS`), resuelve formas superficiales a lemma con el **mismo** lematizador declarado que el Sense Engine (`banks`/`banking` → `bank`) —**sin diccionario, sin LLM y sin dependencias nuevas** (PREMISAS §2 y §21)— y acota a `MAX_MATCHES = 8` unidades. **Invariante D3 intacto: el puente NUNCA crea vocabulario**; solo toca palabras que el alumno **ya tiene** en `vocabulary`. **(B) La carta sube de dificultad sin fingir una recuperación.** `fsrs.apply_difficulty_evidence()` (`DIFFICULTY_EVIDENCE_DELTA = 0.6`, tope `10.0`) **sube `difficulty`** y **adelanta el vencimiento a ahora** —una palabra que no se entiende al oírla reclama repaso— pero **no toca `reps`, `stability`, `state` ni `last_evidence_at`**: un fallo receptivo **no es** una recuperación, así que **no consume un repaso ni corrompe el intervalo real**. Las cartas **fuertes** (`state == "review"` con `difficulty < 6.0`) **no se penalizan**: el dominio demostrado no se rompe por un fallo de escucha de **otra** destreza. Y como `apply_difficulty_evidence` **no reordena por dificultad**, la cola de vencimiento conserva su **prioridad de urgencia**. **(C) Todo queda registrado.** Tabla **append-only** `listening_difficulty_evidence` (palabra, intento, `difficulty_before`/`after`, `due_at`, `created_at`) con `record_difficulty_evidence()` / `list_difficulty_evidence(user_id, day)`; vive **aparte** de `fsrs_cards` porque (1) permite contar la evidencia por día sin deducirla de un `why` de texto y (2) deja la carta FSRS con su **contrato intacto**. `POST /api/listening/answer` devuelve `difficulty_evidence: {words, count}` para que la UI lo **explique** en vez de esconderlo. **(D) La acepción deja de ser una etiqueta de pantalla.** `bank` no es una palabra: es un conjunto de acepciones y el alumno aprende **una**. La elección viaja en el alta (`sense`), se persiste en `vocabulary.sense_json` con el contrato `{term, pos, gloss, lemma, source, domain}` y se expone **en solo lectura** en el léxico; si el alta **no** declara acepción —lista pegada, currículo, importación— el campo **no se manda** (ni como `null`) y el inventario **no pinta** ningún significado: «no consta» es información, **inventarlo** no lo es. Se recorta por campo (**300** caracteres), se **ignoran** las claves desconocidas y `sense_json` **no cambia el scoring** ni la cara B (la traducción del alumno sigue mandando). **(E) Una sola verdad para el día, y la evidencia no se disfraza de progreso.** `services/daily_plan.py::day_metrics` publica `difficulty_evidence` (cuántas **veces** el día ha subido la dificultad de una palabra) y `words_flagged` (cuántas palabras **distintas**), **por separado** porque sumarlas mentiría: una palabra puede fallar tres veces en la misma mañana y son **3** eventos sobre **1** palabra. En Home se pinta una línea propia que **solo aparece si la hay** (nunca un cero decorativo) y que **no** toca ni el porcentaje del objetivo ni los repasos pendientes: la evidencia **no es trabajo hecho**. **(F) Un fallo de contrato real, encontrado al cerrar el circuito (V3.27–V3.91).** El backend sirve `transcript_policy`/`sentence_timings`/`word_timings` en **snake_case** (contrato Pydantic) y el cliente los leía en **camelCase**: llegaban `undefined` y con ellos se caía, **sin ruido**, la **tarjeta de fallo de V3.89** (las tres acciones «Continuar / Repasar ahora / Repasar después» **nunca se pintaban**) y el resaltado de frase y el **karaoke por palabra de V3.29** servían lista vacía. Se arregla en el **borde** (`api/listening.ts::toListeningQuestion`, una sola vez, sin que ninguna pantalla conozca las dos formas), se fija con vitest contra la forma **exacta** del backend y con una **E2E que mockea snake_case**: mockear camelCase habría escondido justo el defecto que la prueba debe vigilar. **(G) Verificación.** `ruff` limpio (backend y lanzador) · `pytest` backend **3408/3408** · `vitest run` **1103/1103** (111 ficheros) · `tsc --noEmit` limpio · `npm run build` correcto · `check_i18n_coverage --strict` **1871** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** (`audit: V3.92.0-contraste-wcag`) · Playwright de las rutas tocadas (**Listening, Home, Diccionario**: `integratedCircuitV392` —nuevo—, `listeningReplayStop`, `homeDailyPlan`, `dictionarySmoke`, `dictionaryFlashcardsBridge`, `responsiveOverflow`) en los **3 breakpoints** · `validation_gate.py auto --require-dist` **10/10** (8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.92.0`). **(H) Lo que NO trae, declarado.** (i) **La evidencia de dificultad NO es un repaso**: no sube `reps`, no reinicia `stability` y no certifica nada. (ii) El emparejamiento es **morfológico y por lemma, no semántico**: una frase fallada puede **no** señalar ninguna palabra y eso es un resultado **válido** (no se inventa evidencia). (iii) La tabla es **append-only y por usuario**: crece con el uso y **todavía no se poda**. (iv) `sense_json` es **contexto declarado**, no una segunda fuente de verdad. (v) El arreglo del contrato de Listening es un **fallo PREVIO** (V3.27), no una funcionalidad nueva. (vi) Los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.92.0.md` y `docs/audit/PARKED.md §V3.92.0`.
+>
+> **Estado de publicación (verificado el 2026-09-30).** La release `v3.92.0` quedó **con tag anotado pero sin publicar**: el tag existía **solo en local** (nunca se empujó a `origin`) y **no había GitHub Release**. **Cerrado el 2026-09-30:** `refs/tags/v3.92.0` está **publicado** en `origin` y desreferencia al commit de release **`fa2a15a`**, y su **GitHub Release** está publicada —**no** *draft*, **no** *prerelease*, **no** *Latest* (la más reciente es `v3.93.2`)— con las notas de `release-notes-v3.92.0.md`: https://github.com/jvelasca/english-tutor/releases/tag/v3.92.0. El **CI sobre `fa2a15a`** es `success` —run **`36588951539`**, **12/12 jobs en verde**— y ese commit es **ancestro** de `main`, así que su código viajó en `main` todo el tiempo: lo que faltaba era el **ancla pública**, no el código. Detalle en `docs/audit/PARKED.md §V3.92.0`.
+>
+> **Nota (2026-09-29 · el diccionario pasa a motor de sentidos y la inversa deja de barrer la tabla): V3.91.0 — release DE PRODUCTO (minor) CON backend y frontend, CON migración de BD ADITIVA e idempotente (columna plegada `translation_fold` en `dictionary_entries` + tabla virtual FTS5 de contenido externo + tres disparadores + guarda de reconstrucción), SIN endpoints nuevos y SIN cambio de contrato incompatible (el contrato de acepción crece con campos ADITIVOS), CON bump de `GENERATOR_VERSION` (`1.6.0 → 1.7.0`).** `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El O(N) de la inversa, medido antes de retirarlo.** `list_entries()` volcaba la tabla entera y el matcher filtraba en Python: **268 ms por consulta** a tamaño de diccionario completo (192 ms de SQL + 76 ms de bucle sobre 64.258 filas, `docs/DISENO-V388-DICCIONARIO-OFFLINE.md` §2.3), y eso **no escala**. Ahora el path de producción usa **consultas dirigidas**: `find_by_translation` (candidatos por **frase FTS5**, ordenados por `bm25` y acotados a **200** filas), `find_by_words` (**por PK**, lotes de **400**: recall y disponibilidad por palabra, que antes leían la caché entera para buscar la fila que ya sabían nombrar) y `distractor_pool` (diana + candidatos del MCQ **reproduciendo el orden por franjas** del helper puro: primero el mismo `pos`, después el resto, cada franja alfabética). `list_entries()` **se conserva con su semántica intacta** y **ya no la usa ningún camino de producción**: es la referencia con la que los tests comprueban que lo dirigido devuelve **exactamente** lo mismo. **(B) Índice y plegado, con una regla que no se puede romper.** Columna plegada `translation_fold` (plegada por la **MISMA** `fold` del comparador: si el índice y el matcher no plegaran igual, el índice **escondería** candidatos que el matcher acepta), **tabla virtual FTS5 de contenido EXTERNO** (`content='dictionary_entries'`: el índice **no duplica** el texto) con `tokenize="unicode61 remove_diacritics 0"` para que la **`ñ` siga siendo una letra distinta** (`año` ≠ `ano`) y **tres disparadores** que sincronizan en la BD —no en el código de una consulta concreta—, más **guarda de reconstrucción** (`'rebuild'` + log) si índice y tabla no cuadran: el caso real es la instalación que **estrena el índice con caché ya dentro**, así el backfill no es un paso que alguien pueda olvidar. **(C) FTS5 es opcional y se declara.** `fts5_available()` **no es dependencia nueva** (FTS5 viene dentro de SQLite), crea y destruye una tabla de sonda dentro de un `SAVEPOINT`, se paga **una vez por proceso** y es **la MISMA sonda** que decide si la migración crea el índice (no puede haber un estado en el que una diga sí y la otra no). Sin FTS5 hay **repliegue declarado** a `LIKE` por token sobre la columna plegada, deliberadamente **más ancho** que la frase: un candidato de más no cambia el resultado (el matcher puro sigue puntuando) y uno de menos **sí**. **Garantía declarada:** la consulta dirigida devuelve un **superconjunto** de lo que el matcher puede aceptar, **nunca un subconjunto**. Y el término se tokeniza en `services.dictionary_reverse.phrase_tokens` (letras y dígitos, ya plegado) para **las dos vías**, así que no pueden buscar cosas distintas ni recibir un comodín escrito por el alumno: **el término es TEXTO, nunca sintaxis**. **(D) El contrato de acepción, de dos campos a nueve.** `{term, pos, gloss, domain, proper_noun, example, context, lemma, source}`: el sentido deja de ser una **etiqueta interna del scoring** y pasa a ser **la unidad que la ficha pinta**. Los **dos prompts** piden **una acepción por significado, en el MISMO orden que `meanings`**, y `GENERATOR_VERSION` sube a **`1.7.0`**: la caché de 1.6.0 se regenera **una sola vez al primer lookup** (invalidación perezosa, sin migración de datos ni de esquema, como en V3.88); `pos`/`gloss` siguen siendo la identidad frente a los sentidos viejos, así que **el scoring NO cambia de forma**. `_decode_senses` conserva **solo las claves que la fila declara** (`bool` **estricto** en `proper_noun`) e **ignora las desconocidas**: una fila anterior al contrato se sirve **tal cual**, sin rellenar campos que nadie declaró, porque rellenarlos inventaría contenido. El contrato vive en **un solo sitio** (`SENSE_KEYS` en `services/dictionary_content.py`) y el repositorio lo **importa**. **(E) La ficha.** Nuevo `SenseList` en `DictionaryLookup.tsx`: acepciones **numeradas** con `pos`, ámbito, marca de **nombre propio**, glosa, contexto, **lema verificado** y **procedencia** (`model`/`lexicon`), y **un altavoz por acepción que suena el EJEMPLO, no la glosa** (la acepción se aprende oyéndola en contexto). Un campo ausente **no se pinta**: nunca se rellena a ojo. Van **después** del selector de significados —elegir sigue siendo la acción principal— y **antes** de la definición, porque **no dependen** del modelo. **(F) El léxico offline, fase 2 sin licencias.** `services/dictionary_batch.py` (**puro**: la E/S se **inyecta**, así que la reanudación, el tope de tiempo y el recuento de fallos se prueban **sin modelo ni BD**) + `scripts/dictionary_lexicon_batch.py` (`--dry-run`, `--limit`, `--max-seconds`, `--json`, `--words-file`, `--progress-every`, `--model`; salidas **0/2/3**). **No es el precalentado de V3.88.0** (ese prepara el léxico de **UN** usuario, por **la puerta de la consulta**, con sus cuotas y un tope de 60): mantenimiento tiene que poder **saltarse las cuotas**, porque con la cuota de **10 palabras nuevas por usuario y minuto** una pasada de **1.041** palabras exigiría **al menos 1 h 45 min de reloj** aunque el modelo fuera instantáneo, más **1.041 consultas a mano**. El script llama al **mismo** generador y persiste por el **mismo** repositorio. **La reanudación no necesita fichero de estado: la caché ES el estado** (`dictionary_repo.fresh_entry_words`, con el **mismo criterio** que `_content_is_fresh`: versión vigente **y** definición no vacía), así que relanzar **salta sola** lo hecho, interrumpir **no deja nada a medias** —cada palabra se persiste entera de una vez— y un fichero de marcas sería una **segunda fuente de verdad** que puede desincronizarse. **Best-effort por palabra**: un fallo se cuenta con su motivo (`empty`, `RuntimeError`, `persist:<error>`, `not_persisted`) y el lote **sigue**; el tope de tiempo se comprueba **antes** de cada palabra. **Universo y coste, medidos `[M]`** (`--dry-run`): **1.268 entradas crudas → 10 descartes → 217 duplicados → 1.041 pendientes**, a **8,7 s/palabra** con `llama3.1:8b` y el contrato de acepción de 1.7.0 (3 palabras preparadas en **26 s** de lote sobre una BD temporal) → **≈ 2 h 31 min** de CPU **una sola vez** (mucho más caro que los 4,05 s que medía V3.88 con `{pos, gloss}`: el prompt de acepción pide ejemplo, contexto, lemma y dominio, y el texto generado es ~3× mayor). **Verificado de punta a punta:** las tres palabras del lote de prueba quedaron en `dictionary_entries` con `generator_version = "1.7.0"`, el contrato de **nueve campos** y sus **tres filas en `dictionary_entries_fts`** —alimentado por el **repositorio**, no por el script. **(G) Fase 3 aparcada, y no por falta de código.** Empaquetar **FreeDict `eng-spa`** (35.935 entradas simples, **24,52 MiB** con FTS5, consultas a **0,034 ms**) daría cobertura **fuera** del currículum, pero es **CC BY-SA 3.0** (**atribución y *ShareAlike* de la obra derivada**): `clean_term`/`map_pos` ya son su **puerta de ingesta**, así que **no es deuda técnica** sino un **gate del gerente** —empaquetarla **cambia la naturaleza del producto** y ninguna decisión técnica puede aceptar una obligación legal en su nombre—; queda en `docs/audit/PARKED.md §Licencia del lexicón offline` con las **tres condiciones** para desbloquearlo (aceptación **escrita**; pantalla de créditos + licencia; asumir que **ES→EN seguiría pagando el modelo**, porque el `spa-eng` tiene 4.502 entradas y está marcado `too small`). **(H) Verificación, y un rojo que se declara.** El **primer** `pytest` completo de este árbol cayó **en un solo test** —`test_validation_gate_v373.py::test_las_comprobaciones_de_auto_no_fallan_en_este_arbol`— porque las versiones ya estaban en `3.91.0` y todavía **no** existían el encabezado del `CHANGELOG` ni la entrada de `PLAN.md`: era **la propia puerta de consistencia** señalando trabajo a medias, y **no se oculta** porque es la prueba de que la puerta funciona. Completados los documentos: `ruff` limpio (backend y lanzador) · `pytest` backend **3368/3368** · `vitest run` **1097/1097** (111 ficheros) · `tsc --noEmit` limpio · `npm run build` correcto · `check_i18n_coverage --strict` **1864** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** (`audit: V3.91.0-contraste-wcag`) · Playwright de las rutas tocadas (**Diccionario**) en los **3 breakpoints**: **31 passed · 2 skipped** · `validation_gate.py auto --require-dist` **10/10** (8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.91.0`). **(I) Lo que NO trae, declarado.** (i) **No se empaqueta ningún dataset de terceros**: el lexicón de esta release es el **batch local** sobre el vocabulario **declarado** (1.041 palabras) y **no** cubre palabras fuera de él. (ii) **Sin FTS5 el peor caso sigue siendo un barrido** (`LIKE` recorre la tabla): degrada, **no desaparece**, y se declara. (iii) **`source: "lexicon"` es una procedencia que hoy no produce ningún camino de producción** (el batch escribe `model`; la UI pinta la etiqueta cuando el valor es `lexicon` **o** `model`, así que está lista pero **no se emite**). (iv) La generación de acepciones está **orientada por prompt, NO garantizada** por el modelo. (v) **El bump a `1.7.0` invalida toda la caché** y la primera consulta de cada palabra vuelve a pagar el modelo hasta que el operador corra el lote. (vi) Los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.91.0.md` y `docs/audit/PARKED.md §V3.91.0`.
+>
+> **Nota (2026-09-29 · el objetivo del día deja de ser solo minutos): V3.90.0 — release DE PRODUCTO (minor) CON backend y frontend, CON migración de BD ADITIVA e idempotente (cinco columnas en `learning_goal`: `plan_mode`, `target_units`, `max_new`, `include_listening`, `include_speaking`; tres en `session_completions`: `kind`, `skill`, `minutes`), CON UN endpoint nuevo (`GET /api/academy/daily-plan`) y CON `GET`/`PUT /api/academy/goal` ampliados.** `GENERATOR_VERSION` (`1.6.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) La decisión: extender `learning_goal`, NO un «Plan diario» paralelo.** El objetivo ya era la **única fuente de verdad** del presupuesto del Session Engine (`minutes_per_day` → `budget_minutes`); un segundo objeto de configuración habría duplicado esa verdad y divergido el día que se editara uno de los dos. **Los defaults conservan el comportamiento anterior**: `time`, `target_units` = 0 (sin tope de unidades), `max_new` = 1 —que es **exactamente** el tope que `SESSION_CAPS` ya aplicaba a la categoría `new`— y las dos destrezas activas. La migración respeta el patrón de siempre: columnas en el `CREATE TABLE` **y** `ALTER TABLE` idempotente tras `PRAGMA table_info` (una BD de V3.89 se abre intacta). **(B) Repaso antes que nuevo, y no hizo falta reordenar nada.** `session_plan` ya entrega los pasos en orden pedagógico (repaso → listening → debilidad → nuevo → refuerzo), así que el recorte por unidades (`max_units`) se aplica **por la cola** y lo que se cae es siempre lo menos prioritario: **el material nuevo es el primero que desaparece** (con una sola unidad de presupuesto el día se queda con el repaso). `max_new` sustituye el tope fijo de la categoría `new` (**0 = día de solo repaso**) e `include_listening = False` saca la categoría de listening del plan. **(C) `include_speaking` deja de ser una casilla decorativa.** El plan diario **no** presupuesta Speaking como tiempo hasta V3.92, pero `include_speaking = False` **sí quita del día los pasos de Speaking** que ya podían entrar por **debilidad** (`weakness`) o **refuerzo** (`easy_wins`): una preferencia declarada que no se aplicara sería una casilla que miente. **(D) El plan sirve lo que FALTA.** Nuevo `_session_steps_with_day` (lee **una sola vez** las unidades completadas del día y devuelve el contexto del día): el presupuesto es `remaining_minutes` y el tope de unidades `remaining_units`, **no** el cupo entero otra vez, que es lo que permite que la barra llegue al 100 % en vez de rellenarse mientras el alumno sigue trabajando; con el objetivo **cumplido** (tiempo y, si se declaró, unidades) el plan devuelve **cero pasos** y la Home lo dice en vez de servir trabajo que ya no toca. `GET /api/academy/session` y `GET /api/academy/daily-plan` comparten **el MISMO** plan de pasos, así que **la barra y la lista no pueden divergir**. **(E) Métricas honestas, y un módulo puro.** Nuevo `services/daily_plan.py` (**puro**: recibe filas ya leídas y devuelve números; no toca la BD, no lee el reloj y no depende de FastAPI, así que se fija con tests sin `monkeypatch`): `minutes` es la **estimación del motor** —los minutos que el plan **había asignado** a la unidad cuando se completó—, **NO tiempo de reloj** (la app no tiene cronómetro y el módulo **no lo finge**: la UI lo etiqueta `engine estimate`); `unknown_units` **declara** las filas anteriores a V3.90 (cuentan como trabajo hecho y **no** suman minutos: mejor un 0 declarado que un dato inventado); `accuracy` es la media **observada** del día (evidencia de academia + intentos de listening, ponderada por número de intentos) y **no una nota del alumno**; y `pending` publica los repasos pendientes **por origen** (FSRS + cola de Listening de V3.89, con `due_queue` y el mismo `due_count` del panel) para que la UI pueda decir de dónde sale cada uno **en vez de sumar a ciegas**. El progreso publica el **mínimo** de los objetivos declarados: en `mixed` el día se cumple con **los dos**, así que la barra no puede ir más rápido que la más atrasada. `set_session_step_done` **congela** la metadata del paso (`kind`/`skill`/`minutes`) al completarlo —los minutos solo pueden medirse una vez, porque el plan se recalcula en cada lectura— y un re-marcado idempotente **no pisa** lo ya congelado. **(F) Frontend.** `TodayPlan.tsx` gana el selector de **modo** (por tiempo / por unidades / las dos), los campos de unidades y de máximo de nuevas, los toggles de Listening y Speaking y la barra **«Today's goal»** con unidades hechas, minutos hechos (**con la etiqueta de estimación**), repasos pendientes **desglosados por origen** y el acierto de hoy (o «sin datos», nunca un 0 disfrazado); `HomeScreen.tsx` lee el plan **una vez** y lo reparte (chip del encabezado + lista de pasos). **Replegado declarado:** si la lectura del plan **falla**, `TodayPlan` no desaparece —relee objetivo y sesión como en V3.89 y se pinta **sin** barra de progreso—, y mientras Home sigue cargando **no** se pregunta nada por duplicado; la barra **no se improvisa** porque necesita las métricas que solo el plan trae. **(G) Lo que NO trae, declarado.** (i) **No hay cronómetro**: los minutos son estimación del motor. (ii) **`max_new` > 1 no añade más material nuevo** mientras el motor solo conozca **un** siguiente objetivo del currículo: la subida es efectiva a 1 y se declara así en vez de prometer en la UI lo que el motor no hace. (iii) **El plan no consume la cola de repaso** (la publica con su origen; se consume donde siempre). (iv) Los **ocho gates humanos siguen `pending`**. **Verificación:** `pytest` backend **3276/3276** · `vitest run` **1094/1094** (111 ficheros) · `tsc --noEmit` limpio · `ruff` limpio · `npm run build` correcto · `check_i18n_coverage --strict` **1856** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas / **0** vacías · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** · Playwright de las rutas tocadas (**Home**) en los **3 breakpoints** (`smoke`, `homeGraphChip`, `responsiveOverflow` y `homeDailyPlan.spec.ts` **nuevo**): **19 passed · 2 skipped** · `check_release_consistency` OK en los **6 orígenes** (`3.90.0`). Detalle en `release-notes-v3.90.0.md` y `docs/audit/PARKED.md §V3.90.0`. **Publicación:** tag anotado `v3.90.0` → `a2c698c`, Release *Latest* en GitHub y CI **12/12** (run `36565300443`) sobre ese mismo commit; el tag se selló **después** del verde.
+>
+> **Nota (2026-09-29 · Listening robusto: el fallo es evidencia, no barrera): V3.89.0 — release DE PRODUCTO (minor) CON backend y frontend, CON migración de BD ADITIVA e idempotente (nueva tabla `listening_review_queue` + columna `outcome` en `listening_attempts`), CON DOS endpoints nuevos (`GET /api/listening/review-queue`, `POST /api/listening/review-queue/{question_id}/defer`) más un `DELETE /api/listening/review-queue/{question_id}` de resolución.** `GENERATOR_VERSION` (`1.6.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El bucle no estaba donde parecía.** `submit_answer` solo puntuaba y persistía; el reintento de la misma pregunta vivía en el **frontend** y existía **una sola vez** en A1/A2, y el «hasta acertar» real era el **drill** de fallidos (en memoria y **sin persistencia**). **(B) Tres salidas explícitas al fallo.** `frontend/src/features/listening/microFlow.ts` gana **`retriesRemain`** y **`skipAnswerStage`** y **el fallo ya no fuerza la salida del ítem** (`completeStageWithAnswer` se queda en `while2` revelando la transcripción cuando la política lo pide): el alumno elige **`Continuar`**, **`Repasar ahora`** (como máximo **una** repetición inmediata, `IMMEDIATE_RETRY_LIMIT = 1`) o **`Repasar después`**. `listeningSession.ts::drillAnswered` **saca la frase del pool al responderla** (acierte o falle), así que el drill **termina con pendientes** en vez de repetir. **(C) La cola es propia y persistente.** Nuevo módulo **puro** `services/listening_review.py`: clasifica el desenlace (`outcome_for` → `correct_first`/`correct_retry`/`wrong`/`hint_used`/`solution_shown`), acota la repetición inmediata y programa la reapertura con espaciado propio (**24 h → 72 h → 168 h → 336 h**) y **prioridad determinista** (nº de fallos + recencia + peso pedagógico del skill). `submit_answer` **encola el fallo** (`enqueue_failure`) y devuelve `outcome`/`queued_for_review`/`immediate_retry_available`; un acierto **resuelve** la entrada. **No es FSRS**: el objeto es una **frase**, no una flashcard. **(D) La cola se ve.** `ListeningLevelPanel` muestra «Repaso pendiente: N» por nivel con acción para repasar y `ListeningPractice` resume el total pendiente y cuántas vencen hoy, con cadenas nuevas en `utils/i18n.ts` (es/en). **Verificación:** `pytest` backend **3231/3231** · `vitest run` **1081/1081** (111 ficheros) · `tsc --noEmit` limpio · `ruff` limpio · `check_i18n_coverage --strict` sin huérfanas ni claves sin definir · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** · `check_release_consistency` OK en los **6 orígenes** (`3.89.0`). **Honestidad:** (i) Listening **no** entra en FSRS (la cola es de ejercicios, no de vocabulario); (ii) la cola es **por usuario**; (iii) la práctica de lo pendiente reutiliza la selección por nivel en modo `failed` (**no** hay navegador de cola propio); (iv) los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.89.0.md` y `docs/audit/PARKED.md §V3.89.0`. **Publicación:** tag anotado `v3.89.0` → `e283dac`, Release *Latest* en GitHub y CI **12/12** (run `36563083080`) sobre ese mismo commit; V3.89 cerró su commit **sin etiquetar** y su tag se selló al comprobarse el verde, **antes** de empezar V3.90.
+>
+> **Nota (2026-09-29 · la espera se ve, los significados principales y el estudio del diccionario offline): V3.88.0 — release DE PRODUCTO (minor) CON backend y frontend, SIN migración de BD (todo es aditivo: el precalentado reutiliza `dictionary_entries` y no crea tablas), CON DOS endpoints nuevos y CON bump de `GENERATOR_VERSION` (`1.5.0 → 1.6.0`).** `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) La espera se ve.** Nuevo componente compartido **`LoadingNotice`** (`role="status"` + `aria-busy="true"` + `aria-live="polite"`; spinner `Loader2` que **se convierte en reloj** con `common.stillWorking` pasados **4 s** desde `slowAfterMs`), cableado sobre los huecos que hoy eran **esperas silenciosas** y no sobre «todo lo que carga»: la **cola de repaso del día** (`useReviewToday` gana `loading` y `FlashcardsScreen` deja de decir «nada que repasar» **mientras la petición vuela**), **mazos y fichas** (`deletingId` / `deletingCardId` / `busyAction` **separados**, para que el `disabled` de una acción no parezca el cuelgue de otra), **`loadDecks()` del panel de alta** (que decía «no hay mazos» *mientras* cargaba → nueva clave `dictionary.lookup.decksLoading`), la **carga inicial y el refresco del léxico**, las **tres altas de vocabulario** y las pestañas de estudio/estadísticas. Tests con `vi.useFakeTimers()` que fijan el cambio spinner→reloj **sin tocar el estado vacío legítimo**. **(B) Los dos o tres significados principales, y el fallo era de DATOS.** La plomería existía de punta a punta desde V3.86.0 (columna `meanings_json`, `normalize_meanings`, selector); lo que faltaba era contenido: el prompt pedía *«at most 6»* **sin mínimo** y solo **6 de 33** entradas cacheadas tenían significados. `services/dictionary_content.py` gana **`MIN_MEANINGS = 2`** inyectado como **regla dura en AMBOS prompts** (EN→ES y ES→EN, con los significados **ordenados del más común al menos**; se mantienen las reglas de nombre propio al final y el contrato JSON intacto para no tocar `parse_content`), y **`GENERATOR_VERSION` sube a `1.6.0`**, que es la palanca correcta: `_content_is_fresh` **invalida y regenera de forma perezosa** las **33 + 13** filas (sin barrido en el arranque y sin migración). En la UI, `DictionaryLookup.tsx` muestra **los 3 primeros significados desplegados por defecto** y pliega el resto tras **`InfoDisclosure` con `content="options"`** (el patrón «...» = «abre para configurar» de V3.75.7), reaprovechando la **misma lista de radios**: `dictionary.lookup.meanings` pasa a «Significados principales» y aparece `dictionary.lookup.moreMeanings`, **sin cambiar la semántica de selección** (`meaningIndex`/`onPickMeaning`/`equivalent`: el elegido sigue mandando sobre audio, práctica y alta). **(C) Precalentado del léxico.** `POST /api/vocabulary/dictionary/warmup` (`{words}` → **202** + **trabajo en memoria**, `domain/dictionary_warmup.py`, `DICTIONARY_WARMUP_MAX_WORDS = 60` y `DICTIONARY_WARMUP_JOBS_KEPT = 20`) y `GET .../warmup/{job_id}` (`status`/`total`/`prepared`/`skipped`/`pending`), siguiendo el patrón de job asíncrono de `routers/listening.py`. **La decisión de diseño que lo hace honesto:** el trabajo reutiliza **el camino de generación que ya existía** (`_ensure_cached_content`: **single-flight, negative cache y las MISMAS cuotas**), así que **precalentar no genera nada que una consulta no generaría**, solo antes; sin cupo la palabra cuenta como **`skipped`** (que **no** es error: cuota agotada, modelo caído o timeout) y el **resultado real no es el trabajo, es la caché global `dictionary_entries`**, que sobrevive al proceso. Una petición vacía marca el trabajo `done` **sin encolar un bucle vacío**. En la vista de consulta, **`DictionaryWarmupAction`** lo arranca, sigue el progreso con `LoadingNotice` y declara el resultado real («N preparadas, M no se pudieron preparar; inténtalo más tarde»). **(D) La caché se puede medir.** Nuevo **`scripts/dictionary_cache_report.py`** —**solo lectura** (`mode=ro` con repliegue documentado si el WAL lo impide), sin ejecutar un solo `INSERT`/`UPDATE`/`DELETE`—: cuenta entradas **por tabla y por `generator_version`**, da la **frescura** contra la versión vigente (que lee del código con dos regex, para no duplicar el número) y el **porcentaje con 2+ significados** sobre el total y sobre las frescas, con muestra de huecos y salida `--json`. Medido sobre la BD de uso: **0 de 46 filas frescas** y **6 de 33 (18,2 %)** con 2+ significados en la directa. **(E) El diccionario offline: estudio, no implementación.** `docs/DISENO-V388-DICCIONARIO-OFFLINE.md` mide y concluye: **NO** se empaqueta un diccionario completo ahora; **SÍ** conviene (fase 1) un **índice FTS5** sobre la caché y (fase 2) un **precalentado por lotes** de las **2.238** palabras del currículum (**≈ 2 h 31 min de CPU**, una vez, sin licencias de terceros). Cifras **medidas** que sostienen el veredicto: **4,05 s** por palabra nueva con el modelo que la propia app elige (`llama3.1:8b`; 3,57–4,59 s en 4 palabras reales) frente a un tope configurado de **90 s**; FreeDict **eng-spa** 2025.11.23 = **64.258 entradas / 3,54 MiB / CC BY-SA 3.0** (leído del `COPYING` **dentro** del tarball), que convertido al esquema de la app da **35.935 entradas / 19,94 MiB / +4,58 MiB con FTS5** (construido en **0,2 s**) y **44,7 %** con ≥2 equivalentes ES; y la inversa ES→EN **escanea la tabla entera en Python**, **192 ms de SQL + 76 ms de bucle** a 64.258 filas frente a **0,034 ms** con índice. **La premisa con la que V3.30 descartó el empaquetado era FALSA** («sin fuente con licencia y bilingüe EN→ES disponible»): la conclusión se mantiene por **otras tres razones** que sí se sostienen —el léxico real es de 2.238 palabras, CC BY-SA obliga a ***ShareAlike*** de la obra derivada, y FreeDict **no cubre la inversa**—, y aparece una cuarta que V3.30 no pudo ver: **la arquitectura interna de la inversa no escala**. **Verificación:** `tsc --noEmit` limpio · `vitest run` **1078/1078** (111 ficheros) · `pytest` backend **3202/3202** · `ruff` limpio en backend y lanzador · `npm run build` correcto · `check_i18n_coverage --strict` **1833** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas / **0** vacías · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** · `check_release_consistency` OK en los **6 orígenes** (`3.88.0`) · Playwright de diccionario, puente, responsive y flashcards: **34 passed · 2 skipped** (el barrido completo no se repite en esta nota). **Honestidad:** (i) **no se ha empaquetado ningún dataset** y el estudio lo dice con datos, no con una opinión; (ii) **la generación de significados está orientada por prompt, NO garantizada por el modelo** —de 4 palabras medidas, `lantern` devolvió **un** significado y `quaint` coló el topónimo `San Miguel` como tercero, que el filtro de V3.86.0 deja al final y nunca preseleccionado, pero el modelo **lo propone**—; (iii) **el escaneo O(N) de la inversa sigue donde estaba** y es la fase 1 recomendada, no trabajo hecho; (iv) **el bump a `1.6.0` invalida toda la caché** (46 filas) y la primera consulta de cada palabra vuelve a pagar el modelo, que es exactamente lo que hace útil el precalentado de (C); (v) **`senses_json` sigue sin pintarse**; (vi) **no hay tag `v3.87.1`**: su delta se publica **dentro de `v3.88.0`**, por decisión explícita de no partirlo en dos commits ni re-sellar las versiones, y viaja en este mismo árbol de trabajo con `release-notes-v3.87.1.md` conservado como nota de la etapa, cuyo encabezado ya lo declara; (vii) **los ocho gates humanos siguen `pending`** y `validation-evidence.json` sigue sin existir. Detalle en `release-notes-v3.88.0.md`, `docs/audit/PARKED.md §V3.88.0` y el estudio `docs/DISENO-V388-DICCIONARIO-OFFLINE.md`.
+
+> **Estado de publicación (verificado el 2026-09-29).** El **tag anotado `v3.88.0`** está **publicado**
+> (`git ls-remote --tags origin` devuelve `refs/tags/v3.88.0`, que desreferencia al commit de release
+> **`969e027`**) y su **GitHub Release** está publicada —**no** *draft*, **no** *prerelease*, marcada
+> **Latest**— con las notas de `release-notes-v3.88.0.md`:
+> https://github.com/jvelasca/english-tutor/releases/tag/v3.88.0. El **CI sobre `969e027`** es
+> `success` —run **`36547401324`**, **12/12 jobs en verde**—. **Se RESTABLECE el invariante de orden
+> que `v3.87.0` había declarado incumplido:** aquí el tag se creó **después** del verde, así que la
+> evidencia queda anclada al commit etiquetado **y** la etiqueta llegó con el verde ya emitido.
+>
+> **Un run rojo que se conserva a propósito.** El primer run de este arco (`36545123518`, commit
+> `efe4d45`) puso **11 de 12** jobs en verde y cayó **solo** en `Backend (ruff + pytest)` por
+> `test_dictionary_warmup_v388.py::test_the_owner_can_poll_the_job` (`assert 0 == 1`). Era
+> **aislamiento del test**, no el producto: el precalentado comparte el estado global de generación
+> (cuota de **10 palabras nuevas/usuario/minuto**, ventana deslizante de 60 s) y a ese fichero le
+> faltaba la fixture `autouse` que los otros cinco ficheros de diccionario **sí** tienen, de modo que
+> los tests anteriores del propio fichero agotaban el cupo y el último se quedaba sin él; solo se
+> manifiesta donde el modelo **no responde al instante**, porque entonces la ventana nunca se
+> desplaza. Se corrigió en `969e027` (fixture **más** un test que fija la aritmética real:
+> `prepared == 10`, `skipped == 5`) y **`efe4d45` se conserva en `main` con su run rojo**: borrarlo
+> habría escondido justo la evidencia de que la puerta funcionó.
+>
+> **Ruido a no confundir:** `efe4d45` tiene **además** un run en verde (`36545266775`), pero es de
+> **Dependabot Updates** (`npm_and_yarn in /frontend for vite`), **no** de la CI. El run de CI de ese
+> commit es el **rojo**.
+>
+> **`v3.87.1` no se etiqueta** y no se etiquetará: su delta (la errata del contrato de `mode`, los
+> contadores de la cola, el comparador sin `casefold` y el panel de estudio plegado) se publica
+> **dentro de `v3.88.0`**, y `release-notes-v3.87.1.md` encabeza ya con esa declaración.
+> **Pendiente de acción humana:** los **10 PRs de Dependabot** abiertos (vite 6→8, pytest 8→9, ruff,
+> uvicorn, piper-tts, motion, jsdom, `@types/node`, react y `actions/setup-node`) **no** forman parte
+> de esta release y **no** están fusionados; el encargo de auditoría de `v3.88.0`
+> (`agentes/auditoria-total-externa-v388.md`) **todavía no existe**, y el prefijo `AZ` sigue agotado.
+> Detalle en `docs/audit/PARKED.md §V3.88.0`.
+>
+> **Nota (2026-09-27 · cierre de la auditoría de V3.87.0): V3.87.1 — release DE ROBUSTEZ (patch) CON backend y frontend, SIN migración de BD, SIN endpoints nuevos (la cola de flashcards publica dos campos ADITIVOS: `upcoming_count` y `queue_count`) y SIN cambio de comportamiento runtime del Planner 3.0.** **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). Cierra los **tres hallazgos** (1 P1 + 2 P2) de la auditoría de V3.87.0. **(A) P1 — contrato de `mode` (Política B).** `mode` es una **preferencia pedagógica**, **no un filtro duro**, y se materializa en **dos capas**: (1) `planner.task_candidates` cae al conjunto **sin filtrar** cuando el filtro deja el conjunto **vacío**; (2) `study_config.fallback_activity` traduce una recomendación fuera del modo a la actividad admisible más cercana (`recognition` → `recall`; `recall` → `sentence`) y **conserva `recognition` como prerrequisito receptivo en `production`** (por eso `production` puede seguir sirviendo `recognition`). **No cambia el runtime**: se corrige la redacción de V3.87.0 (con **errata trazable** en sus notas), `CHANGELOG`, `PLAN.md`, `docs/audit/PARKED.md` y los docstrings de `services/study_config.py`/`planner.py`/`lexicon.py`, y se añaden **tests contractuales** que la congelan (reconocimiento + recomendación de producción; producción + recomendación de recuperación; `mixed`; prerrequisito receptivo; e2e HTTP de `/api/learning/review`). **(B) P2 — la cola separa `due_count` de `upcoming_count`.** En `intensive`, `deck_queue` servía `due + upcoming` y publicaba `due_count = len(due)`, mezclando vencidas con adelantos de ≤ 24 h; ahora `due_count` = **vencidas reales**, `upcoming_count` = **adelantos de `intensive`** (0 en el resto) y `queue_count` = **lo servido** (vencidas + adelantos), **sin reescribir el `due_at`**. Campos **aditivos** en `FlashcardQueueOut`, `FlashcardQueue` del frontend y `normalizeStudyQueue`. **(C) P2 — comparador de producción. (D) UX — la configuración de estudio se pliega.** Donde decía `casefold` (JS no tiene `String.casefold()`) ahora dice la verdad del código: **case-insensitive + espacios colapsados** (`trim` + minúsculas + colapso de espacios). Y en DICCIONARIO/Estudiar el panel de configuración de estudio de V3.87.0, que vivía **siempre abierto** entre el selector de mazo y las dos acciones, **arranca cerrado** y se despliega con el disparador **«...»** alineado a la derecha: en móvil empujaba **«Repasar hoy» y «Estudiar tarjetas»** fuera de la primera pantalla. Se reutiliza `InfoDisclosure` con `content="options"` (la convención «...» = «abre para configurar» de V3.75.7), sin cadenas de i18n nuevas y sin cambio de contrato (`PUT /api/study/config` y recarga de cola iguales). **Fuera de alcance declarado:** la persistencia de `study_config` sigue siendo un merge lectura-modificación-escritura **no atómico** (P2 diferido para la etapa multi-dispositivo: dos pestañas podrían pisarse un campo). **Verificación:** `tsc --noEmit` limpio · `vitest run` **1063/1063** · `pytest` backend **3182/3182** · `ruff` limpio en el alcance del proyecto (backend y lanzador) · i18n `--strict` y contraste `--strict` sin cambios · `npm run build` correcto · `check_release_consistency` OK en los **6 orígenes** (`3.87.1`) · **barrido Playwright completo: 118 passed · 0 failed · 32 skipped**. **Honestidad:** (i) **no cambia lo que el motor hace**, fija por escrito lo que ya hacía; (ii) **los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`; (iii) **no se toca FSRS** ni `fsrs_cards`, el diccionario ni las versiones de contenido. Detalle en `release-notes-v3.87.1.md` y `docs/audit/PARKED.md §V3.87.1`.
+>
+> **Nota (2026-09-27 · FASE 2, incremento 1 — estudio configurable): V3.87.0 — release DE PRODUCTO (minor) CON backend y frontend, SIN migración de BD, CON dos endpoints nuevos (`GET`/`PUT /api/study/config`) y CON un cambio de contrato ADITIVO.** La cola de flashcards publica `prompt`/`answer`/`hint` y `study_config`; `front`/`back` **se conservan**. **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). Es el **incremento 1 de la FASE 2** —la que V3.86.0 declaró fuera y V3.86.1 dejó preparada— y cierra de paso las **dos deudas P2** que aquel patch dejó vivas. **(A) La decisión que evita una migración: dirección = PRESENTACIÓN, no calendario.** Se mantiene **una sola carta FSRS por ítem** compartida por ambas direcciones: **no se toca `fsrs_cards` ni su clave `(user_id, target_type, target_id)`**. Lo que cambia es **la cara que se pinta**: en `en-es`, `prompt = front` y `answer = back`/traducción; en `es-en`, `prompt = back`/traducción y `answer = front` (para el **léxico** se **fuerza la hidratación de la cara** aunque `back` no esté vacío, porque si no el anverso en español sería una cadena vacía). Elegir dirección **no duplica el calendario de repaso ni reinicia el progreso**: el mismo historial, otra pregunta. **(B) El modelo y su tolerancia.** `services/study_config.py` (puro: catálogo + normalización) y `domain/study_config.py` (persistencia **JSON bajo la clave `study_config`** de la tabla `settings`, con **merge + normalización** sobre `settings_repo` en `run_in_threadpool`). Cuatro dimensiones: `direction` (`en-es`/`es-en`), `mode` (`recognition`/`production`/`mixed`), `hints` (`off`/`definition`/`mnemonic`/`all`) y `difficulty` (`gentle`/`auto`/`intensive`), con defectos `en-es`/`recognition`/`off`/`auto`. El `PUT` es **parcial de verdad** (lo ausente se conserva) y un valor fuera del catálogo **cae al defecto** en vez de romper la sesión. **(C) La sesión.** `deck_queue` lee el config y modela los ítems de forma **aditiva**: `prompt`/`answer` por dirección, `hint` antes del volteo (definición y/o recordatorio según `hints`) y `study_config` en `FlashcardQueueOut`. La **dificultad** ajusta el embudo **sin tocar el `schedule` de FSRS**: `gentle` no adelanta y **reduce a la mitad el techo de nuevas**; `auto` = actual; `intensive` **incluye los repasos que vencen en ≤ 24 h**. En el frontend, `production` añade un **campo de texto antes del volteo** con **comparación tolerante** (**case-insensitive** + espacios colapsados; JS no tiene `String.casefold()`) y **autocalificación FSRS** (acierto → `Good`; fallo → `Again`, mostrando **siempre** la respuesta correcta), y el `lang` de los textos sigue la dirección. **(D) El Planner 3.0 respeta el modo como preferencia.** `mode` orienta el **conjunto de actividades** —`recognition` → `recognition`/`recall`; `production` → `sentence`/`write`/`transfer`; `mixed` → sin preferencia— **antes del argmax**; `support_level`/`difficulty` quedan **intactos**, así que `task_key`, la procedencia y la evidencia **no cambian de semántica**. El modo es una **preferencia pedagógica**, **no un filtro duro**, en **dos capas**: si el conjunto filtrado queda **vacío** (p. ej. `production` sin contenido de producción) se cae al conjunto **sin filtrar** para no dejar la sesión sin ítems, y una recomendación fuera del modo se traduce a la actividad admisible más cercana **conservando `recognition` como prerrequisito receptivo en `production`** (por eso `production` puede seguir sirviendo `recognition`). *(Errata de V3.87.0: la redacción original describía solo la primera capa; corregida en V3.87.1.)* **(E) Cierre de las dos P2 de V3.86.1.** El docstring de `create_cards()` deja de describir una «política de producto» que el código no implementaba y pasa a documentar la identidad fuerte real (`UNIQUE(user_id, front_key)`, reutilización de la ficha existente, completado de `back`/`mnemonic` y pertenencia al mazo); y `update_card`/`update_card_with_decks` envuelven el `UPDATE` en `try/except sqlite3.IntegrityError` para convertir una **colisión del índice `idx_flashcard_cards_identity`** (dos ediciones concurrentes al mismo anverso, donde antes podía escapar un error crudo) en `CardFrontConflictError`, que el router traduce al ya existente **`409 CARD_FRONT_TAKEN`**. **(F) Pruebas.** Backend: `test_study_config_v387.py` (**nuevo**: normalización y límites, defectos, `PUT` parcial con merge, persistencia, cola con dirección/modo/ayudas/dificultad y filtro de actividades del planner **con su fallback**) y casos nuevos en `test_multi_deck_v386.py` para la carrera de identidad en `update_card` y en el `PATCH`. Frontend: Vitest de dirección, ayudas, autocalificación de producción y panel de configuración. **Verificación:** `tsc --noEmit` limpio · `vitest run` **1061/1061** (109 ficheros) · `pytest` backend **3178/3178** · `ruff` limpio en el alcance del proyecto (backend y lanzador) · i18n `--strict` **1822** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas / **0** vacías · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** · `npm run build` correcto · `validation_gate.py auto --require-dist` **10/10** (8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.87.0`) · **barrido Playwright completo (26 ficheros): 118 passed · 0 failed · 32 skipped**. **Honestidad:** (i) **el calendario FSRS por dirección no existe** y es a propósito: **una carta por ítem**, compartida por ambas direcciones; (ii) **el modo *listening* queda fuera** (subsistema aparte); (iii) **el Planner 3.0 solo orienta por preferencia de modo**: el `mode` no altera `support_level`/dificultad del planner ni la selección adaptativa más allá de la preferencia, y **no es un filtro duro**; (iv) **no hay overrides por mazo**: la configuración es **per-usuario**; (v) **la preferencia de modo es deliberadamente permisiva** (con el conjunto filtrado vacío se degrada a «sin filtro», y una recomendación fuera del modo se traduce a la actividad admisible más cercana conservando `recognition` como prerrequisito receptivo en `production`); (vi) **`deck_id` sigue existiendo** como proyección legacy (declarado en V3.86.1) y este incremento no lo toca; (vii) **los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`; (viii) **`ruff check .` desde la RAÍZ sigue reportando 1 hallazgo preexistente y ajeno** (`scripts/purge_virtual_testers.py:198`, `DTZ005`, idéntico al de `v3.86.0` y `v3.86.1`). Detalle en `release-notes-v3.87.0.md` y `docs/audit/PARKED.md §V3.87.0`. **Estado de publicación (verificado el 2026-09-27):** el tag anotado **`v3.87.0`** está **publicado** (`git ls-remote --tags origin` devuelve `refs/tags/v3.87.0`, que desreferencia al commit de release **`17d063c`**) y su **GitHub Release** está publicada —**no** *draft*, **no** *prerelease*, marcada **Latest**— con las notas de `release-notes-v3.87.0.md`: https://github.com/jvelasca/english-tutor/releases/tag/v3.87.0. El **CI sobre `17d063c`** es `success` — run **`36304046908`**, **12/12 jobs en verde**—. **Declaración de orden, porque aquí NO se repite el invariante de `v3.86.1`:** el tag se empujó **junto con `main`**, así que se creó **antes** de que el CI terminara (en `v3.86.1` se creó después del verde). El **anclaje sí se mantiene**: el run corrió sobre **exactamente** `17d063c` —el `headSha` del run coincide con el commit al que apunta el tag— y salió verde, de modo que la evidencia sigue siendo la del commit etiquetado; lo que difiere es **cuándo** se creó la etiqueta, no **qué** commit certifica. `main` y `origin/main` están al día en `17d063c`. **No hay encargo de auditoría externa para `v3.87.0`**: no existe `agentes/auditoria-total-externa-v387.md` y no debe buscarse (y el prefijo de dos letras **`AZ` ya se agotó** con el encargo de `v3.86.0`, que dejó a su informe dictaminar la convención de prefijos antes de emitir otro). **Aviso de anclaje para el auditor:** hay tags **SIN Release** —`v3.84.0`, `v3.84.1` y `v3.85.0` entre los recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `v3.77.0`, `v3.77.1`, `v3.77.2`, `v3.78.0`, `v3.79.0` y `v3.81.0` antes—, así que «no hay Release» **no** significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. `v3.87.0` **sí** tiene Release, como `v3.86.0` y `v3.86.1`.
+>
+> **Nota (2026-09-26 · cierre del núcleo técnico post-V3.86.0): V3.86.1 — release DE ROBUSTEZ (patch) CON backend y frontend, CON migración de BD ADITIVA e idempotente, SIN endpoints nuevos y CON un único cambio de contrato de error (`409 CARD_FRONT_TAKEN`).** `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **El tag `v3.86.1` es propio y se publica** (no se repite la absorción de `v3.85.1`). Cierra los **ocho puntos** que la auditoría externa de V3.86.0 dejó abiertos **antes** de diseñar la fase 2. **(A) Identidad fuerte de la ficha (P1), y era de integridad.** La regla «un anverso no genera dos fichas» la sostenía **solo `create_card`** con un `SELECT` + `INSERT`, así que **dos peticiones concurrentes** del mismo anverso (doble clic, la misma palabra desde dos pantallas) podían crear **dos filas**, y `update_card` podía **editar** el anverso de una ficha hasta el de otra **sin comprobar nada**. Ahora la política de normalización es **una sola función**, `db.front_key()` (espacios colapsados + `casefold()`), en `backend/repositories/db.py` porque la necesita el **esquema**: columna aditiva `front_key TEXT NOT NULL DEFAULT ''` en `flashcard_cards` y **`CREATE UNIQUE INDEX idx_flashcard_cards_identity ON flashcard_cards(user_id, front_key)`**. La migración, **dentro de la transacción de `init_db()`**, **reliega** la clave de las fichas viejas (una ficha sin anverso —estado que el modelo no produce— recibe `(legacy:<id>)` para que el índice no choque por dos vacíos) y **funde los duplicados** que ya existieran: conserva el **`id` menor**, **suma** las pertenencias de sus gemelas (`INSERT OR IGNORE` de sus filas de `flashcard_deck_cards`) y borra las perdedoras — **no se pierde el mazo** al que solo apuntaba la copia, y queda en el log si hubo fusiones. `_find_card_by_front` consulta por `front_key` (**índice**, no escaneo en Python); `create_card`/`create_cards` escriben la clave con **`ON CONFLICT(user_id, front_key) DO NOTHING`** y, si otra petición ganó la carrera, **reutilizan la ficha ganadora** y le añaden las pertenencias (dos `POST` concurrentes → **1 fila y N pertenencias**); `update_card`/`update_card_with_decks` lanzan **`CardFrontConflictError`** → **`409 CARD_FRONT_TAKEN`** en vez de duplicar o reventar con un `IntegrityError` opaco. **(B) `PATCH` atómico (P2).** `update_vocabulary_card` (y el envoltorio legacy) encadenaba `update_card` + `set_card_decks`, así que un `deck_ids` inválido devolvía `400` **con el mnemónico ya escrito**; ahora hay **una función de repositorio**, `update_card_with_decks(user_id, card_id, *, front, back, mnemonic, deck_ids)`, que en **UNA transacción** valida la ficha, valida los mazos (con `_owned_deck_ids_in`, **sin** segunda conexión ni ventana TOCTOU), detecta el conflicto de anverso, actualiza campos, reemplaza la tabla puente y repunta `deck_id` a `MIN(mazos)`; si los mazos no son válidos lanza **`NoValidDecksError`** y **no escribe nada** (rollback → `400`). `deck_ids = None` = «no toques los mazos»; una lista (aunque vacía) = «este es el conjunto nuevo» y exige al menos un mazo válido. **(C) Salud de la BD (P2).** `flashcards_repo.cards_without_deck(user_id=None)` cuenta las fichas **sin ninguna fila puente** (`NOT EXISTS`); la **reparación de arranque** sustituye el viejo backfill condicionado a `deck_cards_existed` por una reparación **idempotente que corre siempre** y **solo** inserta la pertenencia de fichas **sin ninguna** (una ficha a la que el alumno le retiró un mazo conserva el otro y **no se resucita**; el dominio nunca deja una ficha sin mazo), exigiendo que el `deck_id` apunte a un mazo existente para que un dato colgante no tumbe el arranque por la FK; `GET /api/system/status` publica **`flashcards.cards_without_deck`** (un contador, sin datos personales) y tras `init_db()` es 0 — el endpoint delata una BD restaurada incoherente con el proceso ya en marcha. **(D) Parser hostil (P2).** `normalize_meanings` hacía `bool(item.get("proper_noun"))`, y **`bool("false")` es `True` en Python**: el modelo devuelve a veces el booleano como string, y una negación explícita se convertía en **nombre propio**, que además **reordena la acepción al final** y la deja fuera del defecto. Ahora **solo `is True`** cuenta (`"false"`, `"true"`, `1`, `None` → `False`). **(E) Contrato de dedupe (P2).** El docstring decía `(term normalizado, pos)` pero el código deduplicaba por término (y con `lower()`); el contrato se fija **por término** —en `meanings` el término **es** el significado—, el tipo pasa a `seen: set[str]` y se usa **`casefold()`**, la misma clave que el índice único. **(F) `deck_id` (P2).** Queda **declarado** como **proyección legacy** («mazo principal» = `MIN(mazos)`, un solo escritor) en el esquema, el repositorio y `docs/audit/PARKED.md`; la **autoridad de pertenencia es `flashcard_deck_cards`**. **(G) QA (P2).** Nuevo `docs/audit/PLAYWRIGHT-SKIPS-V386.md` que clasifica **los 34 skipped** uno a uno (las **19** llamadas a `test.skip`, todas en runtime; 26 specs, 150 tests × 3 proyectos; aritmética 18 + 10 + 4 + 2); se **retira la guarda de proyecto** del test del diccionario polisémico (superficie modificada de V3.86.0, sin captura) → **32 skipped**, y al hacerlo se destapa y corrige un **defecto real**: los CTA «Consult» y «My dictionary» del panel incrustado ocultaban el texto en móvil (`hidden sm:inline`) y quedaban **sin nombre accesible** (solo icono); ahora llevan `aria-label` en `QuizRoutePage.tsx` — **no era un problema del test, era un botón mudo para lectores de pantalla**. La superficie de V3.86.0 (Flashcards, multi-mazo, recordatorio) tiene **cero skips**. **(H) Pruebas.** `test_multi_deck_v386.py` gana **cinco** casos (concurrencia real con hilos + `TestClient` → 1 ficha y N pertenencias; `409 CARD_FRONT_TAKEN` al editar el anverso hasta el de otra ficha y la BD no cambia; `PATCH` atómico con `deck_ids` inválido que deja el `mnemonic` intacto; migración que funde duplicados sembrados a mano y crea el índice; reparación de una ficha huérfana con `cards_without_deck()` de 1 → 0); `test_dictionary_reverse_v339.py` fija el `proper_noun` estricto y el dedupe por término; `test_system_status.py` fija el contador. **Verificación:** `tsc --noEmit` limpio · `vitest run` **1055/1055** (109 ficheros) · `pytest` backend **3165/3165** · `ruff` limpio en el alcance del proyecto (backend y lanzador) · i18n `--strict` **1797** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** (`audit: V3.86.1-contraste-wcag`) · `npm run build` correcto · `validation_gate.py auto --require-dist` **10/10** (8 gates) · **barrido Playwright completo (26 ficheros): 118 passed · 0 failed · 32 skipped** · `check_release_consistency` OK en los **6 orígenes** (`3.86.1`). **Honestidad:** (i) **`deck_id` sigue existiendo** —se **declara** proyección legacy, no se retira: su retirada es una migración de esquema que esta release no aborda—; (ii) **el índice único es por alumno y anverso normalizado**, no una identidad global de contenido (`house`/`House` son la misma ficha, por diseño); (iii) **la fusión de duplicados conserva el `id` menor y descarta reverso/recordatorio de las copias perdedoras** (la pertenencia sí se suma); (iv) **no se toca FSRS ni el mazo automático** (la identidad fuerte es de las fichas manuales); (v) **el `409` es un cambio de contrato**: un cliente que antes recibía un `200` duplicando ahora recibe `409 CARD_FRONT_TAKEN`, que es el objetivo pero se declara; (vi) **`flashcards.cards_without_deck` es un campo nuevo aditivo** de la superficie pública `/api/system/status` (sigue sin exigir sesión, decisión ya declarada en `ARQUITECTURA.md`); (vii) **la fase 2 (estudio configurable) no está**: este patch es el cierre técnico **previo** a diseñarla; (viii) **los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`; (ix) **`ruff check .` desde la RAÍZ sigue reportando 1 hallazgo preexistente y ajeno** (`scripts/purge_virtual_testers.py:198`, `DTZ005`, idéntico al de `v3.85.1` y `v3.86.0`). Detalle en `release-notes-v3.86.1.md` y `docs/audit/PARKED.md §V3.86.1`. **Estado de publicación (verificado el 2026-09-27):** el tag anotado `v3.86.1` **existe y está publicado** (`git ls-remote --tags origin` devuelve `refs/tags/v3.86.1`), apunta al commit de release **`1a49506`** y su **GitHub Release** está publicada —**no** *draft*, **no** *prerelease*, marcada **Latest**— con las notas de `release-notes-v3.86.1.md`: https://github.com/jvelasca/english-tutor/releases/tag/v3.86.1. El **CI sobre `1a49506`** es `success` — run **`36279474597`**, **12/12 jobs en verde**—, y el tag se creó **después** de ese verde, así que la evidencia de CI está anclada al commit de release. `main` y `origin/main` están al día en `1a49506`. **No hay encargo de auditoría externa para `v3.86.1`**: no existe `agentes/auditoria-total-externa-v3861.md` y no debe buscarse (y el prefijo de dos letras **`AZ` ya se agotó** con el encargo de `v3.86.0`, que dejó a su informe dictaminar la convención de prefijos antes de emitir otro). **Aviso de anclaje para el auditor:** hay tags **SIN Release** —`v3.84.0`, `v3.84.1` y `v3.85.0` entre los recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `v3.77.0`, `v3.77.1`, `v3.77.2`, `v3.78.0`, `v3.79.0` y `v3.81.0` antes—, así que «no hay Release» **no** significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos.
+>
+> **Nota (2026-09-26 · diccionario polisémico y fichas en varios mazos, fase 1 de 2): V3.86.0 — release DE PRODUCTO (minor) CON backend y frontend, CON migración de BD ADITIVA e idempotente, CON endpoints nuevos (ficha-primero) y CON bump de `GENERATOR_VERSION` (`1.4.0 → 1.5.0`).** `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). Es la **fase 1 de 2**: el estudio configurable (elegir mazos, dirección ES↔EN, escribir la respuesta, ayudas de sílabas) queda **declarado fuera**. **(A) El defecto reportado, y era de DATOS: «lima» era la capital del Perú.** La caché del diccionario guardaba **una sola** traducción por palabra (clave única `word`) y `senses_json` separaba por **categoría gramatical**, no por **significado**; el prompt pedía *«the most common English equivalent»*, **no prohibía nombres propios** y recibía **solo la palabra, sin contexto**, mientras `parse_reverse_content` aceptaba cualquier texto no vacío. Un `lima → Lima` se guardaba bajo `word="lima"` y se servía **a todos los alumnos para siempre**. Y **la traducción curada correcta ya existía** (`file → lima`, `screw → tornillo`) en los packs del currículum, pero la búsqueda **no la consultaba**. **(B) Significados elegibles.** Ambos prompts devuelven además `meanings: [{term, pos, gloss, domain, proper_noun}]` con la regla dura de que **NUNCA** un nombre propio es el equivalente de un nombre común (si existe un sentido de nombre propio, va **el último** y marcado `proper_noun: true`); nuevo `normalize_meanings` (tope 6, dedupe por término + `pos`, recorte) y **el defecto es el primer significado que NO es nombre propio**. Se conservan `translation`/`english`/`definition`/`situation`/`senses` (compatibilidad y scoring semántico V3.44). Columna aditiva `meanings_json TEXT NOT NULL DEFAULT ''` en **las dos** tablas de caché (mismo `PRAGMA`-guard que `senses_json`), con degradación a `senses` + `translation` en filas antiguas; nuevo `DictionaryMeaningOut {id, term, pos, gloss, domain, proper_noun}` y `DictionaryEntryOut.meanings`, y **`senses` no se toca**. `GENERATOR_VERSION` sube a **`1.5.0`**: el dominio solo sirve caché cuya versión coincide, así que la fila envenenada de `lima` **deja de servirse** y se regenera **al consultarla** (perezoso a propósito, sin barrido en el arranque). Y `dictionary_reverse.py` gana `match_pack_translation(term, items)`, que lee `vocab_collection_items` (packs **globales**) y devuelve los equivalentes ingleses **curados**, ordenados por calidad de coincidencia (exacta antes que parcial) y, a igualdad, alfabéticamente: **autoridad determinista, gratis y sin latencia del modelo**, que es lo que hace que `tornillo → screw` y `lima → file` sean correctos; los candidatos curados se **fusionan** con los del modelo. En la UI, **selector de significado** en la tarjeta de resultado (término, `pos`, ámbito y glosa): los nombres propios van **marcados («nombre propio») y NUNCA preseleccionados**, y lo elegido manda sobre el término de práctica, el audio, el bloque «In English» y la carga útil del alta; cambiar de significado invalida la práctica anterior (era de **otro** significado). **(C) El alta en mazo deja de atascarse.** Se **retira la supresión por `usage.tracked`** (el panel está **siempre** disponible; si la palabra ya está en el léxico, el panel **NO reescribe el léxico**: solo crea/actualiza la ficha y sus mazos, y lo explica); `openAddPanel` **deja de salir temprano por `deckError`** y ofrece **«Reintentar»** (un fallo de red no esconde el selector); los mazos son **casillas** (la ficha nace en **todos** los marcados en **una sola escritura**) con alta de mazo en línea; hay campo opcional **«Recordatorio»** en el propio panel; con `translation: null` la tarjeta se muestra honestamente **pidiendo el reverso a mano** (anverso = lo buscado, reverso editable) en vez de quedarse sin ninguna acción; y el **CTA de estudio viaja siempre con el mazo elegido** (con varios, abre el principal y lo dice). **(D) Fichas en varios mazos.** Migración **aditiva e idempotente** en `init_db()`: tabla puente `flashcard_deck_cards (card_id, deck_id, created_at, PK(card_id, deck_id))` con FK a `flashcard_cards` (**`ON DELETE CASCADE`**) y a `flashcard_decks`, más índice por `deck_id`; columna `flashcard_cards.mnemonic TEXT NOT NULL DEFAULT ''`; y **backfill solo la primera vez que nace la tabla** (`INSERT OR IGNORE ... SELECT id, deck_id, created_at FROM flashcard_cards`), porque repetirlo en cada arranque **resucitaría** una pertenencia que el alumno quitó a propósito. `flashcard_cards.deck_id` queda **DEPRECADA** como «mazo principal» de un único escritor (el esquema viejo sigue abriendo) y la pertenencia real es la tabla puente; una BD de `v3.85.1` se abre **intacta**. **(E) API ficha-primero.** `GET/POST /api/vocabulary/cards`, `PATCH/DELETE /api/vocabulary/cards/{card_id}` y `POST/DELETE /api/vocabulary/cards/{card_id}/decks[/{deck_id}]`; el parcheo es **parcial de verdad** (editar solo el recordatorio no obliga a reenviar el anverso) y `set_card_decks` reemplaza el conjunto **en una transacción**; si ya existe una ficha del usuario con el mismo anverso normalizado **se reutiliza** y solo se añade la pertenencia; las rutas legacy `/decks/{id}/cards...` se conservan como **envoltorios finos deprecados** y el pegado masivo acepta el tercer campo opcional (`anverso,reverso,recordatorio`); el cliente HTTP tolera **`204 No Content`** (antes `res.json()` lanzaba `SyntaxError` y un borrado aplicado se leía como fallo). **(F) Borrar un mazo.** Borra las **pertenencias** de ese mazo, **conserva** las fichas que siguen en otro (repuntando la columna deprecada `deck_id` a `MIN(dc.deck_id)` para satisfacer el FK), borra las huérfanas **con sus cartas FSRS** (recolectando los ids antes) y la UI **dice cuántas se borran y cuántas se conservan** antes de confirmar. `deck_queue` resuelve por la tabla puente y devuelve cada ficha **una sola vez**; la pestaña **Fichas** se rediseña (sin mazo forzado, **mazos como etiquetas**, edición por casillas, formulario con anverso/reverso/**recordatorio** editable y borrable) y `StudySession` muestra el recordatorio en el **reverso**, en pequeño y separado, **sin tocar la máquina de estudio** (eso es fase 2). **(G) Salida del diccionario incrustado.** El panel de APRENDER → Vocabulario **no hospeda la sesión** (el modo `flashcards` se proyecta con `toPanelView`), así que una palabra ya rastreada se quedaba **sin ninguna acción**: ahora la vista de **consulta** declara `RouteDictionaryConfig.allowFlashcardsJump` y la página construye el callback, que **persiste la vista** y **navega** a `#/diccionario`, con el **mazo elegido viajando en un recado de un solo uso** (`utils/studyFocus`, consumido en el montaje de la pantalla central; **no** es una preferencia y no toca `localStorage` ni los ajustes). **(H) Un fallo real que destapó la sonda del puente.** `StudyTab` arrancaba la sesión en cuanto la cola estuviera cargada **sin comprobar de qué mazo era**: al llegar del diccionario con un mazo manual, la primera carga (la del mazo automático, aún seleccionado) podía resolverse **después** del foco, **gastar el encargo con una cola ajena** y dejar al alumno **en el panel, sin sesión**, aunque su mazo sí tuviera tarjetas. El arranque automático ahora exige `queue.deck.id === deck`, con prueba unitaria que reproduce el orden adverso. **(I) Pruebas.** Backend: `test_multi_deck_v386.py` (**nuevo**) —una ficha en varios mazos **sin duplicar la fila**; alta/baja de pertenencias una a una; el recordatorio se edita solo y se puede borrar; **borrar un mazo conserva las fichas compartidas y lo dice**; el mismo anverso **se reutiliza**; una ficha exige un mazo real y **el automático nunca lo es**; fichas y pertenencias **no cruzan entre usuarios**; `init_db()` **idempotente** y con backfill **una sola vez**— más `test_dictionary_reverse_v339.py` (**nombre propio nunca por defecto**, candidato curado sin modelo, **`lima` sirve la herramienta y no la capital**, fusión de significados, round-trip del repositorio) y los tres ficheros que fijan el contrato y `GENERATOR_VERSION == "1.5.0"`. Frontend: unidad del selector de significado, el alta con palabra rastreada, el reintento, el recordatorio, las etiquetas de mazo, el salto del incrustado **con su mazo** y el arranque que ya no se come una cola ajena; E2E ampliado en `dictionaryFlashcardsBridge.spec.ts` (nombre propio nunca preseleccionado y mandando en el alta, la ficha en **todos** los mazos marcados con su recordatorio, la palabra rastreada que ya no se queda sin salida, y la consulta **sin equivalente** pidiendo el reverso a mano) y caso **nuevo** en `vocabularyRoutesReview.spec.ts` (el diccionario incrustado dando salida a una palabra ya rastreada). **Verificación:** `tsc --noEmit` limpio · `vitest run` **1055/1055** (109 ficheros) · `pytest` backend **3157/3157** · `ruff` limpio en el alcance del proyecto (backend y lanzador) · i18n `--strict` **1797** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas (80 prefijos dinámicos) · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** (`audit: V3.86.0-contraste-wcag`) · `npm run build` correcto · `check_release_consistency` OK en los **6 orígenes** (`3.86.0`) · **barrido Playwright completo (26 ficheros): 116 passed · 0 failed · 34 skipped** (150 en total). **Honestidad:** (i) **el recordatorio NO llega al mazo automático** —vive en la ficha manual y el mazo automático (id 0) es una vista del léxico: no se disimula con un campo espejo—; (ii) **la corrección de la caché es perezosa** (el bump invalida; `lima` se regenera al consultarla, no hay barrido); (iii) **`flashcard_cards.deck_id` sigue existiendo, deprecada y con un solo escritor**: su retirada exige una **ventana de reconstrucción de tabla**; (iv) **no hay transacción entre léxico y ficha** (siguen siendo dos escrituras con estado parcial declarado y reintento, decisión de V3.84.1 que se mantiene); (v) **la fase 2 no está** (elegir mazos al estudiar, dirección ES↔EN, respuesta escrita y ayudas de sílabas; `syllables()` en `backend/services/phonemes.py` es hoy un proxy impreciso y la fuente de sílabas se decidirá allí); (vi) **los nombres propios se pueden elegir**, pero solo de forma **explícita**; (vii) **los ocho gates humanos siguen `pending`** y `validation-evidence.json` sigue sin existir; (viii) **`ruff check .` desde la RAÍZ sigue reportando 1 hallazgo preexistente y ajeno** (`scripts/purge_virtual_testers.py:198`, `DTZ005`, idéntico al del delta absorbido de `v3.85.1`), declarado en vez de arreglado en silencio. Detalle en `release-notes-v3.86.0.md` y `docs/audit/PARKED.md §V3.86.0`. **Encargo externo de auditoría de este tag —`v3.85.0..v3.86.0`, con UNA sola release etiquetada— entregado en `agentes/auditoria-total-externa-v386.md`** (prefijo **`AZ`**; informe esperado `docs/audit/AZ-AUDITORIA-TOTAL-V386.md`), en un commit documental **posterior** al tag `v3.86.0` porque **un tag publicado no se recrea**; el encargo declara expresamente, entre otras cosas, **que `v3.85.1` nunca se etiquetó y su delta va dentro de este tag** (`§6-D1`, con la pérdida de subrango que eso implica), **que el backfill de la tabla puente se ejecuta UNA sola vez y puede perderse en silencio** (`§2-B1`), **que `flashcard_cards.deck_id` sigue viva como segunda fuente de verdad** (`§6-D3`), **que un solo push certifica dos deltas** (`§6-D5`) y **que con `AZ` se agota el alfabeto de dos letras: el informe debe dictaminar la convención de prefijos** (`§8`).
+>
+> **Nota (2026-09-26 · la sesión de repaso deja de atascarse, el panel APRENDER recupera el repaso y el contraste identifica la release): V3.85.1 — release DE PRODUCTO (patch) SOLO FRONTEND, SIN migración de BD, SIN endpoints nuevos y SIN cambio de contrato de API.** Cierra la **auditoría externa `AY`** del arco `v3.84.0..v3.85.0` (encargo en `agentes/auditoria-total-externa-v385.md`; informe `docs/audit/AY-AUDITORIA-TOTAL-V385.md`). **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El P0 (hallazgo C1), y era real.** `ReviewSession` gobernaba el avance con **`produced`**, que solo se enciende cuando `WordDrill` dispara **`onProduced`** —y `onProduced` se dispara **solo** en `sentence`/`write`/`transfer`—, así que si el planner servía **`recognition` o `recall`** como actividad inicial **la sesión quedaba clavada** en ese ítem: «Siguiente palabra» no aparecía nunca y la única salida (cerrar el drill) **aborta la sesión entera**. El E2E de `v3.85.0` no lo veía porque servía **todos** los ítems como `activity: "write"` (elección honesta para correr sin micrófono, y exactamente lo que tapaba el agujero). **Reproducido por comando:** con la corrección desactivada, el caso nuevo **falla** en `reviewSession.spec.ts:502` (`Next word` no visible tras el veredicto de Recognition); restaurada, **pasa**. **El arreglo no es que Recognition y Recall mientan:** se separan dos señales confundidas — **`stepCompleted`** (`onStepCompleted`, **nuevo**: el peldaño dio **veredicto**, apruebe o falle → es la puerta del avance) y **`produced`** (`onProduced`, **sin cambios**: el intento **pasó** y acredita **evidencia productiva**). Completar un peldaño reconductivo **avanza sin fabricar evidencia**. El veredicto se declara **una sola vez por palabra** (idempotente por montaje). **(B) Accesibilidad.** El contador `1 of 2` pasa a **región viva** (`role="status"` + `aria-live="polite"` + `aria-atomic="true"`) y el **foco viaja al CTA** («Siguiente palabra»/«Terminar») al aparecer, así que el usuario de teclado no tabula por todo el drill; hay **sonda E2E de teclado/foco**. **(C) D4.** El panel APRENDER → Vocabulario, que en `v3.85.0` se había quedado **sin ninguna vía al repaso** al retirar `ReviewQueueSection`, recupera la puerta con **un solo CTA** («Repasar hoy» → `vocRoutes.reviewCta`) que proyecta `"flashcards"` y navega a `#/diccionario` (Flashcards → Estudiar), **sin duplicar la sesión**. **(D) G3.** `docs/audit/generated/contrast-report.json` declaraba `audit: "V3.75.8-rampa-niveles-direccion"` en `v3.85.0`, así que la cifra «480 pares + 6 guardas / 0 bloqueantes» **no se podía dar por demostrada** para los textos nuevos; `contrast_audit.mjs` deriva ahora `audit`/`version` de `frontend/package.json` y el informe se regenera (`V3.85.1-contraste-wcag`). **(E) Semántica fijada (C2).** «Repasar hoy» **TRABAJA COMPETENCIA; NO consume vencimiento FSRS**: la palabra puede seguir vencida y volver a ofrecerse, y eso **no es un bucle**; el `N` del botón sigue siendo honesto (`due_count = len(served_items)`). **(F) D3 y D2, declaradas en vez de silenciadas.** El límite de presentación de la cola pasó **de 20 a 50** en `v3.85.0` sin decirlo (`REVIEW_LIMIT = 50` = `REVIEW_QUEUE_MAX_LIMIT`, frente a `REVIEW_QUEUE_DEFAULT_LIMIT = 20` que aplicaba `ReviewQueueSection`): queda declarado y con **decisión de UX** escrita —hasta **50 ítems con un clic obligatorio por ítem y sin estado persistido**, así que **segmentar la sesión queda aparcado**—; y el `ReviewTodayCard` que las notas nombraban **no existe** (el resumen se renderiza **en línea dentro de `StudyTab`** y su estado vive en el hook `useReviewToday`). Ambas erratas van en un bloque **posterior a la publicación** de `release-notes-v3.85.0.md`, porque **un tag publicado no se recrea**. **(G) Pruebas.** Unit: `wordDrill.test.tsx` fija el veredicto de Recognition/Recall **sin** `onProduced` y el Write fallido (veredicto sí, producción no); `ReviewToday.test.tsx` fija un ítem `recognition` que **avanza y encadena**, `recall` que avanza, la región viva y el foco en el CTA. E2E: `reviewSession.spec.ts` con **caso nuevo de los CINCO peldaños** —Recognition, Recall, Sentence (con **micrófono falso**), Write y Transfer—, cada uno exigiendo avance, más la sonda de teclado/foco; `vocabularyRoutesReview.spec.ts` con caso nuevo del CTA y su destino. **Verificación:** `tsc --noEmit` limpio · `vitest run` **1048/1048** (109 ficheros) · `ruff` limpio en el alcance del proyecto (**backend** y **lanzador**, cada uno con su `pyproject.toml`) · `pytest` backend **3141/3141** · i18n `--strict` **1776** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas · contraste `--strict` **480 pares + 6 guardas / 0 bloqueantes** (`audit: V3.85.1-contraste-wcag`) · `npm run build` correcto · `validation_gate.py auto --require-dist` **10/10** (8 gates) · **barrido Playwright completo (26 ficheros): 106 passed · 0 failed** · `check_release_consistency` OK en los **6 orígenes** (`3.85.1`). **Honestidad:** (i) **no hay motor de sesión nuevo** (misma sesión encadenada sobre `WordDrill` ítem a ítem y el mismo `GET /api/learning/review`); (ii) **el avance ya no exige producir, pero tampoco certifica nada** —la evidencia productiva sigue siendo de los peldaños que producen y de los aciertos que el servidor puntúa—; (iii) **el contador puede reaparecer tras una sesión completa** (semántica declarada en `§E`, no un defecto); (iv) **el techo de 50 sigue sin resolverse** (aparcado); (v) **el panel incrustado tiene CTA, no sesión**; (vi) **`python -m ruff check .` desde la RAÍZ del repositorio sigue reportando 1 hallazgo preexistente y ajeno** —`scripts/purge_virtual_testers.py:198` (`DTZ005`), **idéntico al del tag `v3.85.0`**— y se declara en vez de arreglarse en silencio. Detalle en `release-notes-v3.85.1.md`, `docs/audit/PARKED.md §V3.85.1` y `docs/audit/AY-AUDITORIA-TOTAL-V385.md`. **ERRATA (declarada el 2026-09-26, antes de publicar `v3.86.0`): esta versión NUNCA se etiquetó.** El trabajo se redactó y se verificó, pero quedó **en el árbol de trabajo** sin commitear y el `HEAD` público siguió en `v3.85.0`, así que **`v3.85.1` no existe como tag** y **no se recrea**. **Su delta va incluido íntegro en `v3.86.0`** (el rango `v3.85.0..v3.86.0` tiene **un solo commit de release**), y `release-notes-v3.85.1.md` lleva ahora una errata en cabecera para que nadie persiga un tag inexistente.
+>
+> **Nota (2026-09-26 · diccionario en dos pestañas y «Repasar hoy» accionable): V3.85.0 — release DE PRODUCTO (minor) SOLO FRONTEND, SIN migración de BD, SIN endpoints nuevos y SIN cambio de contrato de API.** **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones; **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El defecto, y era de diseño.** «Repasar hoy» era una **lista de hasta 20 filas** con cuatro capas de texto por fila (motivo, `why`, señales de la decisión y badges) y **un botón por ítem cuya etiqueta era una palabra de ESTADO** («vencida»), así que en móvil se leía como un informe y no como algo que se pulsa. Ahora es un **resumen** —«tienes N palabras para repasar hoy»— con **UNA sola acción**, «Repasar ahora (N)», que **encadena toda la cola del día** montando el mismo `WordDrill` de siempre, palabra a palabra, con su peldaño recomendado (`initialStep`) y su `decision_id`; con `N = 0` no hay botón y se dice que no hay nada pendiente. **(B) Por qué «Siguiente palabra» y no auto-avance.** `WordDrill` dispara `onProduced` en cuanto el intento **pasa el peldaño**, y desmontarlo en ese instante **ocultaría el feedback** de lo que el alumno acaba de escribir; la sesión deja el drill montado y ofrece **«Siguiente palabra»** (y **«Terminar»** en la última), y al agotar la cola o cerrar el drill vuelve al resumen con los conteos refrescados. La traza declarada **no se pierde**: deja de repetirse veinte veces y pasa a mostrarse **UNA sola vez**, para la palabra que se está trabajando. **(C) Dos pestañas, y el inventario dentro.** El diccionario deja de tener tres modos y pasa a **`Consultar` · `Flashcards`**; el inventario del léxico se convierte en la **sub-pestaña `Mi léxico`** de Flashcards (Estudiar · Mi léxico · Mazos · Tarjetas · Estadísticas), y la sub-pestaña de Estudiar presenta **un bloque con DOS acciones etiquetadas** —«Repasar hoy (N)» (drill de competencia) y «Estudiar tarjetas (N)» (cola FSRS)— que antes se confundían en un solo botón «Iniciar sesión». **(D) La persistencia no se migra, se proyecta.** `DictionaryView` conserva sus tres valores (`"lookup" | "personal" | "flashcards"`): `"personal"` abre Flashcards **directamente en `Mi léxico`**, y elegir esa sub-pestaña vuelve a persistir `"personal"` (cualquier otra persiste `"flashcards"`), así que un valor guardado antes de esta versión abre **exactamente donde el alumno lo dejó**, sin tocar `localStorage` ni el ajuste por usuario, y el panel incrustado de APRENDER → Vocabulario sigue funcionando **sin cambios** vía `toPanelView`. **(E) Lo que se retira, declarado.** `PersonalDictionary` pasa a `LexiconInventory` y pierde `StudyEntryCard` y `ReviewQueueSection`: el inventario es **posesión y producción** (buscador, filtros por estado y procedencia, resumen, matriz de competencia, CEFR, alta de palabras, listas, packs y micro-drill oral), **no** estudio; el **panel incrustado** conserva sus dos modos y **pierde el acceso al drill de repaso**, porque el estudio vive en Flashcards. **(F) Responsive.** La sub-tablist de **cinco** elementos se desplaza en horizontal en anchos estrechos sin desbordar, las dos acciones de estudio van a ancho completo en móvil y la sesión encadenada envuelve cabecera y botones (`flex-wrap`); `responsiveOverflow` recorre también las cinco sub-pestañas a **320/390/768/1280 px**. **(G) i18n.** Nuevas: `dictionary.review.todaySummary`, `todayAction`, `sessionProgress`, `sessionNext`, `sessionFinish`, `flashcards.study.cardsTitle` y `flashcards.study.startCards`; retiradas por huérfanas: `dictionary.tabs.personal`, `dictionary.review.overdue`/`practice`/`practiceHidden`/`hidden.*`/`dueCount`/`hint` y las de `dictionary.inventory.study*`. **Verificación:** `tsc --noEmit` limpio · `vitest run` **1041/1041** (109 ficheros) · `ruff` limpio (backend y lanzador) · `pytest` backend **3140/3140** · i18n `--strict` **1774** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas · contraste `--strict` **0 bloqueantes** · `npm run build` correcto · `validation_gate.py auto --require-dist` **10/10** (8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.85.0`) · Playwright: `dictionarySmoke`, `flashcardsSmoke`, `responsiveOverflow` y `drillProvenance` actualizados a la estructura nueva (el drill se abre por **Flashcards → Estudiar → Repasar ahora**, ya no por PERSONAL) y **`tests/visual/reviewSession.spec.ts` NUEVO** (arranca la sesión, avanza de palabra y termina volviendo al resumen). **Honestidad:** (i) **no hay motor de sesión nuevo**: la sesión encadenada reutiliza `WordDrill` ítem a ítem con el mismo `GET /api/learning/review`; (ii) **el panel incrustado pierde el drill de repaso** (decisión declarada); (iii) **`StudyEntryCard` desaparece** y con él el alta directa a estudio desde la fila del inventario: esa puerta sigue en Flashcards; (iv) **renombrar «Estadísticas» a «Progreso» no se incluye**; (v) **esta release se apila sobre la `3.84.1`**, que se publica **antes**, con su propio commit y su propio tag `v3.84.1`; (vi) **los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`. Detalle en `release-notes-v3.85.0.md` y `docs/audit/PARKED.md §V3.85.0`. **Encargo externo de auditoría de este arco —`v3.84.0..v3.85.0`, con las DOS releases etiquetadas— entregado en `agentes/auditoria-total-externa-v385.md`** (prefijo **`AY`**; informe esperado `docs/audit/AY-AUDITORIA-TOTAL-V385.md`), en un commit documental **posterior** a los tags `v3.84.1` y `v3.85.0` porque **un tag publicado no se recrea**; el encargo declara expresamente, entre otras cosas, **la subida del límite de presentación de la cola de 20 a 50 que el tag no declara** (`§6-D3`) y **un `ReviewTodayCard` que las notas nombran y el código no tiene** (`§6-D2`).
+>
+> **Nota (2026-09-25 · cierre del estado parcial Diccionario → léxico + mazo): V3.84.1 — release DE ROBUSTEZ (patch) CON backend y frontend, SIN migración de BD y SIN endpoints nuevos** (el único cambio de backend es el `detail` de un `400` que ya existía). **SIN cambio de contrato de API, SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones, **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El defecto, y era real.** `addVocabularyItem` (léxico + carta FSRS) y `createFlashcard` (tarjeta del mazo manual) son **dos escrituras** que compartían un `catch`: si la segunda fallaba, el panel decía «No se pudo añadir la palabra» **aunque el aprendizaje ya estaba hecho** —un estado parcial declarado como error—. Ahora el alta del léxico tiene su propio `try/catch`, la tarjeta fallida queda como `pendingDeck`, el panel declara el estado **PARCIAL** («{palabra} ya está en aprendizaje, pero no se pudo guardar en «{mazo}»») y ofrece **reintentar solo la tarjeta** (`handleRetryDeckCard`) **sin repetir** el alta; el CTA «Estudiar en Flashcards» sigue porque el aprendizaje sí se completó. Se elige la opción **A** (dos escrituras + estado parcial + reintento) y **no** la **B** (endpoint transaccional), que queda declarada como deuda de arquitectura porque cambia el contrato de API. Es la variante de producto de **H5**, que sigue abierto para su propio flujo (retención). **(B) Mazo duplicado.** `create_flashcard_deck` responde **`400 DECK_NAME_TAKEN`** (con el nombre ya validado y el usuario de la sesión, el único desenlace posible ahí es la colisión `UNIQUE (user_id, name)`) y el frontend separa `deckCreateError` de `deckError`, así que el mensaje pasa a ser «ya tienes un mazo con ese nombre» **sin ocultar el selector** (antes un duplicado escondía el `<select>` entero con el texto de «no se pudieron cargar tus mazos»). **(C) Pruebas.** E2E de los **cuatro desenlaces** del puente —crear mazo → añadir → estudiar ese mazo → tarjeta visible; mazo existente; solo aprendizaje (una sola escritura: sin POST de tarjeta y el mazo automático sirve la palabra); fallo de la tarjeta → parcial → reintento que no repite el alta— con la **cola de cada mazo construida a partir de lo que entró de verdad** (no un fixture paralelo); el helper `routeFetch` gana respuestas de error estáticas o por llamada, con dos casos unitarios nuevos (parcial + reintento, y duplicado); y test de backend del `detail`. **(D) Deuda y letra.** Se documenta en `ensure_theme_packs_seeded` que el seed es **append-only por `slug`** (editar el `*.json` **no** propaga a la BD: los packs publicados son **inmutables en la práctica** hasta que exista un proceso de actualización de catálogo); **H1 sigue vivo** como deuda aceptada `P2`; `delete_deck` sigue sin ser transaccional; y la **consolidación del ítem** (léxico + tarjeta manual) sigue aparcada. Detalle en `release-notes-v3.84.1.md` y `docs/audit/PARKED.md §V3.84.1`.
+>
+> **Nota (2026-09-25 · responsive global, mazos estándar y ruta de aprendizaje): V3.84.0 — release DE PRODUCTO (minor) CON backend y frontend, SIN migración de BD y SIN endpoints nuevos.** Los packs se siembran solos por `slug` desde `backend/curriculum/vocab_packs/*.json`; el flujo de mazos reutiliza `listFlashcardDecks` / `createFlashcardDeck` / `createFlashcard` y el filtro reutiliza el `collection_id` que la cola FSRS ya aceptaba. **SIN cambio de contrato de API, SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones, **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) El defecto reportado y su clase:** «Practicar esta palabra» se **cortaba** en DICCIONARIO/CONSULTAR porque el cluster de acciones era `flex items-center gap-2` **sin `flex-wrap`** dentro de un `Card` con `overflow-hidden`, así que a 320–390 px se **recortaba en silencio** (sin scroll, invisible a los tests); se arregla el defecto y **la clase** (`wordDrill` —que **sí** provocaba scroll real—, `Header`, cabecera y caras de `StudySession`, filas de `FlashcardsScreen`, pestañas de `DictionaryScreen`, filas con `shrink-0` de `AddVocabSection`/`PersonalDictionary`) con `flex-wrap` + `min-w-0` + `break-words`. **Guardia nueva:** `frontend/tests/visual/layoutHelper.ts` (`expectNoHorizontalOverflow` + `expectInsideClippingAncestor`) y `responsiveOverflow.spec.ts` —11 rutas y las 3 pestañas del diccionario a 390/768/1280 y a **320 px** (ancho que la suite no probaba)— más la regresión del botón en `dictionarySmoke.spec.ts` comparando rectángulos contra el ancestro que recorta. **(B) Diccionario → MAZO manual:** el panel de alta deja de archivar en listas y ofrece **elegir mazo** (`Solo aprendizaje` / mazos propios / `Crear mazo nuevo…` con input en línea); al confirmar crea, además del léxico + carta FSRS, la **tarjeta** del mazo (`createFlashcard`), declara **las dos cosas** y «Estudiar en Flashcards» abre **ese mazo** (`onOpenFlashcards(deckId)` → `StudyFocus.deckId` → `focusDeckId`). **(C) Contenido:** 12 packs nuevos (`tools`, `computing`, `health`, `home`, `city`, `nature`, `body`, `sports`, `clothes`, `feelings`, `school`, `business`) y `food`/`travel`/`work` ampliados → **15 packs de 40–60 palabras** (~650 entradas), con test `backend/tests/test_vocab_packs_content.py` (forma, `slug` único, 40–60 ítems, unicidad). **(D) Ruta genérica:** el mazo automático («Mi diccionario») gana el **filtro** Todas / por pack / por lista reutilizando `collection_id` (`listVocabCollections` + `onStudyCollection`), **frontend puro**. **i18n:** claves nuevas en/es de selector/creación de mazo y filtros, con `check_i18n_coverage.py --strict` verde. **Verificación:** `tsc --noEmit` limpio · `vitest run` **1036/1036** (109 ficheros) · `ruff` limpio · `pytest` **3140/3140** · i18n `--strict` **1780** cadenas con 0 huérfanas / 0 usadas sin definir / 0 duplicadas · contraste **480 pares + 6 guardas / 0 bloqueantes** · `validation_gate.py auto --require-dist` **10/10** (8 gates) · **barrido Playwright COMPLETO: 90 passed · 0 failed · 30 skipped** (no solo los specs nuevos) · `check_release_consistency` OK en los **6 orígenes** (`3.84.0`). **Honestidad:** (i) **entrar en un mazo manual DUPLICA el ítem** (léxico/«Mi diccionario» **y** tarjeta manual) y la UI lo declara; (ii) **archivar en listas desde el diccionario se retira** (las listas siguen existiendo y se crean desde PERSONAL); (iii) **el contenido de los packs es autoría acotada**: el test garantiza forma y unicidad, **no** calidad léxica; (iv) **320 px es un ancho nuevo** que reveló más defectos de los enumerados, ya cerrados; (v) **los ocho gates humanos siguen `pending`** y el ancla de certificación sigue en `v3.83.1`. Detalle en `release-notes-v3.84.0.md` y `docs/audit/PARKED.md §V3.84.0`. **Encargo externo de auditoría de este arco entregado en `agentes/auditoria-total-externa-v384.md`** (prefijo **`AX`**; informe esperado `docs/audit/AX-AUDITORIA-TOTAL-V384.md`), en un commit documental **posterior** al tag `v3.84.0` porque **un tag publicado no se recrea**; la pregunta central del encargo es si la guardia de layout **muerde** (revertido el arreglo, el test falla) o si solo se movió de sitio un botón. **Deriva de ancla declarada:** `KIT-VALIDACION-GATES.md` y `VALIDATION-RELEASE-V373.md` siguen apuntando a `v3.83.1` mientras `v3.84.0` publica producto (UI + contenido), y esta release **no** re-congela: queda como pregunta para el auditor (`§6-D1`) y no se decide aquí.
+>
+> **Nota (2026-09-24 · CIERRE GLOBAL V3.83.x — se congela la rama de instrumentación y se fija el ancla de certificación en `v3.83.1`):** con el tag `v3.83.1` como ancla reproducible, se publica la **síntesis interna de cierre** `docs/audit/CIERRE-GLOBAL-V383.md` y el **encargo externo de cierre** `agentes/auditoria-cierre-global-v383.md` (reserva el prefijo **`AW`**; informe esperado `docs/audit/AW-AUDITORIA-CIERRE-V383.md`). **Veredicto: la serie está lista para EMPEZAR la certificación, no para declararla.** Lo que **bloquea**: (1) la **campaña física no se ha ejecutado** —los **ocho** gates siguen `pending` y `docs/audit/validation-evidence.json` **no existe**—; (2) el **ancla de certificación estaba desfasada** en `v3.81.0` y ahora se **re-congela en `v3.83.1`** (`docs/audit/KIT-VALIDACION-GATES.md` y `VALIDATION-RELEASE-V373.md`), porque entre medias `V3.82.0` cambió el contrato de `POST /api/session` y migró la BD y `V3.83.0` movió la UI; (3) falta el **informe `AV`** del arco `v3.81.2..v3.82.0`, el único que cambia contrato y migra BD. Lo que **no bloquea** (deuda aceptada): **H1** (`P2`, vivo en `retention.py` ~185, aparcado en `AU §12`), **H5** (`P2`, `add_item` no atómico), **H3** (`P3`), los **12 PRs de Dependabot** (`#10`/`#13` rojos) y la **cola pedagógica V3.70** (se cierra dentro de **G7**). **H4** queda **resuelto de facto** porque `v3.83.1` absorbe el commit del arnés dentro del tag. **Verificado por comando:** `validation_gate.py auto --require-dist` **10/10** · `status` **8 gates, los 8 `pending`** · `check_release_consistency` OK en los **6 orígenes** (`3.83.1`) · i18n `--strict` **1772** cadenas con **0** huérfanas / **0** sin definir / **0** duplicadas / **0** vacías · `test_docs_drift_v373.py` `len(GATES) == 8` · H1 vivo · `without_password` en la BD de uso = **2** (`J.A`, `Paz`) · CI del commit del tag `36042834375` `success` (el **no** dispara en tags) · barrido completo: backend **3122** + `ruff` limpio · lanzador **269** + `ruff` limpio · vitest **1033/1033** (109 ficheros) · Playwright **86 passed · 28 skipped** (no solo los specs nuevos). **Alcance:** `v3.83.1` **no arregla producto** (el único cambio en `backend/` es `VERSION`); el diff del tag incluye los **8 commits que ya estaban en `main`**. Detalle en `docs/audit/CIERRE-GLOBAL-V383.md` y `docs/audit/PARKED.md §V3.83.1`.
+>
+> **Nota (2026-09-24 · v3.83.1 — instrumento y honestidad, para poder auditar): V3.83.1 — release DE INSTRUMENTO Y HONESTIDAD (patch), SIN producto nuevo y SIN tocar la aplicación** (`frontend/src` y `launcher/` intactos; el único cambio en `backend/` es la línea de `VERSION`). Existe porque **la versión que se estaba auditando no existía**: hasta ahora la última etiqueta era `v3.83.0` (`ref`/`release`/`compare` de `v3.83.1` daban **404**) y el arreglo H2 y las pruebas visuales nuevas vivían en `main` **sin etiqueta**; el informe `AU` pedía un `v3.83.1` quirúrgico que no se había creado. **Publica:** (A) **H2**, ya corregido en `main` (`54a32fd`): el gate `reduced-motion` **emulaba en vacío** —`test.use({ reducedMotion: "reduce" })` **no es opción válida** en Playwright 1.62 y se ignoraba en silencio desde `V3.73.1`— y ahora emula de verdad con `page.emulateMedia({ reducedMotion: "reduce" })` más una **guarda de mordida** (`matchMedia` activo) para que no pueda volver a pasar por vacío; (B) **E5/i**, la letra de `release-notes-v3.83.0.md §5.1` («No se toca ni el backend ni la BD» → «sin lógica de backend (solo el bump de `VERSION`) y sin tocar la BD»); y (C) **H1** (`_collection_writable` devuelve `True` para un pack global: `not owner`) **aparcado como deuda aceptada `P2`** en `docs/audit/AU-AUDITORIA-TOTAL-V383.md §12` —heredado de `V3.77.1`, no alcanzable desde la UI, **no se endurece** porque rompería la premisa «solo frontend»—. **SIN migración de BD, SIN endpoints nuevos, SIN cambio de contrato de API, SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones, **SIN añadir ni retirar gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **Verificación:** `check_release_consistency` OK en los **6 orígenes** (`3.83.1`) · `check_i18n_coverage.py --strict` sin cambios (no hay cadenas nuevas) · `validation_gate.py auto` **10/10** · pruebas visuales de `reducedMotionAndZoom`, `dictionaryFlashcardsBridge`, `studySessionKeyboard` y `studySessionVisual` en verde. **Honestidad:** (i) **no arregla el producto: etiqueta el árbol y cierra la letra**; (ii) **el diff `v3.83.0...v3.83.1` incluye los 8 commits que ya estaban en `main`** (6 `docs(audit)` + 2 `test(visual)`), no solo el commit de release; (iii) **H1 sigue vivo en el código** y así se declara; (iv) **el CI no dispara en tags**, así que quien certifique el tag audita el CI del commit al que apunta. Detalle en `release-notes-v3.83.1.md`.
+>
+> **Nota (2026-09-24 · diccionario → Flashcards y sesión tipo juego: «todo uno» con PERSONAL): V3.83.0 — release DE PRODUCTO (minor) SOLO FRONTEND que NO toca backend ni BD y NO cambia el contrato de API.** Reutiliza `POST /api/vocabulary/items`, `GET /api/vocabulary/collections`, los mazos y la cola FSRS. **SIN migración, SIN endpoints nuevos, SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones; **los ocho gates siguen `pending`**. **El diagnóstico: el vínculo existía pero no se veía.** El diccionario **ya** daba de alta la palabra en el léxico —y con eso entraba en PERSONAL, en el mazo automático «Mi diccionario» (`AUTO_DECK_ID = 0`, que es una vista del léxico) y en la cola FSRS—, pero el botón se llamaba «Añadir a Personal» y no explicaba nada; y Flashcards se veía como un formulario (tarjeta plana, sin progreso, cuatro botones de texto idénticos). **(A) Diccionario → «Añadir a Flashcards»:** abre un **panel** que declara el vínculo («la palabra queda en aprendizaje, aparece en Personal y en el mazo Mi diccionario, y se repasa con repetición espaciada») y permite **archivarla además en una lista propia** (selector perezoso filtrado a `kind === "user_list"`; un pack curado no es destino); al confirmar llama al **mismo** `addVocabularyItem(userId, practiceTerm, { translation, collectionId })` (en ES→EN se añade el **equivalente inglés**). El éxito es honesto —«{palabra} ya está en aprendizaje» + «aparece en Personal y en tu mazo Mi diccionario»— y cierra con **«Estudiar en Flashcards»**, que salta al modo de estudio de la misma pantalla (`onOpenFlashcards` → `setView("flashcards")`). Si la palabra **ya está** en el léxico (`entry.usage.tracked`), **no se ofrece un alta que no cambiaría nada**: se declara «Ya está en tu diccionario» y se ofrece estudiar (sin duplicados). **(B) Sesión tipo juego:** volteo **3D** real (dos caras en una escena `perspective` + `preserve-3d` + `backface-visibility`; el control sigue siendo el botón con `aria-label` «Flip card» y las caras son decorativas, así que accesibilidad y contratos de test **no cambian**), **barra de progreso** que ahora **se anuncia** (se reenvía `value` a la raíz de Radix, que antes solo movía el indicador y no pintaba `aria-valuenow`), **notas con icono + color semántico + atajo 1–4** (Again rojo / Hard ámbar / Good primario / Easy verde; el rótulo vive en su propio nodo para conservar el nombre accesible exacto —se sigue leyendo «Good», no «3Good»—) y **cierre con celebración** (`Sparkles`) que declara el **acierto de ESTA sesión** (grados ≥ 3) **en línea aparte** del «Session done — N cards reviewed.», sin convertirlo en nota de dominio (D5/E3). **`prefers-reduced-motion` respetado:** el volteo y la celebración se apagan; la información no cambia. Se conservan **intactos** `lang`, badges, lápiz de reverso propio, hidratación de cara B y sus mensajes. **Verificación:** `tsc --noEmit` limpio · `vitest` **1033/1033** (109 ficheros, **+14 casos**) · i18n `--strict` **1772** cadenas con 0 huérfanas / 0 usadas sin definir / 0 duplicadas · contraste **480 pares + 6 guardas / 0 bloqueantes** · `validation_gate.py auto` **10/10** (8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.83.0`). **Honestidad:** (i) **solo frontend**, así que una palabra añadida desde el diccionario **ya era** palabra en aprendizaje antes de esta release —lo que cambia es que **ahora se ve y se dice**—; (ii) **sin gamificación de datos** (no hay XP/niveles/rachas; el juego es visual); (iii) **el acierto es de la sesión**, no una promesa de dominio; (iv) el alta deja la palabra en **`learning` por diseño** (misma cola que las demás); (v) **crear una lista desde el diccionario no se ofrece** (solo elegir entre las existentes); (vi) **`frontend/dist` no se reconstruyó** y los **8 gates humanos siguen `pending`**. Detalle en `release-notes-v3.83.0.md`.
+>
+> **Nota (2026-09-24 · alta profesional de cuentas: el P0 de identidad se cierra para las cuentas activas porque entrar sin contraseña deja de existir): V3.82.0 — release DE PRODUCTO (minor) CON migración de BD aditiva y CON un cambio incompatible de contrato, coordinado en el mismo lanzamiento entre backend, frontend, lanzador y sus tests.** Columnas nuevas: cuatro en `profile_requests` (`email`, `avatar_color`, `avatar_emoji`, `avatar_image`) y cuatro en `users` (`activation_token_hash`, `activation_sent_at`, `password_reset_token_hash`, `password_reset_sent_at`), con el `ALTER TABLE` idempotente de siempre, así que **una BD de `V3.81.2` se abre intacta**. `POST /api/session` pasa de `{user_id}` a `{email, password}`: responde **401 genérico** si el email no existe o la contraseña no es (sin enumerar quién tiene cuenta) y **403 `ACCOUNT_NOT_ACTIVATED`** si la cuenta existe y aún no tiene contraseña. **SIN bump** de `GENERATOR_VERSION` / `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) / `LISTENING_BANK_VERSION` ni de las evaluaciones. **No se añade ni se retira gate** (siguen los **ocho**), pero **la definición de `G0 · identidad-cuentas` cambia**: deja de vigilar un agujero abierto y pasa a vigilar una **cola de tareas**, porque el agujero se cierra **por construcción**. **El diagnóstico:** (1) el formulario de solicitud **no capturaba email ni avatar**; (2) **aprobar no mandaba nada** (creaba la cuenta con `email=''` y `password_hash=''` y la credencial era un segundo paso manual del webmaster); (3) **no existía recuperación de contraseña**; (4) el **enlace de verificación estaba roto** desde V3.81 (`/#/cuenta/verificar?token=…` apuntaba a una ruta que **no existía** en `routeMap.ts` y caía en Inicio sin confirmar nada); y (5) **se entraba eligiendo un nombre de la lista** (`GET /api/users` enumeraba cuentas sin sesión) y **una cuenta con `password_hash == ''` entraba sin contraseña** — el hueco que G0 vigilaba. **El flujo nuevo, de punta a punta:** (A) la persona **solicita** con nombre, **email** y **avatar** (emoji o imagen reducida a data URL) —el correo se valida antes de encolar (`422 EMAIL_FORMAT`) y uno ya usado por una cuenta activa se rechaza (`409 EMAIL_TAKEN`)—; (B) el webmaster **autoriza**, lo que **crea la cuenta con esos datos**, emite un **token de activación de 7 días** y manda la **invitación** (y devuelve el **enlace en claro una sola vez** para entregarlo **a mano** cuando no hay SMTP, que en este equipo es el caso); (C) la persona abre `#/cuenta/activar`, **elige su propia contraseña** y el email queda **verificado** (pulsar el enlace prueba la posesión), el token se consume y sube el `auth_epoch`; (D) entra **solo con email + contraseña**; y (E) **«Olvidé mi contraseña»** deja de ser informativo: `POST /api/account/forgot-password` (**200 siempre**, sin revelar si el correo tiene cuenta, con cupo de 5/min) manda `#/cuenta/restablecer` con un **token de un solo uso, 1 hora y hasheado**, y `POST /api/account/reset-password` fija la nueva y **tumba las demás sesiones**. **(F) La migración heredada queda preparada y probada, NO aplicada:** `backend/scripts/migrate_legacy_accounts.py` es **idempotente**, **simula por defecto** (`--apply` escribe, con **copia previa**) y da `J.A` → `josealberto.vel+ja@gmail.com` y `Paz` → `josealberto.vel+paz@gmail.com` por *plus-addressing*. **Lo que desaparece, que es lo que cierra G0:** el **registro autoservicio** (`POST /api/users`) se **retira**, **`GET /api/users` deja de ser público** (exige sesión) y **el acceso sin contraseña se retira**: `without_password` pasa de vulnerabilidad a **contador operativo** («pendientes de activación»). **El lanzador acompaña el ciclo** (email y avatar en la cola, enlace copiable, «📨 Reenviar invitación» con token nuevo que anula el anterior, y el estado «⏳ Sin activar» en vez de una alarma de seguridad). **Una sonda visual permanente, que encontró un defecto real:** `frontend/tests/visual/accountPages.spec.ts` vigila las tres páginas que llegan por enlace de correo (`activar`, `restablecer`, `verificar`) y las tres de la puerta (`entrar`, `solicitar acceso`, `recuperar`) en los tres breakpoints y **sin backend** —cada prueba responde desde el navegador los endpoints implicados—; al escribirla apareció que la **verificación se quedaba en «Confirmando…» para siempre** bajo el doble montaje de `StrictMode` (la guarda del primer efecto descartaba la única respuesta y el segundo **no volvía a preguntar**, porque el token es de un solo uso), un fallo que **ninguna prueba unitaria veía** porque todas montaban una sola vez; se cierra aplicando el resultado **sin** bandera de «sigo vivo» y queda fijado en las dos capas (el spec visual y `AccountPages.test.tsx`, que **ahora monta también bajo `StrictMode`**), con el candado **comprobado mordiendo**. **Verificación:** `ruff` limpio (backend y lanzador) · `pytest` backend **3122/3122** · `pytest` lanzador **269/269** · `tsc --noEmit` limpio · `vitest` **1028/1028** (109 ficheros) · i18n `--strict` **1762** cadenas con 0 huérfanas / 0 usadas sin definir / 0 duplicadas · contraste **480 pares + 6 guardas / 0 bloqueantes** · `validation_gate.py auto` **10/10** (8 gates) · `check_release_consistency` OK en los **6 orígenes** (`3.82.0`) · Playwright `accountPages` **6/6** en los 3 breakpoints · **E2E del flujo entero sobre una COPIA de la BD real: 83/83 pasos, 0 fallos** (`backend/scripts/e2e_accounts_v382.py`, que **sustituye** a `e2e_accounts_v381.py`), con un **buzón SMTP local** que captura los correos de verdad y el **sha256 de la BD original comprobado al final**. **Honestidad:** (i) **la migración heredada no se aplica aquí** —la BD de uso sigue con **2 cuentas pendientes de activación** (`J.A` y `Paz`) porque asignar correos reales es **acción del gerente**—, y **G0 sigue `pending` por eso y no por código**; (ii) **sin SMTP configurado el flujo es híbrido** (todo funciona, pero el enlace se entrega a mano y la UI lo dice con esas palabras); (iii) **el *plus-addressing* es dependencia del proveedor**; (iv) los **tokens viven en columnas de `users`**, hasheados y con caducidad, pero **sin historial** (emitir uno nuevo anula el anterior sin dejar rastro); (v) el **cupo de recuperación es por IP y por proceso** (un reinicio lo vacía) y **no hay aviso al titular**; (vi) **sigue sin haber 2FA, verificación obligatoria ni nada económico** (a petición expresa del gerente). Detalle en `release-notes-v3.82.0.md`.
+>
+> **Nota (2026-09-23 · cierre de G0 — identidad y ciclo de vida de cuentas): V3.81.2 —
+> release DE PARCHE de PRIVACIDAD sobre V3.81.x que NO cambia el contrato de API ni
+> migra columnas (aditivo y no destructivo en SQLite).** Cierra los dos bloqueantes
+> que la auditoría de V3.81.x dejó abiertos antes de V4.0. **(A) PII después del
+> purge.** El historial `user_events` sobrevive a la purga a propósito —responde
+> «¿quién borró esta cuenta y por qué?»—, pero las notas de `EVENT_CREATED`,
+> `EVENT_CREDENTIALS`, `EVENT_EDITED` y `EVENT_EMAIL_VERIFIED` guardaban el correo en
+> claro, así que «borrar toda la evidencia de la cuenta» no era del todo cierto. Se
+> deja de escribir el email (la nota pasa a ser el **hecho administrativo**), una
+> **migración de arranque** en `init_db()` redacta a `(email)` los correos que ya
+> hubiera en la tabla —idempotente y acotada a las filas con `@`— y al purgar se
+> redactan las notas del sujeto **antes** de borrar la fila de `users`. **(B) Orden de
+> `EVENT_PURGED`.** Se invierte: primero se purga y **solo si tuvo éxito** se registra
+> el evento, así no puede quedar escrito «datos purgados» sin haber purgado nada; el
+> nombre se captura en memoria porque `user_events` sobrevive por su columna
+> `subject_id`. **(C) La transición de cuentas heredadas se cierra con un candado.** Se
+> mantiene la compatibilidad (`password_hash == ''` sigue entrando) y se añade el
+> **octavo gate** `G0 · identidad-cuentas`: `status --strict` pasa de **7/7 a 8/8** y
+> G0 no puede estar en `pass` mientras `without_password > 0`; llevar el contador a
+> cero es trabajo de uso, no de código. El E2E `backend/scripts/e2e_accounts_v381.py`
+> se reescribe para sembrar una cuenta heredada en la copia y recorrer la migración
+> entera (temporal → `403 PASSWORD_CHANGE_REQUIRED` → cambio → `401 SESSION_STALE` de
+> la cookie vieja → login con la definitiva → datos intactos) e incluye la comprobación
+> de que el historial post-purga no contiene ningún correo. **Fuera de alcance
+> (declarado):** política de contraseña, freno de intentos en memoria y limpieza de
+> terminología perfil/usuario. Detalle en `release-notes-v3.81.2.md` y
+> `docs/audit/PARKED.md` §V3.81.2.
+>
+> **Nota (2026-09-22 · cierre de la sesión de Flashcards): V3.80.0 — release DE
+> PRODUCTO (minor) que rehace a fondo el estudio de Flashcards. CON migración de
+> BD aditiva** (una columna: `vocabulary.translation TEXT NOT NULL DEFAULT ''`,
+> con el `ALTER TABLE` idempotente de siempre, así que **una BD de V3.79.0 se abre
+> sin que nadie pierda nada**; las filas viejas quedan en `''`, la lectura honesta
+> de «no consta»), **SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.**
+> G1–G7 siguen `pending` y el árbol que se certifica sigue siendo el de
+> `v3.75.8`. Es la segunda mitad de V3.78.0: aquella construyó la superficie y el
+> alumno la probó y **no funcionaba como una app de tarjetas**. **(A) «Mostrar
+> respuesta» no mostraba respuesta porque el dato no existía.** Medido en la BD
+> del alumno: **139 de 145** cartas del léxico sin traducción; `card_face` solo
+> miraba el catálogo de packs (75 pares) y la caché `dictionary_entries` (**9
+> filas**), y `vocabulary` **no tenía columna de traducción** —el dato que el
+> alumno ya teclea al pegar una lista (`add_item`/`add_bulk` lo reciben desde
+> V3.77.0) **se estaba tirando**—. Ahora hay columna, la **precedencia está
+> declarada** en `card_face` (**lo que escribió el alumno** → pack → caché del
+> diccionario), `PATCH /api/vocabulary/items` (`{word, translation}`) corrige
+> **solo** la fila del usuario de la sesión (no crea vocabulario: 404 si no está
+> en su léxico, invariante D3) y `seed_study_items` guarda la traducción del pack
+> al inscribirse, así que **añadir un pack deja sus palabras con reverso**. Sin
+> ninguna de las tres fuentes devuelve **vacío a propósito** —una tarjeta sin
+> reverso es un dato, no un error que disimular con relleno— y `user_id` deja de
+> ser opcional en `card_face` porque la precedencia depende de un dato por alumno.
+> **(B) La sesión rellena el reverso al voltear y se puede corregir.**
+> `StudySession` lo pide con `lookupDictionaryWord` (caché global + modelo local,
+> timeout 120 s) y lo pinta con un «Generando…» honesto; **si el modelo no está,
+> la sesión no se bloquea** y se puede calificar igual —ese era el fallo de
+> fondo—. Un **lápiz sobre el reverso revelado** lo escribe o lo corrige y su
+> texto **manda** sobre el generado; el lápiz **no** sale en tarjetas manuales
+> (ya tienen su editor y su sitio es Tarjetas). **(C) El mazo es UNA selección, no
+> una por pestaña, y ESE era el «creo un mazo y no sé cómo añadir palabras»:**
+> `CardsTab` tenía su propio `deckId` y arrancaba en `manual[0]` —el primero por
+> orden alfabético, no el recién creado—, así que **faltaba cableado**, no
+> backend. La selección se sube a la pantalla (patrón Anki), **crear un mazo**
+> salta a Tarjetas con el anverso enfocado, **«Añadir tarjetas»** aparece en cada
+> fila manual, **estudiar un mazo vacío** no abre una sesión de 0 (lo dice y
+> ofrece añadir) y el mazo automático vacío manda a Personal. **(D) Pegar una
+> lista de tarjetas con el MISMO parser que el léxico:**
+> `POST /api/vocabulary/decks/{deck_id}/cards/bulk` (`{text}`), una por línea
+> `anverso,reverso` (coma o tabulador, `#` comenta), con `parse_bulk_lines`
+> promovido a público y usado por los dos (el alumno pega lo mismo en las dos
+> pantallas); la **validación NO se comparte** y a propósito. Escritura en **una
+> transacción** (`create_cards`), deduplicación por anverso y **recuento real**
+> —lo que entró, no lo que se pegó—. **(E) Mazos listos** con los `theme_pack`
+> globales, **cero backend nuevo**: sin activar → **Añadir** (materializa palabras
+> + carta FSRS), activado → **Estudiar** el **mazo automático filtrado por ese
+> pack** (`collection_id`, que la cola ya soportaba), sin copiar contenido.
+> **Los cinco candados muerden, comprobado revirtiendo el código:** precedencia
+> sin lo del alumno → **4** fallos (`assert '' == 'ancla'`); sin tabulador en el
+> parser → **6** fallos; sin `hydrate` en el volteo → **3**; sin `setDeckId` en
+> `openCardsFor` → falla «crear un mazo lo selecciona…»; sin el `collection_id` →
+> falla «un mazo listo… se estudia filtrado». Verificación: `pytest`
+> **3008/3008** + `ruff` limpio · `tsc` limpio · `vitest` **965/965** (108
+> ficheros) · build correcto · i18n `--strict` **1706** cadenas con 0 huérfanas /
+> 0 usadas sin definir / 0 duplicadas · contraste 480 pares con 0 bloqueantes ·
+> `check_release_consistency` OK en los **6 orígenes** · `validation_gate.py auto`
+> **10/10** · launcher **205/205** · Playwright `vocabularyRoutesReview` +
+> `drillProvenance` + `profileDialog` verdes. **Honestidad:** la migración es
+> aditiva y **NO rellena nada** (las 139 cartas sin reverso siguen sin él; lo que
+> cambia es que hay vía para arreglarlo); **el relleno depende del modelo local**
+> (mejora condicional, no garantía); el reverso generado **no se guarda en
+> `vocabulary`** (vive en la caché y no es «suyo»); una corrección del alumno
+> **manda sobre el pack pero no se propaga** al catálogo compartido; `card_face`
+> cuesta **una lectura más** por tarjeta servida; **pegar no valida contenido**,
+> solo forma; los mazos listos se estudian con los **límites del mazo automático**
+> y el pack sigue en dos sitios (**duplicación declarada**, consolidar aparcado);
+> y el guardia de `data/` —**sensible al entorno**— falló una vez **porque la app
+> estaba abierta escribiendo en `tutor.db`** (en la segunda pasada, 3008/3008).
+> Detalle en `release-notes-v3.80.0.md`.
+>
+> **Nota (2026-09-23 · el rótulo que dejó el CI rojo): V3.81.1 — release DE PRODUCTO
+> (patch) que NO toca ni una línea de la app.** El CI del commit del tag `v3.81.0`
+> salió **11 de 12 jobs verdes** y el rojo era **`Playwright E2E (visual)`**
+> (`6 failed · 28 skipped · 50 passed`): las **dos** pruebas de
+> `frontend/tests/visual/profileDialog.spec.ts` en los **tres** breakpoints. La
+> causa no era el producto: `V3.81.0` renombró «perfil» a «usuario» y con él
+> `user.editProfile` (`"Edit profile"` → `"Edit user"`) y `profile.editTitle`
+> (idem), pero el spec de `V3.79.0` seguía buscando el rótulo viejo, así que el
+> `click` agotaba los 30 s de timeout — el menú y el diálogo **funcionaban**. Se
+> cierra poniendo el rótulo actual en **una** constante del propio spec
+> (`EDIT_LABEL`) usada en las cuatro búsquedas, con el motivo escrito al lado. **El
+> hueco de método es lo que importa:** la verificación local de `V3.81.0` lanzó
+> **solo los dos specs nuevos** (`dictionarySmoke`/`flashcardsSmoke`, 6/6) y
+> **nunca el barrido visual completo**, que es donde vivía el spec afectado; la
+> lección queda escrita —**un renombrado de i18n obliga a lanzar el barrido
+> entero, no solo los specs nuevos**—. Verificado con `npx playwright test
+> tests/visual/profileDialog.spec.ts` → **6 passed** contra un backend real sobre
+> una **copia** de la BD, y el candado **muerde** (con el rótulo viejo, esos seis
+> casos fallan por timeout: lo demostró el CI). **Sin migración, sin endpoints,
+> sin cambios de contrato y sin tocar el currículum ni las versiones pedagógicas**;
+> **G1–G7 siguen `pending`** y el árbol de certificación **no se mueve** (el de
+> `v3.81.1` solo se diferencia en un fichero de pruebas), así que no hay nada que
+> re-anclar. Detalle en `release-notes-v3.81.1.md`.
+>
+> **Nota (2026-09-23 · gestión de usuarios): V3.81.0 — release DE PRODUCTO (minor)
+> que publica DOS LOTES BAJO UNA MISMA ETIQUETA: (1) la estabilización pre-freeze
+> que se iba a publicar como `v3.80.1` y (2) la Fase 3 del P0 de identidad, que es
+> la gestión de usuarios.** Publicar `v3.80.1` y `v3.81.0` con horas de diferencia
+> habría dejado dos etiquetas para el mismo árbol de trabajo —una sin valor para
+> quien audita— y un `CHANGELOG` que cuenta dos veces lo mismo: el mapa de los dos
+> lotes está en `release-notes-v3.81.0.md` y el detalle del primero, apartado por
+> apartado, en `release-notes-v3.80.1.md`. **(A) La cuenta y su credencial.** El
+> gerente decidió que el producto **sí tiene cuentas** y que la credencial es **por
+> cuenta, no por dispositivo**: cada persona se crea la suya, entra con su
+> contraseña y puede darse de baja, con la última palabra en el programa de
+> gestión. `users` gana `email`, `password_hash`, `email_verified_at`,
+> `email_verify_token_hash`, `email_verify_sent_at`, `must_change_password`,
+> `auth_epoch` y `unenrolled_at` (migración **aditiva e idempotente**: una BD de
+> V3.80.0 se abre intacta y nadie pierde nada) más la tabla `user_events` con el
+> historial. `services/credentials.py` sustituye a `services/pins.py` (**borrado**,
+> con su `test_pin.py`, y en el frontend se van `utils/pin.ts` y `pin.test.ts`):
+> **PBKDF2-HMAC-SHA256** con 200 000 iteraciones y sal por cuenta, comparación con
+> `hmac.compare_digest`, iteraciones **dentro del valor guardado** (subirlas más
+> adelante no invalida lo viejo), política de forma (8-128, sin espacios en los
+> extremos, no una de las obvias —esa lista vive **solo** en el servidor— y no un
+> carácter repetido) y el **freno por cuenta** (5 fallos no frenan; después el
+> retardo dobla con techo de 300 s y se limpia al acertar). Es la pieza que de
+> verdad sostiene la política: sin freno, 8 caracteres son fuerza bruta barata por
+> muy buen KDF que haya. El **PIN de perfil desaparece** como concepto (`PUT
+> /api/session/pin` se retira; `pin_hash` se conserva en la tabla **sin leerse**,
+> porque borrar una columna en SQLite es una reconstrucción de la tabla y una copia
+> antigua restaurada tiene que seguir abriendo). `POST /api/session` **exige
+> `password`** si la cuenta tiene credencial (401 `PASSWORD_REQUIRED` /
+> `PASSWORD_INVALID`, 429 `PASSWORD_THROTTLED` con `Retry-After`) y el token de
+> sesión pasa a llevar la **época de autenticación** (`auth_epoch`, comparada en
+> `dependencies.current_user`, que ya leía el perfil en cada petición): cambiar la
+> contraseña o forzar la baja **tumban las sesiones vivas al instante**, no cuando
+> caduque la cookie. Una contraseña **temporal** del webmaster entra con
+> `must_change_password` y el servidor la hace cumplir con 403
+> `PASSWORD_CHANGE_REQUIRED` hasta que se cambie. **(B) Alta, baja y email.** El
+> registro es **autoservicio** en el propio equipo (`POST /api/users`, acotado por
+> `is_admin_loopback_host` y por el cupo nuevo de `/api/users` en
+> `security._PATH_LIMITS`, porque hashea antes de decir que sí; por la red se sigue
+> **solicitando**, el reparto de V3.77) y los dos conflictos se distinguen a
+> propósito (`USER_NAME_TAKEN`, `EMAIL_TAKEN`). **El email es una señal, no un
+> muro:** `POST /api/account/verify` consume un token de un solo uso, **hasheado** y
+> con caducidad de una hora, y `POST /api/account/resend-verification` —bajo sesión,
+> porque emite tokens— responde con la verdad (`SMTP_NOT_CONFIGURED`,
+> `EMAIL_MISSING`, `ALREADY_VERIFIED`). La **baja autoservicio**
+> (`POST /api/account/unenroll`) **exige la contraseña** aunque ya haya sesión (sin
+> ella, pasar por delante de un equipo con la sesión abierta bastaría para dar de
+> baja a quien esté dentro), marca la cuenta como retirada, sube su época y retira
+> la cookie, y **no borra nada**: el borrado definitivo es la **purga** del
+> webmaster, con copia previa, solo sobre cuentas dadas de baja o desactivadas y con
+> confirmación por nombre. Mezclar «darme de baja» con «borrar mis datos» es cómo
+> las apps borran el historial de un alumno porque alguien pulsó el botón
+> equivocado. El **correo saliente** es la **segunda excepción de red** del producto
+> (`RUNTIME_TOUCHPOINTS`, `kind: "internet"`) y es **fail-closed**
+> (`services/mailer.py`: sin SMTP **no se abre ninguna conexión**, STARTTLS en los
+> puertos normales y TLS implícito en 465, timeout de 10 s porque el envío ocurre
+> dentro de una petición HTTP, texto plano y enlace al **fragmento** del frontend
+> `/#/cuenta/verificar?token=…`, que no se queda en los logs del servidor ni en un
+> `Referer`; un fallo de envío se registra y **no rompe** la acción), y su
+> contraseña vive en `backend/data/mail.secret`, **fuera de los backups** (se suma a
+> `certs`, `backups` y `session.secret`), mientras el **hash de la contraseña de la
+> cuenta sí viaja** porque es estado de la cuenta: declarado, no escondido. **(C) El
+> cuelgue de «Elige tu perfil».** Lo reportado en uso real no era del flujo de
+> cuentas sino de la sesión guardada: una cookie que apuntaba a una cuenta ya
+> purgada (404) o desactivada (403) hacía que `getSession()` **lanzara**, el
+> arranque en `Promise.all` se quedaba a medias y la puerta se pintaba sin lista y
+> sin salida. Se cierra en tres capas: `api/session.ts` trata 404 y 403 como «sin
+> sesión» y **limpia la cookie inservible**; `hooks/useChat.ts` pasa a
+> `Promise.allSettled` (una sonda caída ya no puede vaciar la pantalla); y
+> `ProfileGate` distingue **«no hay cuentas»**, **«no se pudo cargar»** (con
+> **reintentar**) y la lista normal, tres estados que antes se veían igual —
+> ofreciendo «Crear cuenta» **solo** en el propio equipo
+> (`utils/localDevice.ts`, espejo de `is_admin_loopback_host`), porque un formulario
+> que el servidor va a rechazar con 403 es peor que no ofrecerlo—. **(D) La consola
+> de Usuarios del lanzador.** El panel de perfiles pasa a tener la última palabra:
+> cola de alta y baja, alta y edición de cuentas, credenciales (asignar y
+> restablecer entregando una **temporal**), verificación de email **a mano** (modo
+> híbrido), activar/desactivar, baja forzada **con motivo**, historial (que
+> **sobrevive a la purga**: por eso la columna es `subject_id` y guarda también el
+> nombre), purga y SMTP (configurar y probar, con una frase que **concilia** lo
+> guardado con lo que ve el backend en marcha, que resuelve su entorno al arrancar).
+> La vista es **pura** (`launcher/ui.py`) y por eso se prueba sin pantalla. **(E) La
+> superficie sin sesión** pasa a **cuatro escrituras** (`users`, `account/verify`,
+> `session` y `profile-requests`), con `resend-verification` y `unenroll` exigiendo
+> sesión, y el candado en `test_public_surface.py`; `GET /api/users` sigue
+> enumerando **nombres** (la puerta es un selector y los necesita) pero **ya no
+> correos**: el de las demás cuentas se recorta en el borde HTTP, porque sin ese
+> recorte cualquier equipo de la red podría cosechar los correos de la casa sin
+> escribir una contraseña. Verificación: `ruff` limpio (backend y launcher),
+> `pytest` **3085/3085**, launcher **244/244**, `tsc` limpio, `vitest`
+> **1028/1028** (109 ficheros), build correcto (`3.81.0`), i18n `--strict`
+> **1733** cadenas con 0 huérfanas / 0 sin definir / 0 duplicadas, contraste 480
+> pares (+6 guardas) con 0 bloqueantes, `check_release_consistency` OK en los **6
+> orígenes** (`3.81.0`), `validation_gate.py auto` **10/10** y las dos sondas
+> visuales **6/6** en los tres breakpoints; los candados nuevos se **sabotearon**
+> para comprobar que muerden, y la **prueba end-to-end sobre una copia de la BD
+> real** (`backend/scripts/e2e_accounts_v381.py`, reproducible) da **62/62 pasos**
+> —freno, revocación por época, modo híbrido sin SMTP, baja autoservicio, purga
+> con copia previa, historial que sobrevive, cuenta heredada que entra sin
+> contraseña y la BD original con el mismo sha256—. **Honestidad:** (i) **las cuentas heredadas sin
+> credencial siguen entrando sin contraseña** (`password_hash == ''` abre como
+> siempre, para no dejar a nadie fuera de sus datos): **el P0 sigue abierto para
+> ellas**, la consola las lista como tarea pendiente y llevarlas a cero es trabajo
+> de uso; (ii) **no hay recuperación de contraseña por correo** —la restablece el
+> webmaster como temporal— ni segundo factor, ni verificación obligatoria;
+> (iii) `GET /api/users` sigue enumerando nombres en modo LAN (decisión declarada
+> desde V3.75); (iv) **el hash de la contraseña sí viaja en el backup** y quien lo
+> reciba puede atacarlo **sin el freno del servidor**; (v) **el freno vive en
+> memoria** y un reinicio lo vacía (mismo límite que el PIN de V3.76); (vi) **el
+> transporte de correo no se ha probado contra un SMTP real** (los candados cubren
+> el fail-closed, STARTTLS/TLS y la autenticación); (vii) **la consola sigue detrás
+> del doble candado** (PIN de administración + loopback): sin PIN se *cuenta* la
+> cola, pero no se resuelve, edita, fuerza una baja ni se purga; (viii) **el primer
+> candado del `mailer` no mordía** (el doble hacía fallar `smtplib` y el `except
+> Exception` del propio envío se lo comía, así que un test que lanza dentro del
+> `try` no puede probar «no se llama a esta función»): se reescribió para que
+> **registre la llamada antes** de fallar. Y **la API deja de ser solo aditiva**:
+> `PUT /api/session/pin` desaparece y `POST /api/session` cambia, así que los
+> instrumentos de campo que abrieran sesión con un `user_id` a secas deben conocer
+> el contrato nuevo — la base de certificación se re-ancla de `v3.75.8` a
+> **`v3.81.0`** y los 7 gates siguen `pending`. Detalle en
+> `release-notes-v3.81.0.md`.
+>
+> **Nota (2026-09-22 · estabilización pre-freeze): V3.80.1 — release DE PRODUCTO
+> (patch) que cierra los hallazgos de la auditoría externa de V3.80.0 —más un
+> hallazgo de uso real, la cola de perfiles invisible en el lanzador— y NO añade
+> funcionalidad de producto.** SIN migración, SIN endpoints nuevos, SIN bump de ninguna
+> versión de motor; **G1–G7 siguen `pending`**, y lo único que cambia fuera del
+> producto es que la **base de certificación se re-ancla de `v3.75.8` a
+> `v3.80.1`** (por tag, sin fijar SHA a mano, regla V3.73.5), porque
+> V3.78.0/V3.79.0/V3.80.0 añadieron producto y la campaña tenía **0 `record`**
+> —nada que invalidar—. **(A) P1 · La carrera generación ↔ edición de la cara B.**
+> `hydrate()` lanzaba una promesa que puede tardar hasta 120 s (modelo local) y
+> `saveOwnBack()` escribía después, así que una respuesta **tardía** pisaba la
+> traducción recién guardada y la pantalla contradecía la fuente de verdad del
+> alumno. Se cierra con **token por tarjeta** (`hydrationEpoch`) + **espejo
+> síncrono** (`ownBacksRef`, porque dentro del closure async el estado de React
+> puede ir desfasado): `hydrate()` captura el token antes del `await` y **descarta
+> su resultado** (cara y también el error de hidratación) si el token cambió o si
+> ya hay versión propia; guardar o borrar **sube el token** e invalida lo que
+> esté en vuelo; y guardar **retira el spinner** de esa tarjeta, que hasta ahora
+> tapaba la versión propia recién guardada. Candado con **promesa diferida**.
+> **(B) P2 · El badge «Tu versión» sobre una traducción borrada:** `saveOwnBack()`
+> lo marcaba también con `""`, así que borrar dejaba el badge sobre un texto que
+> ya no existía; ahora borrar **desmarca** y **restaura la cara del backend** (o
+> reintenta la caché). **(C) P2 · La `X` del diccionario limpiaba el campo pero no
+> el resultado:** un campo vacío con la tarjeta anterior debajo es un estado que
+> miente; ahora limpia **todo** lo que depende de la consulta y vuelven los
+> ejemplos, sin disparar ninguna petición. **(D) P2 · Los selectores tipo pestaña
+> son pestañas ARIA reales:** `tablist`/`tab`/`tabpanel` con `aria-selected` y
+> `aria-controls`, más el hook `useTabList` con **roving tabindex** y
+> `ArrowLeft`/`ArrowRight`/`Home`/`End`; antes eran `role="group"` +
+> `aria-pressed` pintados como pestañas. **(E) P2 · El `lang` de las tarjetas
+> manuales:** solo se declara cuando el idioma **se conoce** (léxico EN→ES) y se
+> omite en las manuales, en la sesión y en el navegador de Tarjetas. **(F) Sonda
+> visual permanente:** `dictionarySmoke.spec.ts` y `flashcardsSmoke.spec.ts`,
+> permanentes y en los **tres breakpoints** (390/768/1280) sin `skip` —el hueco
+> que V3.80.0 había declarado (el spec de V3.75.8 se borró)—. Sus mocks de `/api/**`
+> van **anclados al origen** (`/^https?:\/\/[^/]+\/api\//`) y no a globs por
+> endpoint: un `**​/api/settings*` casaría también con el módulo de la app
+> `/src/api/settings.ts` y, al servirle JSON, **la app no arrancaría** (la trampa
+> que `drillProvenance.spec.ts` ya documenta). **(G) La cola de perfiles que el
+> lanzador no podía ver** (hallazgo de **uso real**: una baja «no aparecía en el
+> lanzador»). El flujo del alumno estaba bien —la petición sí estaba en
+> `profile_requests` como `pending`—; el fallo era entero del lanzador: sin **PIN**
+> no se consultaba al backend y no había otra vía (aunque `profile_requests.py`
+> afirmaba desde V3.77 que el lanzador podía contar las pendientes sin el backend:
+> era una capacidad **declarada y no implementada**), y `_apply_profiles` **no
+> miraba `result.ok`**, así que un **401/403 o un servidor caído** se pintaban como
+> **«Sin solicitudes pendientes»** con la lista vacía, sin ningún test que lo
+> cubriera. Se cierra con `status.read_pending_requests` (contador en solo-lectura,
+> **siempre**, con PIN o sin él; `0` = vacía y `None` = no se pudo leer),
+> `ui.pending_view` (los estados no se confunden: sin PIN con pendientes **dice
+> cuántas hay**, con PIN y fallo **dice el motivo**) y el **reinicio automático al
+> guardar o retirar el PIN**, porque el backend en marcha no vuelve a leer el
+> entorno hasta arrancar. **Honestidad: el
+> test demuestra que la UI ya no miente, NO que el motor cumpla** (la generación
+> del reverso sigue dependiendo del modelo local); el **timeout de hidratación
+> sigue siendo el global de 120 s** (un timeout corto de cara B queda **aparcado**);
+> **no hay idioma por mazo** (queda aparcado); el **mismo pack sigue en dos
+> sitios**; y el **barrido visual completo sigue con flakiness local** (la tanda
+> completa en paralelo da **54 pasan / 2 fallan / 28 omiten**, y los dos que fallan
+> —el hub y el panel de conversaciones— pasan en aislamiento con estos cambios y
+> sin ellos, porque el Vite local proxea `/api` a un `:8000` que aquí sirve HTTPS),
+> mientras las dos specs nuevas dan **6/6 en los tres breakpoints**. Y, en (G), la
+> cola sigue exigiendo **PIN para leerse en detalle y resolverse**: sin PIN el
+> lanzador ahora **cuenta y anuncia** las pendientes leyendo la BD, pero ver la
+> fila y aprobar/rechazar siguen detrás del doble candado (PIN + loopback) —**contar
+> no es decidir**—. Detalle en `release-notes-v3.80.1.md`.
+>
+> **Nota (2026-09-22 · cierre de la sesión del perfil): V3.79.0 — release DE
+> PRODUCTO (patch) que cierra los DOS fallos que el alumno reportó usando el
+> perfil.** Ninguno era de pintura, y en los dos el mensaje que veía describía mal
+> lo que pasaba. **(A) La baja del perfil devolvía 429 por un bug del rate
+> limiter.** `backend/security.py` guardaba **una sola cola por equipo** y la
+> comparaba contra el cupo de la ruta concreta: `/api/profile-requests` tiene
+> 5/min —un tope antibarrido para una ruta **sin** sesión—, así que cinco
+> peticiones cualesquiera (abrir el diccionario son varias) dejaban la cola por
+> encima de 5 y el primer clic en «pedir la baja» recibía 429 → «El servidor local
+> está saturado». **El cupo por ruta medía el tráfico de todo el equipo.** Ahora
+> la ventana se parte por **`(host, clase de ruta)`**, `_route_class` elige el
+> **prefijo más largo** que casa —con `break` en el primero, que
+> `/api/profile-requests` sea prefijo de `/api/profile-requests/delete` convertía
+> **el orden de escritura** del diccionario en una trampa silenciosa— y la baja
+> gana **cupo propio (30/min)**: es una escritura autenticada, idempotente y de un
+> clic, y no puede medirse con la vara de una ruta sin sesión. `rate_limit_snapshot`
+> y `/api/system/status` no cambian de forma. **(B) El diálogo de perfil se
+> recortaba por arriba, y la causa raíz NO era el CSS.** Era de **contención**: el
+> diálogo se abre desde el menú de usuario, dentro del `<header>`, y ese header
+> lleva `backdrop-blur-xl`; **`backdrop-filter` crea bloque contenedor para
+> `position: fixed`**, así que el `inset: 0` del backdrop no medía el viewport
+> sino la franja del header (~80 px), y el diálogo —más alto— se recortaba por
+> arriba con su asa de cerrar fuera. Medido en el navegador: `rect=0,0 520x76` en
+> el backdrop y `y = -186` en el diálogo **incluso con el CSS arreglado**. El
+> arreglo es un **portal a `document.body`**. El CSS se endurece además por su
+> cuenta porque protege a los otros **tres** diálogos que comparten clases y sí se
+> montan fuera del header: fuera `align-items: center` (el centrado lo da
+> `margin: auto`, que respeta el área desplazable), `dvh` con respaldo `vh` (en
+> móvil `vh` mide el viewport con la barra oculta) y scroll en el **cuerpo** con
+> cabecera y pie fijos (`flex-shrink: 0` + `min-height: 0`). **(C) La baja gastaba
+> su propio cupo a base de clics.** El botón se deshabilitaba solo *después* del
+> éxito; ahora hay estado `busy` en vuelo y un 429 dice **los segundos** que
+> faltan, usando el `Retry-After` que `ApiError` ya exponía y se tiraba. **Los
+> cuatro candados muerden, comprobado revirtiendo el código:** la cola compartida
+> vuelve a dar `assert 429 == 200` (el fallo literal del alumno), sin el portal el
+> test del DOM falla y el de cota vuelve a `y = -186`, sin el `busy` tres clics
+> son tres peticiones, y con `align-items: center` el candado de fuente falla.
+> Verificación: `pytest` **2992/2992** + `ruff` limpio + `transfer_validation
+> OK=True` · `tsc` limpio · `vitest` **948/948** (108 ficheros) · build correcto ·
+> i18n `--strict` **1680** cadenas con 0 huérfanas / 0 usadas sin definir / 0
+> duplicadas · contraste 480 pares con 0 bloqueantes · `check_release_consistency`
+> OK en los **6 orígenes** · `validation_gate.py auto` **10/10** · launcher
+> **205/205** · Playwright `profileDialog` **2/2 en los tres proyectos**.
+> **Honestidad:** el CSS de fuente es un candado de **fuente**, no de píxeles (en
+> escritorio `vh == dvh`, así que el recorte del móvil no es reproducible en un
+> test de navegador, y se dice); el portal **cambia dónde vive el diálogo en el
+> DOM** (pasa a ser hijo directo de `<body>`); **nada comprueba** que otro
+> `position: fixed` no viva dentro de un ancestro con `backdrop-filter` —montar un
+> diálogo nuevo dentro del header reproduce el recorte—; y **queda flakiness local
+> preexistente en el barrido visual** (con backend apagado el conjunto de specs de
+> desktop que falla cambia de una ejecución a otra y pasan en aislamiento sobre un
+> árbol limpio, comprobado con `git stash`): la autoridad es el CI. Detalle en
+> `release-notes-v3.79.0.md`.
+>
+> **Nota (2026-09-22 · cierre de la sesión del diccionario en tres modos): V3.78.0 —
+> release DE PRODUCTO (minor) que reorganiza el diccionario en TRES MODOS
+> (Consultar · Personal · Flashcards) y separa posesión de estudio.** El cambio de
+> fondo no es una pestaña más: **PERSONAL deja de estudiar y pasa a ser el
+> inventario del léxico, y FLASHCARDS se convierte en la ÚNICA superficie de
+> estudio**, con mazos manuales y tarjetas de frente/dorso sobre el motor FSRS que
+> **ya existía**. **(A) Los tres modos.** `DictionaryView` pasa a
+> `"lookup" | "personal" | "flashcards"` y `DEFAULT_DICTIONARY_VIEW` cambia a
+> `"lookup"`: el modo que se abre primero es el que responde a la pregunta con la
+> que se entra a un diccionario, no el que exige tener léxico propio. Es un cambio
+> **visible** y se declara: un valor **persistido** de una versión anterior sigue
+> siendo válido y manda sobre el defecto, así que **nadie pierde su pestaña**; lo
+> que cambia es el arranque limpio. El panel incrustado (`QuizRoutePage`) **sigue
+> siendo de dos modos, ahora como frontera explícita** (`toPanelView()`:
+> `"flashcards" → "personal"`), que es lo que evita que el panel deje **persistido**
+> un modo que no sabe pintar en el ajuste que comparte con la pantalla dedicada.
+> **(B) PERSONAL es el inventario.** Buscador, **filtro por estado** (la
+> clasificación que el servidor ya calculaba y no se podía usar para nada),
+> **procedencia** por fila desde `vocabulary.source` (un dato que se guardaba desde
+> V3.77.0 y no se mostraba) y **fuerza de memoria** por fila (estado FSRS, `due_at`,
+> estabilidad, recuperabilidad, «próxima en N d»). La memoria es el estado del
+> **scheduler** y se muestra **junto** al `recall` derivado de la evidencia porque
+> responden a preguntas distintas —y mezclarlas fue justo lo que M4 tuvo que
+> separar—: vive en `domain/vocabulary.py` (fuente: el scheduler) y no en
+> `services/lexicon.py` (fuente: la curva de olvido de `vocabulary`), y se calcula
+> **puro** sobre una sola lectura de cartas. La sesión incrustada desaparece y en su
+> lugar hay una tarjeta de entrada («N pendientes hoy» + **Estudiar**); si el
+> contenedor no ofrece el salto, el botón **no se pinta** y el texto explica dónde
+> se estudia. `ReviewQueueSection` **se queda** —la cola de competencia del drill es
+> superficie de **producción**, no de calificación de tarjetas—. **(C) Una sola
+> superficie de estudio.** `RetentionSession` → **`StudySession`**: deja de pedir la
+> cola y **recibe los ítems** y un `onGrade`, así que sirve para el mazo automático y
+> para uno manual sin saber cuál es. Desde «Mis listas»/packs la acción salta a
+> Flashcards con **esa colección filtrada** y **arranca sola**; el estado `reviewing`
+> y la sesión acotada de `AddVocabSection` desaparecen a favor de un
+> `onStudy(collectionId, label)` que **no sabe** cómo se navega. El **foco** vive en
+> `DictionaryScreen` y **no se persiste** (encargo de un solo salto, con `nonce`
+> para que un segundo clic reabra la sesión). Se conserva el candado de V3.77.2: el
+> resumen final **tiene** que ser alcanzable. **(D) Backend: tres tablas nuevas
+> aditivas** (`flashcard_decks` con `UNIQUE (user_id, name)`, `flashcard_cards` y
+> `flashcard_reviews`, **append-only**), así que **una BD de V3.77.2 se actualiza sin
+> que nadie pierda nada**. **El mazo automático es VIRTUAL** (`id = 0`, slug `auto`):
+> no es una fila, se sintetiza desde el léxico (currículum, chat, speaking, listas y
+> packs) y no se puede borrar, así que no hay que sembrarlo, no puede quedar
+> desincronizado y no existe el caso raro de «el alumno borró el mazo del sistema»;
+> sus cartas `lexicon` se siembran de forma **perezosa** antes de leerlas —depender
+> de que el alumno abra el panel de REVISAR sería un mazo que no enseña lo que
+> promete—. Módulos nuevos: `repositories/flashcards.py` (CRUD y contadores, sin
+> lógica) y `domain/flashcards.py`. **(E) FSRS: un tipo de carta nuevo y NINGÚN
+> segundo planificador.** `TARGET_TYPES` gana `"flashcard"`; las tarjetas a mano se
+> programan con el mismo `fsrs.schedule` y los cuatro grados de siempre. **Y se
+> cerró en el mismo commit la mitad que no era gratis:** el panel autograduable solo
+> excluía `objective`, así que sin excluir también `flashcard` **las tarjetas
+> manuales se colaban en el panel de REVISAR** y el alumno las habría calificado en
+> dos sitios a la vez —exactamente el doble escritor que M4 cerró—; ahora la
+> exclusión se declara **una sola vez** (`_PANEL_EXCLUDED_TARGET_TYPES`) y la usan
+> los tres sitios. **Los límites del día salen del ledger, no del scheduler:**
+> `flashcard_reviews` cuenta **cada calificación** y no cada tarjeta distinta,
+> porque Anki mide repasos, y `was_new` marca la primera vez; contar «cartas
+> distintas con `last_review_at` de hoy» no distingue nuevas de repaso ni cuenta
+> repeticiones. De ahí sale la definición de **nueva** —«nunca calificada en esta
+> superficie», leída del ledger y **no** el `reps` del scheduler, porque la siembra
+> de retención marca `reps = 1` en las cartas derivadas de la evidencia de las
+> lecciones—. El evento `flashcard:<id>:<grade>` se clasifica **`informative`**,
+> igual que `retention:`, y **nada de esto acredita mastery**. Endpoints nuevos:
+> `GET /api/vocabulary/decks`, `POST/PATCH/DELETE .../decks[/{id}]` (el automático
+> **rechaza** escritura), `GET .../decks/{id}/queue` (`limit` 1–100),
+> `POST .../decks/{id}/review`, `GET/POST/PATCH/DELETE .../decks/{id}/cards[/{id}]`
+> y `GET .../decks/{id}/stats`. Dos decisiones a no deshacer: **borrar arrastra** (la
+> tarjeta borra su carta FSRS; el mazo borra las de sus tarjetas) y **el endpoint
+> viejo no es un segundo escritor** (`POST /api/vocabulary/retention/review`
+> **delega** en el mismo servicio con el mazo automático, así que una palabra
+> calificada por ahí también cuenta en el ledger; si agendara por su cuenta contaría
+> como nueva para siempre y su revisión no aparecería en ninguna estadística).
+> **(F) La UI de Flashcards**, con cuatro subpestañas: **Estudiar** (cola unificada,
+> frente/dorso, 4 grados, límites del día y resumen alcanzable; orden clásico de
+> Anki: repasos vencidos antes que nuevas), **Mazos** (el automático sin renombrar
+> ni borrar + manuales con `new_per_day`/`review_per_day`, por defecto 10 y 50, y
+> borrado con confirmación), **Tarjetas** (filtro por texto y estado, orden y CRUD,
+> cada fila con su fuerza de memoria) y **Estadísticas** (hoy, 30 días, acierto, 14
+> días y previsión a 7). **La previsión excluye las nuevas a propósito**: su
+> `due_at` no anticipa cuándo las estudiará el alumno y contarlas prometería un día
+> que no depende de ellas. **(G) Contratos en la frontera**: `normalize.ts` gana
+> `normalizeDeckList`/`normalizeStudyQueue`/`normalizeFlashcardList`/
+> `normalizeFlashcardStats`, que es la regla que dejó V3.77.2. **Los tres candados
+> del plan muerden, comprobados revirtiendo el código:** sin `"flashcard"` en la
+> exclusión, `test_manual_cards_do_not_leak_into_fsrs_panel` falla; con
+> `new_remaining` grande, `test_queue_respects_new_per_day` falla; y sin el avance
+> del índice en `StudySession` —el fallo exacto de V3.77.2— los **3** tests del
+> resumen y de la salida fallan. **Deuda declarada:** la consulta del diccionario
+> **sigue sin alimentar el léxico** (invariante D3 de V3.77.0, no tocada), así que
+> buscar «however» no lo añade a PERSONAL —se declara como hueco explícito y
+> aparcado, no como efecto colateral—; el mazo automático y los manuales **no son
+> simétricos** (el automático no admite límites propios ni tarjetas a mano); la
+> migración es aditiva y **no migra datos**, así que una palabra que ya existía sale
+> como «sin estudiar» —la lectura honesta de «no consta»—; la tarjeta a mano guarda
+> **texto, no conocimiento** (no se comprueba que el reverso sea correcto); y una
+> sesión está topada en **100 tarjetas** por defensa, no por pedagogía. **SIN bump
+> de `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, currículum intacto
+> (`1.3.1`), evaluaciones intactas y `LISTENING_BANK_VERSION` intacto.** **Los 7
+> gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+> `v3.75.8`. Verificación: `pytest` **2988/2988** + `ruff` limpio +
+> `transfer_validation OK=True` · `tsc` limpio · `vitest` **939/939** (106
+> ficheros) · build correcto · i18n `--strict` **1679 / 0 / 0 / 0** · contraste
+> **480 + 6 / 0 bloqueantes** · `check_release_consistency` OK en los **6 orígenes**
+> · `validation_gate.py auto` **10/10** · launcher **205/205** · Playwright
+> `drillProvenance` **2/2** y `vocabularyRoutesReview` **1/1** en desktop (el
+> barrido completo **no** se corrió en local; la autoridad es el CI). Detalle
+> completo en **`release-notes-v3.78.0.md`**.
+>
+> **Nota (2026-09-22 · cierre de la auditoría externa de V3.77.1): V3.77.2 —
+> release DE PRODUCTO (patch) de ENDURECIMIENTO sobre lo que la V3.77.1 dejó
+> abierto alrededor del diccionario personal.** Siete cosas, y **la primera no es
+> de UI: control de acceso roto en `collection_id` (IDOR, P0)**. `enroll_collection`
+> comprobaba de quién era la colección antes de escribir en ella y **la ingestión
+> no**: `POST /api/vocabulary/items` y `/items/bulk` —los dos endpoints nuevos de
+> la V3.77.0— aceptaban el `collection_id` que mandara el cliente, así que **un
+> perfil podía escribir en la lista privada de otro** (escritura, no lectura: el
+> daño es persistente y lo sufre quien no lo provoca). El arreglo es la puerta que
+> ya existía extraída a un predicado puro (`_collection_writable`) que usan los
+> **tres** sitios, para que la ingestión tenga **exactamente** el mismo criterio
+> que la inscripción; **un pack global sigue siendo destino de todos**, porque eso
+> es lo que significa «global» y no se cierra lo que no estaba roto. **P1:
+> `ErrorBoundary` en el root y por ruta** —no había **ninguno**, así que un `throw`
+> en render desmontaba el árbol entero y dejaba al alumno en blanco, que es lo que
+> convirtió un campo que faltaba en una respuesta HTTP en una pantalla muerta—.
+> **P1: normalización runtime de contratos (H4 y hermanas), que era el hallazgo de
+> fondo**, porque la V3.77.1 arregló una frontera y **el padre tenía el mismo
+> defecto sin tocar**: `PersonalDictionary` guardaba `setLexicon(data)` y
+> `setCandidates(drill.words)` sin comprobar la forma y pintaba
+> `summary.by_cefr.map(...)` / `sortLexicalItems(items)`, así que un contrato
+> incompleto mataba **la pantalla del diccionario y a sus tres hijos** —incluido el
+> `AddVocabSection` ya parcheado: el parche del hijo nunca llegaba a actuar porque
+> el árbol moría en el padre—. Nuevo `frontend/src/api/normalize.ts` aplicado **en
+> la frontera de API y otra vez en los componentes**, y cerradas las hermanas
+> (`ReviewQueueSection` usaba `queue?.items ?? []`, **más débil** que el
+> `Array.isArray(...)` de `AddVocabSection` porque deja pasar un `items` truthy que
+> no sea array; `DictionaryLookup` guardaba `entry` sin normalizar;
+> `wordDrill`/`wordDrillSteps` hacían `.map` sin guardia). Y el camino que no se
+> había contado: **`userId === null` dejaba un spinner infinito**, porque
+> `refresh()` salía temprano y `lexicon` se quedaba en `null` para siempre. **P1:
+> `PersonalDictionary` en modo incrustado** —`DictionaryScreen` ya es dueño del
+> layout, así que la pantalla tenía **dos `h1`** y el ancho reducido dos veces; la
+> prop `showHeader` replica el patrón que `DictionaryLookup` ya usaba—. **P2: el
+> cierre de sesión de retención no se veía nunca**, porque al calificar la última
+> tarjeta el camino de fin llamaba a `load()` y reseteaba `index`/`done`, así que
+> el resumen «N tarjetas revisadas» no aparecía jamás; ahora el índice avanza hasta
+> el resumen, con acción de actualizar. **P2: «Mis listas» y packs, interactivos**
+> —eran badges decorativos—: filas con `item_count` y una acción que abre una
+> `RetentionSession` acotada a esa colección, y «Re-enroll» se sustituye por el
+> estado real («En mi diccionario») más «Repasar», porque inscribirse dos veces
+> siempre fue idempotente. **P3: batch de membresías y siembra FSRS**, que abrían
+> **una conexión por palabra**: ahora las membresías van en **una sola transacción**
+> y la siembra FSRS en un solo paso (**≤ 2** y **≤ 3** conexiones para 40 palabras,
+> constantes y no proporcionales al lote). **Los candados nuevos muerden, y los dos
+> primeros se comprobaron revirtiendo el código:** neutralizada la guardia, los
+> **3** tests de seguridad fallan —y el de la colección inexistente no falla por
+> aserción sino con un `sqlite3.IntegrityError: FOREIGN KEY constraint failed` sin
+> capturar, es decir **un 500 en mitad de la escritura**—; hechos
+> `normalizeLexicon`/`normalizeDrillCandidates` un passthrough (el comportamiento
+> exacto de la V3.77.1), el test del componente **muere en
+> `PersonalDictionary.tsx:130`, en render**, que es el mismo sitio y el mismo modo
+> que describe el hallazgo; y devuelta la rama de `userId === null` a
+> «Cargando…», su test falla. **La suite visual NO se ha corrido en local para esta
+> release** (la autoridad es el CI) y hay además **una decisión tomada contra esa
+> suite a propósito**: los botones nuevos de «Repasar» exponen `aria-expanded` y
+> **no** `aria-pressed`, porque `drillProvenance.spec.ts` localiza la entrada al
+> drill con `li:has(button[aria-pressed]) button[aria-pressed]`. **Deuda
+> declarada:** la normalización es un contrato de **forma**, no de significado, así
+> que un léxico incompleto ya no tumba la pantalla pero se degrada al estado vacío;
+> distinguir «vacío porque no hay» de «vacío porque no entendí» queda pendiente (hoy
+> `loadError` solo cubre el fallo de red). **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, currículum intacto
+> (`1.3.1`), evaluaciones intactas y `LISTENING_BANK_VERSION` intacto.** **No añade
+> producto**: ni pantalla nueva, ni endpoint nuevo, ni tabla nueva. **Los 7 gates
+> siguen en `pending`** y el árbol que se certifica sigue siendo el de `v3.75.8`.
+> Detalle completo en **`release-notes-v3.77.2.md`**.
+>
+> **Nota (2026-09-21 · cierre de la sesión de retención léxica y perfiles): V3.77.1 —
+> release DE PRODUCTO (patch) que arregla un fallo REAL de la V3.77.0 publicada,
+> encontrado por el CI quince minutos después de publicarla y no por los tests
+> unitarios: el diccionario personal podía morir ENTERO —no una tarjeta, la
+> pantalla— si `GET /api/vocabulary/collections` no traía el campo `collections`.**
+> `AddVocabSection` guardaba la respuesta sin comprobar la forma
+> (`setPacks(data.collections)`), así que el estado quedaba en `undefined` y el
+> `packs.filter` de la lista de temas **lanzaba al pintar**; un fallo al pintar no
+> rompe «la lista de packs», rompe el árbol de React entero. El job
+> **`Playwright E2E (visual)`** pasó de verde a 2 fallos en
+> `drillProvenance.spec.ts`, que abre el drill desde la cola de repaso del
+> diccionario: no era el drill, era que **la pantalla ya no existía**; el harness
+> mockea `/api/**` con respuestas vacías y sirvió de **sonda de contrato** sin
+> proponérselo. **Se arregla la causa, no el síntoma** (`Array.isArray(data
+> ?.collections) ? … : []`, y la misma defensa en los avisos de alta) y el **mock
+> se queda vacío a propósito**, porque es lo que lo hace útil: el mismo camino lo
+> recorre un servidor que cambie el contrato. **Candado nuevo**
+> (`AddVocabSection.test.tsx`), **comprobado que muerde**: con el código anterior el
+> caso «respuesta sin `collections`» falla. **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION`, `DECISION_POLICY_VERSION` ni `LISTENING_BANK_VERSION`,
+> currículum intacto.** **Lo que NO cambia:** nada de la V3.77.0 —retención léxica,
+> perfiles con autorización del webmaster, doble candado y borrado en dos pasos
+> siguen exactamente como se publicaron—, y **la V3.77.0 no se reescribe**: el tag
+> se queda como está y la corrección viaja en su propia etiqueta. **En el producto
+> con el backend de verdad el campo siempre viaja**, así que el defecto no se
+> habría visto en uso normal; lo que se arregla es que un contrato incompleto **no
+> pueda tumbar la pantalla**. La **fragilidad del arnés visual bajo carga en
+> Windows** (`PARKED.md` §V3.75.2) **sigue aparcada y no es lo que falló aquí**.
+> **Los 7 gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+> `v3.75.8`. Detalle completo en **`release-notes-v3.77.1.md`**.
+>
+> **Nota (2026-09-21 · cierre de la sesión de retención léxica y perfiles): V3.77.0 —
+> release DE PRODUCTO (minor) que publica DOS TRABAJOS BAJO UNA SOLA ETIQUETA: (A) la
+> retención léxica del diccionario personal y (B) los perfiles con autorización del
+> webmaster.** **CON migración de BD aditiva**: dos tablas nuevas de
+> colecciones/retención, la tabla `profile_requests` y la columna `users.status`
+> (`ALTER` idempotente con `DEFAULT 'active'`), así que **una BD de V3.76.0 se
+> actualiza sin que nadie pierda el acceso ni su vocabulario**. **SIN bump de
+> `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el currículum
+> (`CURRICULUM_VERSION` sigue `1.3.1`), SIN tocar las evaluaciones y SIN tocar
+> `LISTENING_BANK_VERSION`.** No añade ni retira gate: **G1–G7 siguen `pending`**.
+> **(A) Lo que cambia en el diccionario personal:** el motor trabaja sobre **unidades
+> léxicas** (palabra **o frase funcional**, con su forma, su sentido y **el contexto
+> donde apareció**), no sobre palabras sueltas; lo trabajado en el resto de la app
+> llega como **candidato** con su procedencia y **el alumno decide** qué entra a la
+> cola; se añade de **tres formas** (palabra suelta, **lista pegada** y **pack por
+> tema**) que pasan por **una sola puerta** de validación/deduplicado/tope
+> (`repositories/vocabulary.py::seed_study_items`); los **packs** se mueven de
+> `backend/data/vocab_packs/` (**ignorado por git**: el contenido se habría quedado
+> fuera del repositorio) a `backend/curriculum/vocab_packs/`; la sesión de **tarjetas**
+> (`RetentionSession.tsx`) se programa con **FSRS-lite** declarado en `docs/FSRS.md`
+> (no un SM-2 improvisado) y **lo que toca hoy** es lógica pura con test; y —la
+> decisión de fondo— **retención ≠ dominio**: el evento de repaso entra en la evidencia
+> con **papel de retención** (`services/evidence.py`), no como prueba de competencia,
+> porque recordar tarjetas no puede subir la matriz de destrezas. **(B) Lo que cambia
+> en perfiles:** el **webmaster no es un rol, es quien ejecuta el lanzador** (siguen sin
+> haber cuentas, contraseñas ni roles, y `PARKED.md` sigue mandando); el alumno **pide**
+> (`POST /api/profile-requests` **sin sesión** —quien pide un perfil todavía no tiene
+> ninguno— y `POST /api/profile-requests/delete` **con sesión** y sin `{id}` en la ruta)
+> y el webmaster decide **desde el lanzador**; una petición es **inerte** (no crea ni
+> borra nada); el **alta anónima por LAN se cierra** (`POST /api/users` exige
+> **loopback**, porque hasta V3.76 cualquier equipo de la red podía crear perfiles en la
+> BD del alumno); el borrado va **en dos pasos** —**desactivar** (sale del selector, no
+> abre sesión: **`403 PROFILE_DISABLED`**, evidencia intacta, reversible) y **purgar**
+> como acto aparte con **nombre exacto**, **snapshot ZIP previo** y **exigencia de que
+> ya esté desactivado**, y si la copia falla **no se purga**—; `/api/admin/*` lleva
+> **doble candado** (**loopback Y** PIN de administración `X-Admin-Pin`) y es
+> **fail-closed** (sin PIN, deshabilitado, no abierto); y el lanzador gana la sección
+> **«Perfiles»** (pendientes con contador y refresco periódico, aprobar/rechazar,
+> crear con PIN, desactivar/reactivar, purgar, y el estado del candado a la vista),
+> con `launcher/admin.py` como **único** sitio del lanzador que escribe en el producto y
+> **por HTTP** (no tocando la BD). **La app ya no «crea» perfiles: los «pide», y lo
+> dice** («solicitud enviada; el webmaster tiene que autorizarla desde el lanzador»).
+> **Lo que NO cierra, y es lo que hay que leer:** **no hay autenticación de persona** y
+> un perfil sin PIN sigue entrando sin credencial; **desactivar saca del selector y
+> corta el acceso, pero no protege los datos** (la evidencia sigue en la BD hasta que se
+> purgue); **purgar es irreversible** y el ZIP **no está cifrado**; **la administración
+> vive en el lanzador**, así que sin el lanzador delante **nadie crea un perfil** (es el
+> precio declarado de no tener cuentas); el PIN es **credencial compartida**, no por
+> persona; **`POST /api/users` sigue existiendo** para el primer arranque del propio
+> equipo (la frontera es el loopback, no la eliminación de la ruta); los **packs por
+> tema son tres** (comida, viaje, trabajo) y no cubren un currículum; **FSRS-lite no es
+> FSRS** (mismas cuatro salidas, sin los parámetros por alumno del completo); y el
+> `dist` **no se versiona** (hay que recompilar y reiniciar para ver la UI nueva). **Los
+> 7 gates siguen en `pending`** y el árbol que se certifica sigue siendo el de
+> `v3.75.8`: ver la sección **«Re-congelación»** de
+> `docs/audit/KIT-VALIDACION-GATES.md`. Detalle completo en
+> **`release-notes-v3.77.0.md`**.
+>
+> **Nota (2026-09-21 · cierre de la sesión del P0): V3.76.0 — release DE PRODUCTO
+> (minor) con el PIN opcional por perfil (Fase 3 del P0 de identidad) y con G7
+> preparado.** **CON migración de BD** —la única del ciclo pre-V4.0—: `users` gana
+> `pin_hash TEXT NOT NULL DEFAULT ''` con el `ALTER` idempotente que ya existía,
+> aditiva y con defecto vacío, así que **una BD de V3.75.8 se actualiza sin que
+> nadie pierda el acceso**. **SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`**.
+> **Lo que cambia:** (1) `POST /api/session` acepta un `pin` opcional y responde
+> **`401 PIN_REQUIRED` / `401 PIN_INVALID` / `429 PIN_THROTTLED`** (con
+> `Retry-After`), distinguibles a propósito y sin revelar si el PIN estaba cerca;
+> un perfil **sin** PIN abre como siempre; (2) el hash es **PBKDF2-HMAC-SHA256**
+> con 200 000 iteraciones y sal por perfil (`services/pins.py`, stdlib puro) y
+> **solo viaja `has_pin`** —el hash no se serializa en ninguna respuesta—; (3) la
+> pieza que sostiene la decisión es el **freno de intentos por perfil** (5 fallos
+> libres, después retardo que dobla con techo de 300 s, se limpia al acertar, y
+> **el PIN correcto tampoco pasa mientras frena**); (4) **`PUT /api/session/pin`**
+> pone, cambia y retira el PIN **bajo la sesión** (sin `{id}` en la ruta), y
+> cambiar o retirar **exige el anterior**; (5) el **arranque deja de fallar en
+> silencio**: `planSession` gana el desenlace `pin` y `useChat` centraliza la
+> apertura en `openProfile`, compartido por arranque, selector y alta; (6) los
+> **9 dossiers de G7** se regeneraron sobre el árbol congelado y son
+> **reproducibles byte a byte** (también tras el diff del PIN) y su lectura queda
+> ordenada en **`docs/audit/G7-MATRIZ-LECTURA.md`**: nueve ejes con su cifra de
+> cabecera y la decisión que le toca a quien firma. **Lo que NO
+> cierra, y es lo que hay que leer:** un perfil **sin PIN sigue entrando sin
+> credencial** —es una mitigación **opt-in**—, **no es autenticación de persona**
+> (ni identidad ni recuperación), la cookie de un año es **un tecleo por
+> navegador** (no protege ante quien use tu equipo desbloqueado), `GET /api/users`
+> sigue enumerando nombres, el freno vive **en memoria** y el hash **sí viaja en
+> el backup**. **El P0 sigue abierto para el producto** y la decisión de fondo
+> —¿tendrá cuentas?— sigue en `PARKED.md`. **Los 7 gates siguen en `pending`** y el
+> árbol que se certifica pasa a ser el de `v3.76.0` (el PIN entró con **0
+> `record`** grabados, así que no invalidó nada): ver la sección
+> **«Re-congelación»** de `docs/audit/KIT-VALIDACION-GATES.md`. Detalle completo en
+> **`release-notes-v3.76.0.md`**.
+>
+> **Nota (2026-09-20 · cierre de la sesión de UI): V3.75.8 — release DE PRODUCTO
+> (patch) del diccionario de consulta y de la identidad de la compilación.**
+> **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones, SIN tocar `LISTENING_BANK_VERSION` y SIN
+> endpoints nuevos:** el diff de producto es **frontend**. **Lo que cambia:** (1) el
+> **buscador** del diccionario de consulta pasa a ser **el protagonista** de su
+> pantalla —tarjeta-buscador con marco, barra y anillo de foco, campo de **48 px en
+> móvil y 56 px en escritorio/tablet** (medido), conmutador **EN→ES / ES→EN dentro
+> del buscador**, estado vacío con **cuatro ejemplos por sentido** y botón de
+> borrado que solo existe con texto—; (2) **un color por sentido** (azul EN→ES,
+> fucsia ES→EN), **derivado de la tinta** como la rampa de niveles y **no sujeto al
+> acento del perfil** porque es una **leyenda** —si el acento lo moviera, dos acentos
+> afines podrían dejar azul y fucsia casi iguales—; el buscador se tiñe del sentido
+> **activo** y la tarjeta del sentido **de su consulta**, así que conmutar después de
+> buscar no la repinta; (3) **un solo `h1` en `/diccionario`** (`showHeader`);
+> (4) la **Ayuda declara la versión de la compilación** (`utils/buildInfo.ts`, leída
+> del `package.json` al compilar, así que funciona **sin backend**) y su tarjeta de
+> vocabulario explica el sentido y su color. **Lo que NO cierra:** no hay **spec
+> visual permanente** del diccionario (la medición se hizo con un spec temporal que
+> se borró), la versión de la Ayuda es la **versión declarada** y no distingue dos
+> compilaciones de la misma versión, el `dist` **no se versiona** (hay que
+> recompilar), el **P0 de identidad sigue entero** y **los 7 gates siguen en
+> `pending`**. Detalle completo en **`release-notes-v3.75.8.md`**.
+>
+> **Nota (2026-09-20 · cierre de listening): V3.75.7 — release DE PRODUCTO que
+> publica CINCO ITERACIONES juntas (`V3.75.3`–`V3.75.7`) bajo UNA sola etiqueta.**
+> **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el currículum (`CURRICULUM_VERSION` sigue
+> `1.3.1`), SIN tocar las evaluaciones y SIN tocar `LISTENING_BANK_VERSION`.** SÍ
+> toca **producto** (backend de listening, frontend de listening/rutas/apariencia y
+> launcher) y **contenido de listening** en exactamente **tres líneas** del corpus
+> (`c071`, `c084`) más **dos etiquetas** del banco heredado (`l18`, `l19`). **Las
+> cinco iteraciones van registradas una a una en `CHANGELOG.md` y `PLAN.md`; solo
+> `v3.75.7` lleva tag** —`V3.75.3`–`V3.75.6` no tienen tag propio, y eso es una
+> **decisión declarada**, no un hueco: sus etiquetas se citan en el código y en
+> `PARKED.md`, y las cinco entradas las mantienen localizables—. Detalle completo en
+> **`release-notes-v3.75.7.md`**.
+> **(A) El cierre que pidió el gerente.** Listening pierde el paso «He escuchado —
+> responder» (la señal es **pulsar PLAY**), gana cabecera con «Otro ejercicio»
+> discreto, tarjeta de audio con `VoicePicker`, repetición con **dos acentos (A/B) y
+> STOP**, y **tres composiciones** de lectura (`replay_scope`: `"item"` por defecto,
+> `"withOptions"`, `"correct"`). La **RUTA B1** deja de mostrar «Enviar dictado». Los
+> niveles (Pre-A1 → C2) ganan una **rampa de color de 7 pasos**, elegible por perfil
+> en Ajustes > Apariencia (**Semáforo / Espectro / Monocromo**), con el color
+> **medido** por `contrast_audit.mjs` (**472 pares + 4 guardas, 0 bloqueantes**). El
+> **Análisis** sale del ejercicio y pasa a `/analisis` desde la cabecera (el panel
+> flotante `AnalysisPanel.tsx` **se borra**). El launcher **recuerda** su
+> configuración (modo LAN en `launcher/config.json`, escritura atómica).
+> **(B) El icono del desplegable es un contrato.** `InfoDisclosure` gana
+> `content: "info" | "options"` (**defecto `"info"`**): **(i)** cuando el panel solo
+> explica y **(...)** cuando trae opciones. Inventario revisado: **11 disparadores**,
+> 8 con (i), 1 con (...) y 3 sin cambio. En la variante de esquina el panel reserva
+> la **columna** del botón (`pr-12`) para que su primera línea **no** quede tapada.
+> **(C) El P1 que destapó la auditoría de la propia tanda.** Dos ítems del **banco
+> heredado** (`l18` `dictation`, `l19` `shadowing`) seguían con opciones, así que B1
+> **seguía** sirviendo la tarjeta de dictado: el test de `V3.75.6` **filtraba ids
+> `c`** y solo miraba el corpus, y `PRODUCTION_SKILLS` estaba **duplicado en tres
+> sitios**. Cerrado en la causa raíz (fuente única en
+> `services/listening_flow.py`, barrido sobre **todo** `QUESTION_BANK`,
+> reetiquetado de los dos ítems y **control positivo** del test, que hoy barre un
+> conjunto vacío). Con él, tres P3: `X-TTS-Voice` en el audio de listening, escritura
+> atómica de `config.json` y la decisión de LAN centralizada en `launcher/core.py`
+> para poder probarse sin `tkinter`. **(D) El ancla nueva.**
+> **`agentes/auditoria-total-externa-v3757.md`**, anclado al tag **`v3.75.7`** y
+> verificado por comando. Como esta release **sí** cambia producto, **no declara el
+> invariante clásico** («diff de producto vacío»): declara **tres invariantes
+> acotados** que sí pueden cumplirse —currículum y evaluaciones **vacíos**, corpus en
+> **3 líneas**, banco heredado en **2 etiquetas**— y una **lista cerrada** del diff,
+> incluido el **rango `v3.75.2..v3.75.7` con ocho commits** —**siete** que
+> post-datan el tag `v3.75.2` más **el commit de release**; el recuento se corrige
+> en la errata §0.1 del punto de entrada— (declarados). **Lo que
+> NO cierra:** el **P0 de identidad sigue entero** —y `V3.75.3` le añadió una vía más
+> para arrancar expuesto al **persistir** la preferencia LAN—, el **provenance del
+> banco** (`LISTENING_BANK_VERSION` sigue `7.0.0` a propósito porque nombra la caché
+> de audio), **no queda ningún ítem de dictado autorado**, el acento es **simulado**,
+> el **barrido visual completo sigue sin hacerse** y **los 7 gates siguen en
+> `pending`**.
+>
+> **Nota (2026-09-19 · tarde): V3.75.2 — release DOCUMENTAL y de INSTRUMENTO que
+> publica la PAUSA PEDAGÓGICA pre-baseline (auditoría psicométrica del banco,
+> AH–AM) y la deja auditable desde GitHub.** **SIN migración de BD, SIN bump de
+> `GENERATOR_VERSION` ni `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar
+> el currículum y SIN una sola línea de código de producto** (el diff de producto
+> es **cero**). El gerente decide **no publicar una V3.75.2 de corrección** para el
+> sesgo de longitud: tocar el banco otra vez sin entender el patrón completo sería
+> contraproducente. Se abre una **pausa de medición** sobre el baseline congelado
+> **v3.75.1 = `7962d57`** (el commit al que apunta el tag anotado) para decidir
+> **con datos** qué se cierra y en qué fase, y esa medición se **publica con ancla
+> estable** porque sin commit ni tag GitHub no la ve.
+> **(A′) El ancla de la auditoría externa se repara en la misma release.** La
+> entrada vigente (`agentes/auditoria-total-externa-v375.md`) declaraba un
+> invariante —`git diff --stat v3.75.0..main -- backend frontend launcher scripts`
+> **vacío**— que **V3.75.1 ya había roto** al tocar `backend/`, así que seguirla al
+> pie de la letra producía un **P0 falso en el primer comando del auditor** (la
+> regresión que V3.73.3/V3.73.6 documentan y que V3.73.5 declaró cerrada). Se
+> publica **`agentes/auditoria-total-externa-v3751.md`**, anclado a **`v3.75.1`** y
+> verificado por comando, con el invariante **honesto**: producto y contenido sin
+> cambios, y el diff real declarado como **lista cerrada**. **(A) El instrumento (solo
+> lectura).** `backend/scripts/audit_dossier.py` gana `item-form` (nº de opciones,
+> posición y longitud de la correcta por banco, nivel y grupo de `k`, con
+> posiciones muertas) y `distractor-signals` (tres heurísticas declaradas + muestra
+> determinista), y `mc-bias` **separa exámenes de placement**: hasta ahora el grupo
+> llamado «exámenes level/placement» **solo contaba los 22 exámenes** y el
+> **placement (24 ítems) no aparecía** en esa medición — el «63,6 % en posición 0»
+> de V3.75.1 es de **exámenes**, no del conjunto. `cefr-adequacy` **no cambia**.
+> **(B) Cinco ejes en paralelo**, cada uno con su dossier y la regla de evidencia
+> `[D]`/`[A]`/`[R]`: `AH` longitud · `AI` instrumentos de evaluación · `AJ` forma ·
+> `AK` distractores · `AL` niveles, más la síntesis
+> **`AM-SINTESIS-PSICOMETRIA-V3751.md`**. **(C) Resultado: 0 P0 · 4 P1 · 12 P2 ·
+> 9 P3** (25 hallazgos que describen **5 problemas reales** tras deduplicar los
+> cruces). **V3.75.1 sigue siendo la base correcta** para sellar, y esta auditoría
+> es su **acta de deuda de forma**: **(1)** sesgo de longitud real, **concentrado
+> por lote** (corpus C1/C2 **80 %**, B1 checks 50,9 %, C2 checks 56,1 %, placement
+> 50 %; checks globales 39,1 %, +6,0 pp sobre el azar) y **no monótono por nivel**,
+> sin banda en `CEFR-REFERENCE.md` ⇒ **deriva de autoría**, no incumplimiento
+> CEFR; **(2)** los **instrumentos de evaluación conservan sus dos sesgos** porque
+> V3.75.1 no los tocó: en los exámenes la **posición 2 está muerta** (0/22) y la 0
+> concentra el 63,6 %; en el placement la **posición 1 concentra 17/24 = 70,8 %**
+> (marcar siempre 1 simula **6/8 y banda C2**), latente porque **ningún componente
+> consume el placement** y contenido por umbrales en el examen; **(3)** la forma
+> del banco es **heterogénea por residuo**: los **10 checks de `k=4`** son un
+> accidente de autoría en A1 listening `o03`, corpus entero `k=4` y
+> checks/exámenes `k=3`, sin ningún `k=2`; **(4)** **dos de las tres señales del
+> instrumento subestiman** lo que dicen medir (`quantity_literal` dispara **1/904**
+> pese a 87 enunciados de cantidad; `prompt_keyword_echo` solo cuenta el **eco
+> exclusivo**: la correcta contiene palabra del enunciado en 80/904 = 8,9 %,
+> ~2,8× la cifra reportada), declarado para que nadie lea un `0 %` como «sin
+> problema»; **(5)** **el invariante de V3.75.1 aguanta también por nivel**
+> (ninguna posición muerta), pero es **emergente**, no blindado. **(D) Lo que NO
+> hace la pausa.** No corrige nada, **no añade candados que fijen el defecto** (los
+> invariantes de forma se diseñan **con** la corrección) y **no decide** la
+> política de `k` ni el arreglo de `assessments.json`: **propone la fase**, no el
+> cambio. Todo queda registrado con su fase en `docs/audit/PARKED.md`.
+> **Honestidad.** (i) Mide **tasa de acierto explotable**, no aprendizaje: un ítem
+> con la correcta más larga no es por sí solo un ítem malo. (ii) **No mide** la
+> plausibilidad semántica de un distractor (exigiría hablantes) ni la **tasa real**
+> del atajo (el motor guarda acierto, no posición marcada: la estrategia se
+> **simula**). (iii) Los instrumentos de evaluación son **46 ítems, no 904**
+> (placement 17/24 → IC95 % ≈ [52,6 %, 89,0 %]): no se generalizan con la confianza
+> de los 368. (iv) El P0 de V3.75.1 **no se reabre**.
+>
+> **Nota (2026-09-19): V3.75.1 (cierre del P0 del sesgo posicional del currículum)
+> — release de PARCHE y de CONTENIDO, sin capacidad pedagógica nueva.**
+> **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar las evaluaciones
+> (`assessments.json`), pero SÍ toca el currículum (`CURRICULUM_VERSION` 1.3.0 →
+> 1.3.1).** Cierra el **único P0** que quedaba abierto del motor pedagógico
+> (`docs/audit/AA-PED-CONTENIDO-CEFR.md` §3): **329 de 368 checks (89,4 %) tenían
+> la correcta en la posición 0** —y **A2, B2, C1 y C2 al 100 %**—, así que marcar
+> siempre la primera opción acertaba casi 9 de cada 10 sin leer el enunciado.
+> **(A) La regla.** En cada grupo de checks con el mismo nº de opciones `k`,
+> ordenados por `id` ascendente, el check en la posición `j` lleva la correcta a
+> **`j % k`**; se **mueve la correcta** y los distractores conservan su **orden
+> relativo** (una rotación cíclica lo rompía: el distractor que la precedía pasaba
+> a seguirla, y eso desordena opciones autoriadas en orden natural). **(B) El
+> instrumento.** `backend/scripts/rebalance_mc_positions.py` (`--check` /
+> `--write`), idempotente, con tres invariantes antes de escribir —forma canónica,
+> nº de líneas intacto y JSON válido— y reescritura **por líneas** para no
+> arrastrar formato: diff **614/614 líneas**. `--check` queda como **tripwire
+> re-ejecutable** para la reautoría de V4.0.x. **(C) El candado.**
+> `test_mc_position_bias_of_curriculum_checks_is_declared` se reescribe como
+> `test_mc_position_of_curriculum_checks_is_balanced`: **≤ 35 % por grupo de `k`**
+> y **ninguna posición muerta** (agregar los grupos escondería el 4.º distractor).
+> Su contrato anterior —fijar la cifra para forzar la re-auditoría al corregir— se
+> cumplió. **(D) Medición.** `mc-bias` pasa de `0:89,4 % · 1:10,1 % · 2:0,5 %` a
+> **`0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %`** (peor posición **33,5 %** por
+> grupo, bajo el límite del 35 %). **(E) `CURRICULUM_VERSION` 1.3.0 → 1.3.1**:
+> provenance pura —la constante se **sella** en evidencia y snapshots pero
+> **nunca se compara**—, así que no invalida el estado de ningún alumno.
+> **(F) Verificación.** Backend **2882 passed** (el **mismo** recuento que V3.75.0:
+> el test se reformuló **en sitio**, no se añadió ninguno), frontend vitest **721**
+> (87 ficheros), launcher **142**, `ruff` limpio, `check_release_consistency` en
+> los **6 orígenes** (`3.75.1`) y `validation_gate auto` **10/10**.
+> **Honestidad.** (i) **El P2 de longitud NO se cierra y es deliberado:** la
+> correcta sigue siendo la opción más larga en el **39,1 %** de los checks y en el
+> **50 %** del placement. (ii) **`assessments.json` no se toca**: sus 22 ítems
+> siguen con la correcta al **63,6 %** en la posición 0 (otro instrumento, con su
+> propio `ASSESSMENT_VERSION`). (iii) **Elimina el atajo, no mejora los ítems**:
+> mismos distractores y mismos enunciados. (iv) La asignación es estable **por
+> revisión de contenido**, no por ítem; `--check` es el candado que detecta la
+> desviación. (v) Que solo **10 de 368** checks tengan 4 opciones sigue siendo
+> deuda de forma. (vi) **Los 7 gates siguen `pending`** y el kit conserva la
+> identidad del pre-vuelo (`3.73.6` → `13cc30b`) como historia. Ver
+> `release-notes-v3.75.1.md`.
+>
+> **Nota (2026-09-18): V3.75.0 (la identidad la firma el servidor + cierre de
+> VG-N5/VG-N6) — release de PRODUCTO (minor), sin capacidad pedagógica nueva.**
+> Release **`v3.75.0`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, pero
+> **cambia el contrato de la API**. Es la **Fase 2 del P0 de identidad**
+> (`docs/audit/PLAN-P0-IDENTIDAD.md` §6 y §14): V3.74.0 cerró la **superficie**;
+> esta cierra la **identidad**. **(A) El problema.** Hasta V3.74 el perfil activo
+> viajaba en **cada** URL (`?user_id=…`) y el servidor aceptaba el que le pidieras,
+> si existía; la cookie que recordaba la elección (`et_user_id`) la escribía
+> **JavaScript**, así que se reescribía desde la consola del navegador y no era una
+> credencial. **(B) Lo corregido.** `POST /api/session` comprueba que el perfil
+> existe y emite `et_session` = `base64url(payload).base64url(hmac_sha256(secreto,
+> payload))` con `payload = {iat, uid}`, **solo stdlib** y comparación en **tiempo
+> constante** (`hmac.compare_digest`); cookie **`HttpOnly`**, `SameSite=Lax` y
+> `Secure` en HTTPS, con el secreto en `data/session.secret`. `current_user` la
+> verifica en cada petición: sin cookie, manipulada o caducada ⇒ **401
+> `SESSION_REQUIRED`**. `?user_id=` deja de significar nada: el test clave manda
+> **sesión de A + `?user_id=B`** y exige los datos de **A**
+> (`test_identity_source.py`, con el marcador `identidad_cruda` para esquivar el
+> adaptador de `conftest.py` que traduce el `user_id` de las **109** suites
+> históricas a una sesión real). **(C) Autorización.** `PATCH /api/users/{id}` y
+> `PUT /api/settings` exigen sesión **y** que el id sea el de la sesión (**403** si
+> no): antes, con sesión de A, se editaba el perfil de B. **(D) Retirada y
+> frontend.** Se va `et_user_id` con su test; el frontend **pregunta**
+> (`GET /api/session`) en vez de creer, elegir o crear perfil **abre sesión** y la
+> decisión es una función pura con test (`utils/session.ts::planSession`); los
+> **17** módulos de `api/` dejan de añadir `?user_id=…`. **(E) El secreto no viaja
+> en los backups** (`_NON_PORTABLE_TOP_NAMES`), así que el ZIP de otro equipo no
+> permite forjar sesiones; restaurar no borra el secreto local. **(F) El launcher
+> deja de imprimir el token**: «sesión abierta: sí/no» y valor **enmascarado**
+> (Firefox guarda las cookies en claro). **(G) VG-N5.** Actions fijadas por
+> **SHA**, `permissions: contents: read`, job **bloqueante** `deps-audit`
+> (`pip-audit` + `npm audit`) y **Dependabot** (pip, npm, `github-actions`). El
+> escaneo destapó **10 avisos en `starlette 0.50.0`** (por `fastapi==0.128.0`) con
+> parche solo en `starlette>=1.0.1` ⇒ `fastapi` sube a **0.141.1** (`starlette`
+> **1.6.0**) y la suite pasa idéntica. **(H) VG-N6.** `/api/system/status`,
+> `/api/network` y `/api/models` se **declaran aceptados** por escrito
+> (`docs/ARQUITECTURA.md`), con candado en las dos direcciones
+> (`test_public_surface.py`: lo declarado sin sesión sigue respondiendo y lo
+> declarado con sesión no sale sin ella; borrar la sección falla). **(I)
+> Verificación.** Backend **2882 passed**, frontend vitest **721** (87 ficheros),
+> launcher **142**, `ruff`/`tsc` limpios, i18n `--strict` 0/0/0,
+> `validation_gate auto` **10/10**, `check_release_consistency` en los **6
+> orígenes** (`3.75.0`), `npm audit`/`pip-audit` sin vulnerabilidades y **CI de 12
+> jobs**; los recuentos suben exactamente por los tests nuevos (2840 + **42**,
+> 719 + **2** netos, 139 + **3**) y cinco candados nuevos se verificaron por
+> **sabotaje** controlado. **(J) Corrección antes de publicar (el arnés visual).**
+> La **primera run real de CI** sobre el commit de release salió **11/12**
+> (run `35393085610`): `Playwright E2E (visual)` falló **27 de 38** casos en los
+> tres proyectos porque la suite visual —que corre **sin backend** por diseño— no
+> conocía el contrato nuevo: seguía suponiendo la cookie de perfil que escribía
+> JavaScript, así que con la API ausente `GET`/`POST /api/session` fallan,
+> `planSession` no resuelve perfil y la `ProfileGate` se queda abierta
+> interceptando cada clic (`http proxy error: /api/session` en el log).
+> `gateHelper.ts` gana `mockIdentitySession(page, user)` (mismo patrón que el mock
+> de `GET /api/users`) y lo aplican los cuatro specs que gestionan perfiles por su
+> cuenta (`analysis`, `drillProvenance`, `homeGraphChip`, `speaking`). **Lo que no
+> prueba:** que el servidor emita, firme y verifique la sesión; eso es de la suite
+> de backend, `frontend/src/utils/session.test.ts` y el humo de `product-origin`.
+> **Por qué escapó:** en local hay un backend real en `127.0.0.1:8000`, así que
+> allí la sesión se abre de verdad y la suite pasa; solo CI lo reproduce. La suite
+> visual local es además **inestable por contención de máquina** (7/14/18 fallos en
+> ejecuciones sucesivas, con y sin la corrección), de modo que la validación es la
+> **run de CI**, no el resultado local. Ver `release-notes-v3.75.0.md` §7.1.
+> **Honestidad.** (i) **Esto no es autenticación y la
+> Fase 3 sigue sin decidir:** `POST /api/session` acepta cualquier `user_id`
+> **existente** sin credencial y `GET/POST /api/users` siguen abiertos, así que en
+> modo LAN cualquiera que alcance la API puede **abrir sesión para cualquier
+> perfil**; lo que ya no puede es **forjar** una identidad ni **elegirla por
+> petición** (cerrarlo exige credencial y contradice «sin cuentas, sin
+> contraseñas»: decisión de producto). (ii) El token prueba que lo **emitió el
+> servidor**, no que quien lo pide tenga derecho al perfil. (iii) El salto a
+> `starlette` **1.6.0** es una versión mayor dentro de una release de seguridad.
+> (iv) `Secure` depende del esquema: por HTTP plano la cookie no lo lleva. (v) El
+> candado de VG-N6 fija una **lista**, no demuestra que sea completa. (vi) **Los 7
+> gates siguen `pending`** y el kit conserva la identidad del pre-vuelo (`3.73.6` →
+> `13cc30b`) como historia. Ver `release-notes-v3.75.0.md`.
+>
+> **Nota (2026-09-18): V3.74.0 (frontera de red: loopback por defecto y LAN
+> opt-in) — release de PRODUCTO (minor), sin capacidad pedagógica nueva.**
+> Release **`v3.74.0`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, pero
+> **cambia el contrato de red del producto** (y la respuesta de `/api/network`).
+> **(A) El problema.** Hasta V3.73.6 el backend se enlazaba **siempre** a `0.0.0.0`
+> y la regex de CORS aceptaba **cualquier** IP privada: exponer los datos del alumno
+> a la WiFi era el **comportamiento por defecto** y nadie lo había pedido. Como el
+> P0 de identidad sigue abierto (el `user_id` lo elige el cliente y los endpoints de
+> perfil no exigen credencial), ese acceso era lectura **y escritura**. **(B) Lo
+> corregido.** Loopback por defecto (`127.0.0.1`) y LAN **opt-in declarado** con
+> `ENGLISH_TUTOR_LAN=1` o con el botón **«Activar red local»** del panel de acceso
+> del launcher (que lo declara y **reinicia el servidor** para aplicarlo); `lan_mode`
+> se lee **fail-closed** y el launcher lo propaga en el entorno del backend, así que
+> el `--host` de uvicorn (`backend_host`) y la política de orígenes salen de la
+> **misma** decisión y no pueden discrepar. **(C) La trampa que se evitó.**
+> `origin_allowed` comprobaba con `match`: un patrón **vacío** casa con cualquier
+> cadena, así que «desactivar» la regex de la LAN habría **abierto** CORS en lugar de
+> cerrarlo. Ahora hay dos patrones (`LOCAL`/`LAN`), `fullmatch` y consulta **por
+> petición**, con un candado que compara el patrón de `CORSMiddleware` con
+> `origin_allowed` sobre los mismos orígenes. **(D) Sin enlaces muertos.**
+> `/api/network` informa del modo (`lan_mode`, `bind`) y no anuncia la URL de LAN
+> cuando no responde; el panel muestra «desactivada (solo este equipo)» y
+> `ConnectDeviceCard` explica el paso que falta en lugar de pintar un QR inútil.
+> **(E) Verificación.** Backend **2840 passed**, frontend vitest **719** (86
+> ficheros), launcher **139**, `ruff`/`tsc` limpios, i18n `--strict` 0/0/0,
+> `validation_gate auto` **10/10** y `check_release_consistency` en los **6
+> orígenes**; los recuentos suben exactamente por los tests nuevos (2817 + **23**,
+> 717 + **2**, 113 + **26**). **Honestidad.** (i) **No es autenticación: el P0 sigue
+> abierto** y en modo LAN `/api/users` sigue enumerando y creando perfiles **sin
+> credencial**; el `et_user_id` no desaparece hasta la **Fase 2**
+> (`docs/audit/PLAN-P0-IDENTIDAD.md`). (ii) El modo **no se persiste** a propósito:
+> exponerse exige un acto explícito en cada arranque. (iii) **Los 7 gates siguen
+> `pending`** y el kit conserva la identidad del pre-vuelo (`3.73.6` → `13cc30b`)
+> como historia. Ver `release-notes-v3.74.0.md`.
+>
+> **Nota (2026-09-18): V3.73.7 (endurecimiento derivado de la verificación de
+> seguridad) — release de PARCHE, sin capacidad pedagógica nueva.** Release
+> **`v3.73.7`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, pero
+> **SÍ con cambios de PRODUCTO** (backend, frontend y un middleware nuevo), a
+> diferencia de V3.73.2–V3.73.6, que eran documentales. Nace del **triage interno**
+> de la sección de seguridad del informe externo
+> (`docs/audit/VERIFICACION-SEGURIDAD-V373.md`). **(A) Lo que estaba roto.** El
+> límite reforzado de transcripción apuntaba a `/api/voz/transcribe`, una ruta
+> **inexistente** (el router monta `/api/transcribe`), así que Whisper usó el cupo
+> **general** (1200/min) en vez del declarado (180/min); y el backup incluía
+> `data/certs/key.pem`, la **clave privada TLS**, en claro y multiplicada por las
+> **7** copias automáticas. **(B) Lo corregido.** Cupo propio para las cuatro rutas
+> de coste alto (`/api/transcribe` 180, `/api/tts` 240, `/api/translate` 120,
+> `/api/voices/download` 10); `certs/` fuera del ZIP **y conservado** al restaurar
+> (una sola constante gobierna ambos lados); cota de expansión del ZIP (4 GiB, 50 000
+> entradas y rechazo explícito de rutas inseguras); `UserCreate.name` con
+> `max_length=80`; `Secure` en la cookie de perfil cuando la página va por HTTPS;
+> middleware de cabeceras defensivas (`nosniff`, `X-Frame-Options`, `Referrer-Policy`,
+> `Permissions-Policy` y CSP acotada, **sin HSTS** por certificado autofirmado); y el
+> PIN de admin deja `localStorage` por `sessionStorage`. **(C) La causa raíz.** Las
+> claves de `_PATH_LIMITS` eran cadenas sin candado: ahora un test recorre la tabla de
+> rutas real (descendiendo por los `_IncludedRouter` de FastAPI) y falla si alguna no
+> corresponde a una ruta montada. **(D) Verificación.** Backend **2817 passed**,
+> frontend vitest **717**, launcher **113**, `ruff`/`tsc` limpios, `validation_gate
+> auto` **10/10**, `check_release_consistency` en los **6 orígenes**. **Honestidad.**
+> (i) **El P0 de identidad sigue abierto** (el `user_id` lo elige el cliente): esta
+> release cierra el lote barato, **no** el riesgo principal. (ii) La CSP es parcial a
+> propósito (el artefacto trae un script inline de tema). (iii) **Los 7 gates siguen
+> `pending`** y el kit conserva la identidad del pre-vuelo (`3.73.6` · `13cc30b`)
+> como historia. Ver `release-notes-v3.73.7.md`.
+>
+> **Nota (2026-09-17): V3.73.6 (reproducibilidad de las cifras declaradas) —
+> release de PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.6`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos**, y **sin
+> tocar el arnés de validación, sus tests ni el contrato de los 7 gates** (el diff es
+> **documentación**). Nace de un **pre-vuelo del auditor**: clonar el repositorio
+> **desde GitHub** y ejecutar los comandos que el punto de entrada manda ejecutar.
+> Encontró **una cifra no reproducible**: el documento declaraba `2796 passed · 2
+> skipped` como el recuento del **checkout limpio**, y un clon recién hecho da **2795
+> · 3**. El **invariante** (los **2798 casos**) nunca estuvo mal; lo que fallaba era el
+> **reparto** y su **causa**: los saltos **no** son «del banco de escenario», sino de
+> **artefactos no versionados** —`frontend/dist` (1) y el **modelo Whisper opt-in**
+> (2)—, y la cifra de 2796 se había medido en un worktree que **sí** tenía `dist`
+> construido. Corregido: el documento declara **invariante y reparto por entorno**
+> (clon limpio **2795 + 3**; tras `npm run build` **2796 + 2**; árbol completo **2798 +
+> 0**), marca la corrección como **errata** sin reescribir el histórico y pone los **11
+> nombres de job** uno por línea para que un `grep` literal funcione. **Verificación
+> (clon nuevo desde GitHub):** `main` == tag, `git diff --stat v3.73.6..main -- backend
+> frontend launcher scripts` **vacío**, run del commit del tag **11/11**,
+> `check_release_consistency` en los **6 orígenes** (`3.73.6`), recuentos declarados
+> comprobados uno a uno (43/19/23/19 = **104**; launcher **113** y **13 + 7 = 20**),
+> frontend vitest **712**, `ruff`/`tsc` limpios. **Los 7 gates siguen `pending`**: el
+> siguiente hito sigue siendo ejecutar físicamente G1–G7. Ver
+> `release-notes-v3.73.6.md`.
+>
+> **Nota (2026-09-17): V3.73.5 (ancla del punto de entrada de la auditoría) —
+> release de PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.5`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos**, y **sin
+> tocar el arnés de validación, sus tests ni el contrato de los 7 gates** (el diff es
+> **documentación**). Cierra un defecto **estructural** de trazabilidad: el punto de
+> entrada de la auditoría externa (`agentes/auditoria-total-externa-v373.md`) se
+> publicaba **fuera del tag que él mismo declaraba**, porque fijaba a mano el SHA del
+> commit de release, el objeto del tag y el id del run de CI —tres datos que **no
+> pueden existir** cuando se escribe el commit: un commit no contiene su propio SHA
+> ni el id de la run que dispara su push—, así que cada cierre obligaba a un
+> re-anclaje **posterior al tag**. Desde V3.73.5 **el ancla es el tag** (commit y
+> objeto se resuelven con `git rev-parse`) y el **estado de publicación se verifica
+> por comando** (`gh run list --commit <sha>`), de modo que el documento es coherente
+> **dentro de su propio tag** y el commit de release es **final**: `main` deja de ir
+> por delante en documentación. El invariante del código se enuncia **entre el tag y
+> `main`** (`git diff --stat v3.73.5..main -- backend frontend launcher scripts`
+> debe salir vacío). **Verificación:** `check_release_consistency` en los **6
+> orígenes** (`3.73.5`); sin cambios de producto, las cifras de test son las de
+> V3.73.4 (frontend vitest **712**, launcher **113**; el recuento del backend se
+> **corrige en la nota de V3.73.6**, arriba), `ruff`/`tsc` limpios, i18n `--strict` **0/0/0** y
+> `validation_gate.py auto --require-dist` **10/10** con el informe regenerado
+> idéntico. **Los 7 gates siguen `pending`**: el siguiente hito sigue siendo
+> ejecutar físicamente G1–G7. Ver `release-notes-v3.73.5.md`.
+>
+> **Nota (2026-09-17): V3.73.4 (recorder trazable) — release de PARCHE, sin
+> capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.4`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos** (el diff
+> es el **arnés de validación**, sus **tests** y **documentación**). Cierra el
+> eslabón que faltaba en la cadena de certificación: **la evidencia de un gate no
+> decía contra qué commit se había probado**. `record` sella ahora `head_sha` (y la
+> run de CI con `--ci-run`), un **`pass` sin commit se rechaza** (`fail`/`skip`/
+> `pending` sí se registran sin SHA, porque declaran un no-cierre), `status`
+> muestra el commit de cada gate y la puerta fuerte **`status --strict --same-tree`**
+> exige que los siete `head_sha` sean el commit actual; `auto` falla si el `pass`
+> no trae `head_sha` o si el `head_sha`/`ci_run` tienen formato inválido. Además
+> `Gate.human` se declara gate a gate y vale `True` en los **7** (el instrumento no
+> ejecuta ningún flujo de la app), lo que zanja la doble cifra «7 gates (5 de ellos
+> acción humana)» de notas históricas. **Tests:** backend **2798 casos** (el
+> invariante); el reparto `passed`/`skipped` depende de artefactos **no versionados**:
+> **2795 + 3** en un clon limpio sin `npm run build`, **2796 + 2** tras compilarlo y
+> **2798 + 0** con `dist`, modelos Whisper y BD local. **Errata (V3.73.6):** aquí se
+> declaró «**2796 passed · 2 skipped** en el worktree limpio» y se atribuyeron los
+> saltos al banco de escenario —la cifra se midió con `dist` ya construido, y los
+> saltos reales son del `frontend/dist` (1) y del **modelo Whisper opt-in** (2)—
+> (`test_validation_gate_v373.py` 29 → **43**), `ruff` limpio; frontend
+> sin cambios de producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK);
+> launcher **113**; `check_release_consistency` en los **6 orígenes** (`3.73.4`);
+> i18n `--strict` **0/0/0**; `validation_gate.py auto --require-dist` **10/10** y
+> `status --strict` **exit 1** (correcto: es la puerta de V4.0). **Los 7 gates
+> siguen `pending`**: el siguiente hito es ejecutar físicamente G1–G7. Ver
+> `release-notes-v3.73.4.md`.
+>
+> **Nota (2026-09-17): V3.73.3 (kit de validación de los 7 gates) — release de
+> PARCHE, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.3`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos** (el diff
+> es el **arnés de validación**, sus **tests** y **documentación**). Prepara lo
+> único que falta para V4.0 —**ejecutar físicamente los 7 gates**— y corrige la
+> deriva que habría hecho probar el artefacto equivocado. **(A) Kit de campo.**
+> Nuevo `docs/audit/KIT-VALIDACION-GATES.md`: pre-vuelo (build, identidad del árbol
+> que se sella en cada `record`, manifiesto offline y URLs de producto), reglas del
+> instrumento, **hoja por gate** (G1–G7: protocolo enlazado, precondiciones, pasos,
+> qué cuenta como FALLO, evidencia a capturar y el comando `record` copiable),
+> agrupación **por sesión** y cierre. **Referencia los protocolos, no los duplica**:
+> la definición de los gates sigue en `docs/audit/VALIDATION-RELEASE-V373.md`.
+> **(B) Deriva de protocolo corregida (habría invalidado G1 y G4).** El §5 de
+> `docs/audit/RA-RUNTIME-OFFLINE.md` (E5 flujo 1 incluido) y el runbook
+> `docs/audit/G-DEVICES.md` seguían mandando al **dev server de Vite** (`:5173`),
+> que desde V3.72 **no es el runtime de producto** (un solo origen HTTPS `:8000`
+> con el backend sirviendo `dist`): seguirlos al pie de la letra habría probado
+> **otro artefacto**. `docs/audit/RB-INSTALACION.md` pasa a declarar Node/npm como
+> requisito de **compilación**, no de ejecución. **(C) Guard anti-deriva.** El
+> `check_device_matrix` del arnés se generaliza a `check_gate_protocol_origins`
+> (id `gate-origins`): recorre los **tres** protocolos funcionales
+> (`DEVICE_MATRIX.md`, `RA-RUNTIME-OFFLINE.md`, `G-DEVICES.md`) y **falla si alguno
+> contiene `:5173` o no contiene `:8000`** — el chequeo que vigilaba un solo
+> documento ya no deja pasar la deriva por la puerta de al lado (**5 tests nuevos**;
+> `test_validation_gate_v373.py` 24 → **29**). **(D) Punto de entrada de la
+> auditoría externa, re-anclado en el cierre.** `agentes/auditoria-total-externa-v373.md`
+> afirmaba un invariante de código (`git diff --stat v3.73.0..main -- backend
+> frontend launcher scripts` **vacío**) que V3.73.1/V3.73.2 ya habían roto —bajo sus
+> propias reglas, un **P0 falso** en el primer comando del auditor— y sus cifras y
+> versión no eran las publicadas; se re-ancla **en el cierre** al tag de esta
+> release (`ae14dbd`, tag `v3.73.3` objeto `7715fc2`) con el invariante **verificado**
+> (`git diff --stat v3.73.3..main -- backend frontend launcher scripts` **vacío**),
+> el CI **11/11 verde** en el run `35219576565` y el kit en el orden de lectura. **Tests:** backend **2781 passed · 3 skipped** (2784 casos) en
+> un `git worktree` sobre el commit de release, más `ruff` limpio; frontend
+> sin cambios de producto (`tsc` limpio, vitest **712 passed**, `npm run build` OK);
+> launcher **113**; `check_release_consistency` en los **6 orígenes** (`3.73.3`);
+> i18n `--strict` **0/0/0**; `validation_gate.py auto --require-dist` **10/10** y
+> `status --strict` **exit 1** (correcto: es la puerta de V4.0). **Los 7 gates
+> siguen `pending`** y el código sigue congelado: el siguiente hito es ejecutar
+> físicamente G1–G7. Ver `release-notes-v3.73.3.md`.
+>
+> **Nota (2026-09-17): V3.73.2 (corrección de la CI de V3.73.1) — release de PARCHE
+> correctiva, sin capacidad pedagógica nueva y sin cambios de producto.**
+> Release **`v3.73.2`**: **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**, con el
+> backend de producto, el frontend de producto y el launcher **intactos** (el diff es
+> tests e instrumento de auditoría del backend más documentación). **El motivo:** V3.73.1
+> se publicó con **la CI en rojo** —job `Backend (ruff + pytest)`, `1 failed, 2775
+> passed`— porque su §6 borró `frontend/src/features/reading/ReadingPractice.tsx` y dejó
+> ese directorio **vacío**, y **git no versiona directorios vacíos**: el test
+> `test_reading_has_no_dedicated_scorer` lo daba por existente en el disco del autor
+> (suite local **2779 passed**) y **fallaba en un checkout limpio** (CI). **Reapunte, no
+> debilitamiento:** la UI de `reading` es desde la Opción A el **chat con destreza**
+> `/chat/lectura`, así que `audit_dossier.py` declara `reading.ui = chat:lectura` y
+> resuelve su existencia con la tabla explícita `UI_ARTIFACT_PATHS` (los otros 8
+> artefactos conservan **exactamente** su `is_dir()`), mientras el test pasa a comprobar
+> el **cableado real** (`router/chat.ts` declara `reading: "lectura"`) y que el dossier
+> siga viendo la UI (`ui_exists true`), con `scorer_exists false` y `corpus 0`; el
+> dossier regenerado solo cambia la **procedencia** de esa UI y **no** inventa un gap de
+> «sin feature de UI». **Proceso:** la verificación local era **estructuralmente incapaz**
+> de ver el fallo, así que V3.73.2 se verifica en un **checkout limpio** (`git worktree`)
+> con el dossier **estable**. **Los 7 gates siguen `pending`** y `status --strict` sigue
+> **rojo por diseño**: eso no es un fallo, es la puerta de V4.0. Ver
+> `release-notes-v3.73.2.md`.
+>
+> **Nota anterior (2026-09-17): V3.73.1 (cierre GUI pre-V4.0) — release de PARCHE, sin
+> capacidad pedagógica nueva y sin tocar backend ni launcher.**
+> Release **`v3.73.1`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**. Cierra
+> los **seis hallazgos GUI/UX (P2/P3)** que el dictamen externo de cierre de V3.73.0
+> dejó abiertos antes de V4.0 —el hub de APRENDER desordenado, Reading/Writing
+> huérfanos, la navegación móvil con utilidades compitiendo con el núcleo,
+> `prefers-reduced-motion` ignorado por las animaciones JS y el contraste de los 7
+> acentos sin medir— **sin abrir arquitectura** y **congelando el código**: los 7
+> gates físicos siguen `pending` y `status --strict` sigue **rojo por diseño**.
+> **(A) APRENDER (GUI-01/02/04, Opción A).** Las 4 tarjetas pasan a
+> `xl:grid-cols-4` (antes la cuarta quedaba aislada en un grid de 3 columnas); el
+> `aria-labelledby` del grid apuntaba a un `id` inexistente y `SectionHeading` pasa
+> a aceptar `id`; y **Reading/Writing dejan de ser huérfanos**: nuevo
+> `frontend/src/router/chat.ts` (`ChatSkill`, `chatSkillPath` → `/chat/lectura` y
+> `/chat/escritura`, `chatSkillFromPath`), `routeMap` acepta ese segundo segmento
+> (cualquier otro degrada a `home`, como antes), `App` selecciona la sección que
+> trae la URL —de modo que las **recomendaciones del motor** (`NextBestActivity`,
+> Home) también abren el chat con su contexto—, `PracticeView` incluye `reading` en
+> la rama de chat con su `kicker`, `Workspace` deja de resaltar Speaking cuando la
+> URL trae destreza, y `LearnHub` gana el bloque **«Practica con el tutor»**
+> (Reading y Writing) con tap target y `focus-visible`. **El síntoma medido:** antes,
+> elegir Reading abría **Speaking**, porque el efecto de `/chat` forzaba la sección.
+> **(B) Código muerto e i18n.** `components/SectionNav.tsx` (no se importaba) y
+> `features/reading/ReadingPractice.tsx` (inalcanzable) **borrados**, con sus claves
+> i18n huérfanas (`nav.skills`, `group.primary`, `group.support` y la familia
+> `reading.*`): `check_i18n_coverage.py --strict` sigue en **0/0/0** (1477 cadenas).
+> Se conservan `ReadingIcon`/`WritingIcon` (los usa `NextBestCard`) y
+> `WritingPanel`/`WritingJourney` (Progress > Recorridos). **Declarado:** el CSS
+> legacy `.reading-practice-*`/`.reading-card-*`/`.reading-academy-*` **no se toca**
+> (limpieza → V4.0.x). **(C) Navegación móvil (GUI-03/GUI-08).** Los **5 destinos**
+> se mantienen y los touch targets (`min-h-14`) también, pero el núcleo
+> (Inicio/Formación/Aprender) deja de competir con las utilidades
+> (Diccionario/Traductor): **divisor real** antes del bloque auxiliar y peso visual
+> menor (icono/etiqueta atenuados, etiqueta más pequeña en anchos estrechos).
+> **(D) `prefers-reduced-motion` (GUI-05).** `<MotionConfig reducedMotion="user">`
+> envuelve la app: **todas** las animaciones de `motion/react` (stagger del hub,
+> píldoras de la nav, transiciones) respetan la preferencia del sistema, que antes
+> solo atendía `legacy.css`; guarda en Playwright con `reducedMotion: "reduce"`.
+> **(E) Contraste (GUI-06).** Instrumento nuevo
+> `frontend/scripts/contrast_audit.mjs` (`npm run audit:contrast`, **en CI**) que lee
+> los tokens reales de `legacy.css`/`index.css` y mide **184 pares + 2 guardas** →
+> `docs/audit/generated/contrast-report.{json,md}`: **bloqueante** (tipografía base +
+> texto de acento) **0 fallos**; **reportado** (relleno + tinta y borde) **17 de 42,
+> con el máximo alcanzable de cada acento**. Se corrige `--color-text-faint` en
+> claro (`#6f7c90 → #616e84`; el par más ajustado, sobre `--color-bg-soft`, sube a
+> **4.55:1**) y **el texto de acento deja de ser un hex fijo**:
+> `--color-accent-soft` **se deriva del acento elegido** con
+> `color-mix(in srgb, var(--color-accent) var(--accent-soft-share), var(--accent-soft-target))`
+> (hacia blanco en oscuro, hacia negro en claro; 64/67/65/56/56/64/52 % según
+> acento), porque **no seguía al acento** —con turquesa el texto de acento salía
+> índigo— y con ámbar en tema claro quedaba en **2.02:1**; las ~20 reglas que usaban
+> el acento **sólido como color de texto** pasan a este token, y el sólido queda para
+> relleno, borde y anillo de foco. **Guardas:** prohibido `color:
+> var(--color-accent)` como texto, obligada la derivación, y
+> `tests/visual/accentContrast.spec.ts` verifica **en el navegador real** los 14
+> pares acento×tema (≥4.5:1 sobre las tres superficies), lo único que detecta un
+> `color-mix()` inválido en runtime. **Honestidad:** el **relleno de acento con su
+> tinta no puede llegar a AA** con la rampa actual (máximo alcanzable **4.19** índigo
+> oscuro, **3.96** violeta, **3.73** ámbar, **3.68** azul, **3.67** rosa, **3.42**
+> turquesa, **3.41** esmeralda) ni el acento como borde en tema claro (turquesa
+> **2.49**, esmeralda **2.54**, ámbar **2.15**, frente a 3:1): exige **re-rampar los
+> 7 acentos** (p. ej. 600/700 como relleno en claro y 400/500 en oscuro), decisión de
+> identidad visual que se toma en **V4.0.x** con la tabla delante. **No se declara
+> WCAG 2.2 AA certificado.** **(F) Teclado y zoom.** `keyboard.spec.ts` (el primer
+> `Tab` revela el skip link y enfoca `#main-content`; las tarjetas del hub, incluidas
+> las del tutor, se activan solo con teclado) y `reducedMotionAndZoom.spec.ts` (sin
+> desborde horizontal ≤1 px a 200 % de zoom con fuente grande).
+> **Tests:** `tsc` limpio, frontend **712 passed** (85 ficheros; 699 → **+13**),
+> Playwright **38 passed · 28 skipped · 0 failed** (13 specs × desktop/tablet/mobile,
+> a **4 workers**: la corrida a 16 workers dio 13 fallos **solo en desktop** por
+> contención del dev server en frío y los 13 pasan al repetirlos), `npm run build`
+> OK, `check_release_consistency` en los **6 orígenes** (`3.73.1`), i18n `--strict`
+> **0/0/0**, `validation_gate.py auto --require-dist` **10/10** y `status --strict`
+> **exit 1** (correcto: es la puerta de V4.0). Backend y launcher **no se tocan**.
+> **Congelación:** tras este tag no se abre otra ronda de arquitectura; el siguiente
+> hito es **ejecutar físicamente G1–G7**.
+
+> **Nota (2026-09-17): V3.73.0 (Validation release) — release de VALIDACIÓN, sin
+> capacidad pedagógica nueva.**
+> Release **`v3.73.0`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN
+> tocar el frontend**. Cierra el endurecimiento mínimo que el dictamen externo de
+> V3.72 dejó como P2/P3 y construye el **instrumento de certificación** de los 7
+> gates de validación física. **Lo que V3.73 vale es el arnés, no una validación
+> fingida: la release se publica con los 7 gates en `pending` por diseño.**
+> **(A) Fail-closed del runtime de producto (P2).** El hueco medido: el launcher
+> **sí** elevaba `PreparationError` si `npm run build` fallaba, pero el backend era
+> **siempre fail-open**, así que el producto arrancaba **pareciendo listo y sin
+> interfaz**. Ahora `mount_frontend(app, path, require_ui)` distingue los dos
+> runtime: en **producto** (el launcher inyecta `ENGLISH_TUTOR_REQUIRE_UI=1` con
+> `core.backend_env()`) la falta de `frontend/dist/index.html` eleva
+> `RuntimeError` accionable (`npm run build`); en **desarrollo** conserva el
+> `return False`. `main.py` declara el modo explícitamente, `start_backend()` **no
+> arranca** sin artefacto y `ensure_frontend_dist()` distingue «el build falló» de
+> «el build dijo OK y no dejó artefacto». Un `uvicorn main:app` manual sigue siendo
+> fail-open: es el modo desarrollo. Candados:
+> `backend/tests/test_serve_frontend_v373.py` (19) y
+> `launcher/tests/test_preflight_v373.py` (7), que además fijan el **contrato
+> compartido** de la variable (el launcher no puede importar el backend).
+> **(B) Descubrimiento de la IP de LAN sin referencias externas (RA-08, P3).** La
+> IP se obtenía con un socket UDP «connect» a `8.8.8.8:80` en **tres** sitios
+> (`services/network.py`, `services/tls_cert.py`, `launcher/core.py`): técnicamente
+> correcto (el `connect` UDP es **perezoso**, elige la interfaz de salida y **no
+> envía paquetes**, así que funciona sin Internet) pero es una **referencia
+> pública** en el descubrimiento de una app 100 % local. Nuevo
+> `backend/services/net_interfaces.py`: `select_lan_ipv4` es **puro** (descarta
+> loopback/link-local/`0.0.0.0`/multicast, prefiere privadas, determinista, nunca
+> devuelve vacío: último recurso `127.0.0.1`), `candidate_addresses()` enumera el
+> propio equipo por **dos vías** (`getaddrinfo` + `gethostbyname_ex`, porque en
+> algunos Windows el nombre solo aparece en una) y hay override declarado
+> `ENGLISH_TUTOR_LAN_IP` para equipos con varias NIC o VPN. Delegan `network.py` y
+> `tls_cert.py`; el launcher **replica el algoritmo puro**. **Cascada obligatoria
+> del instrumento de V3.71**: `RUNTIME_TOUCHPOINTS` cambia el punto `lan` de
+> `network.py` (UDP) por `net_interfaces.py`, el par determinista
+> `docs/audit/generated/runtime-audit.{md,json}` se **regenera** y el dossier RA
+> cierra **RA-08** (y anota que **RA-06** pierde su excepción (iii)). Candados:
+> `backend/tests/test_net_interfaces_v373.py` (23), `launcher/tests/test_lan_ip_v373.py`
+> (13) y un guard que escanea el **AST** (no la prosa: los docstrings se excluyen) y
+> falla si una IP pública vuelve al código de los cuatro ficheros.
+> **(C) Cobertura CI en Windows (bloque C del dictamen).** Los 8 jobs corrían en
+> `ubuntu-latest`, así que el launcher (utilidad **de Windows**) y el certificado
+> (`cryptography` + rutas de Windows) **nunca se ejercitaban en su sistema real**.
+> Ahora son **11 jobs**: `launcher-windows` (**bloqueante**, stdlib: `ruff` + los
+> **113 casos** del launcher en Windows real, con los mismos pins que el job
+> `backend`), `product-origin-windows` (**informativo declarado**:
+> `continue-on-error: true` porque instalar `requirements-dev.txt` en Windows
+> depende de **ruedas nativas** —`piper-tts`, `faster-whisper`/`ctranslate2`— que no
+> se pueden verificar desde Linux; su criterio de promoción a bloqueante está
+> escrito en las notas) y `validation-gate` (estático, stdlib, sin instalar nada).
+> **(D) Arnés de validación (el instrumento).** `scripts/validation_gate.py`,
+> **stdlib pura**, con tres subcomandos: `auto` (10 comprobaciones **estáticas**:
+> versión consistente, i18n `--strict`, fail-closed cableado, LAN sin IPs públicas,
+> jobs Windows, `DEVICE_MATRIX` en `:8000`, instrumento de red sin deriva, los 7
+> gates declarados, artefacto de UI —`skip` sin `--require-dist`— y evidencia
+> íntegra; escribe `docs/audit/generated/release-validation.{md,json}` y sale 1 si
+> algo falla), `record <gate> <pass|fail|skip> --notes` (evidencia en
+> `docs/audit/validation-evidence.json`; **sin notas no hay registro**, un gate
+> desconocido o un estado inventado se rechazan; guarda estado, notas, fecha y la
+> `VERSION` del árbol) y `status [--strict]` (**la puerta real de V4.0**: sale 1
+> mientras algún gate no esté en `pass`). Los 7 gates (`offline-fisico`,
+> `maquina-limpia`, `launcher-windows`, `dispositivos`, `audio-stt-tts`,
+> `journeys`, `pedagogia`) **referencian su protocolo existente** (`RA-RUNTIME-OFFLINE.md`
+> §5, runbook de `RB-INSTALACION.md`, `DEVICE_MATRIX.md`, `F-UX-JOURNEY.md`,
+> `CONSTITUCION-PEDAGOGICA.md`) en vez de duplicarlo, con runbook en
+> `docs/audit/VALIDATION-RELEASE-V373.md`. **`--strict` NO corre en CI** (los gates
+> humanos están `pending` por diseño; un CI que los exigiera sería rojo para
+> siempre). Candados: `backend/tests/test_validation_gate_v373.py` (24).
+> **(E) Drift documental y frontera.** `docs/DEVICE_MATRIX.md` seguía documentando
+> `https://<ip>:5173` y **Vite como runtime**, contra lo que V3.72 declaró: corregido
+> a **`:8000`** y ampliado con una **matriz de interacción** (touch/tap targets,
+> viewport y scroll, teclado en pantalla y orientación) porque es donde una web de
+> escritorio se rompe y **no se puede certificar con capturas**. `PREMISAS.md`,
+> `ARQUITECTURA.md` y `README.md` declaran las dos fronteras nuevas (con el módulo,
+> la variable y el override); `RC-RUNTIME-PRODUCTO.md` recoge el fail-closed como
+> cierre completo del P2; `PARKED.md` mueve lo cerrado a «deja de ser deuda».
+> Candados: `backend/tests/test_docs_drift_v373.py` (19).
+> **Tests:** backend **2779 passed** (2694 → **+85** en 4 ficheros `*_v373.py`:
+> 19+23+24+19), frontend **699** (83 ficheros, **sin cambios**: V3.73 no toca
+> producto; `tsc` limpio y `npm run build` OK), launcher **113** (93 → **+20**:
+> 7+13), `ruff` limpio en backend y launcher, `check_release_consistency` en los
+> **6 orígenes** (`3.73.0`), i18n `--strict` con **0 huérfanas**, `check_beta_v3` OK
+> y el CI con **11 jobs**, **11/11 verde** en el
+> [run de publicación 35204203522](https://github.com/jvelasca/english-tutor/actions/runs/35204203522).
+> Humo local del arnés: `auto --require-dist` **10/10**,
+> `status` **7 pending** y `status --strict` **exit 1** (correcto: es la puerta).
+> **Honestidad:** los **7 gates siguen en `pending`** — V3.73 construye el
+> instrumento y hace el endurecimiento, **no** la validación física (corte de red
+> real **RA-05**, máquina físicamente limpia **RB-05**, Windows real, móvil real y
+> audio real siguen siendo **acción humana**); `product-origin-windows` es
+> **informativo**, no bloqueante, y así se declara; el fail-closed cubre el
+> **arranque**, no la ejecución degradada (si el artefacto desaparece después de
+> arrancar, el proceso sigue sirviendo lo montado); el descubrimiento local **cambia
+> de técnica, no de garantía** (`getaddrinfo` puede devolver solo loopback en
+> Windows mal configurados: por eso hay dos vías, override y último recurso); `auto`
+> es **estático** y **no sustituye a nada**; y **RA-02** (endpoint de Ollama sin
+> declarar en `config.py`), **RA-07** y **RD-05** siguen abiertos. V4.0 se declara
+> cuando `status --strict` salga 0. Ver `release-notes-v3.73.0.md`.
+>
+> **Nota (2026-09-17): V3.72.0 (UX / product completion) — release de PRODUCTO.**
+> Release **`v3.72.0`**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar el currículum**. Cierra
+> los **dos ítems que V3.71 dejó fechados** en vez de cerrados (`RC-01`: el servido
+> del artefacto con Node como requisito de EJECUCIÓN; y **RD-04**/mitad de
+> **RA-01**: el vector UI del P1 de TTS/offline), lo que V3.70 asignó a esta fase
+> (**AE-04**, **AE-06**) y la deuda UX declarada (`F2`, `F3`, `F4`, claves i18n
+> huérfanas y «por qué esta actividad»). El hilo conductor: **que el producto se
+> sirva de verdad, que diga la verdad sobre lo que descarga y suena, y que el
+> alumno entienda qué hace y por qué**.
+> **(A) Eje UA · servido real de la UI (`RC-01` CERRADO).** El backend monta
+> `frontend/dist` (`StaticFiles` para `/assets` + **fallback SPA** con
+> `/{full_path:path}` → `index.html`, **fail-open** si no hay artefacto) y el
+> producto pasa a **un solo proceso HTTPS en `:8000`**: la raíz sirve la UI y los
+> metadatos del servicio se mueven a **`/api`**. El **certificado TLS autofirmado**
+> se genera de forma **determinista e idempotente** (`services/tls_cert.py` +
+> `scripts/ensure_tls_cert.py`, dependencia nueva **`cryptography`**) con los SANs
+> de LAN/mDNS (`localhost`, `127.0.0.1`, `<hostname>`, `<hostname>.local`, IP de
+> LAN), vive en `backend/data/certs/` (**no versionado**) y es obligatorio porque en
+> HTTP por LAN `navigator.mediaDevices` es `undefined` y el micrófono se rompe. El
+> **launcher pasa de dos procesos a uno**: `backend_command()` añade
+> `--ssl-certfile/--ssl-keyfile`, desaparece `start_frontend`, aparece
+> `ensure_frontend_dist()` (`npm run build` **si falta**, con mensaje accionable sin
+> Node) y `allow-firewall.ps1` abre **solo el 8000**. El **CI** gana el job
+> **`product-origin`** (uvicorn + TLS sobre el `dist` construido, comprobando que la
+> **raíz devuelve el HTML** de la UI). **Node queda como requisito de COMPILACIÓN,
+> no de EJECUCIÓN** (`docs/audit/RC-RUNTIME-PRODUCTO.md` §Cierre, candado en
+> `backend/tests/test_docs_drift_v372.py`).
+> **(B) Eje RD/RA · voz/TTS en la UI (el vector que V3.71 fechó).** `voz.ts`
+> devuelve `{voice, degraded}` leyendo `X-TTS-Voice`/`X-TTS-Degraded`, **aborta de
+> verdad** (`AbortController` + timeout: el `withTimeout` de `client.ts` no
+> cancelaba el `fetch`) y el consumo se centraliza en **`speakWithVoice`**, así que
+> **todos** los puntos de TTS (botones de escucha/speaking, test de micrófono, manos
+> libres, listening, speaking y traductor) informan igual. **Aviso no bloqueante**
+> de voz degradada (`useDegradedVoice` + `DegradedVoiceNotice`, con la voz realmente
+> usada) y **consentimiento de descarga** (`useVoiceDownload` +
+> `VoiceDownloadDialog`: ~60 MB, una vez, con Internet y progreso **indeterminado**
+> porque el endpoint es síncrono). El **auto-download implícito del traductor
+> desaparece**: pasa por el mismo flujo.
+> **(C) Deuda UX declarada.** **F4**: `FsrsReviewPanel`, `EvidenceGraphPanel` y
+> `AssessmentLadder` dejan de **tragarse** los errores de carga (`catch` vacío) y
+> usan el patrón `loading → error → retry` de Home mediante `PanelState`. **F2**:
+> Home lee el readiness **una sola vez** (manda `TodayPlan`; la tríada queda para
+> Progress). **F3**: la cabecera ancla el «estás aquí» con `home.youAreHere` +
+> `home.yourTarget`. **i18n**: 0 huérfanas (el residuo real eran **10** claves: las
+> 50 de la auditoría incluían falsos positivos de familias dinámicas vivas), informe
+> regenerado y **checker en `--strict` dentro del CI**. **«Por qué esta actividad»**:
+> el `why` que el motor **ya declaraba** se pinta también en el **pie «Next» de cada
+> práctica** (`NextStep`) y en las **filas de la cola de repaso**, con una sola
+> pieza compartida (`WhyThisActivity`) y **sin recalcular señales en el cliente**
+> (premisa 21: sin `why` ni `because` no se pinta nada).
+> **(D) Instrumentos (`AE-04`, `AE-06`).** **AE-04**: la limitación del placement
+> («mide reconocimiento/meta-lenguaje, no producción») queda **divulgada en el
+> instrumento y en su contrato**; como **no existe pantalla de nivelación**, la
+> divulgación en UI queda declarada con fase (**→ V4.0.x**) y **fijada por un
+> candado-tripwire** que falla en cuanto exista superficie. **AE-06**: los umbrales
+> de banda **triplicados** pasan a **un solo módulo** (`services/cefr.py`:
+> `BAND_BOUNDARIES` + `level_for_numeric`), **retiran las sub-bandas `+` de la
+> emisión** (siguen como descriptores de contenido y como posición en la escalera)
+> y conservan el emisor de **`pre-a1`**; la equivalencia de la rejilla queda fijada
+> por test.
+> **Tests:** backend **2694 passed** (2643 → **+51**, 5 ficheros `*_v372.py`),
+> frontend **699** (83 ficheros, 661 → **+38**), launcher **93** (75 → **+18**),
+> `ruff`/`tsc` limpios, `npm run build` OK, `check_release_consistency` en los **6
+> orígenes**, i18n `--strict` con **0 huérfanas** y el CI con **8 jobs**, **8/8
+> verde** en el
+> [run 35196758388](https://github.com/jvelasca/english-tutor/actions/runs/35196758388)
+> (el nuevo `product-origin` se estrena ahí).
+> **Honestidad:** el certificado es **autofirmado** (el usuario acepta el aviso del
+> navegador; sin HTTPS no hay micrófono en LAN); **`RC-01` se cierra como «Node no
+> es requisito de EJECUCIÓN»**, **no** como «producto empaquetado y distribuible»
+> (el `dist` no se versiona y hay que compilarlo); el **progreso de descarga de voz
+> es indeterminado** (no hay progreso real que consumir); **`AE-04` no se muestra en
+> UI** porque no hay superficie que enseñe el resultado del placement; y
+> **RA-05** (corte de red real), **RB-05** (máquina físicamente limpia) y **G5**
+> (matriz de dispositivos) siguen siendo **acción humana**. Ver
+> `release-notes-v3.72.0.md`.
+>
+> **Nota (2026-09-16): V3.71.0 (Runtime real, offline verificado e instalación
+> limpia) — release de VERIFICACIÓN con endurecimiento mínimo.** Release
+> **`v3.71.0`**, **SIN migración, SIN bump de `GENERATOR_VERSION` ni
+> `DECISION_POLICY_VERSION`, SIN tocar el banco, SIN tocar el currículum y SIN
+> capacidad pedagógica nueva**. V3.69 validó la **arquitectura** del motor
+> adaptativo y V3.70 midió su **pedagogía**; V3.71 baja al **suelo físico**: qué
+> necesita la máquina, qué toca Internet y qué le dice la app al usuario sobre sí
+> misma cuando algo de eso falla. Se organiza en **seis ejes** (`RE` gates/CI/
+> deriva · `RA` offline real · `RB` instalación limpia · `RC` runtime de producto y
+> salud honesta · `RD` dependencias ocultas y degradación · `RF` síntesis), con las
+> **cuatro decisiones de alcance** del gerente aplicadas: **(A)** medir y declarar
+> la frontera de `npm run dev` · **(B)** verificar y guiar el bootstrap de Ollama ·
+> **(C)** corregir la documentación a favor de `config.py` · **(D)** añadir el job
+> del launcher al CI. **Regla del incremento:** medir antes de tocar, endurecer lo
+> mínimo, y **re-declarar con fase lo que no se cierra** en vez de cerrarlo en
+> falso; cada endurecimiento trae un **test que falla sin el cambio**.
+> **(A) RE · Gates, CI y deriva documental (`docs/audit/RE-GATES-DERIVA.md`).** El
+> launcher era el **único subsistema sin gate** (sus **75 tests** no corrían en CI
+> y `docs/BETA_GATES.md` daba ✅ a «Launcher de escritorio» y «CI completa» igual):
+> nuevo job `launcher` con los mismos pins que el backend ⇒ **CI 7/7**. **Cuatro
+> derivas corregidas y anotadas sin reescribir el histórico**: árbol del launcher
+> en `ARQUITECTURA.md`; **modelo por defecto** (`PREMISAS.md`/`README.md`
+> declaraban `qwen3.5:9b`, que el código **veta**: es `llama3.1:8b`); los ✅ de
+> `BETA_GATES.md`; y la matriz de dispositivos declarada verde con
+> `DEVICE_MATRIX.md` **10/10 en ⬜** (**G5 queda ABIERTO**). **8 tests**
+> (`test_docs_drift_v371.py`) fallan si una deriva vuelve.
+> **(B) RD · El P1 de TTS/offline, cerrado (diferido 4 veces desde V3.46)
+> (`docs/audit/RD-DEPENDENCIAS-OCULTAS.md`).** **El hallazgo central:** el
+> `timeout` de la descarga de voces era **código muerto** —`urlretrieve` **no
+> acepta** `timeout`—, así que la **única dependencia de Internet en ruta de
+> producto** (un `POST /api/tts` de un idioma sin voz instalada) estaba **sin
+> límite** y su degradación era **muda**. Ahora: `urlopen` con timeout **real**
+> (15 s por operación de socket), descarga **atómica** y verificación del tamaño
+> contra `Content-Length`, con degradación **observable** (log + cabeceras
+> `X-TTS-Voice`/`X-TTS-Degraded`, expuestas por CORS). De los **tres vectores** del
+> P1 quedan **2 cerrados** y el de **UI re-declarado con fase a V3.72**; con ello
+> caen **RA-03** y parte de **RA-01**. **6 tests nuevos.**
+> **(C) RC · Runtime de producto y salud honesta
+> (`docs/audit/RC-RUNTIME-PRODUCTO.md`).** Medida la frontera real: la UI la sirve
+> el **dev server de Vite** y el backend **no** sirve `frontend/dist` ⇒ por la
+> decisión **(A)** se **declara con condición de salida** que **Node + npm son
+> requisito de EJECUCIÓN** (fijado por test), y se reevalúa en V3.72/V3.73. Caen
+> dos defectos reales: **(RC-02)** el sondeo de Ollama **no tenía cota** y el
+> launcher solo espera **1,5 s**, así que un Ollama **lento** se disfrazaba de
+> «backend caído» → `LLM_PING_TIMEOUT_SECONDS = 1.0`; **(RC-03)** el indicador de
+> cabecera leía `/api/health`, que responde **200 siempre**, así que decía
+> «Conectado» con la BD o el modelo caídos → ahora **Conectado / Degradado /
+> Desconectado** leyendo la dependencia que gatea `/ready`.
+> **(D) RB · Instalación limpia desde cero (`docs/audit/RB-INSTALACION.md`).**
+> Absorbe **RA-04** y **RD-06**. **(RB-01)** La **voz con la que la app da clase**
+> (`en_US-lessac-medium`) **no estaba en el catálogo curado**, así que
+> `ensure_voice_for_language("en")` **salía sin intentar la descarga**: en una
+> instalación limpia el **español sí se auto-descargaba y el inglés no**, en
+> silencio (falsado empíricamente: antes `False` sin descargar, ahora `True`).
+> **(RB-02)** El bootstrap deja de usar `urlretrieve` y URLs propias: delega en el
+> catálogo y hereda el endurecimiento de RD (efecto colateral: el manifiesto del
+> eje RA se actualizó y se regeneró su par, **mismo censo: 6 puntos de internet**).
+> **(RB-03)** Nueva **verificación previa de solo lectura** (`download_models.py
+> --check`/`--json`) que dice **qué falta y distingue descarga de local**; Ollama se
+> declara `exists=None` a propósito porque este script **no puede** comprobarlo.
+> **(RB-04)** El `README.md` gana el **`ollama pull llama3.1:8b`** explícito y la
+> nota de que `backend/models/` no se versiona (~1,1 GB). **13 tests.**
+> **(E) RA · Offline real: instrumento y protocolo
+> (`docs/audit/RA-RUNTIME-OFFLINE.md`).** Nuevo subcomando **de solo lectura**
+> `runtime-audit` en `scripts/audit_dossier.py` (determinista, con guard por test
+> de que no escribe en `data/` ni en `curriculum/`) + **protocolo de los 12
+> flujos**. Identifica **3 dependencias de Internet no declaradas que se disparan
+> EN TIEMPO DE USO** (voz en caliente, Whisper y su disparador en `/api/tts`): la
+> promesa «100 % local con la descarga inicial como única excepción» **no las
+> cubría**. Propiedades positivas medidas: el frontend **no** tiene CDN ni
+> websockets externos y **no hay ninguna otra primitiva de red** en producto.
+> **11 tests.** **El eje queda entregado pero ABIERTO: falta el corte de red real
+> (RA-05).**
+> **(F) RF · Síntesis (`docs/audit/RF-SINTESIS-RUNTIME-V371.md`).** **P0 = 0 ·
+> P1 = 1 (cerrado) · P2 = 15 · P3 = 14.** De los 15 P2: **8 cerrados**, **3
+> declarados con fase o condición de salida**, **3 abiertos que exigen acción
+> humana** (RA-02 endpoint de Ollama sin declarar en `config.py`, RA-05 corte de
+> red, G5 matriz de dispositivos) y **1 parcial** (RA-01, con la mitad de UI
+> fechada en V3.72).
+> **Tests y gates:** backend **2643 passed** (2600 → **+43**), frontend **661**
+> (76 ficheros), launcher **75** y **ahora en CI**, `ruff` limpio en backend y
+> launcher, `tsc` limpio, `check_release_consistency` verde en los 6 orígenes.
+> **Honestidad (leer antes que el veredicto):** **no hay verificación offline en
+> vivo** (los 12 flujos son estáticos; en CI es **imposible** por la premisa 12, así
+> que cualquier «offline verde» en CI sería **simulado**); **no se ha probado en
+> una máquina físicamente limpia** (RB-05); **no se prueba hardware móvil real**;
+> **no se mide calidad acústica**; y «offline verificado» debe leerse como «sin
+> dependencias de Internet declaradas», **NO** como «producto empaquetado y
+> distribuible» (**el runtime sigue siendo el de desarrollo**, RC-01). El detalle
+> completo está en `release-notes-v3.71.0.md`.
+>
+> **Nota (2026-09-15): V3.70.0 (Auditoría pedagógica + CEFR) — release de
+> MEDICIÓN, con cero líneas de lógica de PRODUCTO (solo bumps de versión).**
+> Release **`v3.70.0`**, **SIN migración, SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco, SIN tocar el currículum, SIN capacidad pedagógica nueva y SIN
+> tocar el argmax del Planner**: lo que entra son **cinco subcomandos NUEVOS y de
+> SOLO LECTURA** en `backend/scripts/audit_dossier.py`, **tests** y
+> **documentación**. Igual que V3.69 validó la **arquitectura** del motor
+> adaptativo, V3.70 mide la **pedagogía real** del contenido y de los
+> instrumentos: ¿el contenido A1..C2 **es** de su nivel?, ¿están cubiertas todas
+> las destrezas?, ¿se corrige de verdad?, ¿«demostrado» significa lo que dice?,
+> ¿los instrumentos de nivelación funcionan?
+> **Regla dura respetada (declarada en el briefing):** *V3.70 es una auditoría,
+> no una release de capacidad*; **no se corrige nada** aunque se encuentre, y
+> cada hallazgo se **asigna a una fase** en vez de arreglarse a costa del alcance.
+> **Los cinco ejes (AA→AE) más la síntesis (AF):**
+> **(A) AA · Adecuación CEFR del contenido (`docs/audit/AA-PED-CONTENIDO-CEFR.md`).**
+> **Un P0: el 89,4 % de los 368 checks del currículum tiene la respuesta correcta
+> en la posición 0** (329/368) — un alumno que marque siempre la primera opción
+> acierta casi 9 de cada 10; el corpus de listening sí está equilibrado (~25 % por
+> posición). P1: A1 entero por encima de su banda de velocidad (86/200 por encima
+> del techo de 115 wpm) y C1/C2 casi enteros por debajo (18/20 y 19/20) ·
+> `connected_speech: true` sin ninguna reducción real en la transcripción en
+> **C1 14/14 y C2 20/20**. P2: escalera de velocidad no monótona (el máximo de B2,
+> 185 wpm, supera al de C1, 170) · 4 de los 5 ítems `inference` de A2 se resuelven
+> con una palabra literal · sesgo de longitud. **P3: deriva documental
+> corregida** — `docs/audit/generated/` estaba desincronizado con el disco
+> (`curriculum-stats` declaraba C1 = 14 y C2 = 14 objetivos frente a los **20 y
+> 20** reales) y las auditorías previas se apoyaron en esas cifras. **Limpio: 0 de
+> 490 ítems fuera de su banda de DIFICULTAD**, 116 objetivos · 368 checks · 512
+> actividades, 0 objetivos sin actividades o sin checks y 0 checks fuera de las
+> `skills` de su objetivo.
+> **(B) AB · Cobertura de destrezas (`docs/audit/AB-PED-COBERTURA.md`).** P1:
+> corpus de listening **B1–C2 al 13,9–20,0 %** de su objetivo declarado
+> (`LISTENING_CORPUS_TARGETS`) · `reading` declara 15 objetivos y 18 checks pero
+> **no existe `backend/services/reading.py`** · **el manifest de la biblioteca de
+> audio humano está versionado y vacío** (`entries: []`: todo el listening es TTS)
+> · `mediation` **no tiene competencias, ni corpus, ni canal, ni scorer, ni UI**.
+> P2: `interaction` sin competencias y sin canal pese a tener módulo, corpus de 66
+> ítems y UI · escenarios de speaking con **1** en A1 y **1** en C1. P3: `pre-a1`
+> sin curso (0/7 celdas) · `pronunciation` fuera de la matriz a propósito.
+> **(C) AC · Feedback y corrección (`docs/audit/AC-PED-FEEDBACK.md`).** P1: **4 de
+> las 7 reglas de grammar nunca pueden confirmarse** (su `confidence` está por
+> debajo de `CONFIRMED_THRESHOLD = 0.8`) · **5 de las 7 no tienen patrón de uso
+> correcto**, así que solo 2 pueden alcanzar `MASTERY_STREAK = 3` · `reading` y
+> `mediation` sin ningún canal de corrección. P2: `listening`, `pronunciation`,
+> `vocabulary` e `interaction` tienen corrección **solo de puntuación**, sin
+> mensaje · el error detectado dentro de las rúbricas solo resta nota
+> (`1.0 − 0.25·len(errors)`) y **no genera la explicación**, que siempre la redacta
+> el LLM desde el prompt. **Correcto y fijado por test:** 5 categorías formales de
+> corrección, guía para los 7 niveles (incluida Pre-A1) y **la nota la decide el
+> scorer determinista, nunca el LLM** (verificado ejecutando
+> `score_writing`/`score_speaking` sin modelo).
+> **(D) AD · Validez de la afirmación de maestría (`docs/audit/AD-PED-MAESTRIA.md`).**
+> P1: **tres registros con tres tamaños para el mismo concepto** de destreza
+> evaluable (9 modalidades · 8 en matriz · 7 canales) y **`interaction` y
+> `mediation` no pueden acreditar evidencia por ninguna vía** aunque la matriz les
+> exija requisitos en los 6 niveles. P2: **`novel_required = 0` en las 48 celdas**
+> pese a que el emisor real de `novel` existe desde V3.26 (**el briefing asumía que
+> no existía y la verificación lo corrigió**: la señal existe, la exigencia no) ·
+> **las filas sin `objective_id` resoluble no acreditan éxito**, medido
+> conductualmente (`result 1,0` → `success False`), lo que deja fuera del gate
+> espaciado a speaking assessment y misión (F-K3). **Correcto y fijado:** sin
+> evidencia no se afirma nada (9/9 modalidades en `not_started`, banda `—`) y
+> `transfer_required` crece 0 → 4.
+> **(E) AE · Instrumentos de nivelación (`docs/audit/AE-PED-INSTRUMENTOS.md`).**
+> P1: **el criterio de parada por precisión del placement es inalcanzable** — pide
+> `SE < 0,5` y la mejor cota con los 8 ítems declarados es `0,7071` (**cota
+> analítica** del modelo 1PL declarado, no simulación) · **el examen de B1 tiene
+> los 12 ítems en dificultad 1**, igual que el de A1, así que no se escala ·
+> **cuatro de seis niveles sin examen final** (A2, B2, C1, C2). P2: el placement
+> mide reconocimiento o meta-lenguaje para listening/speaking/writing/pronunciation
+> (lo declara su propio docstring) · sesgo de forma (correcta = más larga única en
+> el **50 %** y más larga o empatada en el **75 %**; **70,8 %** en la posición 1 y
+> la posición 3 **nunca** correcta) · umbrales de banda triplicados y sub-bandas
+> `+` que ningún estimador emite. **Correcto y fijado:** los tres estimadores
+> coinciden en toda la rejilla (0 desacuerdos) y el banco de placement no tiene
+> huecos de dificultad (4 ítems por cada nivel 1..6).
+> **(F) AF · Síntesis (`docs/audit/AF-SINTESIS-PEDAGOGICA-V370.md`).** Matriz
+> consolidada: **1 P0 · 15 P1 · 12 P2 · 5 P3** (33 hallazgos abiertos) y **4
+> propiedades positivas** verificadas. Cinco cruces que solo se ven mirando los
+> cinco ejes juntos: `reading` roto en tres planos (contenido/corrección/
+> remediación) y `mediation` en cinco; **la forma de los ítems es el patrón más
+> extendido** (checks, corpus y placement comparten el mismo defecto de autoría);
+> **lo declarado supera a lo realizado en cinco instancias** (`connected_speech`,
+> `novel_required`, sub-bandas, biblioteca de audio, `mediation`); y **el producto
+> está más completo donde el alumno empieza que donde debería llegar** (A1/A2 al
+> 100 % de su objetivo de corpus y únicos niveles con examen, frente a B1–C2 al
+> 14–20 %).
+> **(G) Tests:** cinco ficheros nuevos, **48 tests** —
+> `test_ped_content_cefr_v370.py` (8), `test_ped_coverage_v370.py` (10),
+> `test_ped_feedback_v370.py` (10), `test_ped_mastery_v370.py` (10),
+> `test_ped_instruments_v370.py` (10). Cada test fija un hallazgo **medido**: si
+> alguien cierra un hueco, el test **falla** y obliga a re-auditar el eje.
+> **Backend 2600 passed** (2552 → **+48**).
+> **Instrumentos de medición (nuevos, solo lectura):** `cefr-adequacy`,
+> `skill-coverage`, `feedback-coverage`, `mastery-claims` y
+> `assessment-instruments` en `backend/scripts/audit_dossier.py`, con el mismo
+> patrón que los cinco existentes (`_write_generated`, salida regenerable en
+> `docs/audit/generated/`) y **sin escribir nunca en `data/` ni en
+> `curriculum/`**. Declarados honestamente como **herramienta de medición, no
+> ruta de producto**.
+> **Honestidad (lo que V3.70 NO demuestra):** (i) **no** demuestra eficacia
+> pedagógica: mide **adecuación declarada frente a un criterio interno**
+> (`docs/audit/CEFR-REFERENCE.md`, que **no** es un documento CEFR normativo), no
+> aprendizaje de ningún alumno; (ii) **no** valida el nivel real de un alumno (el
+> placement se auditó como instrumento, no contra una evaluación externa); (iii)
+> **no** audita la calidad acústica de un solo ítem (no hay audio humano grabado:
+> todo el análisis de listening es sobre **metadatos declarados**) ni el texto que
+> produce el LLM en ejecución (se auditó la **política declarada**); (iv) **no**
+> audita el frontend; (v) **no** cierra los **6 P2 de la auditoría de V3.69**, que
+> siguen abiertos por decisión de alcance; (vi) la cota del placement es
+> **analítica**, no empírica; (vii) **no corrige nada**: las 33 insuficiencias
+> quedan declaradas y asignadas a fase (**contenido → V4.0.x · motor y
+> acreditación → Planner 4.0 · instrumentos → V4.0.x/V3.72**). El valor de V3.70
+> es que **dejan de ser opinión**. Ver `release-notes-v3.70.0.md`.
+> **Verificación local (medida, en secuencia, 2026-09-15):** `python -m ruff check .`
+> en **`backend/`** (el gate real del CI, `working-directory: backend`) **limpio** ·
+> `pytest` backend **2600 passed** (2552 → **+48**) · `vitest` **76 ficheros / 659
+> tests** · `tsc --noEmit` y `npm run build` **OK** · launcher **75 passed** ·
+> `check_release_consistency` **3.70.0** en los **6 sitios** · `check_beta_v3`,
+> `content_validation` (`OK=True quality=True`) y `transfer_validation` (**0
+> errores**; 7 warnings `demand_spread` *advisory*) exit 0 · **regeneración
+> determinista**: los **10 subcomandos** de `audit_dossier.py` (5 existentes + 5
+> nuevos) se re-ejecutan y **no cambian ni un byte** de `docs/audit/generated/`.
+> **Honestidad sobre la verificación:** invocar `ruff` desde la **RAÍZ** del repo
+> **no** es el gate del CI y reporta **1 `DTZ005` preexistente** en
+> `scripts/purge_virtual_testers.py:198` (`datetime.now()` sin `tz`), un fichero
+> **no tocado** por V3.70 (último cambio: `release(v3.52.1)`); se **registra** en
+> lugar de declararlo limpio.
+> **Roadmap:** **V3.71** runtime/offline/instalación (siguiente) → **V3.72**
+> UX/product completion → **V3.73** auditoría final técnica → **V4.0** («English
+> Tutor, primera versión completa y estable»).
+> **CIERRE (2026-09-16):** commit de release `9ba9c49` (`release(v3.70.0):
+> auditoria pedagogica + CEFR`) y documental `2db93ba` (`docs(v3.70.0)`)
+> publicados en `main` con el **tag anotado `v3.70.0`** (objeto `219038f`), y
+> **CI 6/6 verde** — run
+> [35062382562](https://github.com/jvelasca/english-tutor/actions/runs/35062382562):
+> Backend ruff + pytest (**2598 passed + 2 skipped**; los `2 skipped` son el
+> opt-in de Whisper, igual que en V3.69), Frontend tsc + vitest (**76 ficheros /
+> 659 tests**) + build, Playwright E2E (**25 passed + 26 skipped**), Release
+> consistency (**3.70.0**), Beta V3.0 gate y Content validation. **Registro
+> honesto:** el push llevó los dos commits juntos (el release y su documentación
+> no se habían publicado cuando el agente anterior se detuvo), así que el run de
+> CI es el del HEAD documental `2db93ba`, que **incluye** `9ba9c49`; **no** hay
+> run separado del commit de release. **Auditoría externa:** V3.70 se entregó
+> como auditoría **INTERNA** por decisión declarada en su briefing (a diferencia
+> de V3.69); la entrega son los seis dossiers `AA`–`AF` más los **48 tests** que
+> fijan cada hallazgo. **Añadido (2026-09-16, incremento V3.71):** sí existe ya
+> un **punto de entrada EXTERNO** de la RELEASE de V3.70
+> (`agentes/auditoria-externa-release-v370.md`; informe esperado en
+> `docs/audit/AG-AUDITORIA-RELEASE-V370.md`), así que la afirmación «**no** existe
+> punto de entrada externo de V3.70» queda **corregida**.
+> **Roadmap (sin cambios):** **V3.71** runtime/offline/instalación (siguiente) →
+> **V3.72** UX/product completion → **V3.73** auditoría final técnica → **V4.0**.
+>
+> **🔄 EN CURSO (2026-09-16): V3.71 (runtime/offline/instalación) — eje RE cerrado.**
+> Briefing `agentes/v371-runtime-offline-instalacion.md` con las **cuatro
+> decisiones de alcance ya resueltas** (medir y declarar la frontera de
+> `npm run dev` · verificar y guiar el bootstrap de Ollama · corregir la
+> documentación a favor de `config.py` · job del launcher en CI). **Eje RE
+> (gates/CI/deriva documental) CERRADO:** el CI pasa a **7/7 jobs** (entra
+> `launcher` con sus 75 tests), las **cuatro derivas documentales** quedan
+> corregidas y **fijadas por 8 tests** (`backend/tests/test_docs_drift_v371.py`)
+> que fallan si vuelven, con evidencia en `docs/audit/RE-GATES-DERIVA.md`
+> (P0 = 0 · P1 = 0 · P2 = 2 · P3 = 4, 1 deuda aceptada). **G5 (matriz de
+> dispositivos) queda declarado ABIERTO.** Suite backend: **2608 passed**. Ejes
+> **RA/RB/RC/RD/RF pendientes**. **Sin bump de versión** (el incremento sigue
+> abierto: `3.70.0`).
+>
+> **Nota (2026-09-15): V3.69.0 (E2E + Adaptive Engine Validation) — release de
+> validación, con cero líneas de lógica de PRODUCTO (solo bumps de versión).** Release **`v3.69.0`**, **SIN
+> migración, SIN bump de `GENERATOR_VERSION`, SIN tocar el banco, SIN capacidad
+> pedagógica nueva y SIN tocar el argmax del Planner**: lo que entra son
+> **tests** y **documentación**. Convierte en evidencia lo que la auditoría
+> externa `Y` de V3.68 (§19–§20) pedía antes de entrar en cualquier componente
+> probabilístico: que la cadena `Evidence → Student State → Decision Projection →
+> Task selection → Decision → Serving → Attempt → Outcome → Evidence` funciona
+> como **una sola pieza**.
+> **(A) Batería E2E (`backend/tests/test_adaptive_e2e_v369.py`, 20 tests por
+> HTTP real):** E01 alumno nuevo (arranque en frío **sin** provenance + circuito
+> completo con estado medible) · E02 skill débil · E03 retención/repaso · E04
+> hueco de transferencia · E05 misma tarea en dos contextos (`task_key` igual,
+> `task_instance_key` distinto, ya por HTTP) · E06 `ok, ok, ko` baja el
+> `p_success` · E07 `unclear` fuera de la calibración · E08 abandono sin
+> contaminar `ko` · E09 refresh sin duplicar · E10 doble submit idempotente · E11
+> submit contradictorio rechazado · E12 usuario ajeno · E13 target ajeno · E14
+> transición inválida · E15 servida caducada (nunca `completed`) · E16
+> **determinismo del Planner** en los dos niveles (puro y HTTP, byte a byte) ·
+> E16b **contrato completo** de `GET /api/learning/decisions` (calibración,
+> `provenance_health`, filtros y paginación), que era el **endpoint huérfano** ·
+> E17 hueco de andamiaje (aserción **diferencial**) · E18 evidencia entrando
+> DURANTE la decisión (+ TOCTOU determinista) · E19 dos alumnos activos sin
+> mezcla **en ambas direcciones**.
+> **(B) Contrato de frontend con red mockeada
+> (`frontend/tests/visual/drillProvenance.spec.ts`, 2 specs):** sobre el
+> navegador real y con el job `playwright` (que corre sin backend) fija que el
+> `decision_id` viaja en la query del GET del peldaño y en el body del POST del
+> intento, que `started` se declara **después** de cargar el peldaño, que
+> `abandoned` se declara al desmontar y que **sin** `decision_id` no se declara
+> nada.
+> **(C) Cinco hallazgos MEDIDOS y aceptados como deuda declarada** (tabla §C de
+> `release-notes-v3.69.0.md`): **E01(a)** el arranque en frío no tiene
+> provenance (degradación declarada de V3.64: `has_comparable_capacity`);
+> **E08** el `abandoned_count` del informe cuenta filas `completed` con
+> `outcome = "abandoned"` (hoy inalcanzables), así que el abandono del lifecycle
+> queda fuera del denominador —correcto— pero **invisible** en el informe;
+> **E15** una servida caducada se cierra como `abandoned` y la siguiente cola la
+> **reabre** (`provenance_status = "reopened"`): el registro representa el estado
+> final, no la historia (P2-04); **E17** `SCAFFOLDING_PENALTY` **suma** al hueco
+> de la modalidad limitante, de modo que el alumno **con** dependencia de apoyo
+> recibe un ELV **MAYOR**, no menor (problema de nombre/semántica, candidato a
+> **Planner 4.0**); **§F-1** el doble montaje de `StrictMode` (el launcher sirve
+> `npm run dev`, así que **ocurre en el producto**) declara un `abandoned`
+> prematuro que la FSM **rechaza** y contabiliza como `invalid_transition` (no
+> corrompe la fila, pero ensucia un contador de salud; arreglo mínimo propuesto
+> para V3.70).
+> **Regla dura respetada:** *V3.69 no debía introducir arquitectura nueva salvo
+> que una prueba E2E demostrara que la actual es insuficiente*; **ningún
+> escenario lo demostró**, así que no se tocó producción y los hallazgos se
+> registran en vez de «arreglarse» a costa del alcance.
+> **Verificación (medida, en secuencia):** `ruff check .` limpio, `pytest` backend
+> **2552 passed** (2532 → +20) **en local** (en CI: **2550 passed + 2 skipped**,
+> los dos `skipped` de `test_stt_asr_integration.py`: modelo Whisper opt-in no
+> descargado en el runner), `transfer_validation` OK, `vitest` **659** (sin
+> cambios), `tsc`/`build` OK, launcher **75 passed**, los gates de script OK y
+> `check_release_consistency` **3.69.0** en los 6 sitios. **Dos honestidades sobre
+> lo que NO se declara limpio:** (i) `ruff format --check` **no** es gate del CI
+> (`ci.yml` corre solo `ruff check .`) y arrastra deriva de formato
+> **preexistente** en ficheros que V3.69 **no ha tocado** (verificado contra el
+> árbol sin cambios); se deja como está y se **registra** en vez de declararlo
+> limpio; (ii) `resize.spec.ts` (preexistente) es **intermitente en local** (pasa
+> aislado y falla en tandas; se reproduce **excluyendo** la spec nueva con
+> `--grep-invert decision_id`), así que la referencia válida es el CI.
+> **CIERRE (2026-09-15):** commit `9a4e70a`, tag anotado `v3.69.0` publicado en
+> `main` y **CI 6/6 verde** — run
+> [34978215154](https://github.com/jvelasca/english-tutor/actions/runs/34978215154):
+> Backend ruff + pytest (**2550 passed + 2 skipped**), Frontend tsc + vitest
+> (**76 ficheros / 659 tests**) + build, Playwright E2E (**25 passed + 26
+> skipped**: las **+2 specs nuevas** entran verdes), Release consistency
+> (**3.69.0**), Beta V3.0 gate y Content validation. El run confirma además que
+> la intermitencia local de `resize.spec.ts` **no** ocurre en el runner del CI.
+> **Auditoría externa de esta release:** punto de entrada autocontenido en
+> `agentes/auditoria-externa-release-v369.md` (informe esperado en
+> `docs/audit/Z2-AUDITORIA-RELEASE-V369.md`), con **15 afirmaciones falsables**,
+> comandos de reproducción y la instrucción de dictaminar los **5 hallazgos** de
+> §C uno a uno. Su pareja de diseño es `agentes/auditoria-externa-v369.md`
+> (informe `Z`).
+> **Roadmap:** **V3.70** auditoría pedagógica/CEFR (siguiente) → **V3.71**
+> runtime/offline/instalación → **V3.72** UX/product completion → **V3.73**
+> auditoría final técnica → **V4.0** («English Tutor, primera versión completa y
+> estable»).
+>
+> **Nota (2026-09-15): auditoría total de V3.68.0 (`Y`) recibida — motor
+> adaptativo CONGELADO y confirmado, V3.69 pasa a ser VALIDACIÓN E2E.**
+> — El dossier externo `docs/audit/Y-AUDITORIA-TOTAL-V368.md` audita el salto
+> `v3.67.0` `150186a` → `v3.68.0` `8acee38` (commit de documentación `d5311cc`)
+> y da el veredicto **9,3 / 10 GLOBAL** con **0 P0 · 0 P1 · 6 P2 · 5 P3**. Es la
+> **primera auditoría de la serie sin ningún P1**: confirma los **tres P1 de
+> segunda generación de V3.67** como **CERRADOS** (Task Definition vs Task
+> Instance, FSM real del lifecycle y ownership/integridad del provenance), el
+> **P2-08** (`unclear`/`abandoned` fuera de la calibración) como cerrado, y
+> declara textualmente que **no encuentra ningún P1 que justifique otra gran
+> modificación arquitectónica del Adaptive Engine**. **El diseño del motor
+> adaptativo queda CONGELADO y confirmado por la auditoría externa.**
+> **Lo que cambia respecto al plan anterior (único cambio de roadmap):** V3.69
+> deja de ser «E2E Adaptive Engine (10 casos)» y pasa a ser **«E2E + Adaptive
+> Engine Validation»**: **validación experimental, NO capacidad nueva**, con la
+> batería obligatoria **E01–E19** (E16 es el **determinismo del Planner**: mismo
+> estado + fingerprint + candidatos + política → mismo task, `p_success`, ELV,
+> razón y `decision_id`, siempre). **Regla dura declarada:** *V3.69 no debe
+> introducir arquitectura nueva salvo que una prueba E2E demuestre que la
+> arquitectura actual es insuficiente.* Briefing ejecutable en
+> `agentes/v369-e2e-adaptive-validation.md`. El resto del roadmap
+> (`V3.70` pedagógica/CEFR → `V3.71` runtime/offline/instalación → `V3.72`
+> UX/product completion → `V3.73` auditoría final → **`V4.0` «English Tutor,
+> primera versión completa y estable»** y a partir de ahí `V4.0.x` de
+> mantenimiento y calibración) **no cambia**.
+> **Auditoría de DISEÑO de V3.69 (2026-09-15):** antes de implementar V3.69 se
+> lanza una revisión externa **de solo lectura sobre el plan**, no sobre código
+> (V3.69 **no existe todavía**: `VERSION` sigue en `3.68.0`, sin tag ni release
+> note). Punto de entrada: `agentes/auditoria-externa-v369.md`; informe esperado
+> en `docs/audit/Z-AUDITORIA-DISENO-V369.md` (letra `Z`). Objeto: el briefing,
+> la batería **E01–E19**, el **criterio de derivación P2/P3** del dossier `Y` §30
+> y las afirmaciones sobre el estado de partida. **Huecos cerrados antes de
+> lanzarla:** al preparar la auditoría se detectó que la batería inicial
+> (E01–E16) **no cubría** el caso (3) «alta dependencia de apoyo» ni el caso (10)
+> «evidencia entrando DURANTE la decisión» de los 10 casos originales de la
+> auditoría `X`, y solo cubría **parcialmente** el caso (8) «dos usuarios
+> simultáneos»; se añadieron **E17** (hueco servido − acreditado → penalización
+> declarada, aserción **diferencial**), **E18** (frescura por HTTP + reproducción
+> determinista del TOCTOU de V3.64.1) y **E19** (coexistencia de dos alumnos
+> activos sin mezcla, en ambas direcciones), de modo que el mapeo con los 10
+> casos es ahora **completo**. Las tres decisiones discutibles de E17/E18/E19
+> (aserción diferencial, la mitad que toca internals en E18 y la relación
+> E12/E19) quedan **sometidas a dictamen del auditor**.
+> **Deuda P2/P3 aceptada en el backlog** (ver el dossier `Y` §30): el lifecycle
+> sigue siendo **best-effort** y falta el *provenance failure rate* como release
+> health metric (P2-01); `decision_records` sigue mezclando DECISION / SERVING /
+> ATTEMPT / OUTCOME sin normalizar (P2-02); `decision_id` **no** identifica un
+> serving y falta la identidad lógica `serving_id`/`attempt_id` (P2-03); la
+> reapertura conserva el `decision_id` y el registro representa el estado final,
+> no la historia (P2-04 · solución futura `decision_events` append-only); la
+> calibración sigue siendo **descriptiva** por bandas de 0,2 y se aplaza a
+> propósito (P2-05); el Planner sigue usando tasas **sin recencia** y sin
+> **Expected Learning Gain real** (P2-06 · pertenece a **Planner 4.0**, no a
+> V3.69). P3: `activity_match` sin métrica agregada (`planner_execution_fidelity`),
+> `target_id` frente al **Sense Engine** (deuda histórica pendiente),
+> **CI 6/6 declarado por el release y NO verificado de forma independiente** por
+> el auditor, y el barrido `close_stale` solo en la construcción de cola.
+> **Correcciones documentales aplicadas con esta nota:** nueva nota de cabecera
+> (esta), corrección de la sección **«0. START HERE»** (declaraba `v3.65.0`,
+> desfasada desde V3.66), `PLAN.md` (tablero de briefings, bloque de «Siguiente
+> incremento» con E01–E19 y M13) y nuevo briefing de V3.69.
+>
+> **Nota (2026-09-15): V3.68.0 (Adaptive Engine Hardening & Integrity)**
+> — release **v3.68.0**, **SIN migración destructiva** (migración ADITIVA e
+> idempotente: dos columnas nuevas en `decision_records`), **SIN bump de
+> `GENERATOR_VERSION`, SIN tocar el banco, SIN capacidad pedagógica nueva y SIN
+> tocar el argmax del Planner**, que cierra los **TRES P1 de segunda generación**
+> de la auditoría de V3.67 más el **P2-08**. Es la **primera release de la serie
+> que toca el frontend por un motivo de MEDICIÓN y no de UI**.
+> **(A) Task Definition vs Task Instance (P1-01,
+> `services/observed_difficulty.py`).** `task_key_parts(target_id, activity,
+> support_level, served_difficulty, assessed_skill)` es la identidad de la
+> **DEFINICIÓN** (cinco componentes, **sin contexto**) — lo que el Planner puede
+> calcular **antes** de elegir instancia — y `task_instance_key_parts(...,
+> context)` la del caso concreto; `empirical_success_by_task(rows)` agrupa por
+> **`task_key`** y se añade `empirical_success_by_task_instance(rows)`;
+> `task_signature_parts`/`task_signature` se **eliminan** (rename, no alias).
+> **Cierre del P1-01:** hasta V3.67 la firma incluía el contexto mientras el
+> candidato del Planner lo construía vacío (`context=""`), así que una tarea de
+> transferencia del ledger **NUNCA** resolvía
+> `p_success_source = "task_empirical"`.
+> **(B) FSM real del ciclo de vida (P1-02,
+> `repositories/decision_records.py`).** Tabla **DECLARADA**
+> `_ALLOWED_TRANSITIONS`: `computed → served`; `served → served`/`started`/
+> `completed`/`abandoned`; `started → started`/`completed`/`abandoned`;
+> `completed → completed` **solo con `outcome` idéntico**; `abandoned →
+> abandoned`; todo lo demás (`computed → started/completed/abandoned`,
+> `completed → *`, `abandoned → *`) se **rechaza con contador**.
+> `served → completed` es válida **a propósito** (best-effort: sin declaración de
+> inicio no se pierde el outcome). `_transition()` pasa de `UPDATE` ciego a
+> **compare-and-set** racional (`decision_id + user_id + estados de origen
+> válidos`): `rowcount > 0` → `"ok"`; `0` → diagnóstico + contador.
+> `close_stale(user_id, *, before_iso)` barre `served`/`started` con
+> `COALESCE(served_at, created_at) < before_iso` a `abandoned` (nunca `computed`,
+> `completed` ni `abandoned`).
+> **(C) Integridad y propiedad (P1-03).** Guardas de `user_id` (propiedad) y
+> `target_id` con fallo **best-effort NO-OP silencioso + contador**: nunca rompe
+> la cola ni el drill y el rechazo se ve en `transition_health()`
+> (`missing`, `wrong_owner`, `target_mismatch`, `invalid_transition`,
+> `closed_decision`, `duplicate_outcome`). La **actividad NO es puerta**: se
+> **registra** como hecho (`executed_activity`) y se deriva `activity_match`,
+> porque el drill degrada peldaños legítimamente (recognition → recall →
+> sentence) y rechazarla perdería medición.
+> **(D) Re-servicio y `provenance_status` vivo.** Como el `decision_id` es
+> determinista, una decisión puede re-servirse: el upsert **REABRE** una fila
+> terminal **sin outcome medible** (`abandoned`, o `completed` con
+> `unclear`/`''`) a `computed` con `provenance_status = "reopened"`, mientras que
+> una fila con **medición real** (`ok`/`ko`) **NO se sobrescribe** (la medición
+> manda) y el nuevo servicio cuenta como `closed_decision`.
+> `build_decision_id` hashea `task_key` (definición) en vez de la firma de
+> instancia y `DECISION_POLICY_VERSION = "v3.68.0"`: **cambia el hash**, así que
+> los `decision_id` nuevos no coinciden con los de V3.67 (las filas de V3.67
+> quedan en `computed`, que es su estado real; **no se migran a la fuerza**).
+> **(E) Migración aditiva (`repositories/db.py`).** Dos columnas con defaults vía
+> `PRAGMA table_info`: `task_key TEXT NOT NULL DEFAULT ''` y
+> `executed_activity TEXT NOT NULL DEFAULT ''`.
+> **(F) Calibración honesta (P2-08, `calibration_report`).** Solo entran en las
+> bandas las filas **MEDIDAS** (`outcome ∈ {ok, ko}`): `unclear` y `abandoned`
+> quedan **fuera del denominador** y del `calibration_error`. Contadores
+> explícitos `completed_count`/`measured_count`/`unclear_count`/
+> `abandoned_count`; `list_decisions` expone `task_key`, `task_instance_key`,
+> `executed_activity`, `activity_match` y `outcome_measured`.
+> **(G) Barrido y salud (`domain/review.py`).** `DECISION_ABANDON_AFTER_HOURS =
+> 24` y `close_stale(...)` **una vez por construcción de cola**, best-effort (un
+> fallo nunca rompe la cola); `provenance_health()` devuelve
+> `{"record_failures", "transition_health"}`.
+> **(H) Endpoints (`routers/vocabulary.py` + esquemas).** Los helpers
+> `_mark_served`/`_mark_completed` llevan `user["id"]`, el `target_id` y la
+> `activity` servida; `drill_transfer_context` mueve su `mark_served`
+> **DESPUÉS** de resolver el contexto (declara `context_id`/`context_instance` de
+> la instancia realmente servida); `drill_write_attempt` declara `served` al
+> inicio (no tiene GET); nuevo `POST /api/vocabulary/drill/decision-lifecycle`
+> (`DecisionLifecycleIn {decision_id, event}`, `event ∈ {"started","abandoned"}`
+> validado por `Literal`). Todo best-effort.
+> **(I) Frontend, el eslabón que hace REAL el ciclo.** Hasta V3.67 el cliente
+> **NUNCA** devolvía `decision_id` (cero ocurrencias en `frontend/src`): en
+> producción el ciclo de vida era **código muerto** y la calibración daba
+> siempre `completed_count = 0`. `types/api.ts` gana `decision_id?`/`task_key?`/
+> `task_instance_key?` en `ReviewQueueItem`; **todas** las funciones del drill de
+> `api/vocabulary.ts` aceptan `decisionId?` y lo reenvían (query en los GET,
+> body/FormData en los POST); nuevas `markDrillStarted`/`markDrillAbandoned`;
+> `wordDrill.tsx` declara `started` **cuando el peldaño YA está cargado** (la FSM
+> rechaza `computed → started`: declararlo al montar competiría con el GET y el
+> evento se perdería por una carrera) y `abandoned` **al desmontar**;
+> `ReviewQueueSection.tsx` pasa `decisionId={active.decision_id}`. Sin
+> `decisionId` (drill abierto desde el diccionario) no se declara nada, y la
+> **terminalidad la decide la FSM del servidor**, no el cliente.
+> **Tests:** `backend/tests/test_decision_v368.py` (**29**, test-first) fija el
+> `task_key`/`task_instance_key` con la **regresión del P1-01** (una entrada de
+> tarea con `attempts = 2` y el candidato del Planner casando), la FSM completa
+> con rechazos contados e idempotencia, la propiedad y el target, el re-servicio,
+> el barrido, la calibración honesta y el round-trip del router; actualizados
+> `test_decision_v367.py`/`test_decision_v366.py` y los tests de frontend
+> (`vocabulary.test.ts`, `wordDrill.test.tsx`, `ReviewQueueSection.test.tsx`).
+> **Fuera de alcance (declarado):** Adaptive Instance Selection (el nivel de
+> instancia se **nombra, deriva y observa** pero **no puntúa** el argmax),
+> `decision → serving → attempt` en tablas separadas (se resuelve con la regla de
+> re-servicio y **un outcome por decisión**: el del PRIMER intento de la sesión),
+> snapshot único y calibración real (ML). **Roadmap declarado (diseño del motor
+> adaptativo CONGELADO):** V3.69 E2E completo → V3.70 auditoría pedagógica →
+> V3.71 runtime/offline/instalación → V3.72 UX/product completion → V3.73
+> auditoría final → V4.0 producto terminado. Ver `release-notes-v3.68.0.md`.
+> **CIERRE (2026-09-15):** commit `8acee38`, tag `v3.68.0` publicado en `main` y
+> **CI 6/6 verde** (run `34964205252`: Backend ruff+pytest, Frontend tsc+vitest+build,
+> Release consistency, Beta V3.0 gate, Content validation y Playwright E2E).
+> Gates locales: ruff limpio, **2532 passed**, `transfer_validation` OK, `tsc` limpio,
+> **659 passed** en vitest, `build` OK, `content_validation` OK, `check_beta_v3` OK y
+> `check_release_consistency` OK (3.68.0).
+>
+> **Nota (2026-09-15): V3.67.0 (Task Identity 2.0 + Decision Lifecycle +
+> Provenance Analytics)**
+> — release **v3.67.0**, **SIN migración destructiva** (migración ADITIVA e
+> idempotente sobre `decision_records`), **SIN bump de `GENERATOR_VERSION`, SIN
+> tocar el banco y SIN cambios de UI**, que cierra los **DOS P1** de la auditoría
+> de V3.66: **P1-01** la identidad de tarea deja de ser el `target_id` y pasa a
+> ser `task_signature` (la firma canónica de **SEIS** componentes), de modo que el
+> MISMO ítem con distinta actividad, apoyo o carga servida es **OTRA** tarea; y
+> **P1-02** el Decision Provenance deja de ser append-only escrito en el GET y
+> pasa a ser un **UPSERT idempotente** con `decision_id` DETERMINISTA y **ciclo de
+> vida** `computed → served → started → completed/abandoned`, con round-trip del
+> cliente por los GET/POST del drill.
+> **(A) Task Identity 2.0 (`services/observed_difficulty.py`).**
+> `task_signature_parts()` (pura, determinista) combina `(target_id, activity,
+> support_level, served_difficulty, context, assessed_skill)` con
+> `difficulty.format_vector` y normaliza los componentes ausentes a `""`;
+> `task_signature(row)` deriva la firma de una FILA del estado usando
+> `task_semantics.assessed_skill_for(activity)` (**NO** el `modality` canónico del
+> estado, que habla otro vocabulario) para que la firma del **ledger** y la del
+> **candidato** CASEN; nueva `empirical_success_by_task(rows)` que agrupa por
+> FIRMA (Nivel `task_empirical`) con la MISMA puerta espaciada de V3.54.
+> **(B) Estadística honesta (P2-06/07).** `_empirical_entry()` devuelve
+> `p_success_observed` (nombre honesto), `raw_rate` = `long_term_rate` (tasa
+> global CRUDA) y `recent_rate` (últimos `RECENT_ATTEMPTS = 5` intentos,
+> **descriptiva**: no es una tendencia ni hay suavizado); `p_success` se CONSERVA
+> como alias retrocompatible de V3.66.
+> **(C) Jerarquía de CUATRO niveles (`services/planner.py`).**
+> `expected_learning_value`/`select_task_by_elv` ganan `target_empirical_success` y
+> resuelven `p_success` con el orden `task_empirical` > `target_empirical` >
+> `skill_empirical` > `margin`; `_task_empirical_for(by_activity, activity)`
+> resuelve la tasa por TAREA por ACTIVIDAD del drill (y acepta un payload escalar
+> retrocompatible); el payload añade `p_success_source = "target_empirical"` y
+> `target_p_success`. Sin estimación la salida es EXACTAMENTE la de V3.64/V3.65.
+> **(D) Decision Lifecycle (P1-02, `repositories/decision_records.py` + `db.py`).**
+> `decision_id` pasa de `uuid4` a hash determinista (`build_decision_id`: sha256
+> de `user_id`/`target_id`/`task_signature`/`decision_start_fingerprint`/
+> `policy_version`) y `record_decision()` pasa de INSERT a **UPSERT**
+> (`ON CONFLICT(decision_id) DO UPDATE`) con índice único
+> `idx_decision_records_decision_id` — el ciclo GET→GET→GET ya **no duplica
+> filas**; transiciones `mark_served`/`mark_started`/`mark_completed(decision_id,
+> outcome)` sobre `computed`/`served`/`started`/`completed`/`abandoned`;
+> `DECISION_POLICY_VERSION = "v3.67.0"`.
+> **(E) Migración aditiva e idempotente (`db.py`).** Se elimina el alias confuso
+> `evidence_fingerprint` (P3-09: duplicaba `decision_start_fingerprint`) con guarda
+> para SQLite sin `DROP COLUMN`, y se añaden 12 columnas con defaults
+> (`task_signature`, `context_id`, `context_instance`, `served_load_json`,
+> `support_level`, `assessment_mode`, `decision_status`, `served_at`,
+> `started_at`, `completed_at`, `outcome`, `provenance_status`); las filas legacy
+> quedan con los defaults (status `computed`).
+> **(F) Snapshot coherente (P2, `domain/decision.py`).** `_recompute()` devuelve el
+> estado y AMBOS mapas empíricos **DENTRO del mismo lazo de sellado**, de modo que
+> `state_fingerprint` y el mapa describen el MISMO snapshot de evidencia;
+> `review.py` (P3-10) expone `provenance_health()` con el contador local de
+> pérdida silenciosa del registro.
+> **(G) Léxico (`services/lexicon.py`).** `_task_empirical_by_activity()` resuelve
+> la firma del candidato para cada actividad posible y `_task_signature_for()`
+> produce la firma de la tarea FINAL servida (la MISMA que agrupa el ledger); el
+> ítem servido expone `task_signature`/`served_load`/`assessment_mode`.
+> **(H) Round-trip del ciclo de vida (`domain/review.py` + `routers/vocabulary.py`
+> + esquemas).** El `decision_id` se propaga a cada ítem servido; los GET de
+> peldaño llaman `mark_served` y los POST de intento
+> `mark_completed(decision_id, outcome)` (`ok`/`ko`/`unclear`); los esquemas de
+> intento ganan `decision_id` opcional. Todo **best-effort** (nunca rompe la cola
+> ni el drill).
+> **(I) Analítica del provenance (P3-10/11/12).** Nuevo
+> `GET /api/learning/decisions` (solo lectura) con `list_decisions` (filtros
+> `status`/`target_id`, paginación) y `calibration_report` (predicted vs observed
+> por bandas de 0.2 sobre las filas `completed`, con `calibration_error` medio
+> ponderado).
+> **Tests:** `backend/tests/test_decision_v367.py` (**12**, test-first) fija el
+> determinismo y la sensibilidad de la firma, la firma distinguiendo **DOS
+> actividades del MISMO `target_id`** (el cierre del P1-01), la puerta espaciada,
+> las tasas `raw`/`recent`/`long_term`, la jerarquía completa, la idempotencia del
+> UPSERT, la metadata de tarea, las transiciones del ciclo de vida y el informe de
+> calibración; actualizados `test_decision_v366.py` (ítem → `target_empirical`) y
+> `test_decision_projection_v364.py` (nueva aridad de `_recompute`).
+> **Honestidad:** la identidad de tarea es AHORA la firma completa (P1-01 cerrado)
+> y el provenance es idempotente con ciclo de vida (P1-02 cerrado); el informe de
+> calibración es **descriptivo** (sin ML ni suavizado) y `recent_rate` es una tasa
+> cruda de la cola reciente, no una tendencia. La firma del candidato resuelve el
+> contexto **vacío** (se elige en el GET del peldaño): casa con el ledger en los
+> cinco componentes restantes.
+> **Fuera de alcance (V3.68+):** Adaptive Instance Selection (elegir la INSTANCIA
+> dentro de la tarea), Sense Engine 2.0 y los P2 de calibración pedagógica. Ver
+> `release-notes-v3.67.0.md`.
+> **CIERRE (2026-09-15):** commit `ded2498`, tag `v3.67.0` publicado en `main` y
+> **CI 6/6 verde** (run `34956513808`: Backend ruff+pytest, Frontend tsc+vitest+build,
+> Release consistency, Beta V3.0 gate, Content validation y Playwright E2E).
+> Gates locales: ruff limpio, **2503 passed**, `transfer_validation` OK,
+> `content_validation` OK, `check_beta_v3` OK y `check_release_consistency` OK.
+>
+> **Nota (2026-09-14): V3.60.0 (Context Engine 4.0 — Instance Specification →
+> Parameterized Instance)**
+> — release **v3.60.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION` y
+> SIN cambios de UI**, que cierra los **cuatro hallazgos** de la **auditoría
+> externa R** de V3.59: **P1-1** «3 superficies deterministas siguen siendo
+> memorizables» (una familia se agotaba en **tres intentos**), **P1-2** «la
+> instancia puede cambiar la dificultad real sin poder declararlo»
+> (`CONTEXT_INSTANCE_KEYS = ("instance", "prompt")` no dejaba expresar
+> escenario/objetivo/registro/delta), **P2-6** «Context Engine todavía
+> manual/finito» (20 × 3 = **60 consignas escritas a mano**) y **P2-7** «la
+> instancia no genera dificultad» (la superficie era solo `presentation_surface`).
+> **FRONTERA DECLARADA Y PROBADA (invariante de no-fragmentación):** V3.60 **no
+> añade redacciones a mano NI usa un LLM en el camino de la evidencia** (premisa
+> 21): parametriza la **COMBINACIÓN de contenido DECLARADO**. La **FAMILIA** sigue
+> siendo la identidad pedagógica **y la unidad de EVIDENCIA** (su `id` es el
+> `context_id` del ledger) y la **INSTANCIA** es una superficie concreta de esa
+> MISMA identidad, derivada de una **ESPECIFICACIÓN** declarada:
+> **FAMILIA → ESPECIFICACIÓN → INSTANCIA**. Ninguna clave nueva entra en
+> `CONTEXT_DIMENSIONS`, `context_distance`, `context_diversity`,
+> `_novelty_score`, `transfer_state` ni sus umbrales, y `context_difficulty()`
+> (la carga de la FAMILIA) **no cambia**.
+> **(A) Lista blanca ampliada, NO identitaria.** `CONTEXT_INSTANCE_KEYS` pasa de 2
+> a 7 claves (`scenario`/`goal`/`register`/`difficulty_delta`/`skill_delta`): una
+> superficie puede describir **qué situación concreta** sirve, con qué registro, y
+> el **AJUSTE** de carga o las competencias que **añade**, pero **sigue sin poder
+> tocar la identidad** (`id`, las seis dimensiones core, `cefr`,
+> `difficulty_vector`, `skills`, `lexical_environment`, `syntactic_focus`). Un
+> test fija que la intersección con las claves de familia es **exactamente
+> `{"prompt"}`** y `_surface_details` **lee solo** esas siete claves (descarta el
+> resto): es la garantía de que el ledger no se fragmenta.
+> **(B) Espacio mínimo y techo.** `CONTEXT_INSTANCE_SPACE_MIN = 12` superficies
+> **TOTALES** por familia es el invariante anti-memorización (con 3 redacciones el
+> alumno agotaba la familia en 3 intentos) y `CONTEXT_INSTANCE_SPACE_MAX = 96` el
+> techo: el recorte deja un **PREFIJO** del producto cartesiano en orden
+> declarado. **El banco pasa de 60 a 358 superficies** (16–19 por familia) sin
+> tocar ninguna `id`.
+> **(C) Especificación → superficie (núcleo puro y determinista).**
+> `context_instance_spec` normaliza el `instance_space` declarado y lo declara
+> **INSERVIBLE** (`{}`) si la plantilla no tiene placeholders válidos o si algún
+> placeholder no tiene valores; `_instance_value` exige `value` (**OBLIGATORIA**:
+> sin texto el valor se DESCARTA, no se inventa contenido); `_skill_delta`
+> restringe las competencias añadidas al vocabulario `CONTEXT_SKILLS`;
+> `_expand_spec` recorre el producto cartesiano en el orden de `selection`, suma
+> los deltas por dimensión, deriva la etiqueta con `_slug` (**estable entre
+> ejecuciones: nunca `hash()`**) y descarta lo que no se pueda renderizar.
+> `context_instance_details` devuelve el espacio COMPLETO en un único orden
+> (**histórica → declaradas de V3.59 → generadas**, dedup por consigna, claves
+> siempre presentes) y `context_instances` se conserva como **vista de 2 claves**
+> sobre él, para no romper el contrato puro de V3.59.
+> **(D) Dificultad efectiva (`services/difficulty.py`).** `normalize_delta`
+> (deltas ENTEROS por dimensión canónica, clamp **±2**, ignora basura) y
+> `apply_delta` (base + delta recortado al envelope **1..5**; un delta sobre una
+> dimensión que la base no declara se **IGNORA**; con delta vacío devuelve
+> `normalize_vector(vector)` **EXACTO**). La familia declara la carga **ABSOLUTA**
+> y la superficie solo el **MATIZ**: es la frontera que impide reinterpretar la
+> identidad.
+> **(E) Degradación EXACTA.** Sin intentos la superficie es la **0** (consigna
+> histórica, byte a byte) y el delta efectivo es `{}`; `space[:3]` reproduce byte
+> a byte las **tres superficies de V3.59** (la rotación no cambia, se PROLONGA) y
+> la familia servida es idéntica con y sin `attempts_by_context` (test clave por
+> clave). `context_difficulty()` NO cambia: los llamadores de solo lectura quedan
+> intactos.
+> **(F) Banco.** `instance_space` en las 20 familias con `template` + 2 slots y
+> deltas **solo donde son reales** (`discourse +1` en
+> `debate`/`mediation`/`academic`, `interaction +1` con audiencia crítica,
+> `skill_delta: written_production` en la contribución escrita formal). Las dos
+> `instances` de V3.59 se conservan tal cual en los índices **1 y 2** y el
+> `template` no contiene la unidad objetivo (la consigna sigue dando ESCENARIO, no
+> palabra) ni deja llaves sueltas.
+> **(G) Ledger, sin migración.** `_record_transfer_evidence` persiste
+> `transfer.served_difficulty(context_id, attempts_by_context)` —con el **MISMO
+> resumen** de evidencia que el GET/POST— en las columnas aditivas de V3.55, así
+> que la carga guardada corresponde a la tarea **REALMENTE servida**, incluida su
+> superficie. `observed_difficulty` sigue siendo la proyección legacy y las
+> superficies sin delta (incluida siempre la 0) escriben **bytes idénticos** a
+> V3.59.
+> **(H) Contrato aditivo:** `context_for` gana **8 claves** en TODOS los retornos,
+> incluido el de banco vacío; **36 en total** y las **28 de V3.59** intactas y
+> fijadas por test, con espejo **opcional** en `frontend/src/types/api.ts`.
+> **NO cambia:** la selección de familia (novedad, distancia, diversidad, CEFR),
+> `transfer_state` y sus umbrales, `context_signals`, `CEFR_CAPACITY`, el
+> Difficulty Engine de V3.52–V3.55, el scoring, FSRS, el planner y el Sense
+> Engine. Tests: nuevo `test_context_engine_v360.py` (23, con **equivalencia
+> pedagógica** de las superficies de una familia, robustez de
+> `details`/`metadata` y end-to-end HTTP de la superficie generada con el vector
+> efectivo persistido), `pytest` **2335 passed** en local, launcher **75 passed**,
+> `ruff` limpio, `tsc` OK, `vitest` **651**, `npm run build` OK y
+> `check_release_consistency` **3.60.0**. **CI 6/6 en verde** (run
+> [34814504063](https://github.com/jvelasca/english-tutor/actions/runs/34814504063)
+> sobre `2c79040`: Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.60.0` creada y empujada. Ver
+> `release-notes-v3.60.0.md`.
+> **Auditoría externa:** el punto de entrada es
+> `agentes/auditoria-externa-v360.md` (autocontenido: tag `v3.60.0` → `2c79040`,
+> diff `e721fce..2c79040`, run `34814504063`, 11 afirmaciones a falsar y 10
+> preguntas de alto valor).
+> **Auditorías recibidas (2026-09-14).** Se han archivado **dos** informes con
+> veredictos que **no coinciden**:
+> `docs/audit/S-AUDITORIA-TOTAL-V360.md` (auditoría profunda: **9,6/10,
+> APROBADA**, 0 P0, 3 P1, 5 P2, 2 P3) y
+> `docs/audit/T-AUDITORIA-TOTAL-V360.md` (verificación funcional:
+> **2 defectos**, uno **alta** y otro **media**).
+> **Veredicto consolidado:** `S` acierta en la arquitectura y se equivoca en el
+> **alcance** del anti-spoiler; `T` acierta en el defecto. `S` validó el
+> anti-spoiler sobre el `template` y las claves del `instance_space`, pero **no**
+> sobre cada **valor de slot** contra la unidad objetivo: de ahí el defecto.
+> **(T-01, alta)** la familia `shopping` sirve en el índice 7 la consigna «You are
+> in **a supermarket** and cannot find what you need…»
+> (`backend/services/transfer.py:1074`, servida en `:2978`): si la unidad es
+> `supermarket`, la respuesta está a la vista y la evidencia de transferencia
+> queda contaminada. **(T-02, media)** `TransferAttemptIn` no identifica la
+> superficie emitida (`backend/schemas/vocabulary.py:826`) y el POST recalcula la
+> dificultad con el contador actual (`backend/domain/vocabulary.py:850`), así que
+> el ledger puede persistir el vector de la superficie **siguiente**. El **CI
+> 6/6** de V3.60 se mantiene como **documentado, no verificado de forma
+> independiente** (la consulta directa al run `34814504063` no devuelve los
+> workflow runs; coincide con el P3-03 de `S`). Los **P1 de `S`** (espacio aún
+> memorizable, equivalencia pedagógica no demostrada, Student Skill State
+> agregado) se aceptan como **siguiente escalón**, no como defecto de V3.60.
+> **Cierre aplicado (V3.61):** **Instance-aware Evidence +
+> Anti-spoiler Guard**, que cierra **T-01** y **T-02**: guard anti-spoiler por
+> unidad objetivo en la superficie servida (`available_instance_details`), guard
+> de **identidad inmutable** de instancia en el GET que el POST valida para
+> persistir **su** dificultad servida, y **evidencia instance-aware**
+> (`context_instance` aditivo en el ledger, **sin migración** y manteniendo
+> `context_id = FAMILIA`, es decir sin fragmentar la identidad pedagógica). Incluye
+> los P1 de `S` en su parte determinista: cap **estratificado** en `_expand_spec`
+> (hoy es un prefijo del producto cartesiano), rotación no secuencial a partir del
+> tercer intento y un **validador de contenido** del `instance_space`. La deuda
+> declarada sigue igual: **Student Skill State 4.0** (V3.62; la auditoría `S` lo
+> llama «3.0», pero ese nombre ya es V3.54), **Observed Task
+> Difficulty 2.0** (V3.63), **Planner 3.0** y rotación adaptativa (V3.64),
+> **Instance Generator 2.0** (V3.65) y WSD real.
+>
+> **Estado (2026-09-14): V3.61.0 CERRADA y publicada** — `VERSION`
+> `3.61.0` (app `3.60.0 → 3.61.0`), **columna aditiva idempotente** en
+> `learning_evidence` (sin migración explícita) y **sin bump de
+> `GENERATOR_VERSION`**. **(A) Guard:** `reveals_target` +
+> `available_instance_details` (token/fronteras + variantes inflexivas, sin LLM)
+> retiran del espacio las superficies que NOMBRAN la unidad; `context_for` solo
+> retira del pool las familias sin superficie servible **si queda alternativa
+> segura** y, con el banco patológico, degrada a V3.60 declarándolo
+> (`instance_guarded=False`); en el banco real `shopping` retira **12** superficies
+> con la unidad `supermarket` y conserva **39** servibles. **(B) Identidad
+> inmutable:** `TransferAttemptIn.context_instance` + `serve_instance(...)` →
+> `{instance, index, count, matched, difficulty, suppressed}` y
+> `served_difficulty_for_instance` en el ledger: el POST persiste la carga de la
+> superficie **respondida** aunque el contador avance. **(C) Ledger:**
+> `context_instance TEXT NOT NULL DEFAULT ''` (kw-only en `record_evidence`/
+> `record_evidence_bulk`, devuelta por `list_evidence`) manteniendo
+> `context_id = transfer:<id>` — **nunca** `transfer:<id>:<slug>`. **(D) P1-01:**
+> cap **estratificado** (`_stratified_indices`/`_partial_at`, idéntico por debajo
+> del techo), rotación **no secuencial** desde el 3.er intento sembrada por
+> `(familia, unidad)` con `zlib.crc32` (biyección: se visita todo el espacio) y
+> **banco 358 → 1020 superficies** (tercer eje `constraint`). **(E) P1-02:**
+> `services/transfer_audit.py` + CLI `python -m scripts.transfer_validation`
+> (paso extra del job Backend en `ci.yml`): deltas justificados con
+> `scenario`/`goal`, `register` de instancia = familia, `skill_delta` del
+> vocabulario, tarea asegurada para la unidad y perfil de demanda advisory.
+> **(F) Contrato:** 38 claves en `TransferContextOut` y cinco nuevas en
+> `TransferAttemptOut`, espejo TS y `context_instance` en la petición del drill
+> (sin cambio visual ni de i18n). Verificación local: `pytest` **2373 passed**,
+> `ruff` limpio, launcher **75 passed**, `tsc` OK, `vitest` **651** (76
+> ficheros), `npm run build` OK, `check_release_consistency` **3.61.0**,
+> `check_beta_v3` OK, `content_validation` OK y `transfer_validation` **20
+> familias / 1020 superficies / 0 errores**. Auditorías archivadas en
+> `docs/audit/S-AUDITORIA-TOTAL-V360.md` y `docs/audit/T-AUDITORIA-TOTAL-V360.md`.
+> **Cerrada:** commit de release `1b4af42`, **CI 6/6** (run
+> [34831625926](https://github.com/jvelasca/english-tutor/actions/runs/34831625926),
+> con el paso nuevo `python -m scripts.transfer_validation` **en verde** dentro del
+> job Backend) y etiqueta anotada `v3.61.0` creada y empujada. El detalle está en
+> `release-notes-v3.61.0.md` y el registro del incremento en
+> `agentes/v361-instance-aware-evidence.md`.
+>
+> **Estado (2026-09-14): V3.62.0 CERRADA y publicada** — `VERSION` `3.62.0` (app `3.61.0 → 3.62.0`), **columna
+> aditiva idempotente** en `learning_profile` (`skill_state`) y **sin bump de
+> `GENERATOR_VERSION`**. **(A) Taxonomía:** nuevo `services/skill_axis.py` con
+> `SKILL_MODALITIES` (9), `MODALITY_BY_VOCABULARY` (mapa preciso por vocabulario,
+> totalidad de `LEXICAL_SKILLS` verificada en import), el aplanado `MODALITY_OF`
+> con `AMBIGUOUS_STRINGS` explícitas (el estado NUNCA resuelve competencia con el
+> aplanado: `register`/`discourse`/`nuance`/`pragmatics` pertenecen a VARIAS
+> destrezas), `COMPETENCES_BY_MODALITY` (derivadas de `curriculum.SUBSKILLS` +
+> rúbricas), `canonical_competence` (casefold + strip, **sin** fuzzy matching) y
+> `objective_competences_index()` con `lru_cache`. Decisiones escritas:
+> `spontaneous_use → interaction` (su único emisor es `chat`, que es TEXTO),
+> `interaction`/`mediation` sin competencias, `receptive` en `UNMAPPED` con motivo
+> y la discrepancia `LISTENING_SUBSKILLS` (18) vs `SUBSKILLS["listening"]` (19)
+> resuelta como **unión** probada. **(B) Agregador:** nuevo
+> `services/skill_state.py`: las CUATRO fuentes (léxico, `academy_evidence`,
+> `listening_attempts`, `pronunciation_attempts`) → filas canónicas → **misma**
+> puerta espaciada de V3.54 (2 éxitos en 2 días) → `{modalidad: {competencia:
+> entry}}` con el gate **reutilizado** de `competence.competence_state` (sin un
+> umbral nuevo); el camino léxico aporta entradas de modalidad con `dimensions`
+> (paridad EXACTA con `observed_skill_capacity`) y **sin** competencia, y la
+> competencia solo existe si la FUENTE la declara (subdestrezas del objetivo
+> restringidas a la modalidad, subdestreza de listening; una fila de academia sin
+> objetivo resoluble no acredita éxito: mismo hueco F-K3 del Student Model).
+> **(C) Persistencia y contrato:** `learning_profile.skill_state` por el camino
+> idempotente de `ALTER TABLE`, escritor dedicado `set_skill_state`, lector nuevo
+> `pronunciation.list_attempts`, `LearningProfile.skill_state`/`skill_state_summary`
+> y espejo TS (sin cambio visual ni de i18n); JSON con `sort_keys=True` y sin reloj
+> en la función pura. **(D) La invariante central:** con un `skill_state` rico
+> persistido, `learner_level_state`, el payload del drill (con su `learning_value`),
+> `select_task_by_elv` + `expected_learning_value` y `transfer.context_for`
+> devuelven **exactamente** lo de V3.61, y un test estructural fija que ningún
+> módulo del camino de decisión menciona el estado nuevo. Verificación local:
+> `pytest` **2404 passed**, `ruff` limpio, launcher **75 passed**, `tsc` OK,
+> `vitest` **651** (76 ficheros), `npm run build` OK,
+> `check_release_consistency` **3.62.0**, `check_beta_v3` OK, `content_validation`
+> OK y `transfer_validation` **20 familias / 1020 superficies / 0 errores** (la
+> release NO toca el banco). **Cerrada:** commit de release `f4bcee2`, **CI 6/6**
+> (run [34839206611](https://github.com/jvelasca/english-tutor/actions/runs/34839206611))
+> y etiqueta anotada `v3.62.0` creada y empujada. Detalle en
+> `release-notes-v3.62.0.md`.
+>
+> **Incremento aplicado (relevo ejecutado): V3.62 — Student Skill State 4.0
+> (modalidad × competencia)** — `agentes/v362-student-skill-state-4.md`. Cierra el
+> **P1-03** de la auditoría `S`: hoy conviven **dos** modelos del alumno que nunca
+> se tocan (el **adaptativo léxico**, `LEXICAL_SKILLS` × `DIFFICULTY_DIMENSIONS`,
+> cuya única fuente es `learning_evidence` y que alimenta el ELV/planner/
+> `transfer.context_for`; y el **curricular**, `MASTERY_SKILLS` × 4 estados
+> pedagógicos, Student Model, que solo llega a `/api/profile`), las cuatro
+> «dimensiones» del primero son **CARGA de contenido, no competencia**
+> (`syntax` ≠ `grammar`, y no hay eje fonológico, ortográfico ni pragmático) y
+> toda la evidencia no léxica (grammar, listening por subdestreza, pronunciation,
+> reading, writing, speaking) es **inerte** para el estado. V3.62 los unifica en un
+> estado **{modalidad: {competencia: …}}** alimentado por **las cuatro** fuentes
+> con el **mismo** rigor de muestra espaciada, **reutiliza** el gate de
+> `services/competence.py` (sin umbrales nuevos) y es **aditivo** (columna
+> idempotente + `LearningProfile.skill_state` + espejo TS). **Alcance cerrado con
+> el gerente:** la decisión de tareas queda **intacta** y se prueba **byte a
+> byte**; el recableado del planner es V3.63/V3.64. Ojo con el matiz: el cierre de
+> V3.54 (una capacidad **escrita** no eleva una tarea **oral**) sigue vigente y
+> **no** se re-reclama. Deuda declarada tras V3.62: **Observed Task Difficulty
+> 2.0** (V3.63), **Planner 3.0** y rotación adaptativa (V3.64), **Instance
+> Generator 2.0** (V3.65) y WSD real.
+>
+> **Nota (2026-09-14): auditorías de V3.62.0 recibidas.** Se archiva el informe
+> profundo como `docs/audit/U-AUDITORIA-TOTAL-V362.md` (**9,5 / 10 APROBADA**; 0
+> P0, **2 P1**, 5 P2, 2 P3; letra `U` porque la `R` sigue **reservada** al informe
+> nunca publicado de V3.59) y el punto de entrada de la auditoría externa como
+> `agentes/auditoria-externa-v362.md` (su informe se espera en
+> `docs/audit/V-AUDITORIA-TOTAL-V362.md`). Veredicto: V3.62 **sí** cierra el
+> problema arquitectónico abierto (ya no hay dos modelos del alumno aislados) y
+> evita tres errores graves (no convierte dificultad en competencia, no inventa
+> competencias y no mezcla modalidades), pero **el estado nuevo todavía no
+> gobierna la decisión de tareas**. Los dos P1 son los que importan: **P1-01** (el
+> Skill State es DESCRIPTIVO, no DECISIONAL: el puente debe ser `Student Skill
+> State → Decision Projection → Planner`, nunca `skill_state → planner`
+> directamente) y **P1-02** (la semántica `spontaneous_use → interaction` debe
+> evolucionar cuando exista conversación oral real, para distinguir interacción
+> escrita y oral según el CANAL observado, no según la skill). Los P2 aceptados
+> como deuda del siguiente escalón: competencia de pronunciación (P2-11), eje
+> declarado de capas de listening (P2-12), granularidad por duplicación de
+> competencias (P2-13), semántica del gate por pareja (P2-14), **frescura/caché del
+> estado** (P2-18), **confianza de evaluación vs confianza estadística** (P2-19) y
+> **dificultad empírica de la tarea** (P2-20). El **CI 6/6** de V3.62 queda como
+> **documentado, no verificado de forma independiente** (la consulta directa de
+> `status`/`workflow_runs` de `f4bcee2` no devuelve runs: coincide con el P3-02).
+> **Orden de trabajo decidido:** primero **V3.63 — Observed Task Difficulty 2.0**
+> (más la honestidad del modelo: canal, identidad de evidencia, capas, confianza de
+> evaluación y frescura), y **después** el recableado (**V3.64 Decision Projection
+> + Planner 3.0**), porque precipitar el recableado convertiría el Student Skill
+> State en otra capa de heurísticas superpuestas.
+>
+> **Nota (2026-09-13): V3.59.0 (Context Engine 3.0 — Context Bank Family/Instance)**
+> — release **v3.59.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`,
+> SIN cambios de UI y SIN tocar el ledger**, que cierra el candidato diferido
+> desde **V3.48** y el hallazgo **P2-04** de la auditoría de V3.43: un banco
+> finito de consignas **FIJAS** se **MEMORIZA**. Agotado el banco
+> (`exhausted=True`), el motor rotaba sobre las **mismas 20 redacciones**, así que
+> un alumno podía **reciclar una respuesta aprendida** en lugar de transferir la
+> unidad — y la evidencia lo registraba como transferencia.
+> **FRONTERA DECLARADA Y PROBADA (invariante de no-fragmentación):** una
+> **FAMILIA** es la identidad pedagógica **y la unidad de EVIDENCIA** (su `id` es
+> el `context_id` del ledger); una **INSTANCIA** es una superficie **DECLARADA**
+> de esa misma familia (otra redacción del mismo escenario). V3.59 **no añade
+> familias**: añade superficies **dentro** de las 20 existentes, así que la
+> evidencia no se fragmenta, la escalera de `transfer_state` no se reescala y los
+> umbrales no se reinterpretan. Sin esto, ampliar el banco «a lo bruto» habría
+> movido el ledger retroactivamente.
+> **(A) La superficie 0 es la consigna histórica.** `context_instances` devuelve
+> SIEMPRE la consigna de V3.58 como primera superficie y, sin intentos, la
+> degradación es **EXACTA** a V3.58 (byte a byte en los seis contextos
+> **congelados**, que un test fija). La invariante «misma evidencia → misma
+> consigna» se mantiene.
+> **(B) Rotación por intentos de la FAMILIA** (`N % nº_superficies`) en
+> `context_instance_index`, no por hash ni aleatoriedad: determinista y
+> explicable, y el ítem recibe una redacción distinta en cada estancia hasta
+> agotar la familia. `_count`/`_attempts_for` son **tolerantes** a la forma del
+> resumen de evidencia (int, str, dict o basura) y **solo** leen
+> `{"attempts": n}`: no interpretan notación nueva.
+> **(C) La identidad no se puede tocar.** `CONTEXT_INSTANCE_KEYS` es **lista
+> blanca** (`prompt` + etiqueta): una instancia **no puede** declarar
+> `cefr`/`difficulty_vector`/dimensiones core, y `context_instances` **normaliza y
+> descarta** entradas inválidas. `CONTEXT_INSTANCES_MIN = 2` (superficies
+> adicionales) se verifica en el banco: el banco pasa de **20 consignas a 60
+> superficies** sin fragmentar el ledger.
+> **(D) Contrato aditivo:** `context_for` acepta `attempts_by_context` y devuelve
+> `context_instance`/`instance_index`/`instance_count`; las **25 claves de
+> V3.58** quedan **intactas** y fijadas por test, con espejo **opcional** en
+> `frontend/src/types/api.ts`. El cableado pasa el mapa de intentos en los **dos**
+> caminos de `domain/vocabulary.py` (GET de la consigna y POST del intento), y el
+> test de no-regresión compara el payload con y sin intentos para probar que la
+> **decisión de familia no cambia**.
+> **(E) Sin migración ni regeneración:** las superficies son **contenido
+> declarado** dentro de la estructura existente del banco, no columnas nuevas ni
+> contenido generado. Sin migración, sin bump de generador y sin invalidar caché.
+> **NO cambia:** la selección de familia (selección por novedad, distancia,
+> diversidad y CEFR intacta), `transfer_state` y sus umbrales, `context_signals`,
+> `context_distance`/`context_diversity`/`CONTEXT_DIVERSITY_MIN`,
+> `_novelty_score`, `difficulty.py`, `CEFR_CAPACITY`, el scoring, FSRS, el planner
+> y el Sense Engine. Tests: nuevo `test_context_engine_v359.py` (16, con
+> end-to-end HTTP de la rotación con el pool agotado), `pytest` **2312 passed** en
+> local, launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651**,
+> `npm run build` OK y `check_release_consistency` **3.59.0**. **CI 6/6 en verde**
+> (run [34782482120](https://github.com/jvelasca/english-tutor/actions/runs/34782482120)
+> sobre `e721fce`: Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.59.0` creada y empujada. Ver
+> `release-notes-v3.59.0.md`.
+> **Siguiente paso (ya ejecutado):** V3.60 — **Context Engine 4.0** (Instance
+> Specification → Parameterized Instance), que cierra los P1-1/P1-2/P2-6/P2-7 de
+> la auditoría externa **R** de V3.59. Ver la nota superior.
+>
+> **Nota (2026-09-13): V3.58.0 (Sense Engine 2.0 — `surface → lemma → sense → semantic_fit`)**
+> — release **v3.58.0**, **SIN migración de BD, SIN bump de `GENERATOR_VERSION`
+> y SIN cambios de UI**, que cierra la mitad que **V3.44** dejó abierta. Desde
+> V3.44 el diccionario **declara** los SENTIDOS de la unidad (`[{pos, gloss}]`,
+> generados por el modelo local como CONTENIDO, premisa 21) y los **cachea**,
+> pero el juicio sobre el uso comparaba **FAMILIAS POS**: la `gloss` no la leía
+> **nadie** —dato **INERTE**—. Con `bank` declarando dos sentidos de la MISMA
+> familia («financial place» / «river side»), el motor no podía separar «el banco
+> del río» de «el banco financiero»: era un **límite del contrato**, no de los
+> datos.
+> **FRONTERA DECLARADA Y PROBADA (invariante conservador):** la glosa decide el
+> **SENTIDO**, **nunca el VEREDICTO**. `semantic_adequacy` conserva la adecuación
+> de V3.44 **EXACTA** —solo `incorrect` bloquea el clean success y **no se
+> amplía**— porque la **AUSENCIA de solapamiento no demuestra
+> incompatibilidad** (`"The bank is closed"` no comparte ni una palabra con «a
+> financial place» y es un uso correcto). El solapamiento es **CONFIANZA**, no
+> prueba.
+> **(A) `surface → lemma` (`services/semantics.py`):** `lemma_of` (morfología
+> REGULAR **declarada**, sin diccionario, sin lematizador y sin LLM: plural/3ª
+> persona `-s`/`-ies`, sibilantes `-ches`/`-shes`/`-xes`/`-zes`, pasado `-ed` y
+> gerundio `-ing` con consonante doble `running`→`run`; **por debajo de 4
+> caracteres no se toca** —`go`, `was`, `is`— y `closes`→`close`, **no** `clos`)
+> y `lemma_variants` (superficie + lema + la variante con la **`e` muda**
+> restaurada, `making`→`make`, que es lo que permite que una glosa-etiqueta
+> solape con texto flexionado). Es deliberadamente **PARCIAL** (las irregulares
+> `went`/`gone` no se tocan) porque solo alimenta una señal **SUAVE** que no
+> decide el veredicto: una forma no reconocida no puede contaminar la evidencia.
+> **(B) `lemma → sense`:** `gloss_tokens` (tokens de CONTENIDO de la glosa con
+> `GLOSS_STOPWORDS` declaradas), `context_window` (`CONTEXT_WINDOW = 4` a cada
+> lado, recortada en los bordes), `sense_overlap` (**parecido medido entre
+> VARIANTES DE LEMA de las dos partes**, así `decides` solapa con «to decide», y
+> **cero NO es contradicción**) y `select_sense` con clave de orden **declarada y
+> estable**: familia del **rol sintáctico** (señal **MAYOR**: la gramática manda)
+> → solapamiento con la glosa (**DESEMPATE dentro de la misma familia: el hueco
+> que V3.44 no podía cubrir**) → **orden declarado** (empate real: gana el
+> primero). Devuelve `{index, pos, gloss, score, role, strength, reasons}`; sin
+> sentidos, `index` es `None`.
+> **(C) `sense_fit` y la no-divergencia:** `_adequacy` es la regla **LITERAL** de
+> V3.44 **extraída sin cambios de comportamiento** y `semantic_adequacy` **delega
+> en ella** (firma, taxonomía y veredicto idénticos: las dos rutas no pueden
+> divergir); `sense_fit` añade **ADITIVAMENTE** el sentido resuelto por (familia,
+> solapamiento, orden) entre **todas** las ocurrencias. La invariante se prueba
+> **parametrizada contra los literales históricos** de V3.44, no contra la
+> implementación.
+> **(D) Contrato aditivo:** `score_transfer_attempt` expone `sense_index`/
+> `sense_pos`/`sense_gloss`/`sense_score` **sin alterar** `passed`,
+> `lexical_transfer`, `adequacy`, `semantic_fit` ni `error_type`;
+> `TransferAttemptOut` los declara con espejo **opcional** en
+> `frontend/src/types/api.ts`, así que **el sentido resuelto deja de ser dato
+> inerte y viaja en la respuesta HTTP** (sin cambio de UI).
+> **(E) Sin migración ni regeneración:** la `gloss` **ya estaba cacheada** con
+> `GENERATOR_VERSION = "1.4.0"` (V3.44); V3.58 la **RE-INTERPRETA**, exactamente
+> el patrón de V3.57 con `skill_priorities`. Sin migración, sin bump de generador
+> y sin invalidar caché.
+> **NO cambia:** `semantic_adequacy` (firma y veredictos), `families_from_senses`,
+> `occurrence_role`/`unit_positions`/`pos_family`, la frontera de `incorrect`,
+> `GENERATOR_VERSION`, `normalize_senses`, `transfer_state` y sus umbrales,
+> `context_signals`, `context_diversity`, `CEFR_CAPACITY`, el scoring, FSRS, el
+> planner ni el Difficulty Engine. Tests: nuevo
+> `test_semantics_sense_engine_v358.py` (30), `pytest` **2296 passed** en local,
+> launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.58.0**. **CI 6/6 en verde** (run
+> [34780694687](https://github.com/jvelasca/english-tutor/actions/runs/34780694687)
+> sobre `82f17c4`: Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.58.0` creada y empujada. Ver
+> `release-notes-v3.58.0.md`.
+> **Siguiente paso:** V3.59 — el **Context Engine 3.0**, y después el
+> contrato/prompt de generación de sentidos y la ponderación de la adecuación en
+> `transfer_confidence`.
+>
+> **Nota (2026-09-13): V3.57.0 (Planner 2.0 — argmax `(skill, actividad)` sobre ELV)**
+> — release **v3.57.0**, **SIN migración de BD y SIN cambios de UI**, que cierra
+> la segunda mitad del Planner 2.0: el planner deja de **solo ordenar** la cola
+> por valor esperado de aprendizaje (V3.56) y pasa a **ELEGIR** la tarea, entre
+> las candidatas admisibles, por **argmax de ELV**. Es el candidato que V3.56
+> dejó explícitamente diferido. **Alcance CERRADO con el gerente (conservador):
+> el argmax SOLO actúa con estado del alumno; sin él la decisión es EXACTAMENTE
+> la de V3.56.0 (`select_task`).** Incluye resolver **dos deudas** del planner:
+> el `value` **por modalidad** (`skill_priorities`) en lugar del `priority_score`
+> global, y el **doble conteo de `written_production`** (EJE de `transfer` vs.
+> CANAL que la actividad MIDE).
+> **(A) Núcleo puro (`services/planner.py`):** `capacity_skill(skill)` mapea el
+> EJE de la tarea al CANAL que la actividad **MIDE** vía
+> `task_semantics.assessed_skill_for` (`transfer` tiene eje `spontaneous_use`,
+> pero se entrega por texto y se evalúa como producción ESCRITA,
+> `written_production`); sin actividad declarada cae al propio eje (**no se
+> inventa canal**) y vacío devuelve `""`. `task_candidates(matrix, evidence)` da
+> las tareas **ADMISIBLES hoy** en orden canónico: `error_prone` (gana sobre
+> `slow_recall`) → `recall`; cada hueco de producción accionable en
+> `GAP_CANDIDATE_ORDER` (`spoken_production` **antes** que `written_production`;
+> la preferencia histórica de V3.38.1, para que el desempate no dependa del orden
+> de `PRODUCTION_SKILLS`) → `skill_gap`; y `transfer_gap` → `spontaneous_use`
+> (solo con su propio gate). Una candidata por modalidad, `support_level`
+> declarado por la actividad (mismo contrato que `select_task`), `[]` sin
+> directriz y nunca lanza. `select_task_by_elv(...)` puntúa cada candidata con
+> `expected_learning_value` y devuelve la de mayor ELV:
+> `value = skill_priorities(signals)[skill]` (con el `priority_score` global como
+> respaldo) y el margen se mide sobre el CANAL (`capacity_skill`). **Solo
+> compiten las candidatas con margen COMPARABLE**: una modalidad sin datos tiene
+> `p = 0.5` → deseabilidad `1.0`, el MÁXIMO, y competiría **premiada por
+> ignorancia**. El empate lo rompe el orden canónico de `task_candidates`
+> (`>` estricto). `expected_learning_value` gana `value`/`capacity_skill`
+> **opcionales** y su payload gana `capacity_skill` (informativo); los
+> llamadores de V3.56 **no cambian**. **(B) Degradación neutra EXACTA
+> (invariante):** sin `capacity_by_skill`, sin candidatas o sin **ningún** margen
+> comparable, `select_task_by_elv` devuelve `select_task` **clave por clave**; sin
+> estado del alumno (o sin dificultad declarada del ítem) el `p` es `0.5` →
+> `desirability = 1.0` → `ELV = value`, así que **la tarea servida sin perfil es
+> la de V3.56.0**; se prueba parametrizada sobre varios pares matriz/evidencia.
+> **(C) Deuda 1:** el ELV del argmax usa la prioridad **POR modalidad** que el
+> planner ya calculaba y que `select_task` no consumía en la elección. **(D)
+> Deuda 2:** EJE (lo que la tarea quiere provocar: `value` y hueco) y CANAL (lo
+> que la actividad MIDE: capacidad y margen) se separan, así que `write` y
+> `transfer` **no** son dos mediciones de `written_production` sino **una misma
+> LECTURA**; sin la separación, un éxito de `transfer` habría engordado la
+> capacidad del eje `spontaneous_use` (que el ledger no acredita por canal) y la
+> prioridad del eje escrito se habría contado dos veces. **(E) Cableado
+> (`services/lexicon.py`):** `_capacity_by_skill(learner_state)` calcula UNA vez
+> la capacidad por dimensión de cada modalidad canónica
+> (`learner_skill.skill_capacity` sobre su suelo de `student_state.skill_floor`;
+> `{}` sin estado); `review_queue_item` calcula UNA vez la dificultad declarada
+> del ítem y la capacidad por canal y las pasa a las DOS rutas de decisión
+> (actividad del ítem y `task`) y a la predicción servida, de modo que argmax y
+> `learning_value` **no pueden divergir**; `_task_decision` usa
+> `select_task_by_elv` (que sin estado colapsa a `select_task`) y
+> `_learning_value` resuelve el canal con `capacity_skill` y reporta el
+> `capacity_skill` medido (**aditivo**). **NO cambia:** `select_task` y la
+> cascada de razones, `ACTIVITY_FOR_SKILL`, `EVIDENCE_REASON_ORDER`,
+> `PRIORITY_WEIGHTS`, `transfer_state` y sus umbrales, `context_signals`,
+> `context_diversity`, `CEFR_CAPACITY`, `DIFFICULTY_TOLERANCE*`,
+> `SUPPORT_DISCOUNT_STEPS`, el scoring, FSRS ni el Difficulty Engine; sin
+> migraciones ni columnas nuevas; `priority`/`signals`/`why`/`task`/
+> `skill_priorities` del ítem se conservan. Tests: nuevo
+> `test_planner_argmax_v357.py` (24), `pytest` **2266 passed** en local, launcher
+> **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.57.0**. **CI 6/6 en verde** (run
+> [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640)
+> sobre `a40b58d`: Backend (ruff + pytest), Frontend (tsc + vitest + build),
+> Playwright E2E (visual), Release consistency, Beta V3.0 gate y Content
+> validation), con la etiqueta anotada `v3.57.0` creada y empujada. Ver
+> `release-notes-v3.57.0.md`.
+> **Siguiente paso:** V3.58 — el **Sense Engine 2.0**
+> (`surface→lemma→sense→semantic_fit`) y, después, el Context Engine 3.0.
+>
+> **Nota (2026-09-13): V3.56.0 (Planner 2.0 — `expected_learning_value`)**
+> — release **v3.56.0**, **SIN migración de BD y SIN cambios de UI**, que
+> convierte la prioridad del planner de una **suma de urgencia** en un **VALOR
+> ESPERADO DE APRENDIZAJE** y pasa a ordenar la cola de repaso por ELV. Es el
+> **P1-03** de la lista «V3.53+» que dejó abierta la auditoría externa de V3.52.
+> **Alcance CERRADO con el gerente:** el ELV **puntúa y ordena**, no elige la
+> tarea; `select_task` (la cascada de razones) queda **intacto** y el argmax
+> `(skill, actividad)` es el candidato de **V3.57**.
+> **(A) Núcleo puro (`services/planner.py`):** tabla DECLARADA
+> `SUCCESS_BY_MARGIN` (monótona no decreciente y acotada en `(0,1)`: margen
+> `−3…+3` → `p` `0.05…0.95`), `success_probability(margin)` (clamp fuera de
+> rango; neutro `P_SUCCESS_UNKNOWN = 0.5` sin dato y ante entradas no
+> numéricas/bool), `capacity_margin(task_difficulty, learner_capacity)` (el
+> **MÍNIMO** de las dimensiones declaradas por la tarea que existen en la
+> capacidad — el eslabón más débil manda; una dimensión sin capacidad NO se
+> cuenta como 0 y sin comparables devuelve `None`), `desirability(p) = 4·p·(1−p)`
+> acotado (máximo exacto `1.0` en `p = 0.5`: zona de desarrollo próximo) y
+> `expected_learning_value(signals, *, skill, task_difficulty, learner_capacity)`
+> → `{expected_learning_value, p_success, desirability, value, margin, skill}`
+> con `value = priority_score(signals)` (los MISMOS pesos declarados).
+> **(B) Degradación neutra EXACTA:** sin estado del alumno (o sin dificultad
+> declarada del ítem) `p = 0.5` → `desirability = 1.0` → `ELV = priority`, así
+> que el orden de la cola es **IDÉNTICO al de V3.55.0**, clave por clave; es el
+> invariante de no-regresión del incremento. **(C) Cableado del ítem
+> (`services/lexicon.review_queue_item`):** parámetro opcional `learner_state`;
+> resuelve la modalidad que la tarea evalúa (`task["skill"]` con caída a
+> `limiting_skill`), el suelo de ESA modalidad (`student_state.skill_floor`), la
+> capacidad (`learner_skill.skill_capacity`) y la dificultad declarada del ítem
+> (`difficulty.declared_difficulty` sobre su CEFR léxico). Expone, **aditivos**,
+> `expected_learning_value` y `learning_value`, sin alterar `priority`,
+> `signals`, `why`, `task` ni `skill_priorities`; `explain_priority` gana frases
+> aditivas de capacidad solo cuando la predicción existe (`P_SUCCESS_LOW`/
+> `P_SUCCESS_HIGH`). **Limitación documentada:** en `transfer` el vector real es
+> el del CONTEXTO, todavía no elegido en la cola, así que se usa la dificultad
+> léxica declarada del ítem. **(D) Una sola lectura del estado del alumno:**
+> nuevo `domain/learner_state.py` con la lectura O(1) de la caché del Student
+> Model, compartida por la cola y el drill (premisa 10); `domain/vocabulary`
+> delega y `_skill_floor` pasa a `services.student_state.skill_floor`. No se
+> ubica en `domain.profile` porque `domain.academy` importa `domain.vocabulary` y
+> se crearía el ciclo `vocabulary → profile → academy → vocabulary`. **(E) Orden
+> de la cola (`domain/review.py`):** `_queue_sort_key =
+> (-expected_learning_value, -priority, retrievability, word)`; el estado del
+> alumno se lee UNA vez por cola y se pasa a las DOS pasadas de
+> `review_queue_item` (ranking y servido), de modo que orden y payload no pueden
+> divergir. **(F) Contrato aditivo:** `ReviewQueueItem.expected_learning_value`/
+> `learning_value` (`schemas/learning.py`) con espejo opcional en
+> `frontend/src/types/api.ts`; sin cambio de UI ni del número de ítems/`due_count`.
+> **NO cambia:** `select_task`/`ACTIVITY_FOR_SKILL`/`EVIDENCE_REASON_ORDER`,
+> `PRIORITY_WEIGHTS`, los umbrales de
+> `transfer_state`/`context_signals`/`context_diversity`/`CEFR_CAPACITY`/
+> `DIFFICULTY_TOLERANCE*`/`SUPPORT_DISCOUNT_STEPS`, el scoring, FSRS ni el
+> Difficulty Engine; sin migraciones ni columnas nuevas. Tests: nuevo
+> `test_expected_learning_value_v356.py` (19), `pytest` **2242 passed** en local,
+> launcher **75 passed**, `ruff` limpio, `tsc` OK, `vitest` **651** y
+> `check_release_consistency` **3.56.0**. **CI 6/6 en verde** (run
+> [34763651640](https://github.com/jvelasca/english-tutor/actions/runs/34763651640),
+> el mismo que cerró V3.57.0: su commit viajó en el push siguiente), con la
+> etiqueta anotada `v3.56.0` creada y empujada. Ver `release-notes-v3.56.0.md`.
+> **Siguiente paso:** V3.57 — el **argmax `(skill, actividad)` sobre ELV** (el
+> planner elige la tarea, no solo la ordena) y, después, el Sense Engine 2.0 y el
+> Context Engine 3.0.
+>
+> **Nota (2026-09-13): V3.55.0 (Task Difficulty 3.0)**
+> — release **v3.55.0**, **ADITIVA (tres columnas de BD)**, que da nombres
+> honestos a la dificultad de la TAREA y hace que la capacidad observada acredite
+> lo **superado**, no lo **servido**. Cierra los **P2-01** y **P2-02** de la
+> auditoría de V3.53.1. **(A) P2-01 — tres dificultades:** hasta V3.54
+> `learning_evidence.observed_difficulty` guardaba el vector del contexto
+> **SERVIDO** (no lo superado) y solo lo escribía el drill de Transfer:
+> `recall`/`sentence`/`write` lo dejaban `''`, así que `written_production`,
+> `spoken_production` y `recall` **no acumulaban capacidad nunca**. Nuevas
+> columnas aditivas (`CREATE` + `ALTER TABLE` idempotente)
+> `declared_difficulty` (lo que declara el ÍTEM — su CEFR en la única dimensión
+> que puede declarar, `lexical` — o la actividad), `served_difficulty` (lo que la
+> actividad sirvió: el vector del contexto elegido en Transfer) y
+> `observed_task_difficulty` (lo ACREDITADO, solo en el éxito);
+> `observed_difficulty` se conserva **escrita como proyección legacy de
+> `served_difficulty`**, así que V3.53/V3.54 leen exactamente lo mismo.
+> **(B) P2-02 — descuento por andamiaje:** `SUPPORT_DISCOUNT_STEPS` (pura,
+> monótona con la escalera canónica `copied → guided → cued → independent →
+> spontaneous`) — `guided` resta 2 pasos por dimensión, `cued` 1,
+> `independent`/`spontaneous` acreditan la carga completa y `copied`/apoyo
+> desconocido no acreditan nada; `evidence.observed_signals` lee la carga
+> acreditada (`difficulty.earned_difficulty`, con `served_difficulty` como marca
+> de fila V3.55 y `observed_difficulty` como fallback legacy), sin cambiar el
+> contrato del resumen y con la paridad pura↔SQL intacta. **(C) Núcleo puro:**
+> `difficulty.declared_difficulty` (el `0` de `lexicon.cefr_difficulty` = no
+> declarado, no carga 1), `observed_task_difficulty`, `task_difficulty_vectors`
+> (serializa las tres + la proyección legacy en un solo sitio) y
+> `earned_difficulty`. **(D) Cableado:** Word/Sentence (`guided`, −2), Recall
+> (`cued`/`guided` según `RECALL_CUE_SUPPORT`), Write (`independent`) y Transfer
+> (`spontaneous`, con `declared` = carga léxica del ítem y `served` = vector del
+> contexto), vía el helper `domain.vocabulary._item_task_difficulty`; el volcado
+> de producción del chat libre queda fuera de alcance (recibe formas, no filas) y
+> documentado. **NO cambia:** `level_from_capacity` y el gate CEFR global de
+> V3.53.1, `observed_skill_capacity`/`observed_capacity`/`learner_capacity` y el
+> gate de cobertura de V3.54, `CEFR_CAPACITY`, `transfer_state` y sus umbrales,
+> `context_signals`, `context_diversity`, el scoring, el planner ni FSRS. Tests:
+> nuevo `test_task_difficulty_v355.py` (17), `pytest` **2223 passed** en local,
+> `ruff` limpio, `tsc` OK, `vitest` **651** y `check_release_consistency`
+> **3.55.0**. **CI 6/6 en verde** (run
+> [34757345417](https://github.com/jvelasca/english-tutor/actions/runs/34757345417)
+> sobre `e9b5689`: Backend **2221 passed + 2 skipped**, Frontend tsc + vitest
+> **651** + build, Playwright **23 passed + 22 skipped**, Release consistency
+> **3.55.0**, Content validation y Beta V3.0 gate) con la etiqueta anotada
+> `v3.55.0` creada y empujada. Ver `release-notes-v3.55.0.md`.
+> **Siguiente paso:** V3.56 — el **Planner 2.0 / `expected_learning_value`**
+> (P1-03), con briefing **LISTO PARA LANZAR** en `agentes/v356-planner-2.md`
+> (alcance cerrado: núcleo puro ELV + orden de la cola, `select_task` intacto,
+> argmax `(skill, actividad)` a V3.57, SIN migración y con degradación neutra
+> exacta `p = 0.5` → `ELV = priority`). Después, el Sense Engine 2.0 y el
+> Context Engine 3.0.
+>
+> **Nota (2026-09-13): V3.54.0 (Student Skill State 3.0)**
+> — release **v3.54.0**, **ADITIVA (una columna de BD)**, que conserva la
+> MODALIDAD en la capacidad observada (`skill × dimensión`) para que la evidencia
+> de una modalidad no eleve el reto de otra y una capacidad PARCIAL no desbloquee
+> tareas multidimensionales. **Núcleo puro** (`services/learner_skill.py`):
+> `observed_skill_capacity` (`{skill: {dimension: load}}`, muestra espaciada por
+> skill × dimensión) es la **fuente de verdad** y `observed_capacity` pasa a ser
+> una **proyección legacy** (máximo entre skills); `level_from_skill_capacity`
+> aplica la regla de cobertura **COMPLETA** de V3.53.1 por skill (una capacidad
+> escrita no fabrica un nivel oral) y `skill_coverage`/`skill_capacity` exponen
+> `none`/`partial`/`full` y las `covered_dimensions`. **Suelo por modalidad**
+> (`services/student_state.py`): `floor_level_for_skill` —
+> `demostrado > observado del SKILL > estimado > declarado` — no hereda el
+> observado global de otra modalidad. **Gate de cobertura**
+> (`services/difficulty.py`): `challenge_for` + `select_by_difficulty(...,
+> covered_dimensions, floor_challenge)` solo aplican la subida observada a los
+> contextos cuyas dimensiones son SUBCONJUNTO de las cubiertas; el resto se
+> evalúan contra el suelo declarado. **Cableado** (`services/transfer.py`,
+> `domain/vocabulary.py`): `context_for(..., learner_skill_capacity,
+> capacity_skill)` resuelve la capacidad de la modalidad que la tarea mide y el
+> drill expone el suelo por skill, con paridad GET↔POST intacta. **Persistencia
+> y contrato aditivos:** `learning_profile.observed_skill_capacity` (CREATE +
+> `ALTER TABLE` idempotente, JSON determinista) cacheada en `get_profile_summary`
+> y preservada por `set_cefr`; `LearningProfile.observed_skill_capacity`/
+> `observed_skill_level`/`skill_coverage` y `TransferContextOut.capacity_skill`,
+> con espejo TS. **NO cambia:** `level_from_capacity` (gate CEFR global de
+> V3.53.1), `observed_capacity` (proyección), `learner_capacity`,
+> `CEFR_CAPACITY`, `transfer_state` y sus umbrales, `context_signals`,
+> `context_diversity`, el scoring, el planner ni FSRS. Tests: nuevo
+> `test_learner_skill_v354.py` (19) + ajuste del estado neutro; `ruff` limpio y
+> `check_release_consistency` **3.54.0**. **CI 6/6 en verde** (run
+> [34755745179](https://github.com/jvelasca/english-tutor/actions/runs/34755745179)
+> sobre `b2929e1`: pytest **2204 passed + 2 skipped**, vitest **651**, Playwright
+> **23**) con la etiqueta anotada `v3.54.0` creada y empujada. Ver
+> `release-notes-v3.54.0.md`.
+> **Siguiente paso:** V3.55 (P2-01 `declared`/`served`/`observed_task_difficulty`
+> y P2-02 capacidad con apoyo/independencia/latencia) y, con ellos, el
+> **Planner 2.0 / `expected_learning_value`** (P1-03).
+>
+> **Nota (2026-09-13): V3.53.1 (Observed CEFR Safety Gate)**
+> — patch **v3.53.1**, SIN migración de BD y SIN cambios de contrato, que cierra
+> el **P1-01** de la auditoría de V3.53.0. `services.learner_skill.
+> level_from_capacity` iteraba las dimensiones CON muestra y trataba una sin
+> muestra como «no bloquea», así que `observed_capacity = {"lexical": 5}`
+> producía un `observed_level = "C2"` (capacidad léxica compatible con C2
+> convertida en un CEFR GLOBAL). Ahora recorre las dimensiones que exige el
+> NIVEL candidato (no las observadas), cuenta 0 en las sin muestra y exige
+> **cobertura dimensional COMPLETA**: `observed_capacity` sigue siendo la fuente
+> de verdad por dimensión y `observed_level` es un RESUMEN DERIVADO. Casos:
+> `{"lexical": 5}` → `""`; `{"lexical": 5, "syntax": 3, "discourse": 4,
+> "interaction": 3}` → `"B2"`; envolvente de C1 → `"C1"` (C2 bloqueado por
+> `lexical 4 < 5`); cobertura 3/4 → `""`. `learner_capacity` sigue subiendo el
+> reto solo donde hay evidencia y sin bajar el suelo declarado. Tests:
+> `test_level_from_capacity_requires_full_dimensional_coverage` (reescrito) +
+> aceptación multidimensional y no-regresión; sin cambios de esquema, contratos
+> ni UI. **CI 6/6 en verde** (run
+> [34748988008](https://github.com/jvelasca/english-tutor/actions/runs/34748988008)
+> sobre `6d8af47`, pytest **2185 passed + 2 skipped**, vitest 651 y Playwright 23)
+> con la etiqueta anotada `v3.53.1` creada y empujada. Ver
+> `release-notes-v3.53.1.md`. **Siguiente paso:** V3.54 (Planner 2.0 /
+> `expected_learning_value`, P1-03) y, con él, P2-01/P2-02/P2-03 del skill state.
+>
+> **Nota (2026-09-11): V3.53.0 (Learner Skill State 2.0 + `observed_difficulty`)**
+> — release **v3.53.0**, ADITIVA (tres columnas de BD), que cierra el **P1-02**
+> diferido desde V3.52 y monta el primer Student Skill State OBSERVADO sin tocar
+> `CEFR_CAPACITY`, la escalera `transfer_state`, sus umbrales, `context_signals`,
+> `context_diversity`, el scoring, el planner ni FSRS. **(A) `observed_difficulty`
+> por evento:** nueva columna `learning_evidence.observed_difficulty` con el
+> VECTOR de la TAREA servida (serializado con `difficulty.format_vector` /
+> `parse_vector` puros, `''` = no declarada) —antes `difficulty` guardaba la carga
+> LÉXICA del ítem—; `transfer.context_difficulty` resuelve dict/`id`/`context_id`
+> y el drill de transferencia escribe el vector del contexto SERVIDO (el resto de
+> drills lo dejan `''`). **(B) Capacidad OBSERVADA:** nuevo puro
+> `services/learner_skill.py` (`observed_capacity` con muestra espaciada 2 éxitos
+> en 2 días naturales distintos, `level_from_capacity` conservador sobre la
+> envolvente del banco y `learner_capacity` = máximo por dimensión sin bajar el
+> suelo declarado); nuevo puro `evidence.observed_signals`
+> (`observed_samples`/`observed_days`/`observed_capacity`, atribución
+> `assessed_skill`→`skill`, solo ÉXITOS con vector) con claves en
+> `summarize_evidence`/`empty_summary` y paridad pura↔SQL por construcción.
+> **(C) Suelo y contrato:** `student_state.LEVEL_SOURCES` inserta `observed` entre
+> `demonstrated` y `estimated` (`CERTIFIED_SOURCES` no cambia: usa el margen
+> amplio); `learning_profile.observed_level`/`observed_capacity` aditivas,
+> derivadas del ledger y cacheadas en `get_profile_summary`, leídas en O(1) y
+> pasadas a `context_for(..., learner_capacity=...)` en GET y POST; con
+> `None`/`{}` el resultado es EXACTAMENTE V3.52.2. Contratos aditivos
+> `TransferContextOut.learner_capacity` y `LearningProfile.observed_level`/
+> `observed_capacity` (espejo opcional en `types/api.ts`). **(D)** corregido el
+> comentario obsoleto de B1 `interaction` (P3). Tests: pytest **2185 passed** en
+> local (+19), `ruff` y `tsc` limpios, `check_release_consistency` **3.53.0**
+> exit 0. **CI 6/6 en verde** (run
+> [34747380090](https://github.com/jvelasca/english-tutor/actions/runs/34747380090)
+> sobre `e4bd577`, pytest **2183 passed + 2 skipped**, vitest 651 y Playwright 23)
+> con la etiqueta anotada `v3.53.0` creada y empujada. Ver
+> `release-notes-v3.53.0.md`. **Siguiente paso:** V3.54 (Sense Engine
+> 2.0); el Planner 2.0 / `expected_learning_value` (V3.55/V3.56) todavía **no**
+> tiene briefing y sigue siendo el P1-03.
+>
+> **Nota (2026-09-11): V3.52.2 (cierre de los P2 de la auditoría Q)** — release
+> **v3.52.2**, SIN migración de BD y SIN cambios de contrato, que recalibra el
+> Difficulty Engine al banco real. **(A) P2-01:** `CEFR_CAPACITY` pasa a ser el
+> **envelope monótono** de los `difficulty_vector` del banco (A1 `interaction`
+> 1→2, A2 1→3, B1 2→3, B2 léxico/sintaxis 4→3, C1 léxico 5→4); antes se quedaba
+> corta en A1/A2 y larga en B2/C1 pese a afirmar que estaba «calibrada con el
+> banco», y con la tolerancia ESTRICTA un alumno A2 **certificado** quedaba fuera
+> de `directions`/`shopping` (2 de los 4 contextos A2), de modo que el alumno con
+> más confianza recibía el conjunto más plano. Nuevos tests
+> `test_capacity_is_the_monotone_envelope_of_the_bank` y
+> `test_every_bank_context_fits_its_own_level_under_strict_tolerance`. **Impacto
+> medido: 15 de 48 combinaciones (nivel de ítem × nivel de alumno; 49 posibles,
+> una sin reto) cambian de contexto servido y el patrón es el esperado por el
+> envelope**: el alumno A2 **demostrado** pasa por fin a `directions`/`shopping`
+> (interaction 3) en vez de `story`/`future` (interaction 1), el alumno C1 pasa
+> de `academic` (C2) a `mediation` (C1) y los empates que la tabla inflada
+> «diluía» se estrechan al contexto que encaja exacto (B1 4→1, B2 3→1, C1 2→1).
+> **(B) P2-02:** corregida la
+> justificación de la tolerancia (un margen mayor admite MÁS `overshoot`, no
+> menos exigencia) y documentada como **red de seguridad** para bancos por encima
+> de la envolvente, con test que fija la inercia actual (0 de 48) y verifica que
+> SÍ discrimina con un contexto sintético. **(C)** etiqueta `v3.52.1` creada y
+> empujada (P3-04). Tests: pytest **2166 passed** en local (+2 netos), `ruff`
+> limpio, vitest **76 ficheros/651 tests**, `tsc` en verde y
+> `check_release_consistency` **3.52.2** exit 0. **CI 6/6 en verde** (run
+> [34627238005](https://github.com/jvelasca/english-tutor/actions/runs/34627238005)
+> sobre `a5e2d38`, pytest **2164 passed + 2 skipped**). **Siguiente paso ya
+> preparado:** el briefing de **V3.53 (P1-02 Learner Skill State 2.0 +
+> `observed_difficulty` persistido por evento)** está escrito y listo para
+> lanzar desde un agente local: `agentes/v353-learner-skill-state.md`. Ver
+> `release-notes-v3.52.2.md` y, para el contexto de los hallazgos,
+> `docs/audit/Q-AUDITORIA-TOTAL-V352.md`.
+>
+> **Nota (2026-09-11): V3.52.1 (hotfix de producto + cierre del P1-01)** — release
+> **v3.52.1**, ADITIVA (una columna de BD, `users.is_test`) y determinista. NO
+> cambia la escalera `transfer_state`, el scoring ni FSRS, y tampoco el
+> comportamiento real del motor de dificultad (los 20 contextos declaran las 4
+> dimensiones). **(A) Usuarios fantasma «Visual Tester»:** la raíz era el
+> find-or-create no atómico de `frontend/tests/visual/gateHelper.ts` contra la BD
+> real (specs en paralelo); ahora un `globalSetup` de Playwright crea UN perfil
+> marcado `is_test` en proceso único y un `globalTeardown` lo borra. Guarda:
+> migración aditiva `users.is_test`, `GET /api/users` filtra por defecto
+> (`include_test=true` para tests), `DELETE /api/users/{id}` solo borra
+> `is_test=1`, filtro en `launcher/status.py` con degradación tolerante, y
+> `scripts/purge_virtual_testers.py --is-test`; los 2 perfiles existentes quedaron
+> purgados. **(B) Listening «RUTA ACTUAL»:** sigue al nivel seleccionado
+> (`resolveRouteLevel` sesión > selección > recomendado) y cambiar de ruta recarga
+> la pregunta. **(C) Bucle A/B:** nuevo módulo PURO `features/listening/abLoop.ts`
+> como única fuente de verdad UI↔controller, `play(url)` idempotente por URL,
+> rebobinado con `>=` + `onCurrentTime`, marca con `audioController.currentTime`,
+> hint con el B marcado y controles centrados. **(D) P1-01 de la auditoría de
+> V3.52:** `difficulty.fit` expone `dimensions_expected`/`dimensions_compared`/
+> `coverage` y exige cobertura completa para `within` (un contexto sin
+> `difficulty_vector` ya no gana con `distance=0`); `select_by_difficulty` degrada
+> por cobertura y luego por distancia. **(E)** Cifra de CI normalizada (2156+2
+> skipped primario). Tests: pytest **2164 passed** en local (+6), vitest **76
+> ficheros/651 tests** (+11), lanzador 76, `ruff`/`tsc`/`build` limpios y
+> `check_release_consistency` **3.52.1** exit 0. **CI 6/6 en verde** (run
+> [34622637688](https://github.com/jvelasca/english-tutor/actions/runs/34622637688)
+> sobre `89eff0b`; pytest 2162 passed + 2 skipped en CI). Fuera de alcance
+> (V3.53+): P1-02 (Learner Skill State 2.0 + `observed_difficulty`) y P1-03
+> (Planner 2.0 / Expected Learning Value).
+>
+> **Auditoría Q (2026-09-11): V3.52.1 auditada — 🟢 publicable, SIN P0/P1.**
+> Informe en `docs/audit/Q-AUDITORIA-TOTAL-V352.md` (briefing actualizado:
+> `agentes/auditoria-externa-v352.md`). Verificado por ejecución (ruff, pytest
+> dirigido 78, `tsc`, vitest 31, Playwright 23/22 y CI 6/6) que los dos P1 de
+> V3.51 y el P1-01 de V3.52 están cerrados, que la escalera/scoring/FSRS no se
+> tocan y que el hotfix de producto está corregido de raíz. **Hallazgos abiertos
+> para V3.53:** (P2-01) `CEFR_CAPACITY` no cuadra con el banco que dice calibrar
+> —`interaction` de A1/A2 por debajo del máximo real (1 vs 2/3) y léxico/sintaxis
+> de B2/C1 por encima (4/5 vs 3/4)—: con la tolerancia estricta un alumno A2
+> **demostrado** excluye 2 de los 4 contextos A2; conviene derivar/validar la
+> tabla del banco con un test de consistencia. (P2-02) la tolerancia por fuente
+> (`DIFFICULTY_TOLERANCE` vs `_ESTIMATED`) es **inerte** en el banco real (0 de 48
+> combinaciones) y su justificación escrita está invertida (más margen admite más
+> exceso, no menos exigencia). (P3) fila legacy etiquetada `practice` en vez de
+> `estimated`, `_context_vector` que trata un contexto sin vector como vector, e
+> `is_test` marcable por el cliente. (Proceso) `v3.52.1` no está etiquetada.
+>
+> **Nota (2026-09-11):** **V3.52.0 (Student Skill State + Difficulty Engine
+> 2.0)** — release **v3.52.0**, ADITIVA con **dos columnas de BD** que NO cambia
+> la escalera `transfer_state`, sus umbrales, `context_signals`,
+> `context_diversity`, el scoring ni FSRS: cierra los DOS P1 de la auditoría
+> externa de V3.51. **P1-01 (el `learner_level` no era el demostrado):** nuevo
+> módulo PURO `services/student_state.py` (`LEVEL_SOURCES`, `floor_level`,
+> `level_state`, `is_certified`, `empty_state`) que separa `practice_level` /
+> `estimated_cefr` / `demonstrated_cefr` y deriva el SUELO de dificultad con la
+> política conservadora **demostrado > estimado > declarado > ninguno** (el
+> demostrado gana aunque su banda sea inferior: acredita retención; solo él exige
+> `certification_gate` y usa tolerancia estricta). Migración aditiva:
+> `learning_profile.estimated_level`/`demonstrated_level` (CREATE TABLE + bucle
+> idempotente `ALTER TABLE`, filas legacy `''` que siguen alimentando el suelo
+> como nivel DECLARADO `practice`), conservando `cefr_level`;
+> `repositories.profile.get_profile` devuelve las dos columnas y nueva
+> `set_level_state` (`set_cefr` queda de wrapper que no pisa el demostrado);
+> `domain.profile.get_profile_summary` escribe AMBOS niveles y expone
+> `demonstrated_level` (aditivo en `schemas/profile.py`); nuevo
+> `domain.vocabulary._learner_level_state` lee la caché en O(1) (sin recalcular
+> el Student Model) y pasa `learner_level` + `learner_level_source` a
+> `context_for` con paridad GET↔POST. **P1-02 (el floor mezclaba escalas):**
+> nuevo módulo PURO `services/difficulty.py` (`DIFFICULTY_DIMENSIONS`,
+> `CEFR_CAPACITY` monótona con la `interaction` retrasada en A1–B1, `capacity_for`,
+> `challenge_vector` = máximo por dimensión entre ítem (techo) y alumno (suelo),
+> `fit` con distancia/`max_overshoot`/`within`, `select_by_difficulty` que
+> conserva los `within` y, entre ellos, los de menor distancia, degradando al más
+> cercano si ninguno encaja — nunca al más difícil; tolerancias
+> `DIFFICULTY_TOLERANCE = 1` demostrado / `DIFFICULTY_TOLERANCE_ESTIMATED = 2`).
+> `services/transfer.py` sustituye `_difficulty_floor`/`_within_band` escalares
+> por el motor (el TECHO lingüístico del ítem sigue en `_within_level: una
+> unidad A1 con alumno C2 NO recibe contextos > A1`; `TRANSFER_DIFFICULTY_BAND`
+> queda DEPRECADA y `TRANSFER_DIFFICULTY_KEYS` pasa a alias del vocabulario
+> canónico) y su retorno gana `difficulty_fit` + `learner_level_source`
+> (aditivos; `difficulty`/`difficulty_vector` se conservan). Contratos aditivos
+> `TransferContextOut.learner_level_source`/`difficulty_fit`,
+> `LearningProfile.demonstrated_level` y espejo opcional en `types/api.ts`
+> (`DrillTransferContext`/`DrillDifficultyFit`). **Deuda confirmada y diferida
+> (V3.55):** `assessed_skill` → decisión del planner y `skill_priorities` →
+> `select_task` (evitar el doble conteo de `written_production` con el drill
+> `write`). Tests: pytest **2156 passed + 2 skipped en CI** (2158 passed en local
+> con el modelo Whisper; +39: `test_student_state_v352.py` 15 y
+> `test_difficulty_engine_v352.py` 24; ajuste de
+> `test_learner_level_raises_the_difficulty_floor` a `difficulty_fit`), `ruff`
+> limpio, `check_release_consistency` **3.52.0** exit 0. **CI 6/6 en verde** (run
+> [34604654412](https://github.com/jvelasca/english-tutor/actions/runs/34604654412)
+> sobre `23cbad7`): Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation. Los 2 skipped son `test_stt_asr_integration.py` (opt-in del modelo
+> Whisper, no descargado en el runner). Fuera de alcance:
+> Sense Engine 2.0, `observed_difficulty` persistido, entrega oral real del
+> transfer, `expected_learning_value`/Adaptive Planner 2.0, Context Bank
+> Family/Instance, offline TTS y code splitting del frontend.
+>
+> **Nota (2026-09-11):** **V3.51.0 (Task/Skill semantics + learner-level
+> difficulty matching)** — release **v3.51.0**, ADITIVA con **una columna de BD**
+> que NO cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS:
+> cierra los tres P1 de la auditoría externa de V3.50. **P1-01 (qué se EVALÚA):**
+> nuevo módulo PURO `services/task_semantics.py` con `ASSESSMENT_MODES`
+> (`written`/`spoken`/`receptive`), la tabla `TASK_SEMANTICS` por actividad
+> (`target_skill` = lo que la tarea QUIERE provocar, `assessed_skill` = lo que
+> puede MEDIR, `assessment_mode` = canal, `evidence_skill` = el `skill=` histórico
+> del ledger) y helpers que nunca lanzan (`semantics_for`, `assessed_skill_for`,
+> `assessment_mode_for`, `target_skill_for`, `evidence_skill_for`,
+> `assessable_skills`, `is_assessable`, `activity_for_target`,
+> `activity_from_activity_id`). El drill **Transfer**, que se entrega por TEXTO,
+> declara `target_skill="spontaneous_use"`, **`assessed_skill="written_production"`**,
+> **`assessment_mode="written"`** y conserva `evidence_skill="spontaneous_use"`:
+> antes se podía afirmar que el contexto «servía para hablar» sin que la
+> actividad midiera oral. **Ledger honesto (migración aditiva):**
+> `learning_evidence.assessed_skill` (CREATE TABLE + bucle idempotente
+> `ALTER TABLE`, filas legacy `''`), persistido en
+> `record_evidence`/`record_evidence_bulk`/`list_evidence`; `summarize_evidence`,
+> `empty_summary` y `summarize_by_target` añaden
+> `assessed_skill_attempts`/`assessed_skill_successes` (intentos = todos los
+> eventos; éxito = clave creada en el éxito) con paridad exacta pura↔SQL; las
+> cinco vías de `domain/vocabulary.py` registran las dos dimensiones sin cambiar
+> `skill`. **P1-03 (el argmax descarta información):**
+> `planner.skill_priorities(signals)` expone el vector COMPLETO en orden canónico
+> y `limiting_skill` pasa a ser su argmax; `_transfer_target_skill` elige solo
+> entre `task_semantics.assessable_skills("transfer")` (`written_production`,
+> `spontaneous_use`) y `context_for`/`ReviewQueueItem` exponen `skill_priorities`
+> (aditivo). **P1-02 (de quién es la dificultad):**
+> `context_for(..., learner_level="")`; `level` = CEFR del ÍTEM (techo,
+> `_within_level`) y `learner_level` = nivel DEMOSTRADO del alumno (suelo de reto
+> en `_difficulty_floor`, que usa `max(item_index, learner_index)`);
+> `domain.vocabulary._learner_level` lee la caché del Student Model
+> (`learning_profile.cefr_level`, O(1)) sin recalcular el modelo en el camino
+> caliente; sin nivel conocido el resultado es IDÉNTICO a V3.50 (test de
+> regresión). Contratos aditivos `TransferContextOut` (target/assessed/mode/
+> item_level/learner_level/skill_priorities), `TransferAttemptOut`
+> (target/assessed/mode) y `ReviewQueueItem.skill_priorities`, con espejo
+> opcional en `types/api.ts`. Tests: pytest **2119 passed** (+20: nuevo
+> `test_task_semantics_v351.py`; ajuste del contrato exacto de `empty_summary` en
+> `test_learning_evidence_v336.py`), vitest **75 ficheros/641 tests**, `ruff`/
+> `tsc` limpios, `npm run build`, `check_beta_v3.py`, `content_validation.py` y
+> `check_release_consistency` **3.51.0** exit 0. **CI 6/6 en verde** (run
+> [34599637351](https://github.com/jvelasca/english-tutor/actions/runs/34599637351)
+> sobre `c056546`): Release consistency, Backend (ruff + pytest), Frontend
+> (tsc + vitest + build), Playwright E2E (visual), Beta V3.0 gate y Content
+> validation. **P3-01:** corregida la cifra de
+> V3.50 (2099 → **2097 passed**, la verificada en CI). Fuera de alcance (V3.52+):
+> entrega oral real del transfer (audio+STT), Sense Engine 2.0,
+> `observed_difficulty` por evento, `expected_learning_value`/Adaptive Planner
+> 2.0, Context Bank Family/Instance y offline TTS.
+>
+> **Nota (2026-09-11):** **V3.50.0 (Context→Skill mapping + difficulty
+> matching)** — release **v3.50.0**, ADITIVA y **SIN migración de BD** que NO
+> cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS: cierra
+> el candidato diferido por V3.49.0. Hasta V3.49 el banco declaraba `cefr` y
+> `difficulty_vector` (V3.47/V3.48) y el planner calculaba la modalidad limitante,
+> pero `context_for` solo miraba usados/nivel/novedad: un ítem B1 podía recibir el
+> contexto A1 más plano y dos ítems con modalidades débiles distintas recibían el
+> mismo escenario. **Parte A — Context→Skill mapping:** nuevo vocabulario
+> declarado `CONTEXT_SKILLS` (`recall`/`written_production`/`spoken_production`/
+> `spontaneous_use`), espejo verificado por test de
+> `services.evidence.LEXICAL_SKILLS` y declarado en `services/transfer.py` para no
+> crear el ciclo `evidence → transfer → evidence`; los 20 contextos del banco
+> ganan `skills` curado (subconjunto no vacío, con al menos una modalidad de
+> producción y `spontaneous_use` donde el escenario admite uso libre) y los 6
+> originales conservan `id` y valores core congelados (solo se les AÑADE
+> `skills`); helper puro `context_skills(context)` (acepta dict/`id`/`context_id`,
+> deduplica, ordena por `CONTEXT_SKILLS`, ignora valores fuera del vocabulario,
+> nunca lanza). **Parte B — Difficulty matching:** `TRANSFER_DIFFICULTY_BAND = 1`,
+> `_difficulty_floor(pool, level)` fija el objetivo como la MAYOR del techo real
+> de dificultad alcanzable y la posición del nivel en la escala 1..6 (A1≈1 … C2≈6;
+> anclar al nivel era necesario con los datos reales del banco, porque sin él un
+> ítem B1 seguía recibiendo contextos A1) y `_within_band(pool, floor)` degrada
+> con gracia a lo más difícil disponible si la banda no existe en el pool
+> filtrado. `context_for` gana la firma aditiva `skill=""` y un pipeline
+> determinista (usados → `_within_level` → mínimo sobre todo el alcance →
+> preferencia por modalidad limitante → banda → novedad V3.43 → `_stable_index`);
+> el retorno añade `skills`. Consumo en `domain/vocabulary.py` con
+> `_transfer_target_skill` (`planner.limiting_skill(planned_signals(summary,
+> item_competence_matrix(row)))`, `""` si no hay segmentación por modalidad) en el
+> GET y en el fallback del POST, con paridad de `context_id` GET↔POST. Contratos
+> aditivos `TransferContextOut.skills` (`schemas/vocabulary.py`) y
+> `DrillTransferContext.skills?` (`types/api.ts`); sin cambio de UI. Tests: pytest
+> **2097 passed** (+15: nuevo `test_context_skill_v350.py`; ajuste de
+> `test_transfer_cefr_v347.py`, cuya semántica «con C2 la elección es la de sin
+> nivel» queda superada por el difficulty matching), vitest **75 ficheros/641
+> tests** (sin cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build`,
+> `check_beta_v3.py`, `content_validation.py` y `check_release_consistency`
+> **3.50.0** exit 0. **CI 6/6 en verde** (run
+> [34594042697](https://github.com/jvelasca/english-tutor/actions/runs/34594042697)
+> sobre `1c8d6e0`). Fuera de alcance (V3.51+):
+> Sense Engine 2.0, semantic appropriateness, `expected_learning_value`/Adaptive
+> Planner 2.0 y la persistencia de la dificultad del contexto servido por evento.
+>
+> **Nota (2026-09-11):** **V3.49.0 (Transfer Evidence 3.0 — confianza del eje de
+> transferencia)** — release **v3.49.0**, ADITIVA y **SIN migración de BD** que NO
+> cambia la escalera `transfer_state`, sus umbrales, el scoring ni FSRS: cierra el
+> punto 8 de la auditoría de V3.43.0 («los nombres de los estados pueden sugerir
+> más evidencia de la disponible»). Nueva función PURA
+> `services.evidence.transfer_confidence(evidence, *, now="")` →
+> `{score, level, sample, drivers, recency_days}`: `score` es la suma ponderada
+> (`TRANSFER_CONFIDENCE_WEIGHTS`, suman 1.0) de seis `drivers` 0..1 derivados de
+> evidencia YA registrada por `context_signals` (`contexts` = contextos con éxito
+> limpio / `TRANSFER_STABLE_MIN_CONTEXTS`; `successes` = `clean_successes` con
+> techo `2 * TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED`; `diversity` =
+> `diverse_dimensions` / nº de ejes core; `independence` =
+> `unscaffolded_clean_successes` / `clean_successes`; `variety` = objetivos
+> comunicativos distintos / `TRANSFER_STABLE_MIN_GOALS`; `spacing` =
+> `clean_success_days` / `TRANSFER_STABLE_MIN_DAYS`). `level` ∈
+> `none`/`low`/`medium`/`high` (`TRANSFER_CONFIDENCE_LEVELS`, umbrales
+> `TRANSFER_CONFIDENCE_HIGH = 0.80` / `TRANSFER_CONFIDENCE_MEDIUM = 0.45`)
+> calibrados para que `transfer_stable` caiga en `high` y `transfer_demonstrated`
+> quede por debajo. Es **monótona no decreciente** al añadir evidencia NO
+> andamiada (cada driver lo es) y **conservadora** en resúmenes legacy/parciales
+> (`none`, sin inflar y sin lanzar); `recency_days` es INFORMATIVO (`now`
+> opcional) y NO entra en el `score` (la decisión no usa reloj, igual que
+> `transfer_state`). Se deriva en la MISMA frontera pura↔SQL
+> (`with_transfer_state`), así que resumen puro y SQL exponen el mismo valor, y
+> `empty_summary()` gana el default neutro. Explicabilidad en
+> `planner.planned_signals` (aditivo; `transfer_gap`/`has_contextual_transfer` NO
+> cambian) y en `lexicon.review_item`, con contrato aditivo
+> `ReviewQueueItem.transfer_confidence` (`schemas/learning.py`) y
+> `TransferConfidence` (`types/api.ts`). UI honesta en `ReviewQueueSection`
+> (etiqueta solo con evidencia, `title`/`aria-label` que aclaran «transferencia
+> contextual demostrada bajo el protocolo interno», no generalizada) con claves
+> `dictionary.review.transfer.level.*`/`scope` en paridad es/en. Tests: pytest
+> **2084 passed** (+9: nuevo `test_transfer_confidence_v349.py`; ajuste del
+> contrato exacto de `empty_summary` en `test_learning_evidence_v336.py`), vitest
+> **75 ficheros/641 tests** (+2 en `ReviewQueueSection.test.tsx`), `ruff` limpio,
+> `tsc --noEmit` limpio, `npm run build` y `check_release_consistency` **3.49.0**
+> exit 0. **CI 6/6 en verde** (run
+> [34591158824](https://github.com/jvelasca/english-tutor/actions/runs/34591158824)
+> sobre `034da5c`). Fuera de alcance (V3.50+): Context→Skill mapping y difficulty matching
+> por `difficulty_vector` (datos de V3.47/V3.48 aún no consumidos por el
+> planner), Sense Engine 2.0 (surface→lemma→sense), semantic appropriateness
+> (punto 7) y `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.48.1 (APRENDER más limpio + ruta CEFR seleccionada)**
+> — patch **v3.48.1**, **SOLO-FRONTEND** (más un script de mantenimiento), **sin
+> cambios de contrato ni migración de BD**. **(A) Listening sin «Antes de
+> escuchar»:** `microFlow` salta los pasos `stage === "pre"` (`firstRenderableIndex`)
+> y el flujo arranca en `while1`; se eliminan la tarjeta y las claves
+> `listening.flow.preTitle`/`preHint`/`begin`, y el contexto del ítem pasa a
+> caption compacta bajo el botón de audio (el backend sigue sirviendo `pre` por
+> contrato, sin alterar `transcript_policy`). **(B) Notas CEFR plegables:** nuevo
+> `components/InfoDisclosure.tsx` (`button` + `aria-expanded` + `MoreHorizontal`,
+> montado solo al abrir; variantes `inline`/`corner`) que pliega
+> `routeNote`/`routeCertNote`/`routeRingHelp`/`routesMapHint` en Listening y en el
+> mapa de rutas de las cinco destrezas (`QuizRoutesSection`), y la prosa
+> explicativa (`demonstrateNote`/`demonstrateFormal`/`extraHonestNote`) en los seis
+> paneles de nivel, dejando visibles los estados accionables (gate/`demoNotYet`).
+> **(C) Ruta CEFR seleccionada persistente:** `utils/selectedRoute.ts` (validación
+> `A1..C2`, parseo tolerante, `resolveRouteLevel`) y `hooks/useSelectedRoute.ts`
+> (persistencia doble `localStorage` + `selected_route_level` en `GET/PUT
+> /api/settings`, sin cambios de backend); prioridad **sesión > ruta seleccionada
+> > nivel recomendado**, pulsar un anillo A1–C2 selecciona y abre su panel (anillo
+> resaltado + «Ruta seleccionada»), chip «Auto» para volver al motor y
+> `exitSession` que conserva la selección. **(D) Limpieza:**
+> `scripts/purge_virtual_testers.py` (dry-run por defecto; `--apply` con copia
+> `tutor.db.bak-<ts>` y borrado transaccional enumerando tablas con `user_id`) y
+> eliminación de los 6 perfiles `Visual Tester` (quedan los 2 reales). Tests:
+> vitest **75 ficheros/639 tests** (+3/+16: `InfoDisclosure`, `selectedRoute`,
+> `useSelectedRoute`), `check_i18n_coverage` 0 indefinidas/0 duplicadas,
+> `tsc`/`build`/`check_release_consistency` **3.48.1** en verde. **CI 6/6 en verde** (run [34588975928](https://github.com/jvelasca/english-tutor/actions/runs/34588975928) sobre `6a0a757`). Fuera de alcance
+> (V3.49): Sense Engine 2.0, Context→Skill mapping, difficulty matching y
+> Transfer evidence 3.0; no se tocan FSRS, Evidence Ledger ni el gate.
+>
+> **Nota (2026-09-11):** **V3.48.0 (Context Bank 2.0 + diversidad 2.0)** —
+> release **v3.48.0**, ADITIVA, **sin migración de BD** y sin tocar la escalera
+> `transfer_state`, el scoring ni FSRS, que cierra los dos P2 abiertos por la
+> auditoría externa de V3.43.0 sobre la transferencia. **(A) Context Bank 2.0:**
+> `services/transfer.py` amplía `TRANSFER_CONTEXTS` de **6 a 20 contextos** —14
+> nuevos (`introductions`, `routine`, `directions`, `shopping`, `health`,
+> `travel_plan`, `work_problem`, `community`, `debate`, `review`, `mediation`,
+> `academic`, `negotiation`, `keynote`)— con cobertura **A1:3 / A2:4 / B1:4 /
+> B2:3 / C1:3 / C2:3**; cada contexto declara los 6 atributos core, `cefr`,
+> `difficulty_vector` (`lexical`/`syntax`/`discourse`/`interaction`, 1..5) y los
+> ejes de variedad, y ningún `prompt` contiene `{word}` (la consigna da un
+> escenario, nunca el target). Los **6 contextos originales quedan congelados**
+> (mismos `id` y valores core; guardia por test) para no reinterpretar la
+> evidencia histórica que referencia sus `context_id`. **(B) Diversidad 2.0
+> informativa:** nuevos `CONTEXT_VARIETY_DIMENSIONS` (`register`/
+> `lexical_environment`/`syntactic_focus`), función pura `context_variety`
+> (`{dimensions, varied_dimensions, score}`) y `context_dimensions(...,
+> dimensions=...)` generalizada vía `_normalize_dimensions`; `context_diversity`
+> conserva sus cuatro claves históricas y añade `variety`. **El gate NO cambia:**
+> `CONTEXT_DIMENSIONS`, `context_distance`, `_novelty_score` y
+> `diverse_dimensions` mantienen la semántica de V3.47 y `CONTEXT_DIVERSITY_MIN
+> = 2` se conserva (la distancia mínima entre pares del banco ampliado es `>= 2`);
+> `empty_summary()["context_diversity"]` gana el default `variety` por paridad
+> pura↔SQL. Contrato aditivo (`ContextDiversity.variety` en `types/api.ts`).
+> **Sin cambio de UI.** Tests: pytest **2075 passed** (+12: nuevo
+> `test_context_bank_v348.py`; ajustes en `test_transfer_v343.py` y
+> `test_learning_evidence_v336.py`), vitest **72 ficheros/623 tests** (sin
+> cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
+> `check_release_consistency` **3.48.0** exit 0. **CI 6/6 en verde** (run
+> [34583804612](https://github.com/jvelasca/english-tutor/actions/runs/34583804612)
+> sobre `3438e55`); mismo commit de release `3438e55` que cierra V3.48.0. Fuera
+> de alcance (V3.49+): TTS/offline (auto-descarga implícita de voces), Sense
+> Engine 2.0, `transfer_state` enriquecido (`confidence`/`recency`) y
+> `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.47.0 (Transfer Evidence 2.0 + CEFR/`difficulty_vector`
+> del contexto)** — release **v3.47.0**, doble y ADITIVA, **sin migración de BD**
+> y sin tocar el scoring ni FSRS, que cierra los dos P1 abiertos por la auditoría
+> de V3.46.0 sobre la transferencia. **(A) Transfer Evidence 2.0:** la escalera
+> `transfer_state` deja de acreditar transferencia con un único éxito no
+> andamiado. `services/evidence.py` define `TRANSFER_DEMONSTRATED_MIN_UNSCAFFOLDED
+> = 2` (2 éxitos limpios en condiciones NO andamiadas para
+> `transfer_demonstrated`), `TRANSFER_STABLE_MIN_DAYS` `2 → 3` y
+> `TRANSFER_STABLE_MIN_GOALS = 2` (objetivos comunicativos distintos);
+> `TRANSFER_STABLE_MIN_CONTEXTS = 3` se mantiene. `context_signals` expone la
+> evidencia fina (`unscaffolded_clean_success_contexts`/`_days`,
+> `clean_success_goals` derivados de `communicative_goal`,
+> `last_clean_success_at`/`last_unscaffolded_clean_success_at`; la decisión NO usa
+> reloj) y `empty_summary` los defaults neutros. Fallback legacy intacto (sin
+> datos de condición se conserva la regla anterior) y paridad pura↔SQL por
+> construcción. **(B) CEFR/`difficulty_vector`:** los 6 contextos de
+> `services/transfer.py` declaran `cefr` (`services.cefr.CEFR_LEVELS`) y
+> `difficulty_vector` (`lexical`/`syntax`/`discourse`/`interaction`, 1..5,
+> convención listening/speaking); nuevos helpers puros `difficulty_from_vector`
+> (media redondeada, clamp 1..6) y `cefr_index`; `context_for(..., level="")`
+> (retrocompatible) prefiere contextos de nivel ≤ al del alumno y, si ninguno es
+> alcanzable, cae al nivel más cercano por arriba; el contrato devuelve
+> `cefr`/`difficulty_vector`/`difficulty` (`TransferContextOut` y
+> `DrillTransferContext`). `domain/vocabulary.py` pasa `level=row.get("cefr")`.
+> **Sin cambio de UI.** Tests: pytest **2063 passed** (+16; nuevos
+> `test_transfer_evidence_v347.py` y `test_transfer_cefr_v347.py`; ajustes en
+> `test_transfer_v340.py`/`v343.py`/`test_transfer_condition_v346.py` y
+> `test_learning_evidence_v336.py`), vitest **72 ficheros/623 tests** (sin
+> cambios), `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
+> `check_release_consistency` **3.47.0** exit 0. **CI 6/6 en verde** (run
+> [34582697000](https://github.com/jvelasca/english-tutor/actions/runs/34582697000)
+> sobre `1aa16af`). Fuera de alcance
+> (V3.47.1/V3.48): TTS/offline (auto-descarga implícita de voces), Sense Engine
+> 2.0, Context Bank 2.0, `transfer_state` enriquecido (`confidence`/`recency`) y
+> `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.46.0 (Condición de recuperación en la
+> transferencia — `transfer_condition`)** — release **v3.46.0** que cierra el P1
+> `transfer_condition` de la auditoría de V3.43.0, **aditiva y sin migración
+> destructiva**. Hasta ahora TODO intento de transferencia era `spontaneous_use`
+> con `support_level="spontaneous"`, sin distinguir si la unidad se usó porque se
+> pidió (`prompted`), porque el escenario la insinuaba (`cued_context`), por
+> decisión propia en un escenario abierto (`open_context`), por elección libre
+> (`free_choice`) o porque surgió sola (`naturally_emergent`); sin esa dimensión
+> `transfer_demonstrated` podía declararse con tareas ANDAMIADAS.
+> `services/transfer.py` define `TRANSFER_CONDITIONS` (andamiaje decreciente),
+> `SERVABLE_CONDITIONS` (`prompted`/`cued_context`/`open_context`),
+> `UNSCAFFOLDED_CONDITIONS` (`open_context`/`free_choice`/`naturally_emergent`),
+> `REQUIRED_TARGET_CONDITIONS`, `CONDITION_INSTRUCTIONS`, `normalize_condition`
+> (valores desconocidos → `""`) y la escalera PURA `condition_for_state`
+> (`not_ready` con intentos → `prompted`; `not_ready` sin intentos y `emerging` →
+> `cued_context`, comportamiento de V3.43; `contextualized`+ → `open_context`,
+> unidad NO obligatoria). La condición la DERIVA el servidor del resumen del
+> ledger (premisa 21: el cliente nunca la declara). Persistencia aditiva
+> `transfer_condition TEXT NOT NULL DEFAULT ''` en `learning_evidence` (ALTER
+> idempotente) con plumbing en `record_evidence`/lote/`list_evidence`/SELECT de
+> detalle (paridad pura↔SQL por construcción: el resumen SQL reutiliza la MISMA
+> `context_signals`). `services/evidence.py` agrega `transfer_conditions`
+> (`{condición: {attempts, clean_successes}}`), `success_conditions` y
+> `unscaffolded_clean_successes`, y **endurece `transfer_demonstrated`**: además
+> de 2 contextos limpios con diversidad real (`diverse_dimensions >= 2`), exige
+> ≥1 éxito limpio NO andamiado; sin datos de condición (legacy/parcial) se
+> conserva la regla anterior (cero regresión). `domain/vocabulary.py` sirve,
+> re-deriva y persiste la condición, y un intento de `open_context` que NO usa la
+> unidad no se registra (`required_target=false`). Contratos aditivos
+> (`condition`/`required_target`/`unscaffolded`) y UI del drill con la condición
+> visible y aviso neutro `transferNotRequired`. Tests: pytest **2047 passed**
+> (+17; nuevo `test_transfer_condition_v346.py`; ajustes en
+> `test_learning_evidence_v336.py` y `test_transfer_v340.py`), vitest **72
+> ficheros/623 tests** (+2 en `wordDrill.test.tsx`), `ruff` limpio, `tsc
+> --noEmit` limpio, `npm run build` y `check_release_consistency` **3.46.0**
+> exit 0. **CI 6/6 en verde** (run
+> [34578101387](https://github.com/jvelasca/english-tutor/actions/runs/34578101387)
+> sobre `107d8ec`); el commit de release agrupa V3.44 + V3.45 + V3.46 porque
+> ninguno se había commiteado desde v3.43.0 (mismo caso que v3.42.0). Fuera de
+> alcance (V3.47+): CEFR/`difficulty_vector` del contexto (P1
+> restante), Context Bank 2.0, diversidad 2.0, semantic appropriateness,
+> transfer_state enriquecido y `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.45.0 (Traductor de viaje práctico + voz española
+> real)** — release **v3.45.0** que cierra la experiencia del Traductor de viaje.
+> **(A) Voz española real:** la salida en español sonaba a «un inglés hablando
+> español» porque `language="es"` degradaba a la voz inglesa (no había voces
+> `es_*` instaladas, `download_models.py` solo bajaba la inglesa y
+> `resolve_voice` caía al fallback global). Ahora
+> `SPANISH_VOICE = "es_ES-davefx-medium"` y
+> `DEFAULT_VOICES = {"en": PIPER_VOICE, "es": SPANISH_VOICE}`; la pura
+> `default_voice_for(language)` y `resolve_voice` priorizan el default del
+> idioma (preferencia del usuario del idioma → default del idioma instalado →
+> primera instalada del idioma → fallback global; con `en` idéntico al
+> histórico). `ensure_voice_for_language(language)` (no-op si ya hay voz del
+> idioma; descarga el default del catálogo curado vía
+> `services.voice_downloads`; `False` sin red/disco, NUNCA lanza) se ejecuta en
+> `/api/tts` antes de resolver la voz, así que la primera petición en español
+> instala la voz y sintetiza con ella sin 500 si no hay red;
+> `download_models.py` instala también la española reutilizando el catálogo.
+> Contrato aditivo: `VoicesResponse.defaults` (idioma → voz por defecto).
+> **(B) Modo Conversación:** `TranslatorScreen` gana dos pestañas
+> (**Conversación** por defecto, **Escribir** intacto). Nuevos
+> `useVoiceTurn.ts` (MediaRecorder + AnalyserNode + VAD + transcripción; helper
+> PURO `nextTurnVadState` que cierra por silencio ≥ `SILENCE_MS` tras voz ≥
+> `MIN_SPEECH_MS` y descarta picos de ruido; auto-stop 120 s),
+> `BigMicButton.tsx` (botón `size-24` con anillo según nivel),
+> `ConversationPanel.tsx` (por idioma, con repetir audio, avisos de micro/
+> transcripción y rotación) y `ConversationTranslator.tsx` (dos paneles; cada
+> turno se transcribe, traduce y —si el auto-play está activo— se reproduce en el
+> idioma del interlocutor; historial en
+> `english-tutor.translator-conversation`; toggles «Reproducir automáticamente»
+> y «Cara a cara»; tamaño de texto; aviso y descarga en segundo plano de la voz
+> española). i18n `translator.mode.*`/`translator.conversation.*` con paridad
+> es/en. El Traductor sigue siendo **AUXILIAR**: no registra evidencia ni toca
+> FSRS. Tests: pytest **2030 passed** (+10; `test_voices.py`), vitest **72
+> ficheros/621 tests** (+13; `useVoiceTurn.test.ts`,
+> `ConversationPanel.test.tsx` y `TranslatorScreen.test.tsx` con pestañas),
+> `ruff` limpio, `tsc --noEmit` limpio, `npm run build` y
+> `check_release_consistency` **3.45.0** exit 0. Fuera de alcance (V3.46+):
+> `transfer_condition` + CEFR/`difficulty_vector` del contexto (P1), Context Bank
+> 2.0, diversidad 2.0, semantic appropriateness, transfer_state enriquecido y
+> `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.44.0 (Lexicón sense-aware + scoring semántico
+> 2.0)** — release **v3.44.0** que cierra los dos P1 conceptuales que la
+> auditoría externa de V3.43.0 (9,6/10) deja abiertos, **sin migración de datos
+> y con contratos aditivos**. **P1-01 (sense-aware):** el proxy semántico deja
+> de usar la `pos` GLOBAL como sustituto de sentido. El contrato de contenido
+> gana `senses` (`GENERATOR_VERSION` `1.3.0 → 1.4.0`, regeneración lazy una sola
+> vez) con el helper puro `normalize_senses` (pos canónico, dedupe por
+> `(pos, gloss)`, tope `MAX_SENSES = 4`, orden estable; nunca invalida
+> definición/traducción). Persistencia aditiva `senses_json TEXT NOT NULL DEFAULT
+> ''` en `dictionary_entries` **y** `dictionary_reverse_entries` (migración
+> idempotente con `PRAGMA table_info` + `ALTER TABLE`, también en la tabla
+> inversa ya creada; JSON ilegible → `[]`). Nuevo módulo **PURO**
+> `services/semantics.py`: `pos_family` (por palabras, no subcadenas),
+> `families_from_senses` (con fallback a la `pos` global), `unit_positions`,
+> `occurrence_role` (cues FUERTES: pronombre sujeto, auxiliar/`to`, flexión
+> `-ed`/`-ing`; DÉBILES: determinante, `-s`/`-ies`; las unidades multi-palabra se
+> abstienen) y `semantic_adequacy`. `domain/vocabulary.py` prefiere los sentidos
+> de la `lexical_unit` y cae a la superficie; `_build_dictionary_entry` expone
+> `senses`. Así `I plan my trip.` deja de ser falso positivo si `plan` declara
+> sentido verbal. **P1-02 (scoring robusto):** `score_transfer_attempt(word,
+> text, *, pos="", senses=())` mantiene `passed`/`lexical_transfer` y devuelve
+> `adequacy` ∈ `fit`/`suspect`/`incorrect`/`unknown`: `incorrect` (contradicción
+> fuerte con TODAS las familias) → `semantic_mismatch` es el **ÚNICO** valor que
+> bloquea el clean success; `suspect` → `semantic_doubt` (nueva const en
+> `TRANSFER_ERROR_TYPES`) es **advisory** y NO destruye la evidencia léxica; sin
+> sentidos/POS → `unknown` (nunca bloquea). `semantic_fit: bool | None` se
+> conserva y `score_write_attempt` mantiene su contrato exacto (4 claves).
+> `context_signals` excluye SOLO `semantic_mismatch`, así que `semantic_doubt`
+> cuenta como éxito limpio y `transfer`/`transfer_state` avanzan con él (paridad
+> pura↔SQL por construcción). Contratos aditivos: `DictionaryEntryOut.senses`
+> (+ `DictionarySenseOut`), `adequacy` admite `incorrect`, y `wordDrill.tsx`
+> avisa de `incorrect` con `dictionary.drill.transferSemanticWrong` (warning, sin
+> bloquear `onProduced`). Tests: pytest **2020 passed** (+31; nuevos
+> `test_senses_v344.py` y `test_transfer_v344.py`; ajustes en
+> `test_transfer_v343.py`, `test_dictionary_content_v330.py` y
+> `test_situational_cue_v338.py`), vitest **70 ficheros/608 tests** (+1), `ruff`
+> limpio, `tsc --noEmit` limpio, `npm run build` y `check_release_consistency`
+> **3.44.0** exit 0. Dossier de la auditoría externa:
+> `docs/audit/P-AUDITORIA-TOTAL-V343.md`. Fuera de alcance (V3.45+):
+> `transfer_condition`, CEFR/`difficulty_vector` del contexto, Context Bank 2.0
+> y `expected_learning_value` / Adaptive Planner 2.0.
+>
+> **Nota (2026-09-11):** **V3.43.0 (Transfer 2.0)** — release **v3.43.0** que
+> cierra los 4 P1 de la auditoría de V3.42.0 sobre la evidencia de transferencia.
+> **P1-01 (target oculto):** `services/transfer.py` reescribe
+> `TRANSFER_CONTEXTS` con atributos (`topic`, `communicative_goal`,
+> `discourse_type`, `social_relation`, `time_reference`, `register`,
+> `interaction_type`) y consignas que **nunca contienen `{word}`**;
+> `context_for(word, used_context_ids, *, success_context_ids)` ya no sustituye
+> el target, prioriza el contexto de mayor DISTANCIA mínima a los ya logrados y
+> expone `communicative_goal`/`discourse_type`. El drill oculta la palabra
+> también en `transfer` (cabecera con `transferHiddenTarget`, revelada tras el
+> intento) y la cola deja de mostrarla (`showsWord` sin `transfer`).
+> **P1-02 (semanticidad):** `score_transfer_attempt(word, text, *, pos="")`
+> separa `lexical_transfer` (alias de `passed`) de la adecuación
+> (`semantic_fit`/`adequacy` = `fit`/`suspect`/`unknown`) con un proxy
+> DETERMINISTA y advisory (`_semantic_fit`: POS `noun` usada como verbo o POS
+> `verb` tras determinante → `suspect`); el uso léxicamente correcto pero
+> sospechoso conserva `passed=True` y guarda `error_type="semantic_mismatch"`
+> (nueva `TRANSFER_ERROR_TYPES`), sin bloquear la evidencia léxica.
+> `domain/vocabulary.py` lee la `pos` de `dictionary_entries` y la pasa al
+> scorer; el drill muestra `dictionary.drill.transferSemanticWarning` sin dejar
+> de llamar a `onProduced`. Se documenta (P2-04) que `score_write_attempt`
+> acredita producción LÉXICA, no corrección gramatical ni ortográfica.
+> **P1-03 (diversidad real):** `context_signals` añade
+> `clean_contexts`/`clean_successes`/`clean_success_contexts`/`clean_success_days`
+> y `context_diversity` (ÉXITO LIMPIO = éxito sin `semantic_mismatch`); `transfer`
+> exige `>= CONTEXT_TRANSFER_MIN` contextos limpios **y**
+> `diverse_dimensions >= CONTEXT_DIVERSITY_MIN = 2`. **P1-04 (estado):** nueva
+> `transfer_state` + `TRANSFER_STATES` (`not_ready` → `emerging` →
+> `contextualized` → `transfer_demonstrated` → `transfer_stable` → `automatic`)
+> y `with_transfer_state`; `has_contextual_transfer`/`transfer_gap` leen el
+> estado (`transfer_state` respeta el booleano `transfer` de un resumen
+> legacy/parcial: lo lee como DEMOSTRADA, nunca estable) y `planned_signals`
+> expone `transfer_state`/`context_diversity`. Contratos HTTP aditivos
+> (`TransferContextOut`/`TransferAttemptOut`/`ReviewQueueItem`), sin migración.
+> Tests: pytest **1989 passed** (+14, `test_transfer_v343.py`; ajustes en
+> `test_transfer_v340.py` y `test_learning_evidence_v336.py`), vitest **70
+> ficheros/607 tests** (+1), `ruff` limpio, `tsc --noEmit` limpio, `npm run
+> build` y `check_release_consistency` **3.43.0** exit 0. **Publicada y
+> auditable:** commit `04d8db92df8ea12c247c460ee263bf46a189a406` (tag
+> `v3.43.0`) con el run
+> [34571938704](https://github.com/jvelasca/english-tutor/actions/runs/34571938704)
+> **6/6 jobs en success**. La auditoría pre-release del árbol de trabajo
+> corrigió P2-02 (`transfer_state` respeta el booleano `transfer` de un resumen
+> legacy/parcial) y dejó abierto P2-01 (falsos positivos del proxy semántico en
+> palabras noun/verb). Fuera de alcance
+> (V3.44): modelo *sense-aware*, Context Bank a escala y
+> `expected_learning_value`.
+>
+> **Nota (2026-09-10):** **V3.42.0 publicada (Fase 4 y CIERRE del plan maestro
+> V3.39+)** — release **v3.42.0** (**transferencia contextual real + actividad
+> `spontaneous_use` + gobierno por unidad léxica**). Cuarta y última de las
+> cuatro fases acordadas (diccionario reversible → Traductor → motor de tarea
+> óptima → transferencia real). **Transferencia ≠ recuperación contextualizada:**
+> `services/transfer.py` (puro) define el banco curado de contextos nuevos
+> (`TRANSFER_CONTEXTS`) y la elección determinista del que toca
+> (`context_for(word, used_context_ids)`: filtra los `context_id` ya usados y
+> elige por hash ESTABLE `zlib.crc32` —no el `hash()` sembrado—, rotando sobre el
+> banco completo con `exhausted=True` al agotarse). `services/evidence.
+> context_signals` (pura, reutilizada por el resumen SQL) agrupa el ledger por
+> `context_id` y expone `contexts`/`context_attempts`/`success_contexts`/
+> `home_context`/`transfer` (éxito en ≥ `CONTEXT_TRANSFER_MIN = 2` contextos
+> distintos). `planner.transfer_gap` decide cuándo pedirla: exige contexto
+> registrado, ≥ `TRANSFER_MIN_SUCCESSES = 2` éxitos y <
+> `TRANSFER_MIN_SUCCESS_CONTEXTS = 2` contextos con éxito (sin ventana devuelve
+> `False`); `transfer_gap` entra como último motivo de `EVIDENCE_REASON_ORDER`.
+> **La modalidad `spontaneous_use` deja de medirse sin tarea:** actividad
+> `transfer` con `lexicon.score_transfer_attempt`, `GET /api/vocabulary/drill/
+> transfer-context` (solo lectura; sin `context_id` del cliente el servidor lo
+> deriva del banco) y `POST /api/vocabulary/drill/transfer-attempt` (evidencia
+> `spontaneous_use`, `activity_id="drill:transfer"`, apoyo `spontaneous` y el
+> `context_id` del contexto NUEVO). **Gobierno por `lexical_unit`:** `lexicon.
+> unit_evidence(rows, evidence_by_word)` suma contadores y mapas de las formas
+> hermanas, **recalcula** `success_rate` del total, une `automatic`/
+> `automatic_skills`/`success_contexts` y deriva `transfer`; `ReviewQueueOut.units`
+> (aditivo) y `ReviewQueueItem.unit_surfaces`/`transfer`/`success_contexts`
+> exponen el roll-up sin cambiar la evidencia por forma. **Descomposición de
+> `wordDrill.tsx`:** peldaños presentacionales extraídos a
+> `features/vocabulary/wordDrillSteps.tsx` (`RecognitionStep`/`RecallStep`/
+> `ProductionTextarea`/`TransferStep`) sin cambiar el contrato; la escalera pasa
+> a 5 peldaños y la cola abre `transfer` con `initialStep`. Tests: pytest
+> **1975 passed** (+15, `test_transfer_v340.py`; `test_learning_evidence_v336.py`
+> ajustado al contrato de `empty_summary`), vitest **70 ficheros/606 tests**
+> (+4), `ruff` limpio, `tsc --noEmit` limpio y `check_release_consistency`
+> **3.42.0** exit 0. **Plan maestro V3.39+ completo: sin fases pendientes.**
+> **Publicada y auditable:** commit
+> `3522bac4592beffe92df9fae5fbd3cae817fdc28` (tag `v3.42.0`) con el run
+> [34540962417](https://github.com/jvelasca/english-tutor/actions/runs/34540962417)
+> **6/6 jobs en success**. Ese commit **agrupa las cuatro fases** (v3.39.0 →
+> v3.42.0) porque el trabajo vivió en el árbol de trabajo y las releases
+> intermedias no llegaron a commitearse: **no hay estados intermedios
+> auditables**, y la auditoría fase a fase se hace sobre las notas versionadas
+> (`release-notes-v3.39.0.md` … `release-notes-v3.42.0.md`), no sobre commits
+> intermedios.
+>
+> **Nota (2026-09-10):** **V3.41.0 publicada (Fase 3 del plan maestro V3.39+)** —
+> release **v3.41.0** (**motor de tarea óptima por skill + actividad de escritura
+> + robustez de señales**). Tercera de las cuatro fases acordadas (diccionario
+> reversible → Traductor → motor de tarea óptima → transferencia real). El
+> planner deja de responder "¿qué palabra repaso?" y responde **"¿qué modalidad
+> limita, qué actividad la cierra y con qué apoyo?"**: `planner.skill_priority`
+> aplica `PRIORITY_WEIGHTS` a las señales por modalidad, `planner.limiting_skill`
+> devuelve el argmax con desempate por `LEXICAL_SKILLS` (sin segmentación cae en
+> `recall`) y `planner.select_task(matrix, evidence, signals)` devuelve
+> `{skill, activity, reason, support_level}` con orden declarado `error_prone` →
+> `skill_gap` → `slow_recall`. `ACTIVITY_FOR_SKILL` mapea la modalidad a la
+> actividad (`recall`, `sentence`, **`write`**) y `ACTIVITY_SUPPORT_LEVEL`
+> declara el andamiaje; `evidence_reason` queda como fachada estable y
+> `priority`/`signals`/`why` conservan su semántica. **El hueco simétrico
+> `spoken ✓ / written ✗` ya es accionable:** nueva actividad `write` con
+> `services/lexicon.score_write_attempt` (puro, sin LLM: `unit_produced` sobre la
+> frase propia + `WRITE_MIN_WORDS = 4`, taxonomía `WRITE_ERROR_TYPES`),
+> `domain/vocabulary.submit_write_attempt`, endpoint nuevo
+> `POST /api/vocabulary/drill/write-attempt` y paso `write` en `wordDrill.tsx`
+> (la cola lo abre con `initialStep`). **Señales robustas:** `services/evidence.
+> recency_signals` (ventana de `RECENT_WINDOW_EVENTS = 10`, `recent_error_rate`,
+> `recent_wrong_word`, `median`/`p75`/`p90_response_time_ms` por rango más
+> cercano, `recent_response_time_ms`, `latency_trend`), reutilizada por
+> `repositories/evidence.summarize_by_target` (paridad por construcción);
+> `_has_grave_error` y `error_prone` miran la VENTANA; `is_automatic` se
+> **unifica** con `automatic_skills` cuando el resumen trae segmentación (el
+> criterio global de V3.38.1 queda como fallback de resúmenes parciales/legacy);
+> el ledger encadena el intervalo al evento **cronológicamente anterior**
+> (`last_evidence_at(..., before=now)`) y `example_for_many` batchea los ejemplos
+> del `cloze` en una sola pasada al banco. **Contratos HTTP aditivos:**
+> `ReviewQueueItem.limiting_skill`/`ReviewQueueItem.task` y los campos nuevos del
+> resumen (sección `LexicalEvidence`). Tests: pytest **1960 passed** (+36),
+> vitest **70 ficheros/602 tests** (+5), `ruff` limpio, `tsc --noEmit` limpio y
+> `check_release_consistency` **3.41.0** exit 0. Diferido a la **Fase 4**:
+> transferencia contextual real (contextos A/B/nuevos con evidencia por
+> `context_id`), actividad propia de `spontaneous_use`, agregación del estado
+> pedagógico por `lexical_unit` y descomposición de `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.40.0 publicada (Fase 2 del plan maestro V3.39+)** —
+> release **v3.40.0** (**Traductor de viaje bidireccional ES↔EN, 5.º destino**).
+> Segunda de las cuatro fases acordadas (diccionario reversible → Traductor →
+> motor de tarea óptima → transferencia real). **Nuevo destino AUXILIAR**
+> `translator` con ruta propia `/traductor` (`TRANSLATOR_PATH`, `routeMap`
+> reversible de 10 valores y `pathToRoute` de `#/traductor`), registrado en
+> `ROUTES` justo tras el diccionario —mismo bloque auxiliar tras el separador—,
+> icono `Languages` y bottom-nav `grid-cols-4 → grid-cols-5`; el corte de las
+> píldoras de cabecera se mantiene en `xl` (con `overflow-x-auto` como red de
+> seguridad). **`TranslatorScreen`** (`features/translator/`): conmutador de
+> dirección ES→EN / EN→ES con **ES→EN por defecto** (el caso del viajero),
+> botón ⇄ que intercambia sentido y textos, entrada por voz (`MicButton`, que
+> ahora acepta `language` y auto-detiene a los 120 s) o de texto, panel de
+> resultado con `ListenButton` por idioma para escuchar origen y destino,
+> historial reciente (8 frases) en `localStorage`
+> (`english-tutor.translator-history`) con reutilización y borrado, y aviso de
+> utilidad de apoyo. Es **solo lectura pedagógica**: no crea evidencia, no toca
+> `vocabulary` y es válida sin perfil. **Backend:** `services/translate.py` pasa
+> a BIDIRECCIONAL (`_SYSTEM_PROMPT_ES_EN` nuevo, caché por `(direction, text)`,
+> dirección desconocida → `"en-es"`), `TranslateRequest.direction`
+> (`Literal["en-es","es-en"]`, defecto `"en-es"` → 422 si no), `TTSRequest.language`
+> (defecto `"en"`), `resolve_voice(prefs, language="en")` puro con
+> `voice_language(id)` (preferida del idioma → default del idioma → primera voz
+> del idioma → fallback global documentado) y tres voces `es_*` **medium** en el
+> catálogo curado de Piper (`es_ES-davefx-medium`, `es_ES-sharvard-medium`,
+> `es_MX-ald-medium`, descargables desde Ajustes → Voces). Todo aditivo y
+> retrocompatible: sin `direction`/`language` el comportamiento es el histórico
+> de las pantallas de práctica. Tests: pytest **1924 passed** (+14),
+> vitest **70 ficheros/597 tests** (+2 ficheros/+19), `ruff` limpio,
+> `tsc --noEmit` limpio y `check_release_consistency` **3.40.0** exit 0.
+> Diferido a las fases siguientes: **Fase 3** motor de tarea óptima por skill
+> (`skill_priority`/`limiting_skill`/`select_task`) + ruta de escritura
+> `written_production` + robustez de señales; **Fase 4** transferencia
+> contextual real, actividad `spontaneous_use`, agregación por `lexical_unit` y
+> refactor de `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.39.0 publicada (Fase 1 del plan maestro V3.39+)** —
+> release **v3.39.0** (**Diccionario reversible EN↔ES + persistencia de la
+> pestaña Personal/Consultar**). Primera de las cuatro fases acordadas
+> (diccionario reversible → Traductor → motor de tarea óptima → transferencia
+> real). **Diccionario ES→EN:** doble escalón — (1) inversa INSTANTÁNEA sobre las
+> traducciones ya cacheadas, nuevo servicio PURO `services/dictionary_reverse.py`
+> (`match_translation`: segmenta glosas `, ; / |`, quita paréntesis y artículos
+> iniciales, pliega acentos conservando la eñe, puntúa exacto > parcial y
+> deduplica en orden determinista); (2) generación con el modelo local solo si no
+> hay coincidencia, en la tabla PROPIA `dictionary_reverse_entries` (aislada de
+> `dictionary_entries` para no contaminar el banco de distractores del MCQ;
+> `word` ES como PK + `english`/`pos`/`definition`/`situation`/`generator_version`).
+> `GENERATOR_VERSION` 1.2.1 → **1.3.0** (una sola política de frescura para las
+> dos direcciones; la caché directa se regenera una vez) con
+> `parse_reverse_content`/`generate_reverse_content` (reutiliza el validador puro
+> `services/situation.py` sobre el equivalente inglés). La fontanería de
+> generación (single-flight, negative cache, rate limit) se indexa por
+> `(direction, word)`. Contrato HTTP **aditivo**: `DictionaryLookupRequest.direction`
+> (defecto `"en-es"`) y `DictionaryEntryOut.direction`/`alternatives`. La consulta
+> inversa sigue siendo SOLO LECTURA (D3) y su marca de uso es la del EQUIVALENTE
+> INGLÉS. **Frontend:** conmutador EN↔ES en `DictionaryLookup` (con `lang`/
+> placeholder por dirección), tarjeta reetiquetada (término ES de cabecera,
+> inglés como «In English», definición EN y `alternatives`) y puente de práctica
+> que practica SIEMPRE el término inglés; `lookupDictionaryWord(userId, word,
+> direction)` + tipos TS. **Persistencia de pestaña:** hook `useDictionaryView`
+> con patrón doble (`localStorage` `english-tutor.dictionary-view` +
+> `settings.dictionary_view`, hidratación al cambiar de usuario), integrado en
+> `DictionaryScreen` y en el conmutador incrustado de `QuizRoutePage`. Tests:
+> pytest **1910 passed** (+20, nuevo `test_dictionary_reverse_v339.py`), vitest
+> **68 ficheros/578 tests** (nuevos ES→EN + `DictionaryScreen.test.tsx`), `ruff`
+> limpio, `tsc --noEmit` limpio y `check_release_consistency` **3.39.0** exit 0.
+> Diferido a las fases siguientes: **Fase 2** Traductor bidireccional por voz
+> (5.º destino, voces Piper `es_*`); **Fase 3** motor de tarea óptima por skill
+> (`skill_priority`/`limiting_skill`/`select_task`) + ruta de escritura
+> `written_production` + robustez de señales; **Fase 4** transferencia contextual
+> real, actividad `spontaneous_use`, agregación por `lexical_unit` y refactor de
+> `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.38.1 publicada** — release **v3.38.1** (**Cierre
+> quirúrgico de los P1 del Planner + UI de diccionario y estado**). Release
+> ADITIVA que NO añade funcionalidad: cierra los 4 P1 de la auditoría de V3.38.0
+> y endurece `situation`, sin migración de BD y sin tocar scoring, FSRS ni la
+> semántica del intervalo de evidencia. **(P1-01) Planner globalmente óptimo:**
+> `domain/review.py` separa la cota de CANDIDATOS
+> (`REVIEW_QUEUE_CANDIDATE_LIMIT = 500`) del límite de PRESENTACIÓN: el planner
+> compara TODAS las vencidas y el recorte se aplica DESPUÉS del ranking por
+> `priority`; las cues se resuelven solo para los ítems servidos (de paso, deja
+> de pagarse `example_for` por todas las vencidas). **(P1-02) Señales por
+> modalidad:** `summarize_evidence`/`summarize_by_target` (paridad exacta
+> pura↔SQL) añaden `skill_attempts` y `skill_mean_response_time_ms`;
+> `planned_signals` gana el bloque `skills` (attempts/successes/success_rate/
+> weakness/support/latency por modalidad, aún sin entrar en `priority_score`) e
+> `is_slow_recall` mide la latencia DE `recall` exigiendo un éxito de recall (ya
+> no la media global, que mezclaba modalidades). **(P1-03) `skill_gap` parcial
+> accionable:** basta con que falte `spoken_production` (caso `written ✓ / spoken
+> ✗`) para dirigir la siguiente tarea a `sentence`; el hueco simétrico se expone
+> pero no emite razón hasta que exista un drill de escritura (V3.39). **(P1-04)
+> Automaticidad robusta:** `AUTOMATIC_MIN_INDEPENDENT` 2 → **3** + nueva ratio
+> `AUTOMATIC_MIN_SUCCESS_RATIO = 0.80` + ausencia de fallo grave (`wrong_word` >
+> `AUTOMATIC_MAX_WRONG_WORD_ERRORS = 1`), aplicado a `is_automatic` y a
+> `automatic_skills`. **(P2-01) `situation` endurecida:** nuevo módulo puro
+> `services/situation.py` como única fuente de verdad (UN hueco, UNA sola frase,
+> sin fuga morfológica REGULAR de la diana), usado por la generación
+> (`GENERATOR_VERSION` 1.2.0 → **1.2.1**, regeneración lazy de la caché) y por la
+> lectura de la escalera (una situación cacheada inválida no se sirve ni cuenta
+> como peldaño disponible). **UI:** ruta dedicada `/diccionario` (`DICTIONARY_PATH`
+> + `routeMap` + cuarto destino tras un separador + `DictionaryScreen` con
+> Personal/Consultar; las píldoras de la cabecera pasan a montarse desde `xl`
+> porque con 4 destinos con etiqueta no caben por debajo de 1280px sin invadir
+> las acciones, y la bottom-nav cubre hasta entonces) y estado de conexión en la
+> cabecera (`ConnectionIndicator` con punto verde/rojo y popover `SystemStatus`),
+> retirando la barra inferior (`StatusBar.tsx` y reglas CSS huérfanas). Contrato aditivo (`LexicalEvidence`
+> gana dos histogramas; `planned_signals` gana `skills`). Tests: pytest **1890
+> passed** + `ruff` limpio + vitest (**67 ficheros/568 tests**) + `tsc`/build
+> limpios + `check_release_consistency` **3.38.1** exit 0 + **CI 6/6 en verde**
+> (run [34500794657](https://github.com/jvelasca/english-tutor/actions/runs/34500794657)
+> sobre el commit `856e115`, que corrige el corte de la navegación `md` → `xl`
+> tras el fallo de Playwright E2E en tablet del commit de release `217ebfe`).
+> Diferidos a V3.39:
+> prioridad completa por skill, routing de escritura de `written_production`,
+> `sense`/CEFR/contexto y transferencia real (V3.23), pesos del planner y
+> recencia ponderada, `example_for_many` y refactor de `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.38 publicada** — release **v3.38.0** (**La
+> siguiente tarea óptima: `situación`, planner y automaticidad por skill**).
+> Cierra el incremento que V3.37 dejó abierto, en tres frentes. **(1) P1-03
+> (automaticidad por modalidad).** El `skill` del ledger léxico deja de ser
+> `""`: `services/evidence.py` declara el vocabulario canónico
+> `LEXICAL_SKILLS` (`recall`, `written_production`, `spoken_production`,
+> `spontaneous_use`) y el mapeo canal→skill (`production_skill`); los caminos de
+> escritura (`domain/vocabulary.py`) declaran la modalidad. `summarize_evidence`/
+> `empty_summary` y `summarize_by_target` añaden `skill_successes`/
+> `skill_success_days`/`skill_independent_successes`/`skill_independent_days`
+> (**paridad exacta pura↔SQL** fijada por test) y `automatic_skills` segmenta la
+> automaticidad por modalidad: un ítem ya no es "automático" por mezclar
+> reconocimiento con producción. **Sin migración** (la columna `skill` ya existía
+> desde V3.36.0). **(2) Planner (Optimal Next Task).** Nuevo servicio puro
+> `services/planner.py`: `planned_signals` (olvido, hueco, debilidad, dependencia
+> de apoyo y latencia), `priority_score` con `PRIORITY_WEIGHTS` declarados y
+> `evidence_reason` (`error_prone`, `skill_gap`, `slow_recall`), integrados en
+> `recommend_review_activity`. La cola (`domain/review.py`) se ordena por
+> `priority` (desempate por `retrievability` y palabra) y cada ítem expone
+> `priority`/`signals`/`why`/`automatic_skills` — aditivos y sin spoiler.
+> **(3) `situación`.** `GENERATOR_VERSION` 1.1.0 → **1.2.0** y nueva columna
+> `dictionary_entries.situation` (**migración aditiva e idempotente**, con
+> backfill `''`): un enunciado situacional con un único hueco `_____`, validado
+> de forma determinista (un solo hueco, sin spoiler, ≤ `MAX_SITUATION_CHARS`) y
+> descartado —sin invalidar definición/traducción— si no cumple.
+> `RECALL_CUES` gana `situation` como TECHO de la escalera con apoyo `guided`;
+> `next_recall_rung` solo llega a él con `cloze` consolidado y
+> `resolve_recall_cue` sigue degradando solo hacia más apoyo; el GET/POST del
+> drill lo sirven y lo declaran (`drill:recall:situation`) y la cola lo
+> recomienda cuando hay contenido. Contrato aditivo (`LexicalEvidence`,
+> `ReviewQueueItem`, `DictionaryEntry`); sin tocar scoring, FSRS ni la semántica
+> del intervalo de evidencia (V3.35.1 P1-01). Tests: pytest **1880 passed**
+> (+56: nuevos `test_skill_segmentation_v338.py`, `test_planner_v338.py` y
+> `test_situational_cue_v338.py`) + ruff limpio + vitest (65 ficheros/**560**) +
+> `tsc --noEmit` limpio + `check_release_consistency` **3.38.0** exit 0.
+> Se actualizan las expectativas de V3.37/V3.37.1 (el techo pasa de `cloze` a
+> `situation`). Diferidos a V3.39: deudas de V3.30 + transferencia por contexto
+> V3.23 + `cloze_coverage` de corpus + `example_for_many` de la Review Queue +
+> refactor de `wordDrill.tsx`.
+> **CI verificable:** commit `002af70d3f480068f8a04d2449a635c196475721`
+> con el run [34493744848](https://github.com/jvelasca/english-tutor/actions/runs/34493744848)
+> en `success` (6/6 jobs).
+>
+> **Nota (2026-09-10):** **V3.37.1 publicada** — release **v3.37.1**
+> (**Política de consolidación y regresión de la escalera de recall**). Patch
+> quirúrgico que cierra los dos P1 pedagógicos de la auditoría de V3.37.0, sin
+> migración de BD (el peldaño ya se declaraba en `activity_id` desde V3.37.0) y
+> sin tocar scoring ni FSRS. **P1-01:** `services/recall.py` añade
+> `RECALL_RUNG_PASS_MIN_SUCCESSES = 2` / `RECALL_RUNG_PASS_MIN_DAYS = 2` y
+> `_rung_passed`: un peldaño (`translation`/`definition`/`cloze`) solo se da por
+> SUPERADO con varios éxitos en DÍAS NATURALES distintos (un acierto suelto o el
+> volumen del mismo día no ascienden; la progresión pasa a EVIDENCIA →
+> CONSOLIDACIÓN → MÁS EXIGENCIA). El umbral se mide sobre los ÉXITOS DEL PROPIO
+> PELDAÑO, no sobre `independent_successes`, porque `cued`/`guided` nunca son
+> `independent` y exigir automaticidad bloquearía la escalera. **P1-02:**
+> `RECALL_REGRESSION_FAILURES = 2` y una política determinista:
+> `next_recall_rung` BAJA al peldaño inmediatamente inferior (más apoyo) si el
+> peldaño ideal acumula ≥2 fallos SIN ningún éxito; nunca baja de `translation`,
+> fallar jamás hace subir y la recomendación no oscila (el peldaño inferior ya
+> está consolidado). `resolve_recall_cue` no cambia: sigue degradando SOLO hacia
+> más apoyo. El resumen de evidencia añade `recall_rung_days` y
+> `recall_rung_failures` (`services/evidence.py` + `summarize_by_target` con
+> **paridad pura↔SQL**), consumiendo el `activity_id`
+> `drill:recall:<peldaño>` que V3.37 ya escribía: **sin migración**. La evidencia
+> legacy `drill:recall` (sin peldaño) no alimenta ninguna de las dos políticas
+> (no es evidencia negativa ni acredita peldaños que no declaraba). Contrato
+> aditivo: `LexicalEvidence` amplía esos dos histogramas (schema Pydantic y tipo
+> TS); el resto del contrato HTTP no cambia y la cola sigue sin spoilear (P1-03
+> de V3.35.1 intacto). Tests: pytest **1824 passed** (+11, nuevo
+> `test_recall_policy_v3371.py` con la matriz éxito/fallo/regresión/legacy/
+> paridad) + ruff limpio + vitest (65 ficheros/**560**) + `tsc --noEmit` limpio +
+> `check_release_consistency` **3.37.1** exit 0.
+> **CI verificable:** commit `654c12f98728bf3f61648014aa9c9bb87755168a`
+> con el run [34480419514](https://github.com/jvelasca/english-tutor/actions/runs/34480419514)
+> en `success` (6/6 jobs).
+> Diferidos a V3.38/V3.39: P1-03 (automaticidad segmentada por skill),
+> `cloze_coverage` del corpus y el refactor de `wordDrill.tsx`.
+>
+> **Nota (2026-09-10):** **V3.37.0 publicada** — release **v3.37.0**
+> (**Learning Evidence 3.0: cues graduados y automaticidad**). La escalera del
+> peldaño `2 · Recall` deja de ser un *fallback* (traducción y, si no,
+> definición) y pasa a ser una **PROGRESIÓN** `translation (cued) < definition
+> (cued) < cloze (guided)`. `services/recall.py` añade `RECALL_CUES`,
+> `RECALL_CUE_SUPPORT` (el mapeo peldaño → apoyo vive en la capa pura: dominio,
+> repositorio y tests no pueden divergir), `blank_out` (blanqueo puro del cloze
+> desde el banco de pronunciación, con la misma alineación que acredita la
+> producción del drill; descarta el cue si tras blanquear queda cualquier
+> aparición de la palabra o si no hay frase real — **nunca se inventa
+> contenido**), `next_recall_rung` (peldaño recomendado por ÉXITOS ya
+> registrados por peldaño, leídos de `recall_rungs`; techo en `cloze`) y
+> `resolve_recall_cue` (ideal sin contenido → baja hacia más apoyo, **nunca
+> hacia arriba**). Cada peldaño declara su `support_level` y su `activity_id`
+> (`drill:recall:translation|definition|cloze`), así que `independent_successes`
+> (V3.36) por fin tiene de dónde salir. `services/evidence.py` añade
+> `AUTOMATIC_MIN_INDEPENDENT = 2`, `is_automatic` (éxito independiente **y**
+> espaciado: ≥2 días naturales distintos; `cued`/`guided` no cuentan — D5/E3),
+> `RECALL_RUNG_EVIDENCE` + `recall_rung_activity`/`recall_rung_from_activity` y
+> los agregados `independent_success_days`/`recall_rungs` con **paridad
+> pura↔SQL** en `summarize_by_target`. `recommend_review_activity` incorpora el
+> ítem `automatic` sin hueco de producción → `recall` de mantenimiento
+> (`automatic_maintenance`) y `review_queue_item` expone `recommended_cue` y
+> `automatic` (aditivos) resolviendo el ideal contra la disponibilidad real, sin
+> spoilear la palabra (P1-03 de V3.35.1 intacto). Contrato HTTP aditivo:
+> `cue` opcional en GET/POST (422 **sin evento** si no está soportado o el
+> peldaño no tiene contenido; el servidor **re-deriva** el peldaño, premisa 21),
+> `support_level` en `RecallPromptOut` y `independent_success_days`/
+> `recall_rungs` en `LexicalEvidence`. **Sin migración de BD**
+> (`support_level`/`activity_id` ya existían) y **sin tocar** scoring, FSRS,
+> `error_type` (observacional) ni la semántica del intervalo de evidencia.
+> Frontend: el peldaño Recall pinta el cloze (monoespaciado) y envía su
+> `cue_kind`. Tests: pytest **1813 passed** (+22) + ruff limpio + vitest (65
+> ficheros/**560**, +1) + `tsc --noEmit` limpio + build OK +
+> `check_release_consistency` **3.37.0** exit 0.
+> **CI verificable:** commit `bdc77cd5e467cea4b027178e6235da8e57b36f9e` con el
+> run [34476875230](https://github.com/jvelasca/english-tutor/actions/runs/34476875230)
+> en `success` (6/6 jobs).
+> Pendientes hacia **V3.38**: `situación` (exige extender el contrato de
+> contenido de la caché, `generator_version`) y el planner (Optimal Next Task),
+> más los diferidos de V3.30 y la transferencia por contexto V3.23.
+>
+> **Nota (2026-09-10):** **V3.36.0 publicada** — release **v3.36.0**
+> (**Learning Evidence 2.0**: el ledger longitudinal aprende el CÓMO de cada
+> evento). Migración **aditiva e idempotente** de `learning_evidence` con seis
+> columnas — `support_level` (eje `copied → guided → cued → independent →
+> spontaneous`, espejo de `academy_evidence` con test de paridad),
+> `difficulty` (CEFR 1-6, escala compartida con listening; `0.0` = no
+> declarada), `context_id`/`activity_id`, `response_time_ms` (`NULL` = no
+> medida) y `error_type` (`''` = no clasificado) — más índice
+> `(user_id, target_type, context_id, activity_id)`. `services/evidence.py`
+> añade `EVIDENCE_SUPPORT_LEVELS`, `INDEPENDENT_SUPPORT_LEVELS`,
+> `RECALL_ERROR_TYPES` y el clasificador puro `classify_recall_error`
+> (errata = misma inicial + longitud ≥ 4 + Levenshtein acotado; parcial =
+> prefijo o comienzo de unidad multi-palabra; conservador en palabras cortas:
+> `cat`/`cut` es otra palabra). **Decisión de alcance: `error_type` es
+> OBSERVACIONAL** — no toca scoring, ni evidencia, ni FSRS; una errata sigue
+> siendo `correct=false`, pero el tutor ya distingue "no lo sabe" de "lo sabe y
+> lo escribió mal". Captura end-to-end: recall → `cued`/`drill:recall`;
+> retrieval → `guided`/`drill:word`|`drill:sentence` (duración del cliente
+> convertida a ms); producción → apoyo real del canal (`chat` → `spontaneous`,
+> conversación guiada → `guided`, `speaking`/`writing` → `independent`) y
+> contexto `lexicon:<canal>`. `summarize_evidence`/`summarize_by_target` ganan
+> `success_rate`, `independent_successes`, `support_levels`, `error_types` y
+> `mean_response_time_ms` con paridad pura↔SQL fijada por test. Contrato HTTP
+> aditivo: `RecallAttemptIn.response_time_ms` (opcional, `ge=0`, 422 si es
+> negativa), `RecallAttemptOut.error_type` y `LexicalEvidence` ampliado.
+> Frontend: el peldaño Recall mide la latencia cue → envío. Tests: pytest
+> **1791 passed** (+22) + ruff limpio + vitest (65 ficheros/**559**, +1) +
+> `tsc --noEmit` limpio + `check_release_consistency` **3.36.0** exit 0.
+> **CI verificable:** commit `d91a637a74678e080478656ed02d7c1e6cd4ba07` con el
+> run [34473218199](https://github.com/jvelasca/english-tutor/actions/runs/34473218199)
+> en `success` (6/6 jobs).
+> Pendientes hacia **V3.37**: cues graduados (translation → definition → cloze →
+> situación → free recall), gradiente de apoyo como señal de automaticidad y el
+> planner (grafo evidencia → conocimiento → retención → transferencia →
+> Optimal Next Task), más los diferidos de V3.30 y la transferencia por contexto
+> V3.23 (que ya tiene `context_id`/`activity_id` en el ledger léxico).
+>
+> **Nota (2026-09-10):** **V3.35.1 publicada** — release **v3.35.1** (cierre de
+> la auditoría de V3.35.0). Patch quirúrgico de integridad del modelo de
+> evidencia longitudinal, sin cambios de esquema ni de arquitectura.
+> **P1-01 (intervalo de evidencia):** `interval_since_last_evidence` deja de
+> recibir el `interval_days` de `delayed_retrieval_decision` (hueco desde el
+> ANCLA de retención FSRS) y lo deriva SIEMPRE `record_evidence` de la evidencia
+> anterior del ledger (`learning_evidence → learning_evidence`); el intervalo de
+> retención se queda en la decisión (`credited` + reprogramación de carta) y no
+> se persiste como intervalo de evidencia. **P1-02 (cronología):** se retira
+> `intervals.sort()` de `summarize_evidence` y `summarize_by_target` ordena por
+> `occurred_at, id` — la secuencia real del scheduler ya no se reordena por
+> valor. **P1-03 (pedagógico):** «Repaso de hoy» solo muestra la palabra en
+> `recognition`; en `recall`/`sentence` la oculta (el `WordDrill` ya la ocultaba
+> en Recall). **P2-02:** `record_evidence_bulk` deduplica eventos idénticos
+> (`target_type`+`target_id`+`task`+`activity`+`occurred_at`) y encadena en
+> memoria los eventos distintos del mismo target del lote. Tests: pytest
+> **1769 passed** (+5) + ruff limpio + vitest (65 ficheros/**558**, +1) +
+> `tsc --noEmit` limpio + `check_release_consistency` **3.35.1** exit 0.
+> **CI verificable:** commit `df78307432dddf9fe535860b2e3028258454faff` con el
+> run [34470067665](https://github.com/jvelasca/english-tutor/actions/runs/34470067665)
+> en `success` (6/6 jobs).
+> Pendientes hacia **V3.36 (Learning Evidence 2.0)**: `support_level`,
+> `difficulty`, `response_time_ms`, `error_type`, `context_id`/`activity_id`,
+> cues graduados y estadísticas derivadas del ledger.
+>
+> **Nota (2026-09-10):** **V3.35.0 publicada** — release **v3.35.0**
+> (**Longitudinal Learning Evidence 1.0**: cierra los dos P1 de la auditoría de
+> V3.34.0 y convierte el Evidence Graph en historia longitudinal real, sin
+> rehacer arquitectura ni migración destructiva). **P1-1 (ancla encadenada):** la
+> recuperación demorada deja de medirse desde la primera exposición. Nueva
+> función pura `services/lexicon.py::delayed_retrieval_decision(row, now,
+> due_at)` → `{anchor_at, interval_days, required_days, credited}`: el ancla es
+> la ÚLTIMA recuperación válida (`max(last_retrieval_at, last_recall_at)`; solo
+> la primera recuperación retrocede a `min(first_seen, first_exposed_at)`) y el
+> intervalo exigido lo calcula FSRS (`due_at` de la carta `lexicon`) o, sin
+> carta, el suelo `RETENTION_MIN_INTERVAL_DAYS`. El dominio carga la carta y el
+> repositorio solo persiste (`record_retrievals(..., due_at=…)` encadena
+> `last_retrieval_at`). Efecto: `D0 → D+3` acredita; `D+3 → D+4` ya no si FSRS no
+> ha vencido. **P1-2 (cola propia):** el repaso espaciado sale del speaking
+> micro-drill — nuevo `GET /api/learning/review` (`routers/learning.py`) con las
+> cartas FSRS `lexicon` vencidas ordenadas por urgencia (`fsrs.due_queue`) y la
+> actividad óptima por hueco (`services/lexicon.py::recommend_review_activity`:
+> sin base receptiva → `recognition`, sin `cued_recall` → `recall`,
+> `production_gap` → `sentence`, resto → `recall`); se retira `due_words` de
+> `lexicon.drill_candidates` y la lectura de cartas FSRS de
+> `get_drill_candidates`, así que el speaking drill vuelve a ser solo huecos de
+> producción oral. **Evidencia:** tabla append-only `learning_evidence` (+
+> `event_role` en `learning_events`, default `''` legacy) con repositorio
+> `repositories/evidence.py` y servicio puro `services/evidence.py`
+> (`EVIDENCE_ROLES`, `classify_event_role`, `summarize_evidence` = attempts /
+> successes / distinct_success_days / intervals); contador aditivo
+> `recall_attempts` (intento ≠ éxito) y bloque `evidence` (`LexicalEvidence`)
+> expuesto en el léxico y en la cola de repaso; escrituras de evidencia en el
+> intento de recall (acierto y FALLO), la recuperación del micro-drill y la
+> producción. **UI:** nueva sección «Repaso de hoy»
+> (`features/vocabulary/ReviewQueueSection.tsx`) montada en el diccionario
+> personal, `api/learning.ts::getReviewQueue`, `initialStep` en `WordDrill` (abre
+> el peldaño recomendado) e i18n es/en. Tests: pytest backend **1764 passed**
+> (+21: `test_longitudinal_evidence_v335.py` + `test_review_queue_v335.py`, con
+> `test_lexicon.py`/`test_vocabulary.py`/`test_recall_v334.py` actualizados al
+> ancla encadenada) + ruff limpio + vitest (65 ficheros/**557**, +2
+> ficheros/+8 tests: API de la cola — restaura los 3 casos preexistentes de
+> `getProfile`/`analyzeText`/`getEvents` —, `WordDrill` con `initialStep` y
+> `ReviewQueueSection`) + `tsc --noEmit` limpio + `check_release_consistency`
+> **3.35.0** exit 0. **CI verificable:** commit
+> `b304c257da1cffb408e127c80af1b43e12aa9955` con el run
+> [34467763326](https://github.com/jvelasca/english-tutor/actions/runs/34467763326)
+> en `success` (6/6 jobs: backend ruff+pytest, frontend tsc+vitest+build,
+> release consistency, Beta V3.0 gate, content validation, Playwright E2E).
+> Detalle: `release-notes-v3.35.0.md` y `CHANGELOG.md` `[3.35.0]`. Pendientes
+> hacia **V3.36**: los P2 de la auditoría de V3.34.0
+> (`response_time_ms`, clasificación de errores ortográficos, cues graduados,
+> `support_level`, `difficulty` en evidencia, refactor completo de
+> `wordDrill.tsx`), los diferidos de V3.30 (consumo de `word_breakdown_json`,
+> palabras tocables) y la transferencia por contexto de actividad V3.23.
+>
+> **Nota (2026-09-10):** **V3.34.0 publicada** — release **v3.34.0**
+> (Dictionary → Learning Bridge, eslabón 3: **Recall 2.0 por texto**). El
+> peldaño intermedio del drill deja de ser una repetición oral de la palabra y
+> pasa a ser recuperación REAL por texto: el alumno ve el SIGNIFICADO (cue =
+> traducción o definición sin spoiler, `services/recall.py`) y **teclea la
+> palabra**. La escalera queda **`1 · Recognize` · `2 · Recall` · `3 · Sentence`**
+> (se retira el paso oral de palabra suelta; el micrófono vive solo en
+> Sentence). A diferencia de Recognition (informativo), el acierto de Recall SÍ
+> deja señal léxica PROPIA — `recall_successes`/`recall_days` + ledger
+> `recalled`, migración idempotente y sin backfill en `vocabulary` —, acredita
+> la recuperación demorada existente si supera el intervalo (`retrieval_*`) y
+> **reprograma la carta FSRS `lexicon` con intervalos reales** (Good immediate,
+> Easy si demorado, Again si falla) sin crear deuda por fallar una palabra no
+> rastreada. NUNCA acredita producción (`production_count`/`<channel>_prod`
+> intactos) ni saca la palabra de candidatas: `onProduced` solo lo dispara
+> Sentence (D5/E3: el recall vive en la capa léxica, no en `academy_evidence`).
+> Contrato aditivo: `GET /api/vocabulary/drill/recall` (`available=false` sin
+> cue) y `POST /api/vocabulary/drill/recall-attempt` (409 sin pregunta, 422
+> inválido); el GET nunca expone `expected` (premisa 21). `LexicalCompetence`
+> gana `cued_recall`/`recall_successes`/`recall_days`, `LexiconSummary` gana
+> `recalled` y `get_drill_candidates` antepone las palabras con carta FSRS
+> vencida. Tests: pytest backend **1743 passed** (+20: `test_recall_v334.py`
+> con cue/scoring/señal propia/demorada/FSRS/aislamiento + casos de
+> `cued_recall`/`recalled`/priorización en `test_lexicon.py`) + ruff limpio +
+> vitest (63 ficheros/**549**, +2: peldaño Recall por texto y mocks al degrade
+> Recognize → Recall → Sentence) + `tsc --noEmit` limpio + `check_release_consistency`
+> **3.34.0** exit 0. **CI verificable:** commit
+> `f9880f15fd7e19f17587c3cd25fa9362604af1d4` con el run 34451370871 en
+> `success` (6/6 jobs). Detalle: `release-notes-v3.34.0.md` y
+> `agentes/v334-recall-2.0.md`. Pendientes hacia **V3.35**: los diferidos de
+> V3.30 (consumo de `word_breakdown_json`, palabras tocables), transferencia por
+> contexto de actividad V3.23 y Lexical Evidence Engine / Evidence Graph como
+> fuente longitudinal.
+>
+> **Nota (2026-09-10):** **V3.33.1 publicada** — release **v3.33.1**
+> (hardening de Recognition tras la auditoría externa de V3.33.0). Dos
+> correcciones P1, sin tocar la evidencia informativa ni la seguridad del
+> scoring (el GET sigue sin exponer la correcta):
+> **P1-01 (posición fija de la correcta):** `recognition_options_for(word,
+> entries, seed="")` deriva ahora la permutación de `palabra + seed`; el
+> `GET /api/vocabulary/drill/recognition` entrega un nonce por intento
+> (`question_id: ""`) y el `POST .../recognition-attempt` lo reenvía para
+> reconstruir la MISMA permutación (premisa 21: sin estado servidor). Reintentar
+> la misma palabra rebaraja las opciones, así que no se puede memorizar la
+> posición. Sin firmar: el seed solo ordena y la correcta nunca viaja.
+> **P2:** `_stable_int` pasa a `SHA-256` (mejor dispersión);
+> `listening_bottom_up` conserva su hash (sus ids son content-stable y no deben
+> re-barajarse).
+> **P1-02 (arranque real en Recognize):** `WordDrill` abre en
+> `step="recognition"` y carga la pregunta sola; si `available=false` degrada a
+> Recall (`Practicar → Recognize → Recall → Sentence`, o `Practicar → Recall`),
+> sin pisar una elección manual de otro paso. Cada entrada en Recognize pide un
+> `question_id` nuevo.
+> Contrato aditivo y retrocompatible: `RecognitionQuestionOut.question_id` y
+> `RecognitionAttemptIn.question_id` (opcional). Tests: pytest backend
+> **1723 passed** (+1: test puro de permutación por seed; determinismo y
+> aislamiento reescritos sobre `question_id`) + ruff limpio + vitest (63
+> ficheros/**547**, +1: reentrar en Recognize pide pregunta nueva / arranque y
+> degradación) + `tsc --noEmit` limpios + `check_release_consistency` **3.33.1**
+> exit 0. **CI verificable:** commit
+> `dcaa74cacf4912c3f747a104e491d6a0723c5ca7` con el run 34447562780 en
+> `success` (6/6 jobs). Aclaración para la auditoría: el informe anterior marcó
+> la CI de V3.33.0 como «no verificable», pero **sí** tenía CI verde (run
+> 34383922526, sha `5207729`, 6/6 jobs); la confusión viene de consultar
+> *commit statuses* (`/status`, que queda en `pending`) en lugar de los
+> *check runs* que publica `.github/workflows/ci.yml`.
+> Detalle: `release-notes-v3.33.1.md`; `CHANGELOG.md` con entrada
+> `[3.33.1]`; `PLAN.md` con hito estable V3.33.1. Pendientes hacia **V3.34**:
+> recall demorado con FSRS, transferencia por contexto de actividad V3.23 y los
+> diferidos de V3.30.
+>
+> **Nota (2026-09-09):** **V3.33.0 publicada** — release **v3.33.0**
+> (Dictionary → Learning Bridge, eslabón 2: peldaño **Recognition — MCQ
+> definición ↔ palabra** en la escalera compartida de drill). La escalera
+> `wordDrill.tsx` (lookup Y hub) pasa a **`1 · Recognize` · `2 · Word` ·
+> `3 · Sentence`**: el primer peldaño muestra la palabra y pide su significado
+> entre opciones. La pregunta es **pura y determinista por palabra** (premisa
+> 21, sin estado servidor): `backend/services/dictionary_mcq.py` la construye
+> desde la caché global `dictionary_entries` (`list_entries()` nuevo en
+> `repositories/dictionary.py`) — correcta = `translation` de la diana con
+> distractores de otras entradas (mismo `pos` preferido, dedupe, banco de
+> reserva `definition` cuando el pool de traducciones no alcanza) y barajado
+> estable (`_stable_int`/`_place_options`) ocultando la correcta — y el
+> servidor la RECOMPUTA al puntuar: `GET /api/vocabulary/drill/recognition`
+> nunca expone la correcta y `POST /api/vocabulary/drill/recognition-attempt`
+> devuelve `{correct, correct_index, selected_index}`. Sin distractores o sin
+> entrada → `available=false` / 409 (degradación con aviso). **Evidencia SOLO
+> informativa** (V3.13: el MC de reconocimiento no demuestra destrezas
+> productivas; evita el «mastery de clic»): un `learning_events`
+> `drill:<word>:recognition:ok|ko`; cero escrituras en `vocabulary`/
+> `vocabulary_events`, FSRS, mastery, `usage` ni candidatas (el acierto NO
+> dispara `onProduced`/`refreshEntry`; D3 intacto). Sin etiquetas de origen,
+> sin cambios de esquema de BD. Tests: pytest backend **1722 passed** (+11 del
+> nuevo `backend/tests/test_dictionary_recognition_v333.py`: determinismo y GET
+> sin la correcta · acierto/fallo solo informativos con cero efectos ·
+> modo definition y dedupe · eventos recognition que no alteran
+> `drill_ok_days`/candidatas · aislamiento A/B · sin entrada/sin distractores →
+> 409/`available=false` · normalización) + ruff limpio + vitest (63
+> ficheros/546) + `tsc --noEmit` limpios + `check_release_consistency`
+> **3.33.0** exit 0. Detalle y conteos: `release-notes-v3.33.0.md`;
+> `CHANGELOG.md` con entrada `[3.33.0]`; `PLAN.md` con hito estable V3.33.0.
+> Pendientes hacia **V3.34**: los diferidos de V3.30 — consumo de
+> `word_breakdown_json` en agregados/práctica dirigida de las falladas y
+> palabras tocables en transcripts/chat — y los eslabones restantes del puente
+> (recall demorado FSRS, transferencia por contexto de actividad V3.23;
+> borrador `agentes/v332-dictionary-learning-bridge.md`).
+>
+> **Nota (2026-09-09):** **V3.32.0 publicada** — release **v3.32.0**
+> (Dictionary → Learning Bridge, primer eslabón: la consulta del diccionario
+> V3.30 se convierte en puerta a la práctica real sin romper D3). El botón
+> **«Practicar esta palabra»** en la tarjeta del lookup
+> (`DictionaryLookup.tsx`) monta in-line la escalera de drill existente
+> **Recall → Sentence** (`wordDrill.tsx`, extraída SIN cambio funcional de
+> `PersonalDictionary.tsx`) para la palabra consultada — también si
+> `usage.tracked=false`: el éxito crea producción pura igual que fuera del
+> diccionario — y refresca en silencio las marcas de uso de la entrada al
+> producir. Cero backend nuevo (los endpoints de drill ya aceptan palabras
+> arbitrarias) y **evidencia idéntica, sin etiquetas de origen**:
+> `record_production_text(speaking, as_unit=True, activity="drill")` +
+> `learning_events` `drill:<word>:ok` (:sentence: en el paso frase); el lookup
+> sigue sin escribir (D3 intacto, cerrado por acceptance). Tests: pytest
+> backend **1711 passed** (+3 del nuevo `test_dictionary_bridge_v332.py`:
+> lookup read-only + práctica con evidencia idéntica entre usuarios A/B ·
+> paso frase equivalente con cierre D3 · aislamiento entre usuarios) + ruff
+> limpio + vitest (63 ficheros/542) + `tsc --noEmit` limpios +
+> `check_release_consistency` **3.32.0** exit 0. Detalle y conteos:
+> `release-notes-v3.32.0.md`; `CHANGELOG.md` con entrada `[3.32.0]`; `PLAN.md`
+> con hito estable V3.32.0. Pendientes hacia **V3.33**: los diferidos de V3.30
+> — consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+> falladas y palabras tocables en transcripts/chat — y los siguientes
+> eslabones del puente (reconocimiento MCQ, recall demorado FSRS,
+> transferencia por contexto; borrador `agentes/v332-dictionary-learning-bridge.md`).
+>
+> **Nota (2026-09-09):** **V3.31.1 publicada** — release **v3.31.1**
+> (hardening del diccionario de consulta tras la auditoría profunda de
+> V3.31.0; solo backend + docs, sin cambios de UI ni de esquema de BD). Cierra:
+> **P1-01 residual — `pick_model` exige modelo explícito INSTALADO**
+> (`services/translate.py`: antes bastaba con que no estuviera en
+> `UNUSABLE_MODELS` para llegar a Ollama aunque no estuviera instalado; ahora
+> consulta `installed_models()` — caché de 300 s — y solo devuelve el explícito
+> si está instalado y es utilizable, si no cae al fallback automático) ·
+> **negative cache del generador** (`domain/vocabulary.py`: un fallo de
+> generación — Ollama caído, respuesta inválida o timeout — marca la palabra
+> en memoria durante `DICTIONARY_NEGATIVE_CACHE_TTL_SECONDS` = 30 s; las
+> consultas siguientes degradan a `definition_source="none"` sin reintentar en
+> bucle; la marca expira de forma perezosa o se limpia al conseguir una
+> generación) · **rate limit de generación nueva** por usuario (10/min) y
+> global (40/min) en `config.py`, aplicado solo al dueño de un vuelo (lo
+> cacheado no consume cupo; sin cupo → 200 con `definition_source="none"`,
+> nunca 5xx) · **tope servidor del dueño del vuelo**
+> (`DICTIONARY_GENERATION_TIMEOUT_SECONDS` = 90 s con `asyncio.wait_for`: un
+> Ollama colgado ya no deja el vuelo de la palabra clavado — los waiters tenían
+> su tope de 60 s; el dueño ahora también) · **semántica documentada del
+> contenido canónico** (la caché `dictionary_entries` es global y sin
+> `model_id`; `model` solo influye en la generación de contenido nuevo).
+> Tests: pytest backend **1708 passed** (+11: +3 en `test_translate.py` para
+> explícito utilizable no instalado → fallback y +8 en el nuevo
+> `backend/tests/test_dictionary_hardening_v3311.py`: negative cache suprime el
+> reintento inmediato y expira, el éxito limpia la marca, cupo por usuario
+> bloquea palabras nuevas pero no las cacheadas, cupo global compartido entre
+> usuarios, sin cupo nunca lanza, timeout del dueño degrada y libera el vuelo,
+> D3 intacto) + ruff limpio + vitest + `tsc --noEmit` limpios +
+> `check_release_consistency` **3.31.1** exit 0. Detalle y conteos:
+> `release-notes-v3.31.1.md`; `CHANGELOG.md` con entrada `[3.31.1]`; `PLAN.md`
+> con hito estable V3.31.1. Pendientes hacia **V3.32**: Dictionary → Learning
+> Bridge (borrador movido a `agentes/v332-dictionary-learning-bridge.md`),
+> consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+> falladas y palabras tocables en transcripts/chat.
+>
+> **Nota (2026-09-09):** **V3.31 publicada** — release **v3.31.0** (cierre de
+> los hallazgos residuales de la auditoría profunda de V3.30.1 sobre el
+> diccionario de consulta; backend + frontend de contrato, sin cambios de UI).
+> Cierra: **single-flight robusto a cancelación** (`domain/vocabulary.py`: el
+> `CancelledError` del dueño del vuelo resuelve el Future con None antes de
+> propagar — los waiters ya no se cuelgan — y tope defensivo de espera de 60 s
+> en los waiters) · **invalidación del contenido de caché previo a V3.31**
+> (`GENERATOR_VERSION` `1.0.0 → 1.1.0` en `services/dictionary_content.py`;
+> `DICTIONARY_LEGACY_VERSION = "1.0.0"` en `repositories/db.py`, marca
+> deliberadamente distinta de la actual que la migración aplica a las filas sin
+> versión: el contenido del parser greedy de V3.30 regenera una vez) · **tests**
+> de la migración de upgrade desde una BD V3.30.0 (aditiva + backfill +
+> conservación + idempotencia) y del path real del diccionario con modelo
+> explícito no utilizable (`qwen3.5:9b` nunca llega a Ollama) · **contrato
+> frontend**: tipo `DictionaryLookupRequest`, body tipado, test del
+> `POST /api/vocabulary/dictionary` (método/query/header/body) y timeout de
+> cliente de 120 s. Verificación: pytest backend **1697 passed** (+4) + ruff
+> limpio + vitest + `tsc --noEmit` limpios + `check_release_consistency`
+> **3.31.0** exit 0. Detalle y conteos: `release-notes-v3.31.0.md`;
+> `CHANGELOG.md` con entrada `[3.31.0]`; `PLAN.md` con hito estable V3.31.
+> Pendientes hacia **V3.32**: Dictionary → Learning Bridge (borrador movido a
+> `agentes/v332-dictionary-learning-bridge.md`), consumo de `word_breakdown_json`
+> en agregados/práctica dirigida de las falladas y palabras tocables en
+> transcripts/chat.
+>
+> **Nota (2026-09-09):** **V3.30.1 publicada** — release **v3.30.1** (patch de
+> endurecimiento de la auditoría V3.30.0, sobre el commit `a3857f2` de v3.30.0;
+> solo backend + docs, sin cambios de UI). Cierra los tres P1 del dictamen:
+> **P1-01** single-flight de generación en `domain/vocabulary.py`
+> (`_inflight_content`: N consultas simultáneas de la misma palabra → UNA
+> llamada LLM y UNA fila; el `INSERT OR IGNORE` protegía la fila pero no la
+> generación; los waiters reciben el mismo resultado y un fallo no reintenta en
+> cascada) · **P1-02** la política `UNUSABLE_MODELS` ya no se puede saltar con
+> un modelo explícito (`services/translate.py` `pick_model`: el explícito no
+> utilizable, p. ej. `qwen3.5:9b`, cae al fallback automático — único punto de
+> política para diccionario y traducción) · **P1-03** caché versionada:
+> `dictionary_entries.generator_version` (columna aditiva + migración
+> idempotente con backfill `'1.0.0'` del contenido V3.30 en `repositories/db.py`;
+> `save_entry` upsert `ON CONFLICT DO UPDATE` sustituye a `insert_entry` y da
+> semántica real a `updated_at`; `GENERATOR_VERSION = "1.0.0"` en
+> `services/dictionary_content.py`; el dominio solo sirve caché cuya
+> `generator_version` coincide y regenera/sobrescribe la obsoleta). P2: parser
+> JSON robusto (`parse_content` toma el PRIMER objeto válido con `raw_decode`;
+> la regex greedy `{.*}` se tragaba `{…} texto {…}`). Verificación: pytest
+> backend **1693 passed** (+9 tests: concurrencia misma palabra y dos usuarios,
+> fallo concurrente sin reintentos, regeneración por versión obsoleta, reuso de
+> versión fresca, parser multi-objeto/llaves en prosa, `pick_model` con
+> explícito no utilizable) + ruff limpio + `check_release_consistency` **3.30.1**
+> exit 0. Detalle y conteos: `release-notes-v3.30.1.md`; `CHANGELOG.md` con
+> entrada `[3.30.1]`; `PLAN.md` con hito estable V3.30.1. Pendientes hacia
+> **V3.31**: Dictionary → Learning Bridge (Consultar → Practicar → Transferir →
+> Retener sin contaminar evidencia), consumo de `word_breakdown_json` en
+> agregados/práctica dirigida de las falladas y palabras tocables en
+> transcripts/chat.
+>
+> **Nota (2026-09-09):** **V3.30 publicada** — release **v3.30.0** = commit
+> **`a3857f2`** en `main` con **CI verde 6/6 jobs** (diccionario
+> de consulta con marca de uso y aprendizaje; feature cerrada con las Fases
+> A/B/C del dossier `docs/DISENO-V330-DICCIONARIO-CONSULTA.md`). Resumen:
+> endpoint `POST /api/vocabulary/dictionary` con `usage` por forma y por
+> `lexical_unit` (estado, recall, contadores, matriz de competencia; solo
+> lectura D3, sin eventos ni impacto en mastery), ejemplo determinista del
+> banco (`services/example_sentences.py`) y definición/traducción generadas por
+> el modelo local (`services/dictionary_content.py`, `temperature=0`, prompt
+> JSON, parseo tolerante) cacheadas con `INSERT OR IGNORE` en la tabla global
+> `dictionary_entries` (1.ª consulta paga el modelo; siguientes deterministas;
+> degradación a `definition_source="none"` con fallback en memoria si la BD
+> falla) · UI «Consultar» (`DictionaryLookup.tsx`, conmutador con el diccionario
+> personal en `QuizRoutePage`, solo Vocabulario la declara), cliente
+> `lookupDictionaryWord` + tipo `DictionaryEntry`, claves `dictionary.lookup.*`
+> es/en. Verificación: pytest backend **1684 passed** (39 tests del diccionario)
+> + ruff limpio; vitest **538 passed** (63 archivos) + `tsc --noEmit` limpio;
+> `check_release_consistency` **3.30.0** exit 0. Detalle y conteos:
+> `release-notes-v3.30.0.md`; `CHANGELOG.md` con entrada `[3.30.0]`; `PLAN.md`
+> con hito estable V3.30 y candidato cerrado. Pendientes hacia **V3.31**:
+> consumo de `word_breakdown_json` en agregados/práctica dirigida de las
+> falladas, palabras tocables en transcripts/chat, afinado de la Fase 3
+> (lección orquestada multi-ítem, evaluación acústica real) y el dossier de
+> auditoría del candidato v3.28.0 (letra P).
+>
+> **Nota (2026-09-09, 14:00):** **V3.29 publicada** — release **v3.29.0**
+> (Listening Engine 4.0, **Fase 3, núcleo**). Plan
+> `v3.29_nucleo_fase_3…plan.md` (P1–P6); especificación
+> `docs/LISTENING_ENGINE_4.0.md` a v1.2 con el núcleo de la Fase 3 marcada
+> **implementada** (§14/§15). Resumen: **P1** motor `word_alignment_proxy`
+> offline — `stt.transcribe_words` (`word_timestamps=True`) + módulo puro con
+> sidecar `{wav}.words.json` (`sync: asr_word_proxy`, `coverage`, escritura
+> atómica), `align_words` con interpolación monótona y `MIN_COVERAGE ≈ 0.8`
+> (degradación controlada al sync de frase); hooks en
+> `generate_listening_audio.py`, `get_audio` e `import_audio.py` + backfill
+> `generate_word_alignments.py` · **P2** `word_timings` en el payload
+> (`word_timings_for`, asignación palabra→frase **por tiempo**, `twice`/derivados
+> `d-`, escalado slow/fast por `speech_rate` en cliente) · **P3** evidencia
+> `word_breakdown_json` (columna aditiva nullable idempotente; dictado fallido +
+> target de cloze/segmentation incorrecto; sin consumo en agregados → V3.30) ·
+> **P4** karaoke `KaraokeTranscript` (revelado por frase + palabra activa +
+> toque→seek) · **P5** controles precisos (`onDuration` en `loadedmetadata`,
+> bucle con scheduler rAF inyectable, seek slider + bucle A/B) · **P6** salto a
+> la palabra fallada (`failedWordTiming`, botones normal/slow en dictado/cloze).
+> Verificación íntegra local: pytest + ruff, vitest + `tsc --noEmit`,
+> `check_release_consistency` **3.29.0** exit 0 (conteos finales en
+> `release-notes-v3.29.0.md`). Pendiente para V3.30: diccionario de consulta
+> (candidato), consumo de `word_breakdown_json` en agregados/práctica dirigida,
+> afinado de la Fase 3 (lección orquestada multi-ítem, evaluación acústica real)
+> y el dossier de auditoría del candidato v3.28.0 (letra P).
+>
+> **Nota (2026-09-09, 12:35):** **V3.28.1 publicada** — patch de la auditoría
+> V3.28.0 (release **v3.28.1**, P1 auditados): 1) `partial_dictation` derivado
+> **servible** — `derived_catalog` expone `DERIVED_PRODUCTION_POOL` y
+> `pick_next_question` lo sirve en sesiones bottom-up (Caso A) con señal de
+> `dictation` débil, tras agotar cloze/segmentación del nivel · 2) **scoring
+> exacto por token del dictado escrito** (`dictation_score`, sin Soundex/
+> phoneme/prosodia; `submit_production` lo aplica a todo `task_type=dictation`;
+> fila fonética oculta en la UI) · 3) **Gonnago/reducciones por token y
+> frontera** (`contains_word_token` compartido en
+> `_reductions_in`/`_is_eligible_token`/`_connected_speech_realized`, contenido
+> de `l16` corregido → digest de audio regenerado) · 4) **AudioController
+> integrado** (play/pausa/variantes operativas; seek/setRate fino/loop/replay/
+> markSegment sin UI → V3.29 Fase 3) y `seek()` notifica `onCurrentTime` en
+> pausa (P2-01). Tests negativos añadidos (pools, selector, dictado exacto,
+> frontera de reducción, seek). P2 restantes y Fase 3 → V3.29.
+>
+> **Nota (2026-09-09, 10:30):** **V3.28 publicada** — release **v3.28.0** =
+> commit **`74fb1b3`** en `main` con **CI verde 6/6 jobs** (Listening Engine 4.0,
+> **Fase 2**, Bloques A–F). Plan
+> `v3.28_listening_engine_fase_2_f74493a3.plan.md`; especificación
+> `docs/LISTENING_ENGINE_4.0.md` con la Fase 2 marcada **cerrada**. Resumen:
+> **Bloque A** micro-flujo unificado — `next_question` sirve `flow`/
+> `transcript_policy` también en `level=X` y `mode=failed` (helper
+> `_public_with_flow`); `mastered` conserva el modo compacto sin flow (P1-01) ·
+> **Bloque B** AudioController 4.0 (`audioController.ts` + `useAudioController`
+> con play/seek/setRate+preservesPitch/loopSegment/replayCurrent, variante de
+> URL más cercana al rate) integrado en `ListeningPractice.tsx` · **Bloque C**
+> bottom-up derivado del corpus (`services/listening_bottom_up.py`: cloze
+> auditivo, dictado parcial y segmentación; `derived=True`, filtrados siempre de
+> `route_questions`/`level_items` → nunca certifican) · **Bloque D** timings
+> gruesos de frase (`coarse_sentence_timings`, etiqueta `coarse_heuristic`, no
+> alineación acústica) + `CoarseTranscript` en frontend (hidden/partial/full +
+> frase activa por `currentTime`) · **Bloque E** Shadowing 2.0 — playback de la
+> grabación (`RecordingPlayButton`) + señales auxiliares no bloqueantes
+> (`shadowing_duration_ms`, `shadowing_speech_rate`, migración aditiva
+> idempotente, sin peso de mastery/gate) · **Bloque F** E2E adaptativos y
+> negativos (`test_listening_e2e_v328.py`: E2E-01..04 + contrato pedagógico;
+> ampliación de `microFlow.test.ts` con tareas derivadas en el flujo).
+> Verificación íntegra local: pytest **1683 passed** + `ruff check .` limpio;
+> vitest **505 passed** (61 archivos) + `tsc --noEmit` OK;
+> `check_release_consistency` **3.28.0** exit 0. Pendiente: dossier de
+> auditoría del candidato v3.28.0 (letra P, sesión posterior); Fase 3 del
+> engine (karaoke palabra a palabra / `word_alignment_proxy`) para V3.29.
+> **Candidato V3.29 anotado** (sin diseño): diccionario de consulta con marcas
+> de uso/aprendizaje (ver PLAN.md → «Siguiente incremento»).
+>
+> **Nota (2026-09-09, 09:45):** **V3.27 publicada** — release **v3.27.0**
+> (Listening Engine 4.0, Fase 1) en `main`. **Backend = fuente única de la
+> política pedagógica**: nuevo módulo puro `services/listening_flow.py` sirve
+> `flow` (pre/while1/while2/post/shadowing) y `transcript_policy`
+> (`revelation`/`max_attempts_per_stage`/`allow_manual_reveal`/
+> `shadowing_optional`) en cada pregunta; el frontend ejecuta una máquina de
+> presentación (`features/listening/microFlow.ts`) sin reglas propias.
+> **Perfil auditivo visible en UI** (`services/auditory_profile.py` casos A-D +
+> `AuditoryProfileCard`, no bloqueante, estados sin datos → needsMore →
+> intervención; la capa recomendada prioriza el siguiente ítem vía
+> `pick_next_question(layer=...)`). **Evidencia ampliada**: migración
+> idempotente con 5 columnas en `listening_attempts` (`layer`, `speed_used`,
+> `stage`, `transcript_used`, `segments_replayed`) persistidas en
+> `submit_answer`/`submit_production` con metadatos opcionales de la API.
+> Plan `docs/PLAN-V327-LISTENING-ENGINE-4.md`; release notes
+> `release-notes-v3.27.0.md`; CHANGELOG/PLAN/README actualizados; backend
+> pytest **1647 passed** + ruff limpio; frontend vitest **472 passed** (59
+> archivos) + `tsc --noEmit` OK; `check_release_consistency` **3.27.0** exit 0.
+> Pendiente: auditoría externa del candidato v3.27.0; Fase 2 del engine
+> (reproductor rico, karaoke/segmentos) y calibración de umbrales del perfil.
+> **Candidato V3.28 anotado** (sin diseño): diccionario de consulta con marcas
+> de uso/aprendizaje de las palabras ya usadas en la app (ver PLAN.md →
+> «Siguiente incremento»).
+>
+> **Nota (2026-09-08, 22:10):** **V3.26 publicada** — release **v3.26.0** en
+> `main` (hoja de ruta completa: **Eje A** retención longitudinal multi-punto y
+> gate MASTERED con initial/practice espaciado — F-A1/F-A2/F-A3, **Eje B**
+> emisor real de `novel` en misiones B2+ jamás practicadas + ledger
+> `vocabulary_events` por superficie, **Eje C** taxonomía de capas de Listening
+> + calibración CEFR 2.1.0 unificada + `blocked_by` con motivo en UI + marcas
+> de legacy sin `context_id`). CI GitHub Actions **success**; dossier O
+> `docs/audit/O-AUDITORIA-TOTAL-V326.md`; release notes
+> `release-notes-v3.26.0.md`; CHANGELOG/PLAN/README actualizados;
+> `check_release_consistency` **3.26.0** exit 0. Pendiente: auditoría externa
+> del candidato v3.26.0 (deuda abierta documentada: reactivación calibrada de
+> `novel_required` en B2+, corpus recognition de listening, pesos de support).
+>
+> **Nota (2026-09-08, 21:25):** **V3.26 · Eje C CERRADO — Listening real
+> (taxonomía por capas) + calibración CEFR unificada + skills bloqueantes en UI
+> + marca de legacy sin `context_id` en `main`**. **F-C1** (`f8e0c64`):
+> taxonomía determinista `skill → recognition/comprehension/inference` en
+> `services/listening.py` (reconocimiento = word/sound/phrase_recognition/
+> numbers; comprensión = gist/detail/vocabulary/sequencing/note_taking/
+> prediction; inferencia = inference/attitude/speaker_intention/fast_speech/
+> connected_speech/multiple_speakers; dictation/shadowing y producción aparte,
+> capa `null`), capa expuesta en ítems y reporte `by_layer` del diagnóstico;
+> sin migración de datos ni re-etiquetado del corpus (la deuda de autoría
+> recognition queda documentada). **F-C2** (`b62fc65`): las 4 destrezas planas
+> (vocabulary/grammar/interaction/mediation) pasan a escalera monótona desde
+> B1 siguiendo la fila de `reading`, conservando su suelo histórico A1/A2;
+> extremos unificados por familia (techo de reading/writing); matriz a
+> `version 2.1.0` y monotonicidad de las 8 destrezas fijada por tests y
+> goldens de `evidence_depth` actualizados. **F-C3** (`eee806a`): `readiness`
+> expone `blocked_by` por destreza evaluada y no lista (score/confidence/
+> evidence/transfer/novel) y la UI traduce el motivo en `TodayPlan` (i18n
+> es/en). **F-C4** (`eee806a`): `build_skill_profile` cuenta
+> `legacy_context_rows` y marca `legacy_context_used` por destreza — el
+> fallback del gate a filas ocurre solo cuando un kind con filas no tiene
+> NINGÚN contexto conocido (con contextos, las filas legacy no cuentan ni
+> inflan experiencias) — agregado en `StudentModelOut`
+> (`legacy_context_evidence`/`legacy_context_rows`) y `mastery_gate` expone
+> `legacy_fallback`; el ladder y ProgressScreen/SkillDetail muestran notas i18n
+> cuando el gate o el perfil cae a legacy. Verificación íntegra: pytest backend
+> **1538 passed** + `ruff check .` limpio; vitest frontend **450 passed** +
+> `tsc --noEmit` limpio. **Pendiente hacia V3.26:** cierre de release (bump +
+> dossier + commit final); el Eje C completa el alcance V3.26 del dossier
+> (P2-01/P2-02/P2-03/P2-04 y P2-06) — ver nota del Eje B: la reactivación
+> calibrada de `novel_required` en B2+ queda como decisión de negocio abierta.
+>
+> **Nota (2026-09-08, 19:55):** **V3.26 · Eje B CERRADO — emisor real de
+> `novel` + historia léxica por superficie en `main`**. **F-B1** (`b057e4b`):
+> `novel` deja de ser un kind reservado y gana emisor real — el primer intento
+> de una **misión por escenario B2+ jamás practicado** por el alumno
+> (detección evidence-only: `mission_context_practiced` consulta
+> `academy_evidence` por el contexto canónico `mission:{escenario}`, decisión
+> del gerente) escribe evidencia `novel` (`mission_evidence_kind`,
+> `services/speaking.py`); retries y repeticiones del mismo escenario escriben
+> `familiar` (anti-bombeo: cada escenario produce novel una sola vez, verificada
+> por test e2e de repetición). Decisión del gerente: **no se reactiva el
+> requisito** — `novel_required = 0` en las 48 celdas de la matriz y el gate
+> MASTERED intactos; la activación calibrada de B2+ queda para el Eje C.
+> **F-B2** (`5d0a19d`): historia detallada de eventos léxicos por forma de
+> superficie — tabla `vocabulary_events` append-only (`word`,
+> `lexical_unit`, `event_type` `produced|exposed|retrieval`, `channel`,
+> `activity`, `created_at`) escrita en la MISMA transacción de los 4 writers de
+> `repositories/vocabulary.py` (sin doble fuente de verdad; invariantes de
+> contadores y `sum(channel_prod) == production_count` intactos), endpoint
+> `GET /api/vocabulary/history` paginado por palabra y schema
+> `VocabularyEventOut`. SIN backfill: la historia empieza en V3.26 (mismo
+> criterio que el retrieval); el ledger es señal (D5/E3), nunca puerta de
+> mastery. Verificación íntegra: pytest backend **1520 passed** (+14 tests
+> nuevos: 4 de misión novel + 10 del ledger) + `ruff check .` limpio; frontend
+> sin cambios. **Pendiente hacia V3.26: Eje C** (Listening real + calibración
+> CEFR unificada + skills bloqueantes en UI + marca de legacy sin
+> `context_id`).
+>
+> **Nota (2026-09-08, 19:40):** **V3.26 · Eje A CERRADO — retención
+> longitudinal multi-punto en `main`** (decisión del gerente: Eje A primero).
+> El gate MASTERED y la certificación ya no se satisfacen con un único
+> encuentro/`delayed` puntual. Tres incrementos con su tests-first y su commit:
+> **F-A1** (`c5cb2b8`) — `initial` = primer encuentro de cada contexto y
+> `practice` = re-encuentros ESPACIADOS (≥ `SPACED_PRACTICE_MIN_DAYS` 1 día) del
+> mismo contexto (`familiar_spaced_counts` en `mastery_evidence_gate`); legacy
+> sin contexto conserva el fallback filas/contextos (F-C4 lo marcará en el
+> perfil). **F-A2** (`16bbb50`) — cada evento `delayed` se ancla a su sesión
+> formal origen (`delayed_origin_anchors` desde `source_session_id` → parámetro
+> `delayed_origins` del gate) y el reporte separa `retention_interval_days`
+> (formal→delayed) de `event_age_days` (edad real del evento), conceptos
+> distintos, con alias retrocompatible `interval_days`. **F-A3** (`cd69088`) —
+> la certificación exige **≥ 2 reassessment points estables por destreza**
+> (`CERTIFICATION_REQUIRED_DELAYED = 2`; `stable_points` en el informe), cada
+> uno ≥ `RETENTION_MIN_DAYS` desde su origen y con ratio ≥ 0.9 (un único
+> delayed ya no certifica); fix del escritor: la retención que reevalúa un
+> examen de nivel (`kind=level`) puntúa contra la clave del examen — sus ítems
+> no viven en el índice de checks del currículo y `submit` devolvía None sin
+> escribir `delayed` — y cada reassessment nuevo se espacia ≥ 7 días del último
+> cerrado del mismo origen (`retention_spacing_due`, 409 si no), haciendo que
+> >1 punto sea real y la certificación sea alcanzable end-to-end por la
+> escalera. Los tests previos del gate (los 6 negativos + boundaries) se
+> actualizaron a la semántica multi-punto; docs: `docs/ASSESSMENT_2.md`
+> (sección «Certificación del nivel»), `docs/CONSTITUCION-PEDAGOGICA.md` (H5,
+> item 6) y docstrings de `CertificationOut`. Verificación íntegra: pytest
+> backend **1506 passed** (4 tests nuevos) + `ruff check .` limpio; frontend
+> sin cambios. **Pendiente hacia V3.26: Eje B** (emisor real de `novel` +
+> historia léxica por superficie) y **Eje C** (Listening real + calibración
+> CEFR + `context_id` legacy en el perfil).
+>
+> **Nota (2026-09-08, 19:25):** **V3.25.1 publicada** — release **v3.25.1**
+> `4fd54a5` en `main` (cierre de los 3 P1 de la auditoría externa V3.25:
+> `certification_gate` verifica la retención real desde las filas — baseline
+> formal `task_type="exam"` + eventos `delayed` por `context_id`, enforce
+> `interval >= 7 días` y `ratio >= 0.90`, sin examen no certifica —,
+> agregación real por `lexical_unit` aditiva con superficies independientes
+> (`units_from_rows`/`summary_units`) y `SUPPORT_LEVEL_WEIGHTS` ponderando
+> `generalized_mastery_score` con legacy neutral 1.0). Verificación local
+> reproducida (dossier N `docs/audit/N-AUDITORIA-TOTAL-V3251.md`, los 6 tests
+> negativos del gate como evidencia de cierre): pytest backend **1495 passed**
+> + ruff limpio; vitest **450 passed** (57 archivos) + `tsc` OK;
+> `check_release_consistency` **3.25.1** exit 0. Siguiente paso: V3.26
+> (Listening + `novel` + retención longitudinal) — planificar juntos antes de
+> tocar código.
+>
+> **Nota (2026-09-08, 16:50):** **V3.25.1 en curso — cierre de P1 de la
+> auditoría externa V3.25** sobre `main` (la auditoría del candidato v3.25.0
+> detectó 3 P1 reales que la batería de V3.25 no cubría: `certification_gate`
+> no enforceaba la ventana ≥7 días ni el ratio ≥0.90; `lexical_unit` no
+> agregaba conocimiento por unidad; `support_level` no ponderaba el dominio).
+> Trabajo completo en el árbol: **P1-01** `certification_gate` reconstruye
+> baseline formal (`task_type="exam"`) + eventos `delayed` por `context_id`
+> desde las filas, enforce `interval >= RETENTION_MIN_DAYS` y `rate >= 0.90`, y
+> sin examen no certifica; `retention_report` informa `interval_days`/
+> `initial_score`/`rate`/`baseline_date`. Los 6 tests negativos de la auditoría
+> quedan en `tests/test_assessment_v2.py` (D+6 → False; D+7 ratio 0.89 →
+> False; D+7 ratio 0.90 → True; D+21 ratio 0.50 → False; `created_at` inválido
+> → False; dos eventos sin ratio válido → False). **P1-02** agregación real por
+> `lexical_unit` (aditiva): `units_from_rows`/`summary_units` en
+> `services/lexicon.py`, `LexiconOut.units` + `LexiconSummary.units` en
+> schemas/domain y tipos frontend; superficies independientes (go/going/went/
+> gone). **P1-03** `SUPPORT_LEVEL_WEIGHTS` pondera `generalized_mastery_score`
+> (legacy neutral 1.0). Verificación: backend pytest **1495 passed** + ruff
+> limpio; frontend vitest **450 passed** (57 archivos) + `tsc` OK;
+> `check_release_consistency` 3.25.1 exit 0. Dossier N
+> `docs/audit/N-AUDITORIA-TOTAL-V3251.md`; release notes
+> `release-notes-v3.25.1.md`; CHANGELOG/PLAN/README actualizados. Siguiente
+> paso: cierre del release (commit + bump + CI). Los P2 de la auditoría quedan
+> para V3.26 (Listening + `novel` + retención longitudinal).
+>
+> **Nota (2026-09-08, 14:45):** **V3.25 publicada** — release **v3.25.0**
+> `bb31a1b` en `main` (calibración del Student Model del dossier L — auditoría
+> TOTAL verificada de V3.24.0 — que absorbe los pendientes F-K3…F-K7: evidencia
+> con contexto + `support_level` canónico, transfer por experiencias distintas,
+> certificación robusta con `created_at` + `retention_report` de intervalos,
+> semántica demostrado/estimado/progreso en Student Model y UI, renombrado
+> léxico canónico `production_count`/`exposure_count` con `lexical_unit` y
+> doble vía speaking con `cefr_target` persistido). CI GitHub Actions
+> **success** (Backend ruff+pytest · Frontend tsc+vitest+build · Playwright E2E
+> visual · Content validation · Beta V3.0 gate · Release consistency 3.25.0).
+> Verificación local reproducida íntegra (dossier M
+> `docs/audit/M-AUDITORIA-TOTAL-V325.md`, APROBADO para cierre, sin BUG REAL):
+> pytest backend **1481 passed** + ruff limpio; golden **25 passed**; vitest
+> **450 passed** (57 archivos) + tsc/vite build OK;
+> `check_release_consistency` **3.25.0** exit 0.
+>
+> **Nota (2026-09-08, 14:40):** **V3.25 implementada y verificada en el árbol de
+> trabajo (sin commit ni release aún)** — candidato release **v3.25.0**
+> (calibración del Student Model del dossier L — auditoría TOTAL verificada de
+> V3.24.0 — que absorbe los pendientes F-K3…F-K7: evidencia con contexto +
+> `support_level` canónico, transfer por experiencias distintas en
+> gates/readiness/unit, certificación con `delayed` verificado por `created_at`
+> + `retention_report` de intervalos, Student Model y UI con
+> `demonstrated_level`/`estimated_level`/`level_progress` separados, renombrado
+> canónico `appearances→production_count`/`exposures→exposure_count` con
+> `lexical_unit`, y doble vía speaking con `cefr_target` persistido y emisor
+> `independent`). Verificación local en el árbol: backend pytest **1481 passed**
+> + `ruff check .` limpio; frontend vitest **450 passed** (57 archivos) + `tsc`/
+> `vite build` OK; golden (`thresholds.json`) y E2E A1→A2 en verde;
+> `check_release_consistency` **3.25.0** exit 0. Dossier L
+> `docs/audit/L-AUDITORIA-TOTAL-V324.md`; release notes
+> `release-notes-v3.25.0.md`; CHANGELOG/PLAN/README actualizados. Siguiente
+> paso: cierre del release (commit + bump + CI).
+>
+> **Nota (2026-09-08, 13:35):** **V3.24 publicada** — release **v3.24.0**
+> `8970634` en `main` (calibración de salida del Student Model: **F-K1**
+> MASTERED a lo emisible + **F-K2** estimado anclado + **F-K8** e2e del salto
+> A1→A2; `release-notes-v3.24.0.md`). CI GitHub Actions **success** (Content
+> validation · Backend ruff+pytest · Frontend tsc+vitest+build · Playwright E2E
+> visual · Beta V3.0 gate · Release consistency 3.24.0). Verificación local:
+> suite backend **1457 passed** + ruff limpio; Eje 1 del dossier K **G1 311 +
+> G2 329**. La sección 38 y su backlog quedan cerrados como histórico (V3.24);
+> los P2/P3 del dossier K (F-K3…F-K7) son candidatos del siguiente incremento.
+>
+> **Nota (2026-09-08, 13:20):** alcance de V3.24 cerrado por el gerente (solo
+> **F-K1 + F-K2 + F-K8**) e implementado en el árbol de trabajo (sin commit ni
+> release aún). Decisiones cerradas: **F-K1 (b)** relajar a lo emisible —
+> MASTERED = familiar×2 + transfer×2 + delayed (`assessment_v2.py`) y
+> `novel_required = 0` en las 12 celdas macro de `cefr_matrix.json`; el kind
+> `novel` queda **reservado** (sin emisor real) y la frontera se documenta en
+> `ASSESSMENT_2.md` y la CONSTITUCIÓN §2.1/§6. **F-K2 (a)** anclaje del estimado
+> a niveles completados + progreso del tramo actual (`adaptive.estimated_level`
+> recibe `current_level` + `completed_levels`; `build_student_model` las deriva
+> de las matrículas `completed`). **F-K8**: test e2e del salto A1→A2 (dominar A1
+> → estima A1, no ≥ B2; aprobar el examen A1 → matrícula A2, estimado A1 con
+> numeric 1.0, nunca Pre-A1). Verificación completa en el árbol: suite backend
+> **1457 passed** + ruff limpio; Eje 1 del dossier K **G1 311 + G2 329** (640,
+> +2 tests e2e); frontend sin cambios. Briefing:
+> `agentes/v324-calibracion-salida.md`. Se procede al cierre del release
+> (commit + bump `3.23.0 → 3.24.0` + higiene de la sección 38.5).
+>
+> **Nota (2026-09-08, 12:30):** auditar el **Eje 1 (Student Model → Evidence →
+> Mastery → Academy → CEFR)** deja dossier nuevo `docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md`
+> sobre main `bb3f253` (release v3.23.0 `f3739a9` + fix documental H1; versión
+> declarada 3.23.0 intacta). 638 tests del eje reproducidos en verde (G1+G2 del
+> dossier K). La cadena actividad → evidencia → mastery → CEFR es determinista y
+> sólida (escritor único, no contagio, certificación con `delayed` ≥7 días), pero
+> K **no aprueba el cierre del Eje 1** y deja 2 hallazgos **P1** que deciden el
+> alcance de V3.24: **F-K1** (el evidence_kind `novel` no tiene emisor mientras
+> `mastery_evidence_gate` MASTERED, la readiness B2+ de `cefr_matrix` y el grafo
+> lo exigen → `mastery_missing: novel` permanente en la escalera Assessment 2.0)
+> y **F-K2** (el nivel estimado se calcula sobre un único nivel sin calibrar y
+> rebasa al matricular nivel nuevo — reproducido: dominar A1 estima **B2**;
+> aprobar el examen A1 devuelve el estimado a **Pre-A1**). **Todo lo pendiente
+> para llegar a V3.24 queda consolidado en la sección 38 de este documento**:
+> candidato recomendado, backlog completo y siguientes pasos.
+>
+> **Nota (2026-09-08, 11:15):** posición vigente **v3.23.0** — **Student Model
+> Calibration (parte 2): Retention real y Transfer por contexto** (versión de
+> app `3.22.0 → 3.23.0`). Cierra el plan V3.23 del dossier de la auditoría
+> externa V3.22.0 (P1-02/P1-04) sobre la base de los quick fixes de esa misma
+> auditoría (P1-01/P1-03): **(P1-02) la retención deja de ser exposición/
+> producción espaciada y exige recuperación correcta DEMORADA** — migración
+> idempotente en `vocabulary` con `retrieval_successes`/`retrieval_days`/
+> `last_retrieval_at` (sin backfill: el histórico V3.22 backfilleó
+> `first_exposed_at = last_exposed_at`, una ancla retrospectiva sería injusta —
+> mejor perder evidencia que inventarla); `record_retrievals` cuenta solo éxitos
+> ≥ `RETENTION_MIN_INTERVAL_DAYS` después del ancla
+> `min(first_exposed_at, first_seen)` (días distintos → `retrieval_days`); hook
+> solo en el micro-drill (`submit_drill_attempt` si `produced`,
+> `submit_sentence_attempt` si `passed`); en `item_competence_matrix`,
+> `retention = retrieval_days >= RETENTION_MIN_RETRIEVAL_DAYS` y
+> `_spaced_exposure`/`_spaced_production` pasan a señales independientes
+> (`spaced_exposure`/`spaced_production`) · **(P1-04) la transferencia se mide
+> por contexto de actividad `channel:activity`, no solo por canal** — migración
+> `context_tags` (CSV único y ordenado), `record_production(..., activity)` con
+> merge canónico, `activity` propagada por todas las superficies (mapeo
+> assessment/misión/checks controlados/tareas LLM/read-aloud/drill/rutas
+> speaking/conversación guiada/chat libre), `production_contexts(row)` con
+> fallback `channel:other` para legacy; `transfer`/`transfer_contexts` por
+> contextos (dos actividades del mismo canal cuentan; `chat`+`conversation`
+> dejan de colapsar) · **quick fixes base (auditoría externa V3.22)**: P1-01
+> `item_recall` con `_last_activity_at` (max de `last_seen`/`last_exposed_at`);
+> P1-03 `item_mastery` con pesos de reconocimiento 0.4 volumen / 0.6
+> `exposure_days` y orden ASR `no_speech` (alucinación de silencio) antes que
+> `low_confidence` · `summary` añade `spaced_exposure` (informativo) ·
+> `LexicalCompetence`/`LexiconSummary` (schemas + TS) con los campos nuevos;
+> tooltip del diccionario actualizado (sin renombrar chips). Fuera de alcance:
+> `support_level` por evento (V3.24), backfill de retrieval histórico, superficie
+> de recuerdo de significado. Verificación: backend **pytest 1455** + ruff
+> limpio; frontend **vitest 450** (57 archivos) + `tsc`/`vite build` OK;
+> curriculum `--strict --quality` y content validation OK;
+> `check_release_consistency` **3.23.0** exit 0; i18n parity exit 0 (1232
+> definidas); CONSTITUCIÓN sin cambios (se mantiene señal ≠ evidencia).
+>
+> **Nota (2026-09-08, 10:30):** posición vigente **v3.22.0** — **ASR
+> Calibration + Student Model (léxico)** (versión de app `3.21.0 → 3.22.0`).
+> Cierra el plan V3.22 del dossier de la auditoría externa V3.21.0
+> (P1-01/02/03 + P1-04/05 + P2-01 parcial): **(ASR-01) calibración ASR por
+> segmentos** — en faster-whisper 1.2.1 `avg_logprob`/`no_speech_prob`/
+> `compression_ratio` viven en cada `Segment`, no en `TranscriptionInfo`;
+> `services/stt.py` agrega ahora con `aggregate_asr_segments` (media ponderada
+> por duración de segmento, ratios y `segment_count`) y clasifica con
+> `classify_asr_status(*, text, metrics)` — política explícita con
+> `MIN_SPEECH_ATTEMPT_SECONDS` 0.5 s: sin texto y 0 segmentos → `unintelligible`
+> (audio corto) o `no_speech` (audio ≥ 0.5 s); texto alucinado sobre no-habla
+> (`no_speech_ratio` alto, medido real: silencio decodifica "You" con
+> `no_speech_prob` 0.85) → `no_speech`; `mean_logprob` < -1.0 →
+> `low_confidence`. Estados antes inalcanzables. El gating `asr_status != "ok"`
+> es transparente en todos los routers; la telemetría de segmentos se emite sin
+> clasificar (frontera `LANGUAGE_MISMATCH` documentada) · **(léxico) Retention ≠
+> Transfer** — migración idempotente `exposure_days`/`first_exposed_at` en
+> `vocabulary` (backfill 1 día + `first_exposed_at = last_exposed_at`),
+> `record_exposures` por fila contando días distintos de exposición (patrón
+> `production_days`/`first_seen`), matriz `item_competence_matrix` con
+> `transfer_contexts`, `transfer` = 2+ canales (sin "or spaced"), `retention` =
+> `_spaced_exposure or _spaced_production`, `production_gap` (antes `gap`) y
+> `transfer_gap` (producida-sin-transferir) independientes; `summary` con 6
+> contadores; UI del diccionario a 6 chips + claves i18n. Fuera de alcance:
+> telemetría ASR persistente, `LANGUAGE_MISMATCH`, renombre
+> `appearances → production_count`, preparación Recall → Sentence → Context →
+> Free Transfer. Verificación: backend **pytest 1440** (incluye integración ASR
+> opt-in con Whisper/piper reales) + ruff limpio; frontend **vitest 450** (57
+> archivos) + `tsc`/`vite build` OK; `check_release_consistency` **3.22.0** exit
+> 0; CONSTITUCIÓN sin cambios (se mantiene señal ≠ evidencia).
+>
+> **Nota (2026-09-07, 20:55):** posición vigente **v3.21.0** — **Speaking &
+> Evidence Calibration** (versión de app `3.20.0 → 3.21.0`). Cierra el plan
+> V3.21 del dossier de la auditoría externa V3.20.0 (F1–F6): (F1 P0) la
+> producción del micro-drill se decide por **alineación secuencial**
+> (`unit_produced`, normalización compartida `tokenize`) y las unidades
+> multi-palabra se acreditan a sí mismas (`as_unit=True`, invariante por fila
+> `sum(channel_prod)==appearances`); (F2 P1) **feedback ASR honesto** —
+> metadata de Whisper (`no_speech_prob`/`avg_logprob`/`language_probability`),
+> `asr_status ∈ {ok, no_speech, unintelligible, low_confidence}` y **gating de
+> no-penalización** (un audio no reconocido nunca se puntúa como fallo
+> lingüístico), chips re-etiquetados y mensajes por `asr_status`; (F3)
+> `DEFAULT_MODEL` fuente única (`/api/models` + `resolveDefaultChatModel`),
+> comentario `ADMIN_PIN` fail-closed, hook `useRecordingSession` (cronómetro +
+> auto-stop 120 s) con red de seguridad backend de duración (400) y aviso de
+> audio vacío; (F4) semántica de superficie Speaking (títulos por modo y pies
+> de stats con la competencia real); (F5) **matriz de competencia léxica**
+> (Recognition/Production/Transfer/Retention/gap por ítem, pura sin migrar
+> columnas) expuesta en léxico/diccionario y **Transfer Gap para FSRS**
+> (razón `transfer-gap` por objetivo); (F6) **drill escalera MVP** — paso
+> Sentence determinista sin LLM (`sentence_context_for` + endpoints
+> sentence-context/sentence-attempt) con UI Recall → Sentence en la misma
+> tarjeta, y **graduación espaciada** (2 días de éxito de drill u otra señal
+> espaciada para salir de la lista "pendiente"; sin dominio D5/E3). F6.3
+> (Contexto/Transfer libre) APLAZADO a la auditoría pedagógica de
+> Speaking/Listening. Verificación: backend **pytest 1424** + ruff limpio;
+> frontend **vitest 450** (57 archivos) + `tsc`/`vite build` OK;
+> `check_release_consistency` **3.21.0** exit 0; CONSTITUCIÓN sin cambios
+> (se mantiene señal ≠ evidencia).
+>
+> **Nota (2026-09-07, 15:05):** posición vigente **v3.20.0** — **Speaking único +
+> feedback oral** (frontend-only; versión de app `3.19.0 → 3.20.0`; la
+> implementación de V3.19 que quedó sin release previo viaja en el mismo commit
+> v3.20.0). Cierra el candidato V3.20 de la nota siguiente tras la prueba del
+> gerente, incluido el fix de esa prueba: el botón de **traducir la frase del
+> interlocutor** (y el de la respuesta modelo) en Micro-conversación alternaban
+> el estado de traducción pero la burbuja seguía pintando el inglés crudo —
+> ahora pinta `display` (ES ⇄ EN) como el resto de escenas. Alcance (a)–(f):
+> consolidación F1 (hub 4 tarjetas, modos Micro-conversación/Acento/Diálogo
+> guiado, legadas que degradan al hub), texto «Cada nivel es una ruta…» plegado
+> tras el botón (i), **grabación real reproducible** del alumno, F3 turnos
+> hablados (`mode="voice"`), chips palabra a palabra en Acento y F4 URL por modo
+> + redirección de legadas. Verificación: **vitest 434** (54 archivos), `tsc` y
+> `vite build` OK; `check_release_consistency` **3.20.0** exit 0; backend sin
+> cambios de lógica, CONSTITUCIÓN sin cambios. Fuera del cierre (siguiente
+> candidato): F2 (pulido de claims del modo, opcional), la evidencia formal de
+> interaction (CONV-02, backend) y los pendientes anotados de V3.19.
+>
+> **Nota (2026-09-07, 14:26):** candidato **V3.20 (working tree, frontend-only)** —
+> **F1 de `docs/DISENO-SPEAKING-UNICO.md` + feedback oral en el working tree**:
+> (a) la práctica oral se unifica en una sola superficie **Speaking** — el hub de
+> APRENDER pasa a **4 tarjetas** (listening · speaking · vocabulario · gramatica)
+> y las antiguas tarjetas/URLs de Pronunciación y Conversación dejan de ser
+> actividades propias. Sus motores no cambian: se reutilizan como **modos
+> internos** de la página Speaking (`features/speaking/SpeakingRoutesPractice.tsx`),
+> que ganó un selector de modos **Micro-conversación / Acento / Diálogo guiado**
+> en `QuizRoutePage` (prop `modeTabs`, título de superficie unificado "Speaking";
+> Acento = `PRONUNCIATION_ROUTE_CONFIG`, Diálogo guiado = `CONVERSATION_ROUTE_CONFIG`,
+> exportadas). Consecuencias de navegación: `/aprender/pronunciacion` y
+> `/aprender/conversar` degradan al hub (`LEARN_ACTIVITY_IDS` de 6 a 4); NextBest
+> de destreza `pronunciation` y el CTA post-assessment de Recorridos navegan a
+> Speaking; el chat libre sigue en su raíz `/chat` (marca Speaking en el atajo).
+> (b) El texto «Cada nivel es una ruta…» (`*Routes.routesSubtitle`) dejó de ocupar
+> el header: en `QuizRoutePage` vive ahora tras un botón **(i) «Cómo funcionan las
+> rutas»** plegado por defecto (clave `learn.routesInfoToggle`). (c) **Se reproduce
+> la grabación real del alumno** — el backend solo transcribe y descarta el audio,
+> así que las escenas de micro-conversación y Acento conservan el blob en memoria
+> (`URL.createObjectURL`, revocada al cambiar/desmontar) y muestran el botón
+> **«Oír mi grabación»** (`components/RecordingPlayButton.tsx`) junto a la
+> respuesta/frase modelo en el resultado; en Acento se añade también el altavoz de
+> la frase modelo dentro del resultado. (d) **F3 — Diálogo guiado con turnos
+> hablados reales** (`features/conversation/ConversationVoiceButton.tsx` +
+> `ConversationGuidedChat.tsx`): el micro del mini-chat ya no es dictado plano —
+> graba el turno, mide su duración real (metadata del audio, fallback al reloj),
+> transcribe y lo persiste con `mode="voice"` + telemetría (`Message.mode` admite
+> `"voice"`). El backend (sin cambios) ya distingue el tecleo `mode="conversation"`
+> de los turnos que computan como habla (CONV-01 V3.19): los turnos por voz
+> alimentan `_student_speech_seconds`, `turn_duration`/latencia de
+> `interaction_evidence` y la resistencia de conversación. (e) **Chips palabra a
+> palabra en el modo Acento** (mockup §6.3): nueva tarjeta «Frase palabra a
+> palabra» en el resultado del read-aloud con la frase modelo coloreada por
+> palabra — verde (bien dicha), ámbar (sustituida, muestra `→ lo dicho`), roja
+> (no dicha) y «+extra» punteado (palabras de más). La clasificación la calcula
+> `utils/pronunciationAlignment.ts`, un puerto TS del `SequenceMatcher` de
+> difflib (Ratcliff-Obershelp sin junk) que reproduce exactamente la alineación
+> del backend `services/phonetics.py::word_alignment` (tests de paridad con los
+> casos de `test_phonetics.py`), de modo que los chips siempre cuadran con
+> `word_accuracy` y el breakdown mostrado. (f) **F4 — URL por modo + redirección
+> de legadas** (`router/learnHub.ts`): el modo activo de Speaking vive en la URL
+> (`/aprender/speaking` = micro, `/aprender/speaking/acento` = Acento,
+> `/aprender/speaking/dialogo` = Diálogo guiado; alias en inglés aceptados).
+> `SpeakingRoutesPractice` arranca desde la ruta, la URL manda en back/forward y
+> cambiar de pestaña navega a la ruta canónica (`speakingModePath`). Las
+> sub-rutas legadas de las antiguas tarjetas resuelven SÍNCRONO como Speaking con
+> su modo (`/aprender/pronunciacion` → Acento, `/aprender/conversar` → Diálogo;
+> `SPEAKING_ROOT_LEAF`/`speakingModeFromPath`/`learnActivityFromPath`) y App
+> canonicaliza la URL al destino (`legacySpeakingRedirect`, sin parpadeo de hub).
+> Tests: router/paridad actualizados + **vitest 434 passed** (54 archivos), `tsc`
+> y `vite build` OK;
+> backend **sin cambios** (versiones NO subidas; cierre de candidato V3.20 y
+> CHANGELOG pendientes). Pendiente del doc (no iniciado): F2 (pulido de claims
+> del modo, opcional), la decisión abierta de emitir evidencia formal de
+> interaction (CONV-02, backend) y el cierre del candidato V3.20 (versión +
+> CHANGELOG) tras la prueba del gerente.
+>
+> **Nota (2026-09-07, 10:05):** posición vigente **v3.19.0** — **Léxico por
+> destreza + Speaking micro-drill** (backend `3.18.0 → 3.19.0`). Cierra el
+> candidato V3.19 con las decisiones del gerente y el dossier de la auditoría
+> profunda V3.18: **P0** — `record_words` → `record_production(user, words,
+> channel)`; la tabla `vocabulary` gana `chat_prod`/`speaking_prod`/
+> `writing_prod`/`conversation_prod` (migración idempotente + backfill
+> `chat_prod = appearances`; invariante `sum(columnas) == appearances`) y las 7
+> superficies de producción vuelcan el texto del alumno por un único helper
+> compartido (CAP-01/REFAC-01) · **P1** — speaking micro-drill de 1 nivel
+> honesto: señal determinista en servidor `exposures > 0 AND speaking_prod == 0`
+> (`drill_candidates` + `GET /api/vocabulary/drill/candidates`), práctica sobre
+> el scorer de pronunciación (`POST /api/vocabulary/drill/attempt`; éxito →
+> `speaking_prod`, sin evidence/FSRS — D5/E3) y chips con acción real en
+> `PersonalDictionary` (con error + reintento) · **Fixes P1 del dossier**: R6-01
+> retención impuesta en servidor (409), GATE-01 objetivo `locked` no evaluable
+> (409), CLAIM-01 copy "nivel oral actual (examen)" en Speaking/Pron/
+> Conversation, SIGNAL-01 semántica oral + copy, ERR-01 404→503 en misiones/
+> assessment/task, LIST-01/02/03 tokens de foco servibles + corpus re-etiquetado/
+> re-autorado + unicidad de `script` normalizado, CONV-01 reconstrucción por
+> `mode` (el tecleo no cuenta como tiempo oral) · **Deuda externa**: ADMIN-01
+> fail-closed (`ADMIN_PIN=""` → 401) y BOOL-01 (`type(selected) is int`). Tests:
+> **pytest 1371**, **vitest 417**, ruff limpio, `tsc`/`vite build` OK,
+> curriculum `--strict --quality` exit 0 y `check_release_consistency` **3.19.0**
+> exit 0; CONSTITUCIÓN sin cambios (R8/R9 propuesta abierta; fuera de alcance
+> V3.19: GRAPH-01, modalidad oral/tecleo, WR-UI-01, LEX-03 — ver entrada 37.37).
+>
+> **Nota (2026-09-07):** posición vigente **v3.18.0** — **Knowledge Graph
+> remainder + deuda del grafo** (backend `3.17.0 → 3.18.0`). Cierra el candidato
+> P3: **I2** — ancla de unidad congelada al completar (tabla `unit_review_anchors`
+> de escritura única `INSERT OR IGNORE` + backfill lazy; los refuerzos/decay ya
+> no desplazan las ventanas 7/30/90) · **O1** — cascade de ventanas (una ventana
+> sin intento propio se cierra con un intento superado de la unidad posterior a su
+> `due_at`; el intento propio manda) · **M4** — cartas FSRS `objective` fuera del
+> `FsrsReviewPanel` autograduable (single writer con el micro-review: siembra solo
+> en ventana `due_now`/`failed` o con `reps > 0`; `get_fsrs_due`/`due_count` las
+> excluyen y `/fsrs/review` responde 400) · **O3** — `/unit-plan` agregado por
+> niveles (`{levels, due_count}`, actual + anteriores matriculados) y micro-review
+> con `level_id` que valida la unidad en el nivel donde vive (UI agrupada por
+> nivel) · **H5** — etiquetas humanas de las 7 dimensiones del grafo
+> (`GRAPH_DIMENSION_LABELS` + `dimensionLabel`) en chip/`NextBestCard`/
+> `ObjectiveNodeCard`/`EvidenceGraphPanel` · **H6** — `/session` y `/next-best`
+> lazy (una sola `list_evidence` y solo si hay nodos que construir; payloads
+> idénticos) · **auditoría v3.17** — `ObjectiveNodeCard` distingue error real
+> (copia + reintento) de 404/sin-datos, `_as_float` defensivo en
+> `rank_weakness_objectives`, spec Playwright `homeGraphChip` nueva (chip
+> "Transfer" con mock determinista). Tests: **pytest 1345**, **vitest 414**, ruff
+> limpio, `tsc`/`vite build` OK, Playwright de la región Home/grafo en desktop OK
+> y `check_release_consistency` exit 0; CONSTITUCIÓN sin cambios.
+>
+> **Nota (2026-09-07, 09:10):** verificación de cierre de v3.18 reproducida en
+> vivo sin cambios de código — pytest **1345** ✅, ruff limpio ✅, vitest **414**
+> ✅, `tsc`/`vite build` OK ✅ y `check_release_consistency` **3.18.0** exit 0 ✅
+> (versión en `config.py`/`package.json`/`package-lock.json` y resto de fuentes).
+> Con los candidatos P0–P3 cerrados, solo queda abierto el **pendiente heredado
+> de léxico** (producción volcada por destreza speaking/writing + speaking
+> micro-drill de `recognized_not_produced`); queda definido como candidato
+> **V3.19** en la sección final (bloques P0/P1). CONSTITUCIÓN sin cambios.
+>
+> **Nota (2026-09-07, 09:25):** **auditoría profunda V3.18 (read-only, pre-V3.19)**
+> completada en 6 áreas — dossier `docs/audit/I-AUDITORIA-PROFUNDA-V318.md`
+> (runbook `agentes/auditoria-profunda-v318.md`). Sin P0 confirmado; lista
+> P0/P1/P2 mapeada a decisiones V3.19. V3.18 sigue **APROBADO CON MATICES**:
+> núcleo mastery/repaso I2-O1-M4-O3-H6/FSRS/evidence depth correctos y fijados.
+> P1 clave previos a implementar V3.19: **R6-01** (retención R6 sin enforcement
+> en servidor: `assessment_v2` escribe `delayed` sin ventana ni ratio — candidata
+> a P0), **GATE-01** (objetivo `locked` evaluable por API directa; premisa 21),
+> **CLAIM-01** (UI "Speaking demostrado" desde EMA sin gate), **SIGNAL-01**
+> (`recognized_not_produced` con semántica de teclado y chips inertes),
+> **PROD-01/WR-UI-01** (confirmado en código: ningún flujo oral/escrito vuelca al
+> léxico — base del P0 V3.19). Deuda de la auditoría externa diferida a V3.19:
+> **ADMIN-01** (`ADMIN_PIN=""` → fail-closed) y **BOOL-01** (bool-as-int en
+> `unit_review.py`). Sin cambios de código ni de CONSTITUCIÓN (R8/R9 propuesta
+> abierta); `backend/config.py` sigue `3.18.0`.
+>
+> **Nota (2026-09-06):** posición vigente **v3.17.0** — **Knowledge Graph +
+> Daily Adaptive Plan** (backend `3.16.0 → 3.17.0`). Cierra el candidato P2:
+> el plan diario ahora **deriva del Evidence Graph** — la destreza débil se
+> practica sobre el objetivo que su nodo señala (D1b) y los pasos de la sesión
+> traen `can_do`/`limiting_factor`/`graph_mastery`/`because[]` (enriquecidos
+> por dominio con una única lectura de evidencia; `/session` y `/next-best`
+> nunca divergen). **D2**: vista de grafo real — nuevo componente
+> `ObjectiveNodeCard` (consume `getEvidenceGraphNode`) montado en el curso
+> (hitos de unidad expansibles bajo demanda) y en el perfil (Habilidades);
+> sin claims de dominio: solo refleja lo que el servidor puntúa. **D3**:
+> `/api/academy/today` eliminado de extremo a extremo (endpoint,
+> `get_today_plan`, `TodayPlanOut`/`TodayItemOut`, `adaptive.today_plan` +
+> `TODAY_MIX`, cliente y tipos frontend); la Home consume solo `/session`
+> (Session Engine); tests migrados con rationale honesto. **Deuda v3.16
+> (D4b)**: M2 ✅ (`validate_micro_review_answers`: claves ⊆ muestra e índices
+> en rango → 400), M3 ✅ (prefijos dinámicos en `DYNAMIC_KEY_PREFIXES`) y O2 ✅
+> (test GET==POST con reintento parcial); M1 ✅ en el cierre (devDeps DOM
+> `jsdom` + `@testing-library/react` + `*.test.tsx` en vitest + 6 vitest de
+> componente de `UnitReviewPanel`/`TodayPlan`). **D5**: `GRAPH_VERSION` sigue
+> `2.12.0` (cambio aditivo). **D6**: micro-líneas del can-do/factor limitante
+> en las filas de la sesión. **D7**: fallback silencioso sin nodo (la práctica
+> nunca se bloquea). Tests: **pytest 1333**, **vitest 398**, ruff limpio,
+> `tsc`/`vite build` OK y `check_release_consistency` exit 0; CONSTITUCIÓN sin
+> cambios.
+>
+> Auditoría externa v3.17 (2026-09-06, read-only): **APROBADO CON
+> OBSERVACIONES** — D1b/D2c/D3a/D4b/D5a/D6a/D7a ✅ reproducidos en vivo.
+> Hotfix aplicado (commit en `main` tras `989658e`): **H1** — 2 tests de
+> integración del camino REAL de remediación D1b (paso `weakness` de examen
+> suspendido enriquecido con el can-do real + paridad `/next-best`==`/session`
+> con primer paso CON nodo) → **pytest 1335**; **H2** — panel de Habilidades
+> sin recorte a 12 nodos (criterio 5 de D2); **H3** — `Milestone` no expande
+> objetivos `locked`; **H4** — typo docs («10 puros» → «9»). Deuda menor
+> **H5**/**H6** + observaciones del informe → candidato v3.18 (37.35).
+>
+> **Nota (2026-09-03):** este documento quedó congelado en la posición v2.4.0.
+> La posición vigente es **v3.2.0** (Calibración pedagógica de niveles) y el
+> roadmap actual vive en `PLAN.md` (+ `README.md`, `CHANGELOG.md`,
+> `docs/UI_V3.1.md`, `docs/AUDITORIA-V3.md`). La auditoría pedagógica del modelo
+> de nivelación (2026-09-03) está en `docs/audit/H-NIVELACION-PEDAGOGICA.md` y su
+> especificación normativa en `docs/CONSTITUCION-PEDAGOGICA.md` (ver 37.29 abajo).
+>
+> **Nota (2026-09-06):** posición vigente **v3.16.0** — **Review/SRS por
+> unidad: micro-review + ventanas de retención fijas 7/30/90 días**
+> (backend `3.15.0 → 3.16.0`). Cierra el candidato P1 "Review/SRS por unidad"
+> (auditado abierto 2026-09-05): el motor FSRS ya soportaba
+> `target_type="objective"` pero no se sembraba; no había plan de repaso por
+> unidad ni ventanas fijas. **Motor**: nuevo `backend/services/unit_review.py`
+> puro y determinista — ventanas `(7, 30, 90)` desde el ancla de la unidad
+> (completada = todos sus objetivos `mastered`; ancla = `max(updated_at)`),
+> estados `upcoming/due_now/passed/failed`, micro-review con muestreo
+> balanceado de los checks MC **oficiales** del currículo (cero contenido
+> artificial; reintento prioriza fallidos) y puntuación en servidor (premisa
+> 21). **Siembra**: `sync_fsrs_cards` siembra/refresca cartas `objective` solo
+> para objetivos de unidades completadas del nivel actual, sin pisar `reps > 0`
+> y sin tocar `fsrs.TARGET_TYPES`; `why_for_objective` en `fsrs.py`
+> (`unit-window-N` / `unit-maintenance`). **Datos**: tabla idempotente
+> `unit_review_attempts` (`per_objective` + `failed_items` JSON) + repos; el
+> micro-review **no** crea evidencia de mastery/currículo ni declara dominio
+> (D5; mecanismos separados, E3). **API**: `GET /api/academy/review/unit-plan`
+> y `GET/POST /api/academy/review/unit/{unit_id}/micro-review` con gating
+> (400 ventana no repasable / 404 unidad ajena). **UI**: `UnitReviewPanel` en
+> INICIO (junto a `FsrsReviewPanel`) con chips de ventana 7/30/90, micro-review
+> por tarjetas y nota honesta "no cuenta como demostración de dominio"; lógica
+> pura `unitReviewLogic.ts`; i18n es/en con parity. **Tests**: `pytest 1318`,
+> `vitest 392` y build frontend OK; CONSTITUCIÓN sin cambios (mecanismo, no
+> norma). **Auditoría externa (read-only)**: APROBADO CON OBSERVACIONES; fix
+> aplicado del hallazgo I1 (bug `selected_index` con opción A) + test de
+> regresión; deuda I2/M1–M4/O1–O3 registrada en el candidato v3.17 (37.34).
+>
+> **Nota (2026-09-06):** posición vigente **v3.15.0** — **Profundidad avanzada
+> C1/C2: densidad, taxonomía avanzada y banco grammar C2 normalizado**
+> (backend `3.14.0 → 3.15.0`). Cierra el candidato P0 "C1/C2 depth" (auditado
+> abierto 2026-09-05). **Contenido**: C1 y C2 pasan de 14 a 20 objetivos con
+> evidencia completa (checks MC + activities con fases; +30 activities y
+> +18/+19 checks por nivel) en `c1-m02-u01`/`c1-m03-u01` y `c2-m02-u01` (+2 en
+> `c2-m02-u01-l01` "Register shifts" + lección nueva `c2-m02-u01-l03` con
+> elipsis/gramática formal y cohesion discursiva); módulos Final intactos
+> (`c1-m04`, `c2-m03`). **Taxonomía**: `SUBSKILLS` (`services/curriculum.py`)
+> gana la capa avanzada `register`/`pragmatics`/`discourse`/`nuance`/
+> `argumentation` en speaking/listening/writing/grammar/reading/vocabulary y los
+> objetivos C1/C2 se re-etiquetan donde su contenido lo justifica (C1 3→16 y C2
+> 7→20 con subskill avanzada; A1–B2 intactos). **Banco grammar C2**:
+> normalizado 8 → 15 ítems (11 MC + 4 CP en 3 temas); C2 deja de ser el único
+> banco corto real y su práctica deja de leer `low`; la regla R7 sigue
+> verificada con un **banco corto sintético** construido en los tests.
+> **Tests**: snapshot depth V2.6 reformulado
+> (`test_depth_c1_c2_reach_deep_target_after_v315`), R7 re-apuntada y conteos
+> C2 actualizados (8 → 15); textos "C2 = 4" retirados de
+> `quiz_routes.py`/`grammar_routes.py`. Métricas de cierre: `depth(C1) 93.1`,
+> `depth(C2) 92.5` (≥ 90, por encima del resto), unit coverage 100 % (31/31) y
+> Unit Learning Loop 100 % en 9 fases, `validate_level` vacío en 6 niveles y
+> CLI `--strict --quality` exit 0. Tests: **pytest 1293**, **vitest 382** y
+> build frontend OK (sin cambios de frontend/launcher; CONSTITUCIÓN sin cambios:
+> iteración de contenido, no normativa).
+>
+> **Nota (2026-09-05):** posición vigente **v3.14.0** — **Registro cross-skill
+> de B1 a los 6 niveles (A1–C2)** (backend `3.13.0 → 3.14.0`). Escala el registro
+> por estructura (V3.13 P1.2) del prototipo B1 a `a1..c2` con datos reales por
+> nivel y sin marca de prototipo. **Contenido**: ítems `controlled_production`
+> nuevos en A1 (`a1-cp-01..06`: `to be`, present simple 3.ª, adverbios de
+> frecuencia, `have/has got`, preposiciones, past simple) y C2 (`c2-cp-01..04`:
+> inversión enfática, cleft, mixed conditional, pasiva formal); el banco Grammar
+> crece (A1 38→44, C2 4→8) y C2 conserva "evidence depth LOW" (banco ≤12) sin
+> claims falsos. **Motor**: `backend/services/cross_skill.py` generalizado
+> (`CROSS_SKILL_LEVELS = a1..c2`), `PRODUCTION_BINDINGS_BY_LEVEL` normativo en
+> los seis niveles (test: sin CP huérfanos y toda estructura con binding ofrece
+> producción); se elimina `proto` del esquema (`schemas/cross_skill.py`) y de los
+> tipos frontend; `/api/cross-skill` valida `a1..c2` (400
+> `cross_skill.level_unknown`). **UI**: `CrossSkillMatrix` en el panel Grammar de
+> cualquier nivel, copia generalizada y clave `crossSkill.protoNote` retirada de
+> i18n. Tests: **pytest 1293**, **vitest 382**, Playwright desktop verde
+> (grammarRoutesReview mockea `/api/cross-skill`).
+>
+> **Nota (2026-09-05):** posición vigente **v3.13.0** — **Calibración de
+> evidencia pedagógica** (backend `3.12.0 → 3.13.0`). La iteración recalibra el
+> modelo pedagógico sin añadir actividades: `docs/CONSTITUCION-PEDAGOGICA.md`
+> pasa a ser el documento normativo único con **Reglas inmutables R1–R7**, §6.4
+> **evidence depth** (LOW/MEDIUM/HIGH contra `cefr_matrix.json`) y §7 por
+> modalidades. **P0 (motor)**: nuevo `backend/services/evidence_depth.py`
+> (expuesto en `/api/profile`), claims honestos —`stats` por nivel con
+> `bank_size` + `evidence_depth`; bancos cortos (Grammar B2/C2 ≤12 checks)
+> muestran "practice coverage · evidence depth LOW" y nunca invitan a competencia
+> fuerte—, suelo de "demostrado" = gate funcional + mínimo de muestras +
+> retención ≥7d + **producción** en destrezas productivas (solo MC no demuestra;
+> vocabulary techado en `functional`), `current_level` redefinido como sugerencia
+> de material con fallback `review_due`, e invariantes pedagógicas en
+> `test_pedagogical_invariants.py`. **P1 (producción/cross-skill)**: ítems
+> `controlled_production` de grammar en el currículo (typed answers
+> deterministas, A2–C1) sobre el motor compartido de rutas; cross-skill evidence
+> B1 (registro de estructuras, `/api/cross-skill`, panel `CrossSkillMatrix`);
+> golden pedagogical dataset (`tests/golden/pedagogy/`). **P2 (UI)**: shell
+> compartido `frontend/src/features/routes/QuizRoutePage.tsx` + máquina de sesión
+> consolidada `routeSession.ts`; migradas Grammar, Vocabulary, Pronunciation,
+> Conversation y Speaking (~1.600 líneas eliminadas; Listening no migra: es la
+> única práctica servida dentro del runner `PracticeView` del workspace);
+> parity i18n automática (`i18n.parity.test.ts`). Tests en verde: **pytest 1290**,
+> **vitest 382**, Playwright desktop con las 5 review specs de rutas.
+>
+> **Nota (2026-09-05):** posición vigente **v3.12.0** — **Grammar por rutas CEFR
+> (página única de checks MC del currículo)**. APRENDER → Grammar deja el chat
+> del tutor (que sigue en `/chat`) y pasa a página única como el resto: arriba
+> el escenario de práctica —un check MC de grammar del currículo del nivel
+> recomendado, con feedback inmediato y la respuesta correcta revelada al
+> fallar— y debajo el mapa de rutas A1–C2 con anillos y el panel del nivel
+> (Practicar el nivel / Repetir fallidas / Repasar aprendidas + bloque
+> «Demostrar el nivel» que abre los instrumentos formales del curso: exámenes y
+> escalera de evaluaciones). El banco **no se inventa**: reutiliza los checks MC
+> de la destreza grammar del currículo oficial
+> (`backend/curriculum/a1.json`…`c2.json`, 97 checks; B2 = 8 y C2 = 4 como
+> bancos cortos con puerta adaptada) sobre el **motor compartido**
+> `backend/services/quiz_routes.py`. Intento determinista
+> `domain/grammar_routes.py::submit_attempt`, persistido en
+> `grammar_route_attempts` (repo `repositories/grammar_routes.py`); endpoints
+> `/api/grammar/routes/stats|question|items` y `POST /attempt`. Frontend:
+> página única `GrammarRoutesPractice` + `GrammarLevelPanel` + `grammarSession`
+> en `/#/aprender/gramatica` (Workspace: rama propia, fuera de PracticeView).
+> Ruta = práctica (`functional`, nunca certifica); demostrar exige exámenes +
+> evaluaciones formales del curso. Con Grammar, las 6 actividades de APRENDER
+> comparten la misma página única de rutas CEFR.
+>
+> **Nota (2026-09-05):** posición vigente **v3.11.0** — **Vocabulary por rutas
+> CEFR (página única de checks MC del currículo)**. APRENDER → Vocabulary deja de
+> ser solo el diccionario personal y pasa a página única como el resto: arriba
+> el escenario de práctica —un check MC de vocabulary del currículo del nivel
+> recomendado, con feedback inmediato y la respuesta correcta revelada al
+> fallar— y debajo el mapa de rutas A1–C2 con anillos y el panel del nivel
+> (Practicar el nivel / Repetir fallidas / Repasar aprendidas + bloque
+> «Demostrar el nivel» que abre los instrumentos formales del curso: exámenes y
+> escalera de evaluaciones). El banco **no se inventa**: cada nivel reutiliza los
+> checks MC de la destreza vocabulary del currículo oficial
+> (`backend/curriculum/a1.json`…`c2.json`) sobre el **motor compartido de rutas
+> quiz** `backend/services/quiz_routes.py` (cobertura/precisión/checkpoint
+> adaptada a bancos cortos; lo reutilizará Grammar v3.12). Intento determinista
+> `domain/vocabulary_routes.py::submit_attempt` → `services/quiz_routes.py`,
+> persistido en `vocabulary_route_attempts` (repo
+> `repositories/vocabulary_routes.py`); endpoints
+> `/api/vocabulary/routes/stats|question|items` y `POST /attempt`. Frontend:
+> página única `VocabularyRoutesPractice` (con el diccionario personal integrado
+> bajo el botón «Mi diccionario») + `VocabularyLevelPanel` + `vocabularySession`.
+> Ruta = práctica (`functional`, nunca certifica); demostrar exige exámenes +
+> evaluaciones formales del curso. Siguiente: Grammar (v3.12) con la misma
+> filosofía.
+>
+> **Nota (2026-09-04):** posición vigente **v3.10.0** — **Conversation por rutas
+> CEFR (página única de mini-diálogos guiados multi-turno)**. APRENDER →
+> Conversation deja el chat libre (que vive en su propia raíz `/chat` desde esta
+> versión, siempre accesible) y pasa a página única como Speaking: arriba el
+> mini-diálogo guiado con el tutor (contexto, roles, metas comunicativas y línea
+> de apertura; se conversa por texto o micrófono) y debajo el mapa de rutas
+> A1–C2 con anillos y el panel del nivel (Repetir fallidos / Repasar aprendidos
+> + bloque «Demostrar el nivel» → Speaking Assessment). Banco oficial
+> `backend/curriculum/conversation_corpus.json` (v1.0.0: 11 mini-diálogos por
+> nivel). El intento se evalúa sobre el transcripto completo de la conversación
+> (`domain/conversation_routes.py::submit_attempt` →
+> `speaking_llm.extract_speaking_evidence` con task_type conversation + señal
+> objetiva de interacción) y se persiste por diálogo. Ruta = práctica
+> (`functional`, nunca certifica); demostrar exige Speaking Assessment +
+> evidencia + retención. Siguiente: Vocabulary (v3.11) y Grammar (v3.12) con la
+> misma filosofía.
+>
+> **Nota (2026-09-04):** posición vigente **v3.9.0** — **Pronunciation por rutas
+> CEFR (página única read-aloud)**. APRENDER → Pronunciation es ahora una página
+> única como Speaking/Listening: arriba la frase modelo (escucha con TTS local +
+> grabación) y debajo el mapa de rutas A1–C2 con anillos y el panel del nivel
+> (Repetir fallidas / Repasar aprendidas / Practicar o repasar el nivel + bloque
+> «Demostrar el nivel» que abre el Speaking Assessment). Banco oficial
+> `backend/curriculum/pronunciation_corpus.json` (v1.0.0: 20 frases por nivel);
+> intento determinista `domain/pronunciation_routes.py::submit_attempt` →
+> `services/pronunciation.py::score_pronunciation` (Whisper, sin LLM). Ruta =
+> práctica (`functional`, nunca certifica); demostrar exige Speaking Assessment +
+> evidencia + retención. Siguiente: Conversation (v3.10), Vocabulary (v3.11) y
+> Grammar (v3.12) con la misma filosofía.
+>
+> **Nota (2026-09-04):** posición vigente **v3.8.0** — **Speaking por
+> micro-conversaciones guiadas con operativa tipo Listening**. El roadmap y los
+> cambios viven en `PLAN.md`, `CHANGELOG.md` y `README.md`. Para retomar Speaking:
+> APRENDER → Speaking es una página única con scroll (escenario de práctica con
+> tarjetas de intercambio `{setup, you, app_line, model_response}` arriba y mapa
+> de rutas A1–C2 con anillos bajo él); el banco curado es
+> `backend/curriculum/speaking_corpus.json` (v2.0.0, 148 tarjetas) y cada intento
+> se evalúa como respuesta abierta (`domain/speaking_routes.py::submit_attempt`
+> → `speaking_llm.extract_speaking_evidence` + `speaking.scores_from_evidence`),
+> con audio TTS cacheado por tipo (`?kind=opening|model`). La ruta sigue siendo un
+> hito de práctica (`functional`, nunca certifica); demostrar el nivel exige el
+> Speaking Assessment + escenarios/misiones + retención.
+
+## 0. START HERE — para el gerente que retoma ahora
+
+**Posición actual (2026-09-19):** `v3.75.1` **cierre del P0 del sesgo posicional del
+currículum** (release de **PARCHE y de CONTENIDO**, sin capacidad pedagógica nueva
+—ver la nota de cabecera—). **SIN migración de BD, SIN bump de `GENERATOR_VERSION` ni
+`DECISION_POLICY_VERSION`, SIN tocar el banco y SIN tocar las evaluaciones
+(`assessments.json`), pero SÍ toca el currículum (`CURRICULUM_VERSION` 1.3.0 →
+1.3.1).** Cierra el **único P0** que quedaba abierto del motor pedagógico: **329 de
+368 checks (89,4 %) tenían la correcta en la posición 0** —y **A2, B2, C1 y C2 al
+100 %**—, así que marcar siempre la primera opción acertaba casi 9 de cada 10 sin leer
+el enunciado. El reparto pasa a `0:33,4 % · 1:33,2 % · 2:32,9 % · 3:0,5 %` y el test
+que pinchaba el sesgo pasa a fijar el **invariante** (≤ 35 % por posición, sin
+posiciones muertas). **El código sigue congelado:** los 7 gates siguen en `pending` y
+**V4.0 no se declara** hasta que `status --strict` (y, con el árbol congelado,
+`status --strict --same-tree`) salga 0. Ver la nota de cabecera,
+`release-notes-v3.75.1.md` y `docs/audit/AA-PED-CONTENIDO-CEFR.md`.
+
+> **El ancla de esta release es el tag `v3.75.1`, no un SHA escrito a mano.** Desde
+> V3.73.5, el commit y el objeto del tag se resuelven con `git rev-parse <tag>^{commit}`
+> y `git rev-parse <tag>` y el run con `gh run list --commit <sha>`, porque un commit no
+> puede contener su propio SHA ni el id de la run que dispara su push. El invariante del
+> código se enuncia **entre el tag y `main`**
+> (`git diff --stat v3.75.1..main -- backend frontend launcher scripts` debe salir
+> **vacío**), que es lo que el auditor puede comprobar al ejecutarlo.
+
+### La línea V3.75, en dos releases
+
+- **`v3.75.0` — la identidad la firma el servidor** (release de **PRODUCTO**: cambia el
+  contrato de la API; **SIN** migración de BD, bump de generador/política, banco ni
+  currículum). Fase 2 del P0 de identidad: `POST /api/session` emite `et_session`
+  firmada (HMAC, **solo stdlib**, comparación en tiempo constante) en cookie
+  `HttpOnly`/`SameSite=Lax`, y `?user_id=` **deja de significar nada** (`403` al editar
+  el perfil de otro). Cierra además `VG-N5` (Actions fijadas por SHA, `deps-audit`
+  bloqueante, Dependabot) y `VG-N6` (superficie sin sesión declarada por escrito). Ver
+  `release-notes-v3.75.0.md` y `docs/audit/PLAN-P0-IDENTIDAD.md` §14.
+- **`v3.75.1` — el P0 del sesgo posicional del currículum** (esta release, arriba).
+
+### Lo que está ABIERTO y hay que decidir o ejecutar (leer esto antes de planificar)
+
+**La lista viva, fase por fase, es `docs/audit/PARKED.md`** — su sección `V3.75`
+(identidad) y `V3.75.1` (contenido) es la declaración honesta de lo que esta línea
+**no** cierra; léela antes de buscar «lo que falta». Aquí queda solo lo que gobierna la
+planificación inmediata:
+
+1. **Los 8 gates de validación física siguen `pending`** (8 desde V3.81.2, que añade
+   `G0 · identidad-cuentas`: `without_password == 0` y el E2E de cuentas verde).
+   **V4.0 no se declara** hasta que `status --strict` (y `--strict --same-tree` con el
+   árbol congelado) salga 0. Kit y protocolo: `docs/audit/KIT-VALIDACION-GATES.md`.
+2. **Acción humana, no trabajo del proyecto** (detalle en `PARKED.md`): corte de red
+   real (`RA-05`, protocolo §5 de `docs/audit/RA-RUNTIME-OFFLINE.md`), máquina
+   físicamente limpia (`RB-05`), **matriz de dispositivos** (G, 10/10 en ⬜ →
+   `docs/DEVICE_MATRIX.md`) y **variabilidad LLM de speaking** con Ollama real
+   (`eval_speaking_variability`).
+3. **`AE-04` — divulgación del placement en UI: sin superficie.** No existe pantalla de
+   nivelación; la divulgación vive en el instrumento, con **candado tripwire** que falla
+   en cuanto alguien muestre el resultado sin divulgarlo (fase declarada **→ V4.0.x**).
+4. **`RA-02` — el endpoint de Ollama no está declarado** en `config.py` (se delega en el
+   default de la librería y `OLLAMA_HOST` no se contempla).
+5. **`RC-01` (residuo honesto) — el `dist` no se versiona** ⇒ Node sigue siendo
+   requisito de **instalación/compilación**; «sin Node» solo es cierto una vez
+   compilado, y un **producto empaquetado y distribuible** (y el launcher fuera de
+   Windows) sigue **fuera de alcance**.
+6. **Progreso real de la descarga de voz** (exige rediseñar el endpoint síncrono a
+   streaming): declarado **fuera de alcance**.
+7. **`assessments.json` (exámenes y placement)** conserva su propio sesgo posicional
+   (**63,6 %** de sus 22 ítems en la posición 0) bajo su propio `ASSESSMENT_VERSION`: es
+   **otro instrumento** y su arreglo **no** se ha mezclado con el de V3.75.1. Igual que
+   el **P2 de longitud** (la correcta sigue siendo la opción más larga en el **39,1 %**
+   de los checks y el **50 %** del placement).
+
+**Honestidad:** el certificado es **autofirmado** (el navegador avisa y aceptarlo es un
+paso del usuario; **sin HTTPS no hay micrófono en LAN**); **V3.75.0 no es
+autenticación y la Fase 3 sigue sin decidir** —`POST /api/session` acepta cualquier
+`user_id` **existente** sin credencial, así que en modo LAN cualquiera que alcance la
+API puede **abrir sesión para cualquier perfil**; lo que ya no puede es **forjar** una
+identidad—; y **V3.75.1 elimina el atajo, no mejora los ítems** (mismos distractores y
+mismos enunciados, así que no sube la discriminación del ítem).
+
+### PENDIENTE INMEDIATO
+
+**Auditoría externa de cierre del producto (antes de V4.0).** El punto de entrada
+vigente es `agentes/auditoria-total-externa-v375.md`, que **declara la posición
+`v3.75.0`**: si se lanza contra esta release hay que **re-anclarlo a `v3.75.1`** (la
+lección de V3.73.5 vale también para los puntos de entrada, no solo para el producto).
+**No se ha recibido informe**: el último archivado es `Y` (V3.68) y el prefijo previsto
+para el cierre era `AI`. La reserva de `AG`/`AH` para los puntos de entrada de
+V3.70/V3.71 sigue **sin consumir**.
+
+### Releases cerradas de la línea V3.7x — anclas verificables
+
+Resueltas del repositorio con `git for-each-ref`, **no** copiadas a mano. El detalle de
+cada una vive en su `release-notes-*.md`; el registro release a release, en
+`CHANGELOG.md` y `PLAN.md` (§«Estado actual»).
+
+| Versión | Objeto del tag | Commit | Fecha |
+|---|---|---|---|
+| `v3.75.0` | `6e9e136` | `aa9dbaa` | 2026-09-19 |
+| `v3.74.0` | `267b082` | `f51daf5` | 2026-09-18 |
+| `v3.73.7` | `907397d` | `3bf891a` | 2026-09-18 |
+| `v3.73.6` | `32b4d8e` | `13cc30b` | 2026-09-17 |
+| `v3.73.5` | `c252ee1` | `e10b24d` | 2026-09-17 |
+| `v3.73.4` | `3f2ec88` | `5007c3a` | 2026-09-17 |
+| `v3.73.3` | `7715fc2` | `ae14dbd` | 2026-09-17 |
+| `v3.73.2` | `58a9ec1` | `cdc9dd0` | 2026-09-17 |
+| `v3.73.1` | `b19d0dd` | `59e731d` | 2026-09-17 |
+| `v3.73.0` | `8196ab7` | `859c6c2` | 2026-09-17 |
+| `v3.72.0` | `da6fb6d` | `096dcc4` | 2026-09-17 |
+| `v3.71.0` | `6ac22db` | `2eff6ea` | 2026-09-16 |
+| `v3.70.0` | `219038f` | `9ba9c49` | 2026-09-15 |
+
+Comando para re-verificar la tabla entera:
+
+```powershell
+git for-each-ref --sort=-creatordate --format='%(refname:short) | %(objectname:short) | %(*objectname:short) | %(creatordate:short)' refs/tags
+```
+
+### Histórico anterior a V3.70
+
+**No se duplica aquí.** El registro release a release vive en `CHANGELOG.md` y `PLAN.md`
+(§«Estado actual»), y el detalle por milestone en las **secciones §1–§38 de este mismo
+documento**. Esta sección existe para **retomar** el trabajo, no para archivarlo: si
+necesitas la historia de V1.15–V3.69, esos tres sitios son la fuente.
+
+## 1. Qué es el proyecto
+
+Profesor de inglés **100% local** (sin Internet, sin cuentas, sin costes). Conversa por
+texto y voz con un LLM local (Ollama), con modos de tutor y corrección de pronunciación.
+
+- **Fuente de verdad de reglas:** `docs/PREMISAS.md` (14 premisas). Léelas primero.
+- **Arquitectura:** `docs/ARQUITECTURA.md` (estructura modular y responsabilidades).
+- **Guía de desarrollo:** `docs/DESARROLLO.md` (arranque, flujo con subagentes, Git/GitHub).
+- **Roadmap y estado:** `PLAN.md`.
+
+## 2. Stack (fijado, premisa 3-4)
+
+- Backend: Python + FastAPI + Pydantic (tipado fuerte).
+- Frontend: Vite + React + TypeScript (modo estricto).
+- LLM: Ollama (local). Modelo inicial `qwen3.5:9b`.
+- Voz: `faster-whisper` (STT, CPU) y `piper-tts` (TTS, CPU).
+- Persistencia: SQLite (`backend/data/tutor.db`).
+
+## 3. Estado actual (qué funciona)
+
+Hecho y verificado (tests verdes):
+
+- **M0** esqueleto modular · **M1** streaming (SSE) · **M2** voz local · **M3** memoria/historial.
+- **M4** modo profesor: 4 modos de tutor (`conversation`, `grammar`, `exercises`, `pronunciation`)
+  + corrección de pronunciación (`POST /api/pronunciation`).
+- **M5** modelo conversacional: evaluado `llama3.1:8b` vs `qwen3.5:9b`; se mantiene
+  `qwen3.5:9b` (mejor calidad de tutor). `llama3.1:8b` queda instalado como alternativa.
+- **M6** release a GitHub.
+- **M7** multi-usuario: tabla `users` + columna `user_id` en `conversations` (migración
+  idempotente, usuario por defecto `Usuario`), `GET/POST /api/users`, CRUD de conversaciones
+  filtrado por `user_id`, selector de perfil en frontend con aislamiento al cambiar.
+- **M8** diseño y UX: tokens en `index.css`, tema claro/oscuro (`useTheme`, `ThemeToggle`,
+  anti-FOUC), responsive (drawer + hamburguesa ≤768px), a11y y micro-interacciones.
+- **M9** seguimiento de progreso: `GET /api/progress?user_id=<id>` (`ProgressSummary`:
+  conversaciones, mensajes, ejercicios, correcciones, pronunciación) + `POST /api/pronunciation`
+  con `user_id` opcional para persistir intentos (`pronunciation_attempts` + columna `mode`).
+  Frontend: panel colapsable `ProgressSummary` + `api/progress.ts`.
+- **M10** voz continua / manos libres: modo conversación por voz sin pulsar botones. VAD en
+  cliente (RMS + silencio ≥1.2s vía Web Audio API), bucle escuchar → transcribir → responder →
+  leer en voz alta → volver a escuchar. Frontend: `useChat.sendText`, `utils/vad.ts`,
+  `hooks/useHandsFree.ts`, `components/HandsFreeToggle.tsx`. Sin cambios de backend.
+- Tests: backend `pytest tests/ -q` (27 tests), frontend `npm test` (vitest, 37 tests) + `tsc --noEmit`.
+
+## 4. GitHub
+
+- Repo **público**: https://github.com/jvelasca/english-tutor
+- Rama por defecto: `main`. Última versión estable: tag `v1.5.2` (release publicado).
+- Issues de seguimiento:
+  - #1 M5 modelo conversacional
+  - #2 Seguimiento de progreso del alumno
+  - #3 Conversación por voz continua
+  - #4 M7 multi-usuario
+  - #5 M8 diseño y UX nivel top
+
+## 5. HECHO — M5: modelo conversacional (se mantiene qwen3.5:9b)
+
+**Tarea:** evaluar `llama3.1:8b` como reemplazo de `qwen3.5:9b` para el rol de tutor.
+
+- Script: `backend/scripts/eval_model.py` (`--model <m>` envía 4 prompts de tutor).
+- Briefing: `agentes/m5-modelo-conversacional.md`.
+- **Descarga:** con VPN iba lenta (~400-900 KB/s) y se atascaba cada ~30 min. Al
+  **quitar la VPN** (2026-08-24) la descarga terminó en ~1 min a 52 MB/s y sin error de
+  certificado (el MITM de DigiMobil ya no afectaba a esa conexión). `llama3.1:8b` instalado.
+- **Decisión:** se mantiene **`qwen3.5:9b`** como `DEFAULT_MODEL`. `qwen3.5:9b` gana en
+  calidad como tutor (correcciones estructuradas, ejercicios con contexto, guía IPA de
+  pronunciación detallada y correcta). `llama3.1:8b` es ~6x más rápido (21s vs 125s) pero
+  comete un error de pronunciación (confunde /θ/ con /ð/), así que **no es claramente
+  mejor**. Queda instalado como alternativa selectable en el frontend.
+- **Fix:** `scripts/eval_model.py` ahora fuerza UTF-8 en stdout/stderr (Windows usaba cp1252
+  y fallaba al imprimir emojis/símbolos fonéticos).
+
+## 6. HECHO — M7: multi-usuario
+
+**Implementado y verificado** (backend 20 tests, frontend 14 tests, `tsc` sin errores).
+
+- Backend: `services/store.py` ahora gestiona `users` y `conversations` con `user_id`
+  (migración idempotente; usuario por defecto `Usuario` y reasignación de huérfanas).
+  `routers/users.py` (`GET/POST /api/users`), `routers/conversations.py` filtra por `user_id`
+  (query param). `schemas/users.py` (`User`, `UserCreate`).
+- Frontend: `api/users.ts`, `components/UserSelect.tsx`, `utils/users.ts` (`nextDefaultUserName`),
+  hook `useChat.ts` con estado de usuario y aislamiento al cambiar de perfil.
+- Briefings: `agentes/m7-backend-multiusuario.md`, `agentes/m7-frontend-multiusuario.md`.
+
+## 7. HECHO — M8: diseño y UX nivel top
+
+**Implementado y verificado** (frontend 19 tests, `tsc` sin errores, `npm run build` OK).
+
+- Tokens de diseño en `index.css` (`--color-*`, `--font-*`, `--text-*`, `--space-*`,
+  `--radius-*`, `--shadow-*`, motion), tema claro en `:root[data-theme="light"]`.
+- Tema claro/oscuro: `hooks/useTheme.ts` + `utils/theme.ts` (`resolveInitialTheme`) +
+  `components/ThemeToggle.tsx`; persistencia en `localStorage` y anti-FOUC en `index.html`.
+- Responsive ≤768px: sidebar drawer + hamburguesa + backdrop. a11y: `:focus-visible`,
+  `aria-*`, `prefers-reduced-motion`.
+- Briefing: `agentes/m8-diseno-ux.md`.
+
+## 7b. HECHO — M9: seguimiento de progreso del alumno
+
+**Implementado y verificado** (backend 27 tests, frontend 26 tests, `tsc` sin errores,
+`npm run build` OK).
+
+- Backend: `schemas/progress.py` (`PronunciationStats`, `ProgressSummary`),
+  `routers/progress.py` (`GET /api/progress?user_id=<id>` con 404 si no existe el usuario),
+  `services/store.py` (tabla `pronunciation_attempts`, columna `mode` en `messages` con
+  migración idempotente, `record_pronunciation`, `get_progress`), `routers/pronunciation.py`
+  (`user_id: str = Form(None)` persistente), `ChatMessage.mode: str | None = None`.
+- Frontend: `api/progress.ts`, `components/ProgressSummary.tsx` (panel colapsable con 4
+  stats + sección de pronunciación y estados vacíos), `utils/progress.ts`
+  (`formatScore`/`formatAverage`/`pronunciationLevelLabel`, tolerantes a `null`),
+  `types/api.ts` (`PronunciationStats`/`ProgressSummary` con campos anulables),
+  `hooks/useChat.ts` (estado `progress` + `refreshProgress`, `mode` adjuntado a los mensajes),
+  `PronunciationPractice.tsx` (pasa `user_id` y refresca), `App.tsx` (renderiza el panel).
+- Nota de tipado: los campos `best`/`average`/`last_score`/`last_level` son `null` si no hay
+  intentos (reflejado en frontend como anulables).
+- Briefings: `agentes/m9-backend-progreso.md`, `agentes/m9-frontend-progreso.md`.
+
+## 7c. HECHO — M10: conversación por voz continua (manos libres)
+
+**Implementado y verificado** (frontend 37 tests, `tsc` sin errores, `npm run build` OK;
+backend intacto, `import main` OK).
+
+- **Sin cambios de backend:** reutiliza `POST /api/transcribe`, `POST /api/tts` y
+  `POST /api/chat/stream` ya existentes.
+- Frontend: `hooks/useChat.ts` extrae y exporta `sendText(text): Promise<string>` (el `send`
+  actual se apoya en él). `utils/vad.ts` (`rms`, `shouldEndUtterance`, constantes
+  `SILENCE_THRESHOLD=0.02`, `SILENCE_MS=1200`, `MIN_SPEECH_MS=300`, `MAX_CHUNK_MS=15000`).
+  `hooks/useHandsFree.ts` (un `MediaStream` persistente, `AnalyserNode` para energía,
+  `MediaRecorder` por chunk; estados `idle/listening/transcribing/thinking/speaking`).
+  `components/HandsFreeToggle.tsx` (toggle accesible + indicador de estado con `role="status"`).
+  `App.tsx` lo conecta en `header-controls`. Estilos en `index.css` (tokens, tema claro/oscuro).
+- **VAD:** muestreo cada 50 ms con `getByteTimeDomainData`; si `rms > 0.02` marca habla; al
+  llegar silencio ≥1.2 s tras habla (y duración ≥0.3 s para descartar clics) cierra el chunk;
+  tope de seguridad 15 s. Sin barge-in (fuera de alcance en esta iteración).
+- **Limitaciones conocidas:** autoplay (el `AudioContext`/mic se lanzan dentro del clic),
+  umbral fijo (podría calibrarse), sin interrupción de la voz del asistente.
+- Briefing: `agentes/m10-voz-continua.md`.
+
+## 8. Notas de diseño de M7 (para no romper en M8)
+
+- Contrato de la API (no cambiar sin coordinar frontend):
+  - `GET /api/users` → `User[]`; `POST /api/users` con `{ name }` → `User`.
+  - `GET /api/conversations?user_id=<id>` y `POST /api/conversations?user_id=<id>`.
+  - `ConversationMeta` incluye `user_id`.
+- El usuario por defecto se llama `Usuario`; el frontend genera nombres sin colisión con
+  `nextDefaultUserName` (`Usuario`, `Usuario 2`, ...).
+
+## 8. Cómo arrancar y verificar desde cero
+
+```powershell
+# Backend
+cd backend
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m pytest tests/ -q
+
+# Frontend
+cd frontend
+npm install
+npm test            # vitest
+npx tsc --noEmit    # tipos
+
+# Arranque integrado: F5 en Cursor (configuración "English Tutor (F5)")
+#   backend :8000 + frontend :5173
+```
+
+## 9. Reglas de oro para continuar (premisas clave)
+
+- **Todo se descompone en subagentes autocontenidos** en `agentes/<nombre>.md` (premisa 5).
+- **Antes de alucinar, reiniciar el contexto** apoyándose en `docs/` (premisa 12).
+- **Documentación VITAL:** todo cambio actualiza `docs/`, `PLAN.md`, `README.md` (premisa 8).
+- **Tests obligatorios:** ninguna feature se da por acabada sin sus tests (premisa 12).
+- **Ritmo:** hito a hito, un cambio a la vez (premisa 6).
+
+## 10. Fase de endurecimiento (FASES 1, 2 Y 3 CERRADAS — post v1.0.0)
+
+**Motivo:** auditoría interna + externa. La app es un MVP/RC arquitectónico; NO rehacer, pero
+sí endurecer antes de seguir con features. Hallazgo crítico: **el aislamiento multiusuario
+(M7) no está realmente garantizado** — el CRUD de conversaciones por `cid` no comprueba el
+propietario, y `/api/pronunciation` no valida el usuario. M7 no debe considerarse "terminado".
+
+- Plan completo y secuencia de subagentes: `docs/PLAN-ENDURECIMIENTO.md`.
+- Prioridades: P0 aislamiento · P1 robustez · P2 Learning Profile · P3 pronunciación real.
+- Briefings en `agentes/endurecimiento/` (uno por subagente, autocontenidos).
+
+### Estado de subagentes (FASE 1 · P0) — COMPLETA ✔
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| E1.1 Store ownership + routers | `agentes/endurecimiento/e1-01-store-ownership.md` | ✔ hecho |
+| E1.2 Frontend propagar user_id | `agentes/endurecimiento/e1-02-frontend-userid.md` | ✔ hecho |
+| E1.3 LocalUserContext + tests seguridad API | `agentes/endurecimiento/e1-03-context-security-tests.md` | ✔ hecho |
+| E1.4 Contratos y límites | `agentes/endurecimiento/e1-04-contratos-limites.md` | ✔ hecho |
+| E1.5 Límites de audio + sanitización de errores | `agentes/endurecimiento/e1-05-audio-errores.md` | ✔ hecho |
+
+> **Fase 1 (P0) cerrada.** Aislamiento multiusuario extremo a extremo, `system` fuera del
+> input externo, límites de payload (chat/messages/TTS/audio) y sanitización de errores.
+> **Fase 2 (P1) cerrada** (store no bloqueante, health real, chat integrable, CI + deps + CORS).
+> **Fase 3 (persistencia y dominio) cerrada** (mensajes append-only, capa de dominio, FKs reales).
+> **Fase 4 (Learning Profile) cerrada** (ver sección 11).
+> **Fase 5 (Tutor Policy + Context Builder) cerrada** (ver sección 12).
+> Siguiente bloque: **FASE 6 (Progreso pedagógico real)** — ver
+> `docs/PLAN-ENDURECIMIENTO.md`.
+
+### HECHO — E1.1: aislamiento real en store y routers
+
+- `services/store.py`: `get_conversation(cid, user_id)`, `save_conversation(cid, user_id, …)`,
+  `delete_conversation(cid, user_id)` con `AND user_id = ?`; `record_pronunciation(...) -> bool`
+  (valida usuario); índices `idx_conversations_user_id` y `idx_pronunciation_user_id`.
+- `routers/conversations.py` y `routers/pronunciation.py`: exigen/validan `user_id`.
+- Tests: `test_store_isolation.py` (5 tests nuevos); total backend **32 tests verdes**.
+- **ATENCIÓN:** el contrato de la API cambió (GET/PUT/DELETE y pronunciación ahora exigen
+  `user_id`). El frontend queda temporalmente roto para cargar/guardar/borrar conversaciones
+  hasta cerrar E1.2 (siguiente subagente).
+
+### HECHO — E1.2: frontend propaga user_id (cierra el par de contrato)
+
+- `api/conversations.ts`: `getConversation(id, userId)`, `saveConversation(id, userId, …)`,
+  `deleteConversation(id, userId)` con `user_id` en la query vía `URLSearchParams`.
+- `api/pronunciation.ts`: `checkPronunciation(blob, expected, userId)` con `userId` obligatorio.
+- `hooks/useChat.ts`: `loadConversation`/`removeConversation`/`persist` pasan `currentUserId`
+  con guard `if (!currentUserId) return;` y deps actualizadas.
+- `components/PronunciationPractice.tsx`: guard `!userId` + `disabled={processing || !userId}`.
+- Test nuevo `api/conversations.test.ts` (3 tests, mock de fetch). Frontend: **40 tests verdes**,
+  `tsc` sin errores, `npm run build` OK.
+- **Contrato cerrado:** la app queda funcional de nuevo y con aislamiento extremo a extremo
+  (backend exige `user_id`, frontend lo envía).
+
+### HECHO — E1.3: LocalUserContext + tests canónicos de seguridad API
+
+- `dependencies.py`: dependencia `current_user(user_id: str = Query(...))` que resuelve y
+  valida el perfil activo (`store.get_user`), `404` si no existe.
+- `routers/conversations.py` y `routers/progress.py`: `get_one`/`save`/`delete`/`progress`
+  usan `Depends(current_user)` (DRY) en lugar de recibir `user_id` crudo.
+- Tests: `tests/test_api_security.py` (aislamiento por API: no leer/actualizar/borrar la
+  conversación de otro usuario, pronunciación con usuario desconocido → 404). Total backend
+  **38 tests verdes**.
+
+### HECHO — E1.4: contratos (quitar `system`) y límites de payload
+
+- `schemas/chat.py`: `Role = Literal["user", "assistant"]` (fuera `system`); `content`
+  con `max_length=MAX_CONTENT_CHARS`; `messages` con `max_length=MAX_CHAT_MESSAGES`.
+- `schemas/voz.py`: `TTSRequest.text` con `max_length=MAX_TTS_CHARS`.
+- `config.py`: constantes `MAX_CHAT_MESSAGES=100`, `MAX_CONTENT_CHARS=8000`, `MAX_TTS_CHARS=4000`.
+- Tests: `tests/test_schemas.py` (rechaza `system`, rechaza content/messages/TTS fuera de
+  límite). Total backend **43 tests verdes**.
+
+### HECHO — E1.5: límites de subida de audio + sanitización de errores
+
+- `config.py`: `MAX_AUDIO_BYTES = 25 * 1024 * 1024` (25 MB).
+- `dependencies.py`: `read_audio_limited(file) -> bytes` (415 si el content-type no es audio,
+  413 si excede `MAX_AUDIO_BYTES`, lectura por chunks de 1 MB).
+- `routers/voz.py`: `/api/transcribe` usa `read_audio_limited`; errores de transcribir/TTS
+  sanitizados (`logger.exception` + `500` genérico).
+- `routers/pronunciation.py`: usa `read_audio_limited`; error de transcripción sanitizado.
+- `routers/chat.py`: `/api/chat` → `502` "No se pudo completar la respuesta"; `/api/chat/stream`
+  emite `{"error": "..."}` sin filtrar `exc`.
+- `routers/models.py`: `/api/models` → `502` "No se pudo contactar con Ollama".
+- Tests: `tests/test_robustness.py` (413, 415, models/chat no filtran `exc`). Total backend
+  **47 tests verdes**.
+
+### Estado de subagentes (FASE 2 · P1) — COMPLETA ✔
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| E2.1 Store no bloqueante (threadpool) | `agentes/endurecimiento/e2-01-store-no-bloqueante.md` | ✔ hecho |
+| E2.2 Health real (live/ready/dependencies) | `agentes/endurecimiento/e2-02-health-real.md` | ✔ hecho |
+| E2.3 Chat integrable + tests Ollama mockeado | `agentes/endurecimiento/e2-03-chat-integrable.md` | ✔ hecho |
+| E2.4 CI + deps + CORS | `agentes/endurecimiento/e2-04-ci-deps-cors.md` | ✔ hecho |
+
+### HECHO — E2.4: CI + dependencias reproducibles + CORS
+
+- CORS: `config.py` `ALLOWED_ORIGINS` (solo `localhost:5173`/`127.0.0.1:5173`); `main.py` la usa
+  (antes `["*"]`). Test `tests/test_cors.py` (3 tests).
+- Deps: `requirements.in` (intención) + `requirements.txt` y `requirements-dev.txt` pineados
+  (versiones exactas verificadas) + `ruff` en dev.
+- Ruff determinista: `pyproject.toml` (`select E,F,W,I,B`, `ignore B008`, `line-length 88`).
+  Se arreglaron issues preexistentes (F401/I001/E501/B904) con cambios mecánicos sin alterar
+  comportamiento (reenvuelto de líneas y `raise ... from None`).
+- CI: `.github/workflows/ci.yml` (backend: ruff + pytest; frontend: tsc + vitest + build).
+- Total backend **62 tests verdes**; frontend **40 tests** + tsc + build OK; `ruff` limpio.
+
+### HECHO — E2.3: chat integrable (DI del cliente Ollama) + tests
+
+- `services/llm.py`: cliente Ollama inyectable (`_client`, `get_client()`, `set_client()`);
+  `chat_once`, `chat_stream`, `list_models`, `ping` usan `get_client()` en vez de instanciar
+  `ollama.AsyncClient()`. Firmas y comportamiento público sin cambios.
+- Tests: `tests/test_chat_integration.py` (7 tests con `FakeOllamaClient`): system prompt +
+  modo correcto, fallback a conversación con modo desconocido, stream OK, role inválido 422,
+  mensajes vacíos 422, Ollama caído 502 sin fuga, error en stream → evento `error` sin fuga.
+  Total backend **59 tests verdes**.
+
+### HECHO — E2.2: health real (live / ready / dependencies)
+
+- `services/store.py` (`ping()`), `services/llm.py` (`ping()` async), `services/stt.py`
+  (`is_ready()`), `services/tts.py` (`is_ready()`): checks de cada dependencia.
+- `routers/health.py` (nuevo): `/api/health` (compat), `/api/health/live`,
+  `/api/health/dependencies` (estado por dependencia), `/api/health/ready` (200/503).
+- `routers/models.py`: eliminado el `/api/health` estático. `main.py`: registra `health_router`.
+- Tests: `tests/test_health.py` +4 (live, dependencies ok, ready 200, ready 503 con Ollama
+  caído, todo con monkeypatch). Total backend **52 tests verdes**.
+
+### HECHO — E2.1: store no bloqueante (threadpool)
+
+- `services/store_async.py` (nuevo): 11 envolturas `async` que delegan en `store` vía
+  `starlette.concurrency.run_in_threadpool` (referencias resueltas en runtime → compatible con
+  `monkeypatch`). `store.py` síncrono queda **intacto**.
+- `dependencies.py`: `current_user` pasa a corrutina (`await store_async.get_user`).
+- `routers/users.py`, `conversations.py`, `progress.py`, `pronunciation.py`: usan `store_async`
+  (`await`). Firmas y contratos (200/404) sin cambios; `create`/`list_all` conservan `user_id: str`.
+- Tests: `tests/test_store_async.py` (delega igual que el store síncrono). Total backend
+  **48 tests verdes**.
+
+**Línea base (pre-fase):** backend `27 tests` verdes, `import main` OK. Entorno de este
+workspace: Python 3.13.7 (global), dependencias de runtime ya instaladas
+(`ollama`, `faster-whisper`, `piper-tts`, `python-multipart`).
+
+### Estado de subagentes (FASE 3 · persistencia y dominio) — COMPLETA ✔
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| E3.1 Mensajes append-only (backend) | `agentes/endurecimiento/e3-01-mensajes-append-only.md` | ✔ hecho |
+| E3.2 Mensajes con id (frontend) | `agentes/endurecimiento/e3-02-mensajes-id-frontend.md` | ✔ hecho |
+| E3.3 Capa de dominio (Service → Repository) | `agentes/endurecimiento/e3-03-capa-dominio.md` | ✔ hecho |
+| E3.4 FK reales | `agentes/endurecimiento/e3-04-fk-reales.md` | ✔ hecho |
+
+### HECHO — E3.1: mensajes append-only (backend)
+
+- `schemas/chat.py`: `ChatMessage.id: str | None = None` (opcional, no rompe `/api/chat`).
+- `repositories/db.py` (antes `services/store.py`): columna `message_id` + índice único
+  `(conversation_id, message_id)`; `get_conversation` devuelve `id` (= `message_id`);
+  `save_conversation` append-only (`INSERT OR IGNORE`) cuando todos los mensajes traen `id`,
+  y fallback legacy (replace-all) si no.
+- Test `tests/test_store_append_only.py` (3 tests). Total backend **65 tests verdes**.
+
+### HECHO — E3.2: mensajes con id estable (frontend)
+
+- `types/api.ts`: `Message.id?: string`.
+- `hooks/useChat.ts`: `id` (`crypto.randomUUID()`) en mensaje de usuario y en el de asistente
+  (un único `assistantId` por envío, reutilizado en `onDelta` y `persist`); las ramas de error
+  usan su propio id. `App.tsx`: `key={m.id ?? ...}`.
+- Frontend: **40 tests verdes**, `npm run build` OK. El backend ya recibe todos los mensajes
+  con `id` → persistencia append-only activa.
+
+### HECHO — E3.3: capa de dominio (Router → Service → Repository)
+
+- **Refactor puro, sin cambio de comportamiento** (65 tests verdes).
+- Nuevo `repositories/` (acceso a datos puro): `db.py` (conexión/esquema/migraciones/ping),
+  `users.py`, `conversations.py`, `pronunciation.py`.
+- Nuevo `domain/` (servicios async vía `run_in_threadpool`): `users.py`, `conversations.py`,
+  `pronunciation.py`.
+- Recableados `routers/{users,conversations,progress,pronunciation,health}.py`, `dependencies.py`
+  y `main.py` para depender de `domain/` y `repositories.db`.
+- Eliminados `services/store.py` y `services/store_async.py` (sustituidos).
+- Tests re-apuntados (cambio mecánico de imports); `test_store_async.py` → `test_domain_async.py`.
+
+### HECHO — E3.4: FKs reales (user_id → users.id)
+
+- `repositories/db.py`: `_conn(foreign_keys=True)`; en `init_db` se añade una **fase 2** que
+  reconstruye `conversations` y `pronunciation_attempts` (idempotente, con `foreign_keys OFF`)
+  para añadir `FOREIGN KEY user_id → users(id)`. Sentencias `CREATE TABLE IF NOT EXISTS`
+  intactas.
+- Test `tests/test_foreign_keys.py` (6 tests: presencia de FK, enforcement con `IntegrityError`,
+  idempotencia, migración desde esquema legacy). Total backend **71 tests verdes**.
+
+**Estado global al cierre de Fase 3:** backend `71 tests` + `ruff` limpio + `import main` OK;
+frontend `40 tests` + `tsc`/`build` OK. Arquitectura ahora `Router → Service (domain) →
+Repository (repositories) → SQLite`, con mensajes append-only y FKs reales. Siguiente bloque:
+**FASE 4 — Learning Profile** (CEFR, gramática, vocabulario, errores recurrentes, eventos).
+
+## 11. FASE 4 — Learning Profile (CERRADA ✔)
+
+Backend primero (F4.1–F4.4), frontend al final (F4.5). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F4.1 Eventos de aprendizaje | `agentes/endurecimiento/f4-01-eventos-aprendizaje.md` | ✔ hecho |
+| F4.2 Vocabulario | `agentes/endurecimiento/f4-02-vocabulario.md` | ✔ hecho |
+| F4.3 Errores gramaticales recurrentes | `agentes/endurecimiento/f4-03-gramatica.md` | ✔ hecho |
+| F4.4 CEFR + recomendaciones | `agentes/endurecimiento/f4-04-cefr-perfil.md` | ✔ hecho |
+| F4.5 Frontend Learning Profile | `agentes/endurecimiento/f4-05-frontend-perfil.md` | ✔ hecho |
+
+### HECHO — F4.1: eventos de aprendizaje
+- `schemas/learning.py` (`LearningEventType`, `LearningEvent`, `LearningEventCreate`),
+  `repositories/learning.py` (`record_event`, `list_events`), `domain/learning.py`,
+  `routers/learning.py` (`POST/GET /api/learning/events`).
+- `repositories/db.py`: tabla `learning_events` con FK inline + índice. Total backend **79 tests**.
+
+### HECHO — F4.2: vocabulario
+- `services/vocabulary.py` (`EN_STOPWORDS`, `extract_words` puro), `repositories/vocabulary.py`
+  (`record_words` upsert, `get_vocabulary`), `domain/vocabulary.py`, `schemas/vocabulary.py`,
+  `routers/vocabulary.py` (`POST /api/vocabulary/analyze`, `GET /api/vocabulary`).
+- `repositories/db.py`: tabla `vocabulary` (`UNIQUE(user_id, word)` + FK). Total **89 tests**.
+
+### HECHO — F4.3: errores gramaticales recurrentes
+- `services/grammar.py` (7 reglas regex deterministas + `find_errors`), `repositories/grammar.py`
+  (`record_errors` upsert, `get_recurring_errors`), `domain/grammar.py`, `schemas/grammar.py`,
+  `routers/grammar.py` (`POST /api/grammar/analyze`, `GET /api/grammar/errors`).
+- `repositories/db.py`: tabla `grammar_errors` (`UNIQUE(user_id, rule)` + FK). Total **102 tests**.
+
+### HECHO — F4.4: CEFR + recomendaciones
+- `services/cefr.py` (`CEFR_LEVELS`, `estimate_cefr`, `recommendations` puras),
+  `repositories/profile.py` (`get_profile`, `set_cefr`), `domain/profile.py` (compone
+  vocabulario + errores + pronunciación + CEFR), `schemas/profile.py`, `routers/profile.py`
+  (`GET /api/profile`).
+- `repositories/db.py`: tabla `learning_profile` (PK `user_id` + FK). Total **114 tests**.
+- Nota: se simplificó el plan (`GET /api/profile` recalcula la estimación en cada consulta;
+  no se creó `POST /api/profile/assess` por ser redundante).
+
+### HECHO — F4.5: frontend Learning Profile
+- `types/api.ts` (`CefrLevel`, `GrammarRecurringError`, `LearningProfile`),
+  `api/learning.ts` (`getProfile`, `analyzeText`), `utils/cefr.ts` (`cefrTone`, `cefrLabel`),
+  `components/LearningProfile.tsx` (badge CEFR + vocabulario + errores + recomendaciones).
+- `hooks/useChat.ts`: estado `profile` + `refreshProfile` (aislamiento al cambiar de usuario) y
+  `analyzeText(trimmed, currentUserId)` tras cada envío del alumno. `App.tsx` renderiza el panel.
+- `index.css`: sección `.learning-profile` con tokens + responsive. Total frontend **48 tests**.
+
+**Estado global al cierre de Fase 4:** backend `114 tests` + `ruff` limpio + `import main` OK;
+frontend `48 tests` + `tsc`/`build` OK. La tabla `learning_events` queda lista pero aún sin
+consumidor de UI (se cableará en Fase 5/6). Siguiente bloque: **FASE 5 — Tutor Policy +
+Context Builder** (el perfil del alumno entra al prompt del tutor).
+
+## 12. FASE 5 — Tutor Policy + Context Builder (CERRADA ✔)
+
+Backend primero (F5.1–F5.2), frontend al final (F5.3). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F5.1 Tutor Policy (correctness policy) | `agentes/endurecimiento/f5-01-politica-correccion.md` | ✔ hecho |
+| F5.2 Context Builder + perfil al prompt | `agentes/endurecimiento/f5-02-context-builder.md` | ✔ hecho |
+| F5.3 Frontend propagar user_id al chat | `agentes/endurecimiento/f5-03-frontend-user-id.md` | ✔ hecho |
+
+### HECHO — F5.1: política de corrección (correctness policy)
+- `services/policy.py` (`CORRECTNESS_GUIDANCE` por nivel CEFR + `correctness_guidance(cefr_level)`,
+  pura y determinista, sin LLM). Tests `test_policy.py` (4). Total backend **118 tests**.
+
+### HECHO — F5.2: Context Builder + perfil al prompt
+- `services/context.py` (`build_system_prompt(mode, profile)`: prompt base + política por CEFR +
+  errores recurrentes + áreas de enfoque).
+- `schemas/chat.py`: `ChatRequest.user_id: str | None = None` (opcional → sin ventana rota).
+- `services/llm.py`: `_messages`/`chat_once`/`chat_stream` aceptan `system_prompt` inyectable.
+- `domain/profile.py`: extrae `_compute_profile` y añade `get_profile_context` (lectura sin
+  persistir CEFR; `get_profile_summary` intacto y con mismo comportamiento).
+- `routers/chat.py`: `_system_prompt(req)` resuelve el perfil vía `get_profile_context` y pasa el
+  prompt a `chat_once`/`chat_stream`. Sin `user_id` (o usuario inexistente) → prompt base.
+- Tests `test_context.py` (6) + `test_chat_profile.py` (4). Total backend **128 tests**.
+
+### HECHO — F5.3: frontend propaga user_id al chat
+- `api/chat.ts`: `sendChat`/`streamChat` envían `user_id` (`null` si no hay usuario).
+- `hooks/useChat.ts`: `sendText` pasa `currentUserId` a `streamChat`.
+- Test `api/chat.test.ts` (3). Total frontend **51 tests**.
+
+**Estado global al cierre de Fase 5:** backend `128 tests` + `ruff` limpio + `import main` OK;
+frontend `51 tests` + `tsc`/`build` OK. El perfil del alumno (CEFR + errores recurrentes +
+recomendaciones) ya entra al system prompt del tutor; sin `user_id` el chat queda como antes.
+Siguiente bloque: **FASE 6 — Progreso pedagógico real** (no solo counts).
+
+## 13. FASE 6 — Progreso pedagógico real (CERRADA)
+
+Backend primero (F6.1–F6.2), frontend al final (F6.3). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear. Decisiones de diseño: un único endpoint nuevo
+(`GET /api/progress/history`), análisis **determinista sin LLM** (premisa 12), y el frontend
+**reemplaza** `ProgressSummary` por un dashboard de progreso real (responsive móvil/tablet).
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F6.1 Registro automático de eventos | `agentes/endurecimiento/f6-01-registro-eventos.md` | ✔ hecho |
+| F6.2 Progreso histórico (tendencias, racha, dominio, hitos) | `agentes/endurecimiento/f6-02-progreso-historico.md` | ✔ hecho |
+| F6.3 Frontend dashboard de progreso | `agentes/endurecimiento/f6-03-frontend-dashboard.md` | ✔ hecho |
+
+### HECHO — F6.1: registro automático de eventos de aprendizaje
+- `domain/learning.py`: `_MODE_TO_EVENT` (`exercises→exercise`, `grammar→correction`, resto→
+  `message`) + `record_chat_activity(user_id, mode, detail)` async.
+- `routers/chat.py`: `_record_activity(req)` (solo si hay `user_id`; detail = último mensaje
+  truncado a 200) llamada en `chat` y `chat_stream_endpoint` tras `_system_prompt`. Sin `user_id`
+  o usuario inexistente → no registra y el chat sigue con prompt base (sin ventana rota).
+- `routers/pronunciation.py`: registra evento `pronunciation` (detail = `expected`).
+- `routers/conversations.py`: registra evento `conversation` (detail = `conv["id"]`).
+- Tests: `tests/test_activity.py` (8 tests). Total backend **136 tests**.
+- La tabla `learning_events` deja de estar dormida: ahora la alimentan los endpoints reales.
+  La consumirán F6.2 (backend) y F6.3 (UI).
+
+### HECHO — F6.2: progreso histórico real (tendencias, racha, dominio, hitos)
+- Nuevo endpoint `GET /api/progress/history?user_id=<id>&bucket=day|week|month` (default `week`)
+  con `ProgressHistory` = `series` + `streak` + `mastery` + `milestones`. Sin romper
+  `/api/progress` ni `/api/profile`.
+- `schemas/progress.py`: `Bucket`, `SeriesPoint`, `Streak`, `ErrorMastery`, `Milestone`,
+  `ProgressHistory`.
+- `services/trends.py` (puro): `daily_activity`, `active_days`, `aggregate_series` (day/week/
+  month), `compute_streak` (racha actual + mejor).
+- `services/mastery.py` (puro): `classify_errors` (activos vs resueltos por `last_seen`,
+  umbral 14 días) y `compute_milestones` (catálogo de 10 hitos).
+- `repositories/progress.py`: `activity_events` (mensajes con modo + pronunciaciones).
+- `domain/progress.py`: `get_progress_history` compone repo + servicios puros.
+- Tests: `test_trends.py` (7) + `test_mastery.py` (3) + `test_progress_history.py` (5).
+  Total backend **151 tests**.
+
+### HECHO — F6.3: frontend dashboard de progreso real
+- `components/ProgressDashboard.tsx` reemplaza a `ProgressSummary.tsx` (eliminado): racha,
+  gráfico de actividad (por día/semana/mes), dominio de errores (activos/resueltos), hitos y
+  timeline de eventos recientes. **Responsive total**: tablet (`@media 1024px`) + móvil
+  (`@media 768px`), según premisa 14.
+- `api/progress.ts::getProgressHistory`, `api/learning.ts::getEvents`; tipos nuevos en
+  `types/api.ts`; helpers `bucketLabel`/`eventLabel` en `utils/progress.ts`.
+- `useChat` expone `history`/`events`/`bucket` y refresca tras cada envío y pronunciación.
+- Tests: `api/progress.test.ts` (2) + `utils/progress.test.ts` (2) + `api/learning.test.ts` (1).
+  Total frontend **56 tests**.
+
+**Estado al cierre de Fase 6:** backend `151 tests` + `ruff` limpio; frontend `56 tests` +
+`tsc`/`build` OK. El progreso dejó de ser "counts estáticos": ahora hay tendencias temporales,
+racha, dominio de errores (activos vs resueltos) e hitos, deterministas y sin LLM.
+
+## 14. FASE 7 — Pronunciación fonética (CERRADA)
+
+Sustituir el evaluador único (`difflib` a nivel de caracteres) por un **evaluador compuesto
+determinista** (sin LLM): precisión por palabra + similitud fonética (Soundex) + caracteres.
+El breakdown viaja solo en la respuesta (sin migración). Decisiones: Soundex (sí), persistencia
+solo en respuesta (sí).
+
+### HECHO — F7.1: evaluador compuesto (backend)
+- `services/phonetics.py` (puro): `tokenize`, `soundex` (variante simplificada, sin deps),
+  `word_alignment` (correct/missing/extra/substituted + total), `word_accuracy`,
+  `phonetic_similarity` (greedy por Soundex) y `composite_score`
+  (pesos `word 0.6 / phonetic 0.3 / char 0.1`).
+- `services/pronunciation.py::score_pronunciation` delega en `composite_score` y amplía el
+  contrato: `score`, `level`, `ok`, `word_accuracy`, `phonetic_score`, `breakdown`. Umbrales
+  `good ≥80` / `fair ≥50` intactos.
+- `schemas/pronunciation.py`: `WordSubstitution`, `PronunciationBreakdown` y
+  `PronunciationResponse` ampliado. `routers/pronunciation.py` sin cambios.
+- Sin migración de `pronunciation_attempts` (sigue guardando `score`/`level` agregados).
+- Tests: `test_phonetics.py` (12). Total backend **163 tests**.
+
+### PENDIENTE — F7.2: frontend feedback fonético
+`PronunciationPractice.tsx` mostrará el breakdown (palabras correctas/omitidas/sustituidas +
+score fonético) vía `utils/pronunciationFeedback.ts` (puro) y tipos nuevos en `types/api.ts`.
+
+### HECHO — F7.2: frontend feedback fonético
+- `types/api.ts`: `WordSubstitution`, `PronunciationBreakdown` y `PronunciationResponse`
+  ampliado (`word_accuracy`, `phonetic_score`, `breakdown`).
+- `utils/pronunciationFeedback.ts` (puro): `joinWords`, `feedbackHints`, `wordsCorrectLabel`.
+- `PronunciationPractice.tsx`: muestra precisión por palabra, similitud fonética, resumen de
+  aciertos y avisos (omitidas/sustituidas/de más). Responsive con tokens.
+- Tests: `utils/pronunciationFeedback.test.ts` (9). Total frontend **65 tests**.
+
+**Estado al cierre de Fase 7:** backend `163 tests` + `ruff` limpio; frontend `65 tests` +
+`tsc`/`build` OK. La pronunciación pasó de un único `difflib` a un evaluador compuesto
+(precisión por palabra + Soundex + caracteres) con feedback por palabra, determinista y sin LLM.
+
+## 15. FASE 8 — Listening / Speaking / CEFR (CERRADA)
+
+Backend primero (F8.1–F8.3), frontend al final (F8.4). Un commit `feat:` por subagente, cada uno
+verificado en verde antes de commitear. Decisiones: CEFR **multi-señal rico** (bandas por
+destreza + descriptor); fluidez **con duración** (STT expone `info.duration`); **listening**
+incluido ya (banco estático + TTS existente). Todo determinista, sin LLM.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F8.1 CEFR multi-señal (backend) | `agentes/endurecimiento/f8-01-cefr-multisenial.md` | ✔ hecho |
+| F8.2 Fluidez oral (backend) | `agentes/endurecimiento/f8-02-fluidez-oral.md` | ✔ hecho |
+| F8.3 Listening (backend) | `agentes/endurecimiento/f8-03-listening.md` | ✔ hecho |
+| F8.4 Frontend CEFR + fluidez + listening | `agentes/endurecimiento/f8-04-frontend.md` | ✔ hecho |
+
+### HECHO — F8.1: evaluación CEFR multi-señal (backend)
+- `services/cefr.py`: `evaluate_cefr` (punto-sum: vocab + pron + ejercicios + gramática +
+  fluidez) + bandas `vocabulary_band`/`grammar_band`/`fluency_band`/`pronunciation_band` +
+  `_LEVEL_DESCRIPTORS`/`level_descriptor`; `estimate_cefr` delega (compat v1). `recommendations`
+  intacta.
+- `schemas/profile.py`: `CefrBands` + `LearningProfile.cefr_bands`/`cefr_descriptor`.
+- `domain/profile.py::_compute_profile` calcula `grammar_error_rate` + `messages` y usa
+  `evaluate_cefr`.
+- Tests: `test_cefr_evaluation.py` (9). Total backend **172 tests**.
+
+### HECHO — F8.2: fluidez oral con duración (backend)
+- `services/fluency.py` (puro): `compute_fluency` (WPM = palabras/min; `fluent ≥120`,
+  `good 60–119`, `slow <60`, `—` sin audio válido).
+- `services/stt.py`: `transcribe_with_timing` (devuelve `{text, duration}` con `info.duration`);
+  `transcribe` delega (contrato de string intacto para `voz.py`).
+- `schemas/pronunciation.py`: `FluencyStats` + `PronunciationResponse.fluency`.
+- `routers/pronunciation.py`: usa `transcribe_with_timing` + `compute_fluency`.
+- Se actualizaron 2 monkeypatch de tests existentes (`test_activity.py`, `test_api_security.py`)
+  para devolver `{text, duration}`. Tests: `test_fluency.py` (6). Total backend **178 tests**.
+
+### HECHO — F8.3: listening (banco + preguntas, backend)
+- `services/listening.py` (puro): `QUESTION_BANK` (8 preguntas A1–B1, opción múltiple) +
+  `get_question`/`pick_next_question`/`score_answer`.
+- `schemas/listening.py`: `ListeningQuestion`, `ListeningAnswerRequest`, `ListeningAnswerResponse`,
+  `ListeningStats`.
+- `repositories/listening.py`: tabla `listening_attempts` + `record_attempt`/`seen_question_ids`/
+  `get_stats`; `domain/listening.py`: `next_question`/`submit_answer`/`get_stats`.
+- `routers/listening.py`: `GET /api/listening/question`, `POST /api/listening/answer`,
+  `GET /api/listening/stats` (registra evento `exercise`). `db.py` (tabla+índice) y `main.py`
+  (registro router) solo aditivos.
+- Tests: `test_listening.py` (13). Total backend **191 tests**.
+
+### HECHO — F8.4: frontend CEFR + speaking + listening
+- `types/api.ts`: `FluencyStats`, `CefrBands`, `PronunciationResponse.fluency`,
+  `LearningProfile.cefr_bands/cefr_descriptor`, tipos de listening.
+- `utils/cefr.ts` (`bandLabel`), `utils/fluency.ts` (`wpmLabel`, `fluencyLevelLabel`),
+  `api/listening.ts` (3 funciones).
+- `LearningProfile.tsx`: descriptor CEFR + bandas por destreza. `PronunciationPractice.tsx`:
+  línea de fluidez (nivel · WPM). `ListeningPractice.tsx` (nuevo): TTS + opciones + feedback +
+  stats + "Siguiente". `App.tsx` lo monta; `index.css` con estilos responsive.
+- Tests: `utils/fluency.test.ts` (4) + `utils/cefr.test.ts` (+2) + `api/listening.test.ts` (3).
+  Total frontend **74 tests**.
+
+**Estado al cierre de Fase 8:** backend `191 tests` + `ruff` limpio + `import main` OK;
+frontend `74 tests` + `tsc`/`build` OK. CEFR dejó de ser una heurística plana: ahora hay
+evaluación multi-señal con bandas por destreza y descriptor; la pronunciación añade fluidez
+(WPM) con la duración del audio; y hay ejercicios de comprensión auditiva (banco + preguntas)
+reproducidos con el TTS local.
+
+## 16. FASE 9 — Evaluación objetiva del tutor (CERRADA)
+
+Backend primero (F9.1–F9.2), frontend al final (F9.3). Un commit `feat:` por subagente, cada
+uno verificado en verde antes de commitear. Evaluación determinista y sin LLM-juez (premisa 12).
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| F9.1 Evaluador objetivo del tutor (backend) | `agentes/endurecimiento/f9-01-evaluador-tutor.md` | ✔ hecho |
+| F9.2 Informe agregado + script por lotes (backend) | `agentes/endurecimiento/f9-02-informe-agregado.md` | ✔ hecho |
+| F9.3 Panel de calidad del tutor (frontend) | `agentes/endurecimiento/f9-03-panel-calidad-tutor.md` | ✔ hecho |
+
+### HECHO — F9.1: evaluador objetivo del tutor (backend, puro)
+- `services/evaluation.py` (puro, sin LLM-juez): `SPANISH_WORDS`, `FRIENDLY_MARKERS`,
+  `EVAL_CASES` (8 casos canónicos A1–B1), `normalize`, `_words`, `contains_fragment`,
+  `contains_any_fragment`, `spanish_word_ratio`, `english_word_ratio`, `conciseness_score`,
+  `engagement_score`, `evaluate_tutor_reply` (señales `correction`/`english`/`conciseness`/
+  `engagement` + `total` ponderado) y `summarize` (medias por señal).
+- Tests: `test_evaluation.py` (16). Total backend **207 tests**.
+
+### HECHO — F9.2: informe agregado + script por lotes (backend)
+- `services/evaluation.py`: `TUTOR_PROMPTS` + `build_tutor_prompt`, `build_report`
+  (resumen + desglose por caso + `verdict`), `format_report` (texto legible).
+- `scripts/eval_tutor.py` (CLI): `--model` + `--json`; envía `EVAL_CASES` al modelo, puntúa
+  cada respuesta y emite el informe agregado. No persiste nada en BD.
+- Tests: `test_evaluation_report.py` (10). Total backend **217 tests**.
+
+### HECHO — F9.3: panel de calidad del tutor (frontend)
+- `utils/tutorEvaluation.ts` (puro, espejo del evaluador): `normalize`, `words`,
+  `spanishWordRatio`, `englishWordRatio`, `concisenessScore`, `engagementScore`,
+  `evaluateTutorReply`, `averageEvaluations`.
+- `components/TutorQualityPanel.tsx` (presentacional): medias de `Inglés`/`Concisión`/
+  `Engagement`/`Total` + últimos 3 turnos del tutor. Responsive móvil/tablet. `App.tsx` lo
+  monta tras `LearningProfile`; estilos `.tutor-quality` en `index.css`.
+- Tests: `utils/tutorEvaluation.test.ts` (14). Total frontend **88 tests**.
+
+**Estado al cierre de Fase 9:** backend `217 tests` + `ruff` limpio + `import main` OK;
+frontend `88 tests` + `tsc`/`build` OK. El tutor ya se puede evaluar objetivamente (sin
+LLM-juez): por corpus en backend (script por lotes) y en vivo en el frontend (panel de calidad
+sobre la conversación actual).
+
+## 17. FASE 10 — Release 1.0 estable + Launcher de escritorio (CERRADA)
+
+Versión unificada `1.1.0`, gate verde completo y nuevo componente `launcher/`.
+
+| Subagente | Briefing | Estado |
+|---|---|---|
+| A.1 Launcher núcleo puro | `agentes/endurecimiento/a1-launcher-core.md` | ✔ hecho |
+| A.2 Launcher GUI + procesos + atajo | `agentes/endurecimiento/a2-launcher-gui.md` | ✔ hecho |
+
+### HECHO — Launcher de escritorio (`launcher/`)
+- `core.py` (puro): rutas (`REPO_ROOT`, `BACKEND_DIR`, `FRONTEND_DIR`, `DB_PATH`), comandos
+  (`backend_command`, `frontend_command`), URLs y normalización (`app_summary`,
+  `health_status`, `db_summary`, `user_overview`).
+- `process_manager.py`: `ProcessManager` (arranca/para backend `uvicorn` y frontend `npm run
+  dev`; matado del árbol de procesos en Windows con `taskkill /T /F`; logs en `launcher/logs/`).
+- `status.py`: `fetch_health`/`fetch_frontend` (HTTP) y `read_db_counts`/`read_users`
+  (SQLite solo lectura).
+- `launcher.py`: GUI `tkinter` (servicios, BD, usuarios; botones Iniciar/Detener/Abrir/
+  Actualizar; refresco en hilo de fondo). No duplica servicios ya activos al iniciar.
+- `make_icon.ps1` (genera `icon.ico`) y `install_shortcut.ps1` (crea `English Tutor.lnk`
+  en el escritorio).
+- Tests: `test_core.py` (13) + `test_status.py` (7) + `test_process_manager.py` (2) = **22 tests**.
+
+### HECHO — Versión 1.1.0
+- `backend/config.py::VERSION = "1.1.0"`; expuesta en `/api/health` y en `/`; `main.py`
+  (`FastAPI(version=VERSION)`); `frontend/package.json` → `1.1.0`.
+- Tests de versión en `test_health.py` (`test_root` y `test_health`).
+
+**Estado al cierre de Fase 10:** backend `217 tests` + `ruff` limpio; frontend `88 tests` +
+`tsc`/`build` OK; launcher `22 tests` + `ruff` limpio. Versión `1.1.0` unificada y lanzador
+de escritorio con acceso directo e icono.
+
+## 18. M14 — GUI responsive a ancho completo + personalización + acceso en red (HECHO)
+
+Requisito del usuario: que la GUI sea más atractiva y **responsive** (adaptarse a tablets/móvil
+y, en escritorio, **aprovechar todo el ancho** en vez de concentrar el contenido en una columna
+central), con **zonas redimensionables** al gusto, **persistencia por usuario** de todos los
+ajustes (incluido el modelo), aspecto **100% profesional**, **personalización visual del
+perfil** (avatar/imagen/icono/color) y **acceso desde toda la red local** mostrando la URL de
+acceso en la propia web y en el launcher.
+
+### Layout multi-panel responsive y redimensionable
+- `App.tsx`: la zona principal pasa de una columna centrada a un `workspace` flex con tres
+  paneles: `pane--sidebar` (conversaciones), `pane--main` (chat) y `pane--insights`
+  (dashboard de progreso + perfil + calidad del tutor + listening). El ancho se aprovecha al
+  máximo en escritorio.
+- `components/ResizeHandle.tsx`: asa de redimensionado horizontal (pointer events + teclado
+  ←/→, `role="separator"`, `aria-*`) entre paneles.
+- `utils/layout.ts`: `LAYOUT_DEFAULTS`, `clampSidebar`/`clampRight` (mín/máx), `parseLayout`/
+  `serializeLayout`. Tests en `utils/layout.test.ts`.
+- `index.css`: clases `workspace`/`pane`/`pane--*`/`resize-handle`; en ≤1024px los paneles
+  laterales pasan a **drawers superpuestos** (hamburguesa/insights-toggle + backdrop), y en
+  ≤768px se compacta el header. El chat usa `chat-scroll` + `chat-inner` (máx 860px, centrado).
+
+### Persistencia de preferencias por usuario (modelo, modo, layout)
+- Backend: tabla `settings` (clave/valor, PK `user_id+key`, upsert) en `repositories/db.py`;
+  `repositories/settings.py`, `domain/settings.py`, `schemas/settings.py` y
+  `routers/settings.py` (`GET/PUT /api/settings`). El modelo (`qwen3.5:9b` por defecto), el
+  modo y las dimensiones del layout se guardan por usuario y se restauran al reabrir.
+- Frontend: `api/settings.ts` + `hooks/useChat.ts` (`persistSettings`, `selectModel`,
+  `selectMode`, `setLayout` cargan/guardan por `currentUserId`).
+
+### Personalización del perfil (avatar/imagen/icono/color)
+- Backend: columnas `avatar_color`/`avatar_emoji`/`avatar_image` en `users` (migración
+  idempotente), `schemas/users.py` (`UserUpdate`), `repositories/users.py::update_user`,
+  `domain/users.py`, y `PATCH /api/users/{id}` en `routers/users.py`.
+- Frontend: `components/UserAvatar.tsx` (imagen → emoji → iniciales con color determinista),
+  `components/ProfileDialog.tsx` (nombre, icono, color, subir/quitar imagen con
+  `utils/image.ts::resizeImageToDataUrl`), `components/UserMenu.tsx` (selector de perfil,
+  crear/editar). `UserSelect.tsx` eliminado (sustituido por `UserMenu`).
+
+### Acceso en red local (LAN)
+- Backend: `config.py` añade `ALLOWED_ORIGIN_REGEX` (IPs privadas IPv4) y `main.py` la usa en
+  `CORSMiddleware` (`allow_origin_regex`). `services/network.py::get_lan_ip` +
+  `routers/network.py::GET /api/network` (IP + URLs).
+- Launcher: `core.py::backend_command` enlaza uvicorn a `0.0.0.0`; `core.py::lan_ip`/`lan_url`;
+  `launcher.py` añade el recuadro "Acceso a la app" (URL local y LAN).
+- Frontend: `components/NetworkBadge.tsx` muestra la URL LAN y permite copiarla.
+
+### Tests añadidos
+- Backend: `test_settings.py`, `test_user_profile.py`, `test_network.py`, +`test_cors.py`
+  (caso LAN). Total backend **260 tests**.
+- Frontend: `utils/layout.test.ts`, `utils/avatar.test.ts` (más los tests existentes). Total
+  frontend **106 tests**.
+- Launcher: `test_core.py` (+`test_backend_command_binds_lan`, `test_lan_url`). Total **24 tests**.
+
+### Decisión de modelo (respuesta al usuario)
+Se mantiene **`qwen3.5:9b`** como modelo por defecto (mejor calidad como tutor, ver sección 5);
+`llama3.1:8b` queda instalado y seleccionable. La elección ahora es persistente por usuario.
+
+## 19. M15 — Launcher: UI moderna con iconos, paneles colapsables y logs (HECHO)
+
+Requisito del usuario: hacer el programa de arranque de escritorio más atractivo y completo,
+con iconos en la UI y más información en paneles colapsables.
+
+- **`launcher/ui.py`** (nuevo, puro y testeable): `COLORS` (paleta claro con acento índigo),
+  `SERVICE_ICONS`/`SECTION_ICONS`/`ACTION_ICONS` (emoji), `status_dot()` (punto de estado por
+  color) y `read_log_tail()` (últimas N líneas de `logs/*.log`).
+- **`launcher/status.py`**: `fetch_version()` (versión desde `/api/health`) y
+  `read_db_details()` (contadores de tablas opcionales — vocabulario, errores, eventos,
+  pronunciación, listening, preferencias — tolerante a tablas inexistentes vía `sqlite_master`).
+- **`launcher/launcher.py`** (reescrito):
+  - Tema `clam` personalizado (`ttk.Style`) con banner de cabecera (logo "EN" + título +
+    versión + píldora de estado "En marcha/Detenida" con punto de color).
+  - Botones con iconos (Iniciar/Detener/Abrir/Actualizar).
+  - **Paneles colapsables** reutilizables (`class Collapsible`): Servicios, Acceso a la app,
+    Base de datos (con detalle de tablas), Usuarios y Registros (logs de backend/frontend en
+    un `Notebook`, colapsado por defecto).
+  - Contenido desplazable (Canvas + Scrollbar) y footer de estado. Lógica de concurrencia
+    (cola + hilos + `ProcessManager`) intacta.
+- **Tests**: `tests/test_ui.py` (nuevo, 5) + `tests/test_status.py` (+4). Total launcher
+  **33 tests** + `ruff` limpio.
+
+> Nota de arranque en red: el frontend (Vite) ahora escucha en `0.0.0.0` (`vite.config.ts`
+> `host: true`), igual que el backend, para que la app sea accesible desde otros equipos de la
+> LAN (antes solo respondía `localhost` y el puerto 5173 no era alcanzable).
+
+## 20. HECHO (V1.8) — Loop diario: placement adaptativo + objetivo + Session Engine
+
+> **Origen.** Auditoría pedagógica: faltaba un "loop diario" integrado. Este bloque cierra ese
+> hueco cableando a la UI el placement adaptativo ya existente en backend, añadiendo un objetivo
+> personal editable y un **Session Engine** que unifica las señales CEFR y de listening en una
+> sesión diaria priorizada.
+
+### 20.1 Placement adaptativo cableado a la UI
+- `frontend/src/components/Academy.tsx`: el placement pasó de batch (`getPlacement` +
+  `submitPlacement`) a adaptativo (`startAdaptivePlacement` + `nextAdaptivePlacement`), con
+  estado `placementItem`/`placementSessionId`/`placementAnswers`/`placementAnswered`.
+- `frontend/src/api/academy.ts`: `startAdaptivePlacement`, `nextAdaptivePlacement`.
+- `frontend/src/types/api.ts`: `PlacementStart`, `PlacementAdaptive`.
+
+### 20.2 Objetivo personal editable
+- **DB** (`backend/repositories/db.py`): tabla `learning_goal`
+  (`user_id PK, goal_type, minutes_per_day, days_per_week, target_level, updated_at`, FK a users).
+- **Repo** (`backend/repositories/academy.py`): `get_goal`, `upsert_goal`.
+- **Schemas** (`backend/schemas/academy.py`): `LearningGoalIn` (`GoalType` literal, minutos 5–180,
+  días 1–7, `target_level` CEFR), `LearningGoalOut`.
+- **Domain** (`backend/domain/academy.py`): `DEFAULT_GOAL`, `get_learning_goal`, `set_learning_goal`;
+  `get_today_plan` y `get_student_model` usan el objetivo (`minutes_per_day` y `target_level`).
+- **Routers** (`backend/routers/academy.py`): `GET/PUT /api/academy/goal`.
+- **Frontend**: `getGoal`/`putGoal` en `api/academy.ts`; editor de objetivo (tipo, meta CEFR,
+  min/día, días/semana) en `components/TodayPlan.tsx`, con `putGoal` + recarga de modelo/sesión.
+- **Tests**: `backend/tests/test_academy_goal.py` (repo + endpoints); `frontend/src/api/academy.test.ts`.
+
+### 20.3 Session Engine (backend puro)
+- `backend/services/adaptive.py`:
+  - Refactor `_assign_minutes(items, budget, mix=None)` para repartir minutos con un `mix` por
+    categoría (antes pesos fijos).
+  - `SESSION_MIX` = `{review: .30, listening: .15, weakness: .30, new: .15, easy_wins: .10}`.
+  - `SESSION_CAPS` = `{review: 3, listening: 2, weakness: 2, new: 1, easy_wins: 1}`.
+  - `session_plan(profile, level, remediation, mastered_ids, next_objective_id, listening_weak,
+    budget_minutes)`: secuencia priorizada review → listening → debilidad → nuevo → refuerzo,
+    con `level_id` y `skills` en los pasos con objetivo (para arrancar la lección).
+  - `steps_of(steps, kind)` y `session_summary(steps)` → `{review_count, practice_count}`.
+- `backend/schemas/academy.py`: `SessionStepOut` (`kind, skill, subskill, objective_id, level_id,
+  skills, title, reason, minutes`) y `SessionOut` (`items, total_minutes, review_count,
+  practice_count`).
+- `backend/domain/academy.py`: `get_session(user_id)` une el perfil CEFR (`list_objective_mastery`,
+  `mastered_objective_ids`, `remediation_plan`, `recommend_next`) con el diagnóstico de listening
+  (`listening_repo.list_attempts` + `listening_diagnostic`) y llama a `session_plan` con el
+  presupuesto del objetivo.
+- `backend/routers/academy.py`: `GET /api/academy/session`.
+- **Tests**: `backend/tests/test_adaptive.py` (session_plan/session_summary, pasos con
+  level_id/skills) + `test_academy_goal.py` (endpoint session).
+
+### 20.4 Frontend: sesión en "Hoy" + enrutado por paso
+- `frontend/src/types/api.ts`: `SessionStep`, `Session`, `LearningGoal`, `LearningGoalType`.
+- `frontend/src/api/academy.ts`: `getSession`.
+- `frontend/src/components/TodayPlan.tsx`:
+  - Muestra `Session` (no `TodayPlan`): cabecera `total_minutes` + "repasa N · practica M" y
+    lista `SessionStepRow` (botón accionable) con `KIND_LABELS`/`SUBSKILL_LABELS`/`SKILL_LABELS`.
+  - Botón "Empezar la sesión de hoy" lanza el primer paso.
+  - Nueva prop `refreshKey` que recarga modelo+sesión al cambiar (para reflejar pasos completados).
+- `frontend/src/App.tsx`:
+  - `handleSessionStep(step)`: listening → abre insights + scroll a `#listening-practice`;
+    objetivo → `startLesson(...)`; skill → cambia `mode` vía `SKILL_MODE`.
+  - `sessionVersion` state: `onAttempt` y "Terminar lección" lo incrementan; se pasa como
+    `refreshKey` a `TodayPlan` para que el paso completado desaparezca al recargar la sesión.
+- `frontend/src/index.css`: estilos `.goal-editor`, `.session-headline`, `.today-item-action`
+  (botón de paso), `.kind-listening`.
+
+### 20.5 Pendiente / siguiente incremento natural
+- **P3–P6 de Etapa 2** (vocabulario, listening competencia, CEFR evidencia, pronunciación fonémica):
+  ver `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 21. HECHO (V1.8.1) — Marcar pasos de la sesión como "hechos"
+
+Cierra el hueco de `review`/`easy_wins` (que solo cambiaban de modo): ahora cualquier
+paso se puede marcar como completado y desaparece de la sesión de hoy, con reseteo diario.
+
+- **`services/adaptive.py`**: `step_key(step)` (clave estable: `listening:<subskill>`,
+  `<weakness|new>:<level>:<objective>`, `<review|easy_wins>:<skill>`) y
+  `session_plan(..., exclude_keys=...)` que anota cada paso con `step_key`, filtra los
+  ya completados y **reparte los minutos solo entre los pasos restantes**.
+- **`repositories/db.py`**: tabla `session_completions` (`PK (user_id, step_key)`,
+  `completed_on` para el reseteo diario, FK a users).
+- **`repositories/academy.py`**: `mark_session_step(user_id, step_key, completed_on)`
+  (upsert) y `list_session_steps(user_id, completed_on) -> set[str]`.
+- **`schemas/academy.py`**: `SessionStepOut.step_key` + `SessionCompleteRequest`.
+- **`domain/academy.py`**: `_today()` (fecha UTC `YYYY-MM-DD`); `get_session` excluye los
+  pasos de hoy (`exclude_keys`); `set_session_step_done(user_id, step_key)` → devuelve la
+  sesión actualizada.
+- **`routers/academy.py`**: `POST /api/academy/session/complete` (`{step_key}`) → `SessionOut`.
+- **Frontend**: `SessionStep.step_key`, `completeSessionStep` en `api/academy.ts`; en
+  `TodayPlan.tsx` cada paso tiene un botón "✓" (`.today-item-done`) que llama al endpoint
+  y sustituye la sesión con la respuesta (el paso marcado desaparece). Estilos en `index.css`.
+- **Tests**: `test_adaptive.py` (+`step_key`, +`exclude_keys`), `test_academy_goal.py`
+  (+repo mark/list y +endpoint complete), `api/academy.test.ts` (+`completeSessionStep`).
+
+### Verificación rápida del estado sin commitear
+```powershell
+cd backend && .venv\Scripts\python.exe -m pytest -q && .venv\Scripts\python.exe -m ruff check .
+cd frontend && npx tsc --noEmit && npx vitest run
+```
+
+## 22. EN CURSO (sin commitear) — P3: vocabulario exposure / production / mastery
+
+> **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P3: hoy `vocabulary` solo medía producción
+> (`appearances` = mensajes en los que el alumno escribió la palabra). Este incremento separa los
+> tres conceptos: **exposición** (palabras que lee en las respuestas del tutor), **producción**
+> (palabras que escribe) y **dominio** (producción repetida y espaciada en el tiempo).
+
+### 22.1 Modelo de datos (exposición vs producción)
+- **`repositories/db.py`**: migración idempotente en `vocabulary`:
+  - `exposures INTEGER NOT NULL DEFAULT 0` (mensajes del tutor en los que apareció la palabra).
+  - `last_exposed_at TEXT NOT NULL DEFAULT ''`.
+  - `production_days INTEGER NOT NULL DEFAULT 0` (días distintos con producción = espaciado).
+  - Backfill: `UPDATE vocabulary SET production_days = 1 WHERE appearances > 0 AND production_days = 0`.
+
+### 22.2 Señal de dominio (pura)
+- **`services/vocabulary.py`**: `classify(appearances, production_days)` → `"exposed"` (nunca
+  producida) | `"learning"` (producida, sin consolidar) | `"mastered"` (≥3 producciones y ≥2 días
+  distintos). Constantes `MASTERY_MIN_PRODUCTIONS = 3`, `MASTERY_MIN_DAYS = 2`.
+
+### 22.3 Repositorio
+- **`repositories/vocabulary.py`**:
+  - `record_words` ahora también incrementa `production_days` cuando la producción cae en un día
+    distinto al último (`_day(iso)` → `iso[:10]`).
+  - `record_exposures(user_id, words)` (nuevo): upsert con `appearances = 0` para crear filas
+    solo-expuestas.
+  - `get_vocabulary` devuelve `exposures`, `last_exposed_at`, `production_days`.
+
+### 22.4 Schemas + dominio
+- **`schemas/vocabulary.py`**: `VocabularyItem` gana `exposures`, `last_exposed_at`,
+  `production_days`, `status: Literal["exposed","learning","mastered"]`.
+- **`domain/vocabulary.py`**: `record_exposure(user_id, text)` (nuevo) y `get_vocabulary` calcula
+  `status` por palabra vía `classify`.
+
+### 22.5 Captura de exposición en el chat
+- **`routers/chat.py`**: tras la respuesta del tutor (`chat` y `chat_stream`), si hay `user_id` se
+  llama `vocabulary_service.record_exposure(user_id, reply)`; en el stream se acumulan los chunks y
+  se registra al final.
+
+### 22.6 Perfil separa producido / expuesto / dominado
+- **`domain/profile.py`**: `vocab_size` (para CEFR y recomendaciones) ahora cuenta solo palabras
+  producidas (`appearances > 0`), no las solo-expuestas; calcula `vocabulary_mastered` y
+  `vocabulary_exposed`.
+- **`schemas/profile.py`**: `LearningProfile` gana `vocabulary_exposed` y `vocabulary_mastered`.
+
+### 22.7 Frontend
+- **`frontend/src/types/api.ts`**: `LearningProfile.vocabulary_exposed`/`vocabulary_mastered`.
+- **`frontend/src/components/LearningProfile.tsx`**: bloque Vocabulario muestra "N dominadas · M
+  vistas" (`.learning-sub`).
+
+### 22.8 Tests
+- `test_vocabulary.py`: `classify` (5 casos), `record_exposures` (crea/acumula/unknown),
+  `production_days` con días controlados (monkeypatch `_now`), endpoint `status`, migración P3
+  (drop column + backfill).
+- `test_profile.py`: perfil separa `vocabulary_size`/`vocabulary_exposed`/`vocabulary_mastered`.
+- `test_chat_profile.py`: `chat` y `chat_stream` registran la exposición del tutor.
+
+### 22.9 Siguiente incremento natural
+- **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
+  `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 23. HECHO (V1.10) — P4: listening como competencia
+
+> **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P4: el listening ya medía `difficulty`,
+> `response_time_ms` y `replay_count`, pero no distinguía **tema**, ni precisión por
+> dificultad/tema, ni tendencia reciente, ni reincidencia. Este incremento lo convierte en
+> una señal de **competencia**.
+
+### 23.1 Tema (`topic`)
+- **`services/listening.py`**: `LISTENING_TOPICS` (10 temas canónicos), campo `topic` en
+  `ListeningAsset` y en los 23 ítems de `QUESTION_BANK`; `validate_listening_bank` exige
+  `topic` válido.
+
+### 23.2 Métricas de competencia (puras y deterministas)
+- `accuracy_by_difficulty(rows)`, `accuracy_by_topic(rows)`, `recent_trend(rows, window=10)` y
+  `recurrence_stats(rows)`; `listening_diagnostic` expone `by_difficulty`, `by_topic`, `trend`
+  y `recurrence`.
+
+### 23.3 Persistencia + dominio + esquemas
+- `repositories/db.py`: migración idempotente `topic` en `listening_attempts`.
+- `repositories/listening.py`: `record_attempt(..., topic=...)` y `list_attempts` incluyen `topic`.
+- `domain/listening.py`: `submit_answer` pasa el tema de la pregunta.
+- `schemas/listening.py`: `topic` en `ListeningQuestion` + `ListeningDifficultyOut`,
+  `ListeningTopicOut`, `ListeningTrend`, `ListeningRecurrence` en `ListeningDiagnostic`.
+
+### 23.4 Frontend
+- `types/api.ts` (nuevos tipos) y `ListeningPractice.tsx` (precisión por tema/dificultad,
+  tendencia reciente y reincidencia). Estilos en `index.css`.
+
+### 23.5 Tests
+- `test_listening.py` (+11) y `test_listening_architecture.py` (+2). Total backend
+  **556 tests**; frontend **143 tests**.
+
+### 23.6 Pendiente / siguiente incremento natural
+- **P5–P6 de Etapa 2** (CEFR por evidencia, pronunciación fonémica): ver
+  `docs/PLAN-ETAPA-PEDAGOGICA.md`.
+
+## 24. HECHO (V1.11) — P5: CEFR basado en evidencia
+
+> **Origen.** `PLAN-ETAPA-PEDAGOGICA.md` P5: `services/cefr.py::evaluate_cefr` sumaba puntos
+> (`_vocab_points`, `_pron_points`, `_exercise_points`, `_grammar_points`, `_fluency_points`) y
+> mapeaba la suma a un nivel. Era un "contador": subías de nivel con vocabulario aunque no
+> tuvieras ni una muestra de pronunciación, listening o gramática. Este incremento lo sustituye
+> por un modelo de **evidencia** y expone la **confianza** del nivel.
+
+### 24.1 Modelo de evidencia (`services/cefr.py`)
+- `MIN_SAMPLES` (mínimo de muestras por destreza): `vocabulary=50`, `grammar=5`,
+  `fluency=5`, `pronunciation=3`, `listening=5`; `TRACKED_SKILLS` con ese orden.
+- `listening_band(accuracy)` (umbrales 85/70/50, `"—"` si `None`) y `_band_rank`.
+- `evaluate_cefr` reescrito: por destreza calcula `band` + `samples` + `confidence`
+  (`min(1, samples/required)`); el nivel es la **banda más baja entre las destrezas con
+  evidencia suficiente** (`confidence >= 1` y `band != "—"`), o `A1` si no hay ninguna;
+  devuelve `{level, bands, evidence, confidence, descriptor}`.
+- Eliminadas las funciones privadas de puntos (`_vocab_points`, `_pron_points`,
+  `_exercise_points`, `_grammar_points`, `_fluency_points`, `_level_from_points`).
+- `estimate_cefr` sigue delegando en `evaluate_cefr(signals)["level"]` (API v1 intacta).
+
+### 24.2 Dominio (`domain/profile.py`)
+- `_compute_profile` ahora obtiene `listening_repo.get_stats` y pasa a `evaluate_cefr` las
+  señales nuevas: `pronunciation_attempts`, `user_messages`, `listening_accuracy`,
+  `listening_attempts`. Expone `estimated_confidence` y `estimated_evidence`.
+
+### 24.3 Esquemas (`schemas/profile.py`)
+- `EstimatedBands` + `listening`; nueva `CefrEvidence` (`skill`, `band`, `samples`,
+  `required`, `confidence`); `LearningProfile` + `estimated_confidence` y `estimated_evidence`.
+
+### 24.4 Frontend
+- `types/api.ts` (nuevos tipos), `utils/cefr.ts` (`bandLabel("listening")`),
+  `components/LearningProfile.tsx` (banda de listening + barra de confianza + detalle por
+  destreza) y estilos en `index.css`.
+
+### 24.5 Tests
+- `test_cefr_evaluation.py` (casos de evidencia, `listening_band`, 5 destrezas en `evidence`)
+  y `test_profile.py` (nuevos niveles B1/C1 y `estimated_confidence`/`estimated_evidence`).
+  Total backend **558 tests**; frontend **143 tests**.
+
+### 24.6 Pendiente / siguiente incremento natural
+- **V1.12 — Student Model unificado + Assessment Loop** (P6 speaking + P7 unificación): ver
+  sección 25 y `agentes/pedagogia/p6-speaking-2.0.md` / `p7-student-model-unificado.md`.
+- El P6 original (pronunciación fonémica) queda **diferido** a favor de esta unificación.
+
+## 25. HECHO (V1.12) — Student Model unificado + Assessment Loop
+
+> **Origen.** La auditoría externa de V1.11 detectó dos estimadores CEFR paralelos que se
+> contradicen (`/api/profile` con banda mínima vs `/api/academy/student-model` con nivel continuo
+> ponderado), 4 defectos de scoring en Speaking y la falta de histórico de evaluación. V1.12
+> convierte el **Student Model de la Academy en la fuente de verdad única**, corrige los P0 y añade
+> **snapshots de evaluación** reproducibles. Dos subagentes (`p6`, `p7`), cada uno su `feat:`.
+
+### 25.1 P6 — Speaking scoring 2.0 + higiene de release
+- **`services/speaking.py`**: `task_achievement` usa `task_achieved` del LLM en flujo libre
+  (el solapamiento de tokens es solo cota inferior con `expected`); `lexical_resource` mide
+  diversidad léxica (TTR) con `lexical_diversity(tokens)`; `coherence` usa el `coherence` del LLM
+  + marcadores discursivos (eliminado `len(heard)/len(expected)`); `pronunciation` devuelve
+  `observed=false`/`score=None` sin audio y `_weighted_overall` recalcula solo criterios
+  observados. Añade `observed` y `confidence` por criterio; penalizaciones discursivas
+  (`self_corrections`, `hesitations`, `repetitions`) reducen `fluency`.
+- **`services/speaking_llm.py`**: `SPEAKING_EVIDENCE_FIELDS` ampliada con `cohesion`,
+  `discourse_markers`, `self_corrections`, `hesitations`, `repetitions`; helpers
+  `_parse_float_field`/`_parse_count_field` con fallback.
+- **`config.py`** → `VERSION = "1.11.0"`; **`README.md`** → "v1.11.0".
+- **`schemas/academy.py`** / **`domain/academy.py`**: `observed` en speaking, `criteria` con
+  `float | None`.
+- Tests: `test_speaking.py` (observed, diversidad, sin audio, penalizaciones),
+  `test_speaking_llm.py` (campos opcionales + fallback).
+
+### 25.2 P7 — Student Model fuente única + snapshots + naming CEFR
+- **`domain/academy.py`**: `build_student_model(user_id) -> dict` como única fuente de verdad
+  (reutiliza `build_skill_profile` + `adaptive.estimated_level` + `readiness` +
+  `reassessment_due`); `get_student_model` proyecta a `StudentModelOut`.
+- **`domain/profile.py`**: `_compute_profile` delega en `build_student_model` (adiós al min-band
+  propio); helpers puros extraídos (`_bands_from_skills`, `_skill_states`, `_activity_stats`,
+  `_maybe_record_snapshot`). `get_profile_summary` incluye `cefr_history`.
+- **`repositories/db.py`**: tabla idempotente `cefr_assessment_snapshots` + índice.
+- **`repositories/profile.py`**: `record_cefr_snapshot`, `list_cefr_history`,
+  `last_cefr_snapshot`.
+- **`services/cefr.py`**: `estimate_cefr` (API v1) intacta; bandas documentadas como
+  "heuristic CEFR-aligned band"; `CEFR_MODEL_VERSION` y `heuristic_band(score)`. `evaluate_cefr`
+  deja de ser la fuente del perfil global.
+- **`schemas/profile.py`**: `EstimatedBands` con 7 destrezas (`speaking`, `reading`, `writing`);
+  nuevas `SkillState` y `CefrSnapshot`; `LearningProfile` con `overall_ability`, `target_level`,
+  `skills`, `readiness` y `cefr_history`.
+- **Frontend**: `types/api.ts` (nuevos tipos, adiós `CefrEvidence`), `utils/cefr.ts`
+  (`bandLabel` speaking/reading/writing), `utils/modes.ts` (`conversation` → `speaking`),
+  `components/LearningProfile.tsx` (barra `overall_ability`, `readiness` con `blocking_skills`,
+  desglose por destreza con muestras/confianza/tendencia, histórico CEFR), estilos en `index.css`.
+- Tests: `test_profile.py` (nuevo shape + snapshot una sola vez), `test_cefr_evaluation.py`
+  (`heuristic_band`, `CEFR_MODEL_VERSION`), frontend `cefr.test.ts`/`modes.test.ts`.
+
+### 25.3 Verificación
+- Backend `566 tests` + `ruff` limpio; frontend `143 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 25.4 Pendiente / siguiente incremento natural
+- **V1.13** — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2): ver sección 26.
+- **V1.14** — Listening Evidence & Adaptive Selection: ver sección 27.
+- **V1.15** — Speaking 3.0 (sobre el mismo Student Model). Ver sección 28.
+
+## 26. V1.13 — Listening 3.0 (audio TTS pre-renderizado + cierre A1→B2)
+
+> **Origen.** `agentes/pedagogia/p8-listening-3.0.md`. El listening tenía arquitectura sólida
+> (banco versionado, vector 8D, 15 sub-destrezas, métricas de competencia) pero **sin audio
+> pre-renderizado**: el frontend sintetizaba `script` en vivo con la voz Piper única, ignorando
+> `speech_rate`/`accent`. Además faltaba `b2.json` (el banco ya tenía ítems B2: `l16`, `l17`, `l20`,
+> `l21`). V1.13 sirve **audio TTS pre-renderizado por ítem**, cierra **A1→B2** y garantiza evidencia
+> independiente por sub-destreza. Honesto con el límite local: Piper es una sola voz; acentos/ruido/
+> hablantes son límite de **contenido**, no de código.
+
+### 26.1 Audio TTS pre-renderizado por ítem
+- **`services/tts.py`**: `synthesize(text, length_scale=1.0)` ahora acepta velocidad vía
+  `SynthesisConfig(length_scale=...)`.
+- **`services/listening.py`**: `length_scale_for_rate(speech_rate)` (mapea wpm → `length_scale`,
+  clamp `[0.6, 1.6]`), `audio_text(question)` (`transcript` con fallback a `script`), y
+  `LEVEL_ORDER = ["A1", "A2", "B1", "B2"]`.
+- **`domain/listening.py`**: `get_audio(question_id)` sintetiza y cachea en `DATA_DIR/listening/`
+  (primera petición) y sirve del caché después; `audio_ready(question)` y `_public` exponen
+  `audio_ready`.
+- **`routers/listening.py`**: `GET /api/listening/audio/{question_id}` → `audio/wav` (404/503).
+- **`schemas/listening.py`**: `ListeningQuestion.audio_ready`.
+
+### 26.2 Cierre A1→B2
+- **`curriculum/b2.json`**: nivel B2 (8 objetivos, checks de opción múltiple cubriendo sus
+  destrezas evaluables — invariante curricular verde).
+- **`services/curriculum.py`**: `LISTENING_BANK_VERSION` → `3.0.0`.
+- **`scripts/generate_listening_audio.py`**: pre-renderiza todo el banco (idempotente, `--force`).
+
+### 26.3 Evidencia por sub-destreza
+- `test_new_subskills_generate_independent_evidence` cubre `fast_speech`, `connected_speech`,
+  `multiple_speakers`, `dictation`, `shadowing`, `speaker_intention` en `listening_diagnostic`.
+
+### 26.4 Frontend
+- **`api/listening.ts`**: `getListeningAudioUrl(questionId, userId)`.
+- **`types/api.ts`**: `audio_ready: boolean`.
+- **`components/ListeningPractice.tsx`**: reproduce audio TTS pre-renderizado cuando `audio_ready`,
+  degrada a TTS en vivo con aviso "audio de referencia no disponible"; respeta `replayCount`.
+- **`index.css`**: estilo `.listening-audio-degraded`.
+
+### 26.5 Higiene de release
+- `config.py`/`README.md`/`PLAN.md`/`package.json`/`package-lock.json` → `1.13.0`; `CHANGELOG.md`
+  con entrada 1.13.0.
+
+### 26.6 Verificación
+- Backend `576 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 26.7 Pendiente / siguiente incremento natural
+- **V1.14** — Listening Evidence & Adaptive Selection: ver sección 27.
+- **V1.15** — Speaking 3.0 (sobre el mismo Student Model): fluency/grammar/lexical/
+  pronunciation/coherence/interaction medidos longitudinalmente. Ver sección 28.
+
+## 27. HECHO (commiteado) — V1.14: Listening Evidence & Adaptive Selection
+
+> **Origen.** Auditoría externa de V1.13 (commit `37ac52b9…`, 2026-08-26). Veredicto: arquitectura
+> muy buena, pero el "audio real" era en realidad **TTS Piper de una sola voz**, y la metadata
+> (`accent`/`speaker_count`/`noise`/`connected_speech`) podía generar **evidencia pedagógica falsa**
+> en el Student Model. V1.14 añade una capa de **AudioRealization** + **Evidence Integrity** y hace
+> que el **selector consuma de verdad el Student Model**, sin rehacer V1.13.
+
+### 27.1 Modelo de realización del audio
+- **`services/listening.py`**: `AUDIO_TYPES` (`tts`/`recorded`/`mixed`/`synthetic_multispeaker`/
+  `real_world`), `realized_vector` (qué factor realiza el audio servido), `realization_status`
+  (`declared`/`realized`/`verified`), `realized_difficulty`, `realization_gap_factors` y
+  `subskill_realization_gap` (mapa `SUBSKILL_REALIZATION_FACTOR`).
+- Para una voz Piper única: `vocabulary`/`syntactic`/`length` se realizan; `speed` solo con
+  `speech_rate`; `connected_speech` solo si el texto escribe la reducción; `accent`/
+  `speaker_count`/`noise` no se realizan (quedan en 1).
+- `audio_digest` (hash texto + velocidad + repetición) para invalidar el cache.
+
+### 27.2 Integridad de evidencia
+- `listening_diagnostic` añade `realization_gap` por sub-destreza y resumen `realization`
+  (`attempts`/`verified`/`gap`). El Student Model no debe tratar como dominio real una
+  sub-destreza entrenada con audio que no respalda su factor.
+- `schemas/listening.py`: `ListeningQuestion` expone `audio_type`, `realized_difficulty`,
+  `realization`; `ListeningSubskillOut.realization_gap`; `ListeningDiagnostic.realization`.
+- `repositories/listening.py` + migración `realized_difficulty` en `listening_attempts`.
+
+### 27.3 Selector adaptativo
+- `pick_next_question(..., weak_subskills=...)` prioriza, **dentro del nivel de trabajo** del alumno,
+  las sub-destrezas débiles con realización auditiva válida (no entrena `multiple_speakers` con una
+  sola voz). `domain.next_question` lo alimenta con `listening_diagnostic(attempts)["weak"]`.
+
+### 27.4 Cache de audio versionado (P1.1)
+- `domain/listening.py`: `_audio_cache_dir()` → `DATA_DIR/listening/{bank_version}/{voice}` y
+  `_audio_path()` → `{id}-{digest}.wav`. `scripts/generate_listening_audio.py` usa el mismo path.
+
+### 27.5 Frontend
+- `types/api.ts`: `audio_type`, `realized_difficulty`, `realization`, `realization_gap`,
+  `ListeningRealizationSummary`.
+- `components/ListeningPractice.tsx`: etiqueta honesta del tipo de audio (voz sintética local vs.
+  grabación real), aviso cuando `realized_difficulty < difficulty`, y marca `realization_gap` en
+  el diagnóstico. Estilos en `index.css`.
+
+### 27.6 Higiene de release
+- `config.py`/`README.md`/`PLAN.md`/`package.json`/`package-lock.json` → `1.14.0`; `CHANGELOG.md`
+  con entrada 1.14.0. Renombrado "audio real" → "audio TTS pre-renderizado" en CHANGELOG, README,
+  PLAN, RELEVO y comentarios de código.
+
+### 27.7 Verificación
+- Backend `592 tests` + `ruff` limpio; frontend `144 tests` + `tsc` OK.
+
+### 27.8 Pendiente / siguiente incremento natural (P1/P2 de la auditoría)
+- **Delayed retention** (P1.2): `immediate_accuracy` vs `delayed_accuracy` (Day 0/2/7/30).
+- **True listening tasks** (P1.3–P1.8): shadowing con grabación/alineamiento, dictado real,
+  varios hablantes, connected speech real, acentos reales, ruido real.
+- **Audio variants / difficulty ladder** (P1.9): variantes de un mismo contenido (slow/clean →
+  natural → fast → noise → accent).
+- **V1.15** — Speaking 3.0 sobre el mismo Student Model: ver sección 28.
+
+## 28. HECHO (commiteado) — V1.15: Speaking 3.0
+
+> **Origen.** `agentes/pedagogia/p9-speaking-3.0.md`. El speaking ya tenía un rubric determinista
+> (fluency/grammar/lexical/pronunciation/coherence) y evidencia por intento, pero **no medía la
+> evolución longitudinal por criterio** (a diferencia de `listening_diagnostic`), ni contemplaba la
+> **interacción** como dimensión. V1.15 añade `speaking_diagnostic` espejo del de listening, integra
+> `interaction` como séptimo criterio y expone el diagnóstico en el Student Model y en el frontend.
+
+### 28.1 Diagnóstico longitudinal por criterio (S1)
+- **`services/speaking.py`**: `speaking_diagnostic(evidence_rows)` agrupa por criterio
+  (`attempts`/`mean`/`min`/`max`/`review_due`), deriva `weak` (`mean < 0.7`) y `recommendation`
+  (criterio con menor media), y `trend` global sobre las filas `overall`/`overall_mean`.
+  Umbrales `SPEAKING_WEAK_THRESHOLD`/`SPEAKING_MIN_ATTEMPTS`/`SPEAKING_TREND_WINDOW`.
+- **`schemas/academy.py`**: `SpeakingCriterionOut`, `SpeakingTrend`, `SpeakingDiagnostic`.
+- **`domain/academy.py`**: `get_speaking_diagnostic(user_id)` + puente de criterios de speaking
+  como `subskills` en `_annotated_profile` (espejo de listening).
+- **`routers/academy.py`**: `GET /api/academy/speaking/diagnostic`.
+
+### 28.2 Criterio `interaction` (S2)
+- **`services/speaking.py`**: `SPEAKING_CRITERIA` pasa a 7 (`interaction`), `CRITERION_WEIGHTS`
+  rebalanceado (`interaction` 0.05); `score_speaking` trata `interaction` como `None` cuando no es
+  observable (read-aloud).
+- **`services/speaking_llm.py`**: `build_speaking_prompt` pide `interaction`, `parse_speaking_evidence`
+  lo extrae, `SPEAKING_EVIDENCE_OPTIONAL_FIELDS` lo incluye.
+
+### 28.3 Frontend (S3)
+- **`types/api.ts`**: `SpeakingCriterionProgress`, `SpeakingTrend`, `SpeakingDiagnostic`.
+- **`api/academy.ts`**: `getSpeakingDiagnostic(userId)`.
+- **`components/SpeakingDiagnostic.tsx`**: desglose por criterio, tendencia global y puntos a
+  revisar. Integrado en `App.tsx` (panel de insights). Estilos en `index.css`.
+
+### 28.4 Higiene de release
+- `config.py`/`package.json` → `1.15.0`; `CHANGELOG.md` con entrada 1.15.0; `PLAN.md`,
+  `PLAN-ETAPA-PEDAGOGICA.md` y `ARQUITECTURA.md` actualizados.
+
+### 28.5 Verificación
+- Backend `602 tests` + `ruff` limpio; frontend `145 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 28.6 Pendiente / siguiente incremento natural
+- **Writing 3.0** sobre el mismo Student Model (espejo del patrón listening/speaking).
+- Retomar los **P1 de listening** de la auditoría V1.14: delayed retention (P1.2), shadowing real
+  (P1.3), dictado real, varios hablantes, acentos y ruido reales, variantes de dificultad.
+
+## 29. HECHO (commiteado) — V1.16: Speaking Assessment & Evidence 2.0
+
+> **Origen.** Auditoría externa de V1.15. Veredicto: arquitectura 9.3/10, pero **validez
+> pedagógica ~7.5–8/10** — el "Longitudinal Speaking Competence" seguía siendo un agregador
+> `mean/min/max + trend`, no un modelo de competencia, y varios criterios eran demasiado toscos.
+> V1.16 se divide en **6 piezas (S1–S6)** más **3 bloques de cierre** ejecutados con subagentes.
+> Filosofía intacta: el LLM sigue siendo **solo extractor de evidencia**; todo el scoring es
+> determinista; un criterio no observado NO se inventa (`score=None`).
+
+### 29.1 S1 — task_achievement continuo + GrammarEvidence 2.0 (P0-1, P0-2, P2)
+- `services/speaking.py`: docstrings "6→7 dimensiones"; `TASK_SUBDIM_WEIGHTS` (task_completion/
+  task_relevance/task_coverage/task_appropriateness) + `_task_achievement_score` (graduado, con
+  fallback binario `task_achieved`); `_GRAMMAR_PENALTY_MINOR/MAJOR/CRITICAL` + `_grammar_score`
+  (severidad en vez de `1 - 0.25·errores`).
+- `services/speaking_llm.py`: extrae `grammar_error_details` (type + severity) y las 4
+  sub-dimensiones de tarea.
+
+### 29.2 S2 — SpeakingTaskProfile + dificultad declared/realized/verified + pesos por task_type (P0-1)
+- `services/speaking.py`: `SpeakingTaskProfile` (task_type, cefr_target, duration_target,
+  difficulty_vector, `difficulty`), `TASK_TYPES`, `SPEAKING_DIFFICULTY_FACTORS`,
+  `CONVERSATIONAL_TASK_TYPES`, `difficulty_from_vector`, `weights_for_task_type`, `realized_vector`,
+  `realized_difficulty`, `realization_gap_factors`; `scores_from_evidence(..., task_type=...)`
+  ajusta pesos; `evidence_from_speaking(..., difficulty=...)` registra la dificultad.
+- `schemas/academy.py` + `domain/academy.py` + `routers/academy.py`: `task_type`, `difficulty`,
+  `difficulty_vector`, `expected` propagados.
+
+### 29.3 S3 — LexicalEvidence 2.0 + FluencyEvidence 2.0 (P1-2, P1-3)
+- Léxico: TTR puro → MSTTR por segmentos + `range` (mínimo de tipos) + sophistication/precision/
+  collocations del LLM (`LEXICAL_SUBDIM_WEIGHTS`, `_msttr`, `lexical_evidence`, `_lexical_score`).
+- Fluidez: `fluency ≠ speed` — bandas CEFR de WPM (`_speech_rate_score`) + smoothness/rhythm del
+  LLM (`FLUENCY_SMOOTHNESS_WEIGHT`/`FLUENCY_RHYTHM_WEIGHT`, `_fluency_score`).
+
+### 29.4 S4 — InteractionEvidence 2.0 + pronunciación integrada (P1-4, P1-5)
+- `INTERACTION_SUBDIM_WEIGHTS` (5 sub-dimensiones semánticas del LLM) + `_interaction_score`.
+- `expected` integra `pronunciation` en flujo libre (solo si hay referencia; sin `expected` sigue
+  `observed=false`).
+
+### 29.5 S5 — Student Model ownership del diagnóstico (P1-6, P1-7)
+- `speaking_diagnostic` pasa de `mean/min/max` a **vista** sobre señales del Student Model:
+  `recent_score` (EMA α=0.5), `lifetime_score`, `confidence`, `stability`, `review_due` por
+  olvido/fallo reciente/decaimiento (`_ema`, `SPEAKING_EMA_ALPHA`). `SpeakingCriterionOut` y
+  `SpeakingDiagnostic.overall_recent` ampliados.
+
+### 29.6 S6 — Speaking level continuo + Speaking Journey (CEFR)
+- `services/speaking.py`: `speaking_level` (nivel continuo `numeric = 1.0 + 5.0·score` + confianza)
+  y `speaking_journey` (steps cronológicos con nivel + confianza).
+- `schemas/academy.py`: `SpeakingLevelOut`, `SpeakingJourneyStep`, `SpeakingJourneyOut`.
+- `domain/academy.py`: `get_speaking_level`, `get_speaking_journey`.
+- `routers/academy.py`: `GET /api/academy/speaking/level`, `GET /api/academy/speaking/journey`.
+
+### 29.7 Tres bloques de cierre (subagentes)
+- **InteractionEvidence objetiva** (P1-4): `services/interaction.py` (puro: `interaction_evidence`
+  → turn_balance/avg_response_latency_ms/turn_completion/student_turns/assistant_turns/
+  interruptions, con umbrales nombrados); fusión objetiva+semántica en `_interaction_score` vía
+  `INTERACTION_OBJECTIVE_WEIGHT=0.5` (clave `evidence["interaction_objective"]`, backward-compatible);
+  columnas `duration_ms`/`latency_ms` en `messages` (migración idempotente); telemetría TTFB/duración
+  en `POST /api/chat/stream`; `GET /api/conversations/{id}/interaction`.
+- **Speaking Assessment 1.0**: instrumento `curriculum/speaking_assessment.json` (4 partes:
+  interview → individual task → interaction → follow-up); tabla trazable
+  `speaking_assessment_sessions`; `services/speaking_assessment.py` (`load_speaking_assessment`,
+  `assessment_parts`, `aggregate_assessment` — reutiliza `speaking_level`+`speaking_diagnostic`);
+  dominio + endpoints `/api/academy/speaking/assessment/{start,part,finish}` y
+  `GET /api/academy/speaking/assessment/{session_id}`.
+- **Frontend**: tipos + API (`getSpeakingLevel`/`getSpeakingJourney`), `utils/speaking.ts`
+  (`numericToCefr`, `formatConfidence`, `formatTrendDelta`, `nextFocus`, `criterionLabel`),
+  `components/SpeakingPanel.tsx` (NEXT FOCUS + PRACTICE NOW) y `components/SpeakingJourney.tsx`
+  (barra A2→B1→B2 con marcador "YOU"), CSS en `index.css`, montaje en `App.tsx`.
+
+### 29.8 Pendiente → HECHO en V1.17
+1. ✅ **UI del flujo de Speaking Assessment** — `components/SpeakingAssessment.tsx` (sección 30.1).
+2. ✅ **Puente conversación→speaking** — telemetría objetiva cableada de extremo a extremo (sección 30.2).
+3. ✅ **Writing 3.0** sobre el Student Model (sección 30.3). Queda **P1 de listening** (V1.14).
+
+## 30. HECHO (commiteado) — V1.17: Speaking Assessment UI + puente + Writing 3.0
+
+> **Origen.** Cierre de los tres incrementos naturales que dejó V1.16 (sección 29.8), lanzados
+> como subagentes autocontenidos en orden: (1) la pantalla del Speaking Assessment, (2) el puente
+> conversación→speaking y (3) Writing 3.0. Filosofía intacta: el LLM solo extrae evidencia; todo
+> el scoring determinista; un criterio no observado no se inventa.
+
+### 30.1 UI del flujo de Speaking Assessment (commit `012ec01`)
+- `frontend/src/types/api.ts`: `SpeakingAssessmentPartInfo`, `SpeakingAssessmentPartScores`,
+  `SpeakingAssessmentStart`, `SpeakingAssessmentPart`, `SpeakingAssessmentResult`,
+  `SpeakingAssessmentState` (espejo de `schemas/academy.py`).
+- `frontend/src/api/academy.ts`: `startSpeakingAssessment`, `submitSpeakingAssessmentPart`,
+  `finishSpeakingAssessment`, `getSpeakingAssessment`.
+- `frontend/src/components/SpeakingAssessment.tsx`: flujo `idle → part → result`; micrófono
+  (`getUserMedia`+`MediaRecorder`+`transcribe`, `duration_seconds` con `performance.now()`) y
+  entrada manual por `<textarea>` (usable sin micrófono).
+- `frontend/src/utils/speaking.ts`: `formatScorePct`, `formatDurationTarget`; CSS `.speaking-assessment*`;
+  montaje en `App.tsx`; tests en `utils/speaking.test.ts` y `api/academy.test.ts`.
+
+### 30.2 Puente conversación→speaking (commit `e679300`)
+- `backend/schemas/chat.py`: `duration_ms`/`latency_ms` en `ChatMessage` (persistidos vía
+  `save_conversation`).
+- `backend/domain/academy.py`: helper `_inject_interaction_objective`; `conversation_id` opcional
+  en `submit_speaking_assessment_part` y `submit_speaking_task` → `conversations_repo.get_turns` →
+  `services.interaction.interaction_evidence` → `evidence["interaction_objective"]` antes de
+  `scores_from_evidence` (fusionado por `_interaction_score`).
+- `backend/schemas/academy.py` + `routers/academy.py`: `conversation_id` en
+  `SpeakingAssessmentPartSubmit`/`SpeakingTaskSubmitRequest` y propagación en endpoints.
+- Frontend: `utils/telemetry.ts` (`turnTelemetry`), `api/chat.ts` (`conversationId`/`messageId`),
+  `hooks/useChat.ts` (captura `duration_ms`/`latency_ms` del turno del alumno y envía
+  `conversation_id`/`message_id` en `/api/chat/stream`).
+- Tests: `test_speaking.py` (fusión objetiva+semántica, backward-compat, E2E con `conversation_id`);
+  `utils/telemetry.test.ts`; `api/chat.test.ts`.
+
+### 30.3 Writing 3.0 (commit `34e32e6`)
+- `backend/services/writing.py`: `writing_diagnostic`/`writing_level`/`writing_journey` (espejo de
+  `speaking.py`) sobre `WRITING_CRITERIA`, con `_ema`/`_mean_trend` y constantes
+  `WRITING_EMA_ALPHA`/`WRITING_WEAK_THRESHOLD`/`WRITING_CONFIDENCE_THRESHOLD`/`WRITING_TREND_WINDOW`.
+- `backend/schemas/academy.py`: `WritingCriterionOut`, `WritingTrend`, `WritingDiagnostic`,
+  `WritingLevelOut`, `WritingJourneyStep`, `WritingJourneyOut`.
+- `backend/domain/academy.py`: `get_writing_diagnostic`/`get_writing_level`/`get_writing_journey`;
+  `backend/routers/academy.py`: `GET /api/academy/writing/diagnostic|level|journey`.
+- Frontend: tipos + `getWriting*`, `utils/writing.ts` (`writingCriterionLabel`), `WritingPanel.tsx`
+  + `WritingJourney.tsx`, CSS `.writing-*`, montaje en `App.tsx`; tests `test_writing.py`,
+  `utils/writing.test.ts`, `api/academy.test.ts`.
+
+### 30.4 Pendiente → HECHO en V1.18
+- ✅ **P1 de listening** (auditoría V1.14): delayed retention (P1.2), dictado real (P1.4),
+  shadowing real (P1.3) y escalera de variantes de velocidad (P1.9). Ver sección 31.
+- ⏳ **P1.5–P1.8** (varios hablantes, connected speech real, acentos reales, ruido real) requieren
+  **biblioteca de audio humano** (límite de contenido, no de código).
+- ⏳ (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
+  Assessment.
+- ⏳ **P6** (pronunciación fonémica) sigue diferido.
+
+## 31. HECHO (commiteado) — V1.18: P1 de listening (retention + dictado/shadowing + variantes)
+
+> **Origen.** Retoma los P1 de listening que dejó pendientes la auditoría V1.14 (§27.8), lanzados
+> como subagentes autocontenidos en orden: (1) delayed retention (P1.2), (2) dictado + shadowing
+> reales (P1.3/P1.4) y (3) escalera de variantes de audio (P1.9). Filosofía intacta: el LLM solo
+> extrae evidencia (aquí ni siquiera puntúa); todo el scoring determinista y local (Whisper + Piper).
+
+### 31.1 Delayed retention (P1.2) — commit `6071bca`
+- `services/listening.py`: `delayed_retention(attempt_rows, now="")` (pura) — agrupa por
+  `question_id`, la primera exposición es `immediate` y las re-exposiciones a ≥2 días son
+  `delayed`, con buckets `0-2`/`2-7`/`7-30`/`30+` días y `retention_rate` (delayed/immediate).
+  Reutiliza `services.forgetting.days_since`. Integrada en `listening_diagnostic` (kwarg `now` +
+  clave `retention`).
+- `schemas/listening.py`: `ListeningRetentionBucket`/`ListeningRetention` + `retention` en
+  `ListeningDiagnostic`; `domain/listening.py` pasa `now=db._now()`.
+- Frontend: tipos + bloque de retention en `ListeningPractice.tsx` + CSS. Tests
+  `test_listening_retention.py`.
+
+### 31.2 Dictado y shadowing reales (P1.3/P1.4) — commit `2183849`
+- Migración idempotente: `task_type TEXT NOT NULL DEFAULT 'mcq'` y `score REAL` en
+  `listening_attempts`; `record_attempt`/`list_attempts` las manejan.
+- `services/listening.py`: `PRODUCTION_PASS_SCORE=80`, `production_score` (delega en
+  `phonetics.composite_score`) y `production_reference` (`transcript → clean_transcript → script`);
+  `mean_score` por sub-destreza en `listening_diagnostic`.
+- `domain/listening.py`: `submit_production(user_id, question_id, transcript, task_type)` (valida
+  skill, persiste `answer_index=-1` + score continuo). `routers/listening.py`:
+  `POST /api/listening/dictation` y `/api/listening/shadowing`.
+- Frontend: `ListeningPractice.tsx` bifurca por `skill` (dictado → textarea; shadowing →
+  MediaRecorder + `transcribe(blob)`); tipos, API (`submitListeningDictation/Shadowing`) y CSS.
+  Tests `test_listening_production.py` + `api/listening.test.ts`.
+
+### 31.3 Escalera de variantes de velocidad (P1.9) — commit `26ae6c4`
+- `services/listening.py`: `AUDIO_VARIANTS=("slow","normal","fast")`,
+  `VARIANT_SPEED_FACTORS={slow:.75, normal:1.0, fast:1.25}`, `variant_speech_rate`,
+  `variant_length_scale`, `audio_variants`, y `audio_digest(question, variant="normal")` que
+  **preserva** el digest de `normal` (no invalida cache).
+- `domain/listening.py`: `_audio_path(question, variant)`, `get_audio(question_id, variant)` (400
+  si variante inválida), `_public` expone `variants` + `default_variant`. Router: query param
+  `variant`. `schemas/listening.py`: `ListeningAudioVariant`.
+- Frontend: botones Slow/Normal/Fast en `ListeningPractice.tsx` + `getListeningAudioUrl(..., variant)`.
+  Tests `test_listening_variants.py` + `api/listening.test.ts`.
+
+### 31.4 Pendiente / siguiente incremento natural
+- **P1.5–P1.8** — varios hablantes, connected speech real, acentos reales, ruido real: requieren
+  **biblioteca de audio humano** (grabaciones reales o sintetizador multi-voz). Límite de
+  **contenido**, no de código; hoy Piper es una única voz.
+- (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
+  Assessment (señal objetiva en vivo, no solo `conversation_id` manual).
+- **P6** (pronunciación fonémica) sigue diferido.
+
+## 32. HECHO (commiteado) — V1.19: Refresco UI profesional (frontend)
+
+> **Origen.** Petición explícita de tomar el control de la interfaz y dejarla "100% profesional y
+> más atractiva" conservando el diseño responsivo y el sistema de apariencia existente
+> (`data-theme`/`data-accent`/`data-font`/`data-density` → variables CSS). Solo frontend, sin
+> cambios de backend ni de lógica de negocio. Ejecutado desde un plan Cursor
+> (`refresco_ui_profesional`) en vez de un subagente `agentes/*.md`.
+
+### 32.1 Fundamento: tokens y primitivas CSS
+- `index.css`: tokens `--color-surface-3` y `--shadow-card` (dark + light); escala tipográfica
+  por defecto afinada (`--text-sm` 13→14px, `--text-xs` 12→12.5px); `data-font` sigue escalando
+  por encima.
+- Primitivas reutilizables: `.card`, `.card__header`, `.card__toggle`, `.card__icon`,
+  `.card__title`, `.card__chevron`, `.card__actions`, `.card__body`, `.badge`, `.pill` y
+  `.section-divider`.
+
+### 32.2 Header
+- Sticky con `backdrop-filter: blur(12px) saturate(1.4)` + fondo translúcido
+  (`color-mix(in srgb, var(--color-bg) 80%, transparent)`) y borde inferior sutil.
+- Alturas de control uniformes (36px) en `.icon-button`, `.hands-free-toggle` y `.model-trigger`.
+- A ≤768px los controles secundarios (apariencia/ayuda) se repliegan en un menú desplegable
+  (`.header-secondary` + `.header-more`) con cierre al hacer clic fuera.
+
+### 32.3 Chat principal
+- Estado vacío más rico: kicker (`empty-kicker`) + badge mayor (64px) y `active` en las
+  sugerencias.
+- Burbujas del tutor con avatar circular (`tutor-avatar`) en `ChatMessage.tsx`.
+- Composer intacto (ya tenía foco y padding móvil); sin cambios de lógica.
+
+### 32.4 Panel de análisis: tarjetas colapsables (mayor impacto)
+- Nuevo `components/InsightCard.tsx`: cabecera con título + chevron, `aria-expanded`/
+  `aria-controls`, cuerpo colapsable y slot de `actions` (p. ej. `BucketToggle`).
+- `App.tsx` envuelve los 11 paneles; expandidos por defecto `ProgressDashboard`, `TodayPlan` y
+  `ListeningPractice`, el resto colapsados. Los paneles internos pierden su título externo (se
+  centraliza en `InsightCard`) y su "cromo" de tarjeta se neutraliza con `.card__body > section`.
+- `BucketToggle` se exporta desde `ProgressDashboard` y se monta como `actions` de su tarjeta.
+
+### 32.5 Responsive + accesibilidad
+- Nuevo breakpoint `@media (max-width: 480px)`: header compacto (se ocultan labels de modo/
+  modelo/manos libres/nombre), `composer` compacto y drawer de análisis a 100vw.
+- `aria-expanded`/`aria-controls` en las tarjetas colapsables; `:focus-visible` y
+  `prefers-reduced-motion` conservados. Breakpoints 1024/768 verificados sin roturas.
+
+### 32.6 Verificación
+- `npx tsc --noEmit` OK y `npx vitest run` → 25 archivos / 198 tests en verde. Sin tests nuevos:
+  no se añadió ninguna util nueva (el colapso usa `useState` local dentro de `InsightCard`).
+
+### 32.7 Pendiente / siguiente incremento natural
+- **P1.5–P1.8** — varios hablantes, connected speech real, acentos reales, ruido real: requieren
+  **biblioteca de audio humano** (grabaciones reales o sintetizador multi-voz). Límite de
+  **contenido**, no de código; hoy Piper es una única voz.
+- (Opcional) Integrar el **turn-taking real del chat** en la parte "Interaction" del Speaking
+  Assessment (señal objetiva en vivo, no solo `conversation_id` manual).
+- **P6** (pronunciación fonémica) sigue diferido.
+
+## 33. HECHO (commiteado) — V1.20: P6 fonémica + turn-taking real + audio humano
+
+> **Origen.** Cierra los tres incrementos naturales que dejó pendientes V1.19 (§32.7), lanzados
+> como subagentes autocontenidos en orden: (1) P6 pronunciación fonémica, (2) turn-taking real del
+> chat en la parte "Interaction" del Speaking Assessment y (3) infraestructura de biblioteca de
+> audio humano (P1.5–P1.8). Filosofía intacta: el LLM solo extrae evidencia; todo el scoring
+> determinista y local.
+
+### 33.1 Pronunciación fonémica (P6)
+- `services/phonemes.py`: `phoneme_alignment(expected, heard)` (alineación de fonemas con
+  `difflib.SequenceMatcher`, espejo de `word_alignment`), `syllables(word)` (grupos vocálicos) y
+  `prosody_score(expected, heard)` (proxy de ritmo por nº de sílabas).
+- `services/phonetics.py::composite_score`: pesos rebalanceados `W_WORD=0.35`, `W_PHONEME=0.35`,
+  `W_PHONETIC=0.15`, `W_PROSODY=0.15` (se elimina `W_CHAR`); devuelve `prosody_score` y
+  `phoneme_breakdown`.
+- `services/pronunciation.py`: `PRONUNCIATION_CRITERIA` pasa a 4 (añade `prosody`),
+  `PRONUNCIATION_WEIGHTS` rebalanceado; `score_pronunciation`/`score_pronunciation_cefr` exponen
+  `prosody`.
+- `schemas/pronunciation.py`: `PhonemeSubstitution`/`PhonemeBreakdown`; `PronunciationResponse`
+  con `prosody_score` + `phoneme_breakdown`.
+- Frontend: tipos + `PronunciationPractice.tsx` muestra "Precisión de fonemas" y "Prosodia
+  (ritmo)". Tests `test_phonemes.py`/`test_phonetics.py`/`test_pronunciation.py`/
+  `test_pronunciation_academy.py`.
+
+### 33.2 Turn-taking real del chat → Interaction
+- `utils/speaking.ts`: `CONVERSATIONAL_TASK_TYPES`, `isConversationalTaskType`, `rolePlaySetup`.
+- `api/academy.ts`: `submitSpeakingAssessmentPart` acepta `conversationId` opcional y lo envía
+  como `conversation_id`.
+- `components/SpeakingRolePlay.tsx` (nuevo): role-play en vivo dentro del assessment (`streamChat` +
+  persistencia de conversación + `turnTelemetry` con `duration_ms`/`latency_ms`).
+- `components/SpeakingAssessment.tsx`: bifurca por `task_type` conversacional para renderizar
+  `SpeakingRolePlay`; `index.css` con `.speaking-roleplay*`. El puente backend
+  (`conversation_id` → `interaction_objective`) ya existía desde V1.17.
+- Tests `utils/speaking.test.ts` + `api/academy.test.ts`.
+
+### 33.3 Infraestructura de biblioteca de audio humano (P1.5–P1.8)
+- `services/audio_library.py` (nuevo): `AUDIO_LIBRARY_VERSION`, `AudioLibraryEntry`/
+  `AudioLibraryManifest`, `load_manifest`, `entry_for`, `resolve_file` (rechaza rutas fuera de la
+  biblioteca), `is_recorded`, `recorded_audio_path`, `library_summary`, `validate_manifest`.
+- `backend/audio_library/manifest.json` (nuevo): manifest versionado vacío (límite de contenido).
+- `domain/listening.py`: `audio_ready` ya no depende solo de Piper (para `recorded` basta el WAV);
+  `get_audio` sirve el WAV grabado del manifest y devuelve 404 (no TTS) si falta.
+- Tests `test_audio_library.py` (21 tests: manifest, resolución segura, servido y `audio_ready`).
+
+### 33.4 Higiene de release
+- `config.py`/`package.json`/`package-lock.json`/`README.md` → `1.20.0`; `CHANGELOG.md` con
+  entrada 1.20.0; `PLAN.md` y este `RELEVO.md` actualizados.
+
+### 33.5 Verificación
+- Backend `755 tests` + `ruff` limpio; frontend `202 tests` + `tsc` OK; launcher `55 tests` +
+  `ruff` limpio.
+
+### 33.6 Pendiente / siguiente incremento natural
+- **Contenido** de la biblioteca de audio humano: incorporar WAV reales (varios hablantes,
+  connected speech real, acentos reales, ruido real) y añadir sus entradas al manifest. La
+  infraestructura ya está lista.
+- (Opcional) Ajustar la UI de variantes de velocidad (`ListeningPractice.tsx`) para no mostrar la
+  escalera slow/normal/fast en ítems `recorded` (su velocidad es la real, no sintetizable).
+
+## 34. HECHO (commiteado) — V1.23: UI 2.0 (incremento 1)
+
+> **Origen.** Adopción de un *design system* real (Tailwind CSS v4 + shadcn/ui + Motion) para
+> sustituir el CSS custom (~6.450 líneas) por primitivas y microinteracciones. Cambio solo-frontend.
+
+- **Stack de diseño**: `tailwindcss` + `@tailwindcss/vite`, `motion`, `lucide-react` y dependencias
+  shadcn; alias `@/*` → `src/*`; `components.json` y `lib/utils.ts` (`cn`).
+- **Tokens**: `index.css` con tokens semánticos shadcn mapeados al sistema de apariencia; `legacy.css`
+  aislado en `@layer base`.
+- **Primitivas**: `Button`, `Card`, `Badge`, `Progress` + `SkillBar`, `LevelBadge`, `JourneyNode`,
+  `Milestone`.
+- **Reestilizados**: `AppShell`/`Header`/`Navigation` (nav inferior móvil + píldora animada), `Home`,
+  `Course`.
+- **Higiene**: versión → `1.23.0`.
+
+## 35. HECHO (commiteado) — V1.24: Analysis redesign + responsive 100%
+
+> **Origen.** El panel ANALYSIS apilaba 10 acordeones colapsables y cortaba texto en el drawer
+> estrecho; el usuario pidió rediseño total por pestañas + pasada responsive completa de la app +
+> tests visuales. Se añaden las premisas 19–21.
+
+### 35.1 Panel ANALYSIS por pestañas
+- **`components/AnalysisPanel.tsx`** (nuevo): contenedor de 7 pestañas (Overview, Today, Profile,
+  Speaking, Writing, Assessment, Tutor) con iconos `lucide-react`, indicador activo animado
+  (`layoutId` de Motion), transición de contenido (`AnimatePresence`) y scroll vertical propio por
+  pestaña (sin `text-overflow: ellipsis` ni `overflow: hidden`). Speaking agrupa Diagnostic+Panel+
+  Journey; Writing agrupa Panel+Journey (se elimina el título "Speaking" duplicado).
+- **`app/PracticeView.tsx`**: sustituye las 10 `InsightCard` por `<AnalysisPanel />`.
+- **`components/InsightCard.tsx`**: eliminado (quedó huérfano, verificado con `rg`).
+- Accesibilidad: `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`.
+
+### 35.2 Pasada responsive completa
+- `ProgressScreen`, `ListeningPractice`, `ReadingPractice`, `PronunciationPractice`,
+  `SpeakingAssessment`, `SpeakingRolePlay`, `SettingsDialog`, `ProfileDialog`, `HelpDialog`,
+  `Composer`, `HandsFreeToggle`: correcciones de overflow, `flex-wrap`, `min-w-0`, tap targets
+  ≥40px (`min-h-10`), pestañas con scroll horizontal. Sin tocar `legacy.css` (usando utilidades
+  Tailwind con sufijo `!` donde el cascade legacy lo exigía).
+
+### 35.3 Tests visuales Playwright
+- **`@playwright/test`** (devDependency) + **`playwright.config.ts`** con 3 proyectos (desktop
+  1280×800, tablet 768×1024, móvil 390×844) y `webServer` que reutiliza el dev server de Vite.
+- **`tests/visual/smoke.spec.ts`**: recorre Home, Course, Progress, Chat (+ panel ANALYSIS abierto)
+  y Learn, capturando un screenshot por ruta en `tests/visual/screenshots/<proyecto>/`.
+- **`scripts/visual.ps1`** + script npm **`test:visual`** (`playwright test`).
+- `.gitignore`: excluye `playwright-report/`, `test-results/`, `.artifacts/` y `screenshots/`.
+
+### 35.4 Verificación
+- Frontend `206 tests` + `tsc` OK; `playwright test` → 3 passed (18 screenshots). Backend sin cambios.
+
+### 35.5 Pendiente / siguiente incremento natural
+- **Fases 3–6 del rediseño UI 2.0**: listening (entorno auditivo), speaking (estudio de conversación),
+  progress (dashboard pedagógico), móvil específico y **retirada de `legacy.css`**.
+- **Contenido** de la biblioteca de audio humano (grabaciones reales).
+
+## 36. HECHO (commiteado) — V1.25: paneles del chat redimensionables + persistentes
+
+> **Origen.** Los tres paneles del CHAT (conversaciones, zona central y Análisis) ya tenían
+> infraestructura de redimensionado (`ResizeHandle` + `layout.sidebarWidth`/`rightWidth` persistido
+> en settings por usuario), pero el asa era un carril de 6px transparente casi invisible, no era
+> accesible y persistía en cada `pointermove` (spam de `PUT`). Se mejora la usabilidad, la
+> accesibilidad y la eficiencia de la persistencia.
+
+### 36.1 Asa visible y accesible
+- **`components/ResizeHandle.tsx`** reescrito con Tailwind: asa de 8px (`w-2`) con *grip* central
+  visible (`w-0.5 bg-border`, `bg-primary` al hover/foco vía `group`), `cursor-col-resize`,
+  `touch-none`, `hidden lg:flex` (oculta en móvil/tablet donde los paneles son drawers).
+- Añadidos `role="separator"`, `aria-orientation="vertical"`, `aria-valuenow/min/max` y soporte de
+  teclado (←/→ = ±24px). `PracticeView` pasa `value`/`min`/`max` desde `layout` y los límites
+  (`SIDEBAR_MIN/MAX`, `RIGHT_MIN/MAX`).
+
+### 36.2 Persistencia eficiente por usuario
+- **`hooks/useChat.ts`**: `setLayout` actualiza el estado inmediatamente (preview en vivo) pero
+  persiste con **debounce de 400ms** (`layoutPersistTimer`), de modo que un arrastre produce un único
+  `PUT /api/settings` en lugar de uno por movimiento. La carga inicial (`parseLayout`) no cambia.
+
+### 36.3 Limpieza CSS
+- **`styles/legacy.css`**: eliminadas las reglas huérfanas de `.resize-handle` (base + `display:none`
+  en `≤1024px`); se conserva `body.is-resizing`.
+
+### 36.4 Test visual
+- **`tests/visual/resize.spec.ts`** (nuevo): normaliza el ancho al mínimo por teclado, lo agranda con
+  flechas, comprueba el cambio y verifica la persistencia tras `reload`. Solo desktop (skip en
+  móvil/tablet).
+
+### 36.5 Verificación
+- Frontend `206 tests` + `tsc` OK; `playwright test` → 4 passed + 2 skipped (18 screenshots +
+  redimensionado). Backend sin cambios funcionales (solo `VERSION` → `1.25.0`).
+
+### 36.6 Pendiente / siguiente incremento natural
+- Ver **sección 37** (consolidado de todos los próximos incrementos).
+
+## 37. PRÓXIMOS INCREMENTOS (consolidado)
+
+> **Punto de partida del siguiente chat.** Todo lo que queda por hacer, en orden sugerido. La
+> regla sigue siendo la premisa 6 (poco a poco, un incremento a la vez) y la 5/7/8 (subagentes
+> autocontenidos, relevo al saturar). Cada incremento cierra con: build + tests frontend
+> (`npm test`, `tsc`) + backend (`pytest`, `ruff`) + Playwright (`npm run test:visual`) + bump de
+> versión en `config.py`/`package.json`/`package-lock.json`/`README.md` + `CHANGELOG` + esta sección.
+
+### 37.1 HECHO (V1.26) — Rediseño UI 2.0 fases 3–6 (solo frontend)
+- ✅ **Fase 3** — `features/listening/ListeningPractice.tsx`: entorno auditivo inmersivo (reproductor
+  con onda Motion, variantes 0.8x/1.0x/1.2x). Reutiliza `SkillBar`/`Badge`/`Card`.
+- ✅ **Fase 4** — `features/speaking/*` + `PronunciationPractice`: "estudio de conversación" (mic que
+  pulsa, feedback de fluidez/coherencia con `SkillBar`/`Badge`).
+- ✅ **Fase 5** — `features/progress/ProgressScreen.tsx`: dashboard pedagógico limpio.
+- ✅ **Fase 6** — Móvil específico (tap targets ≥40px, sin overflow) + poda de `legacy.css`
+  (~1.400 líneas huérfanas retiradas). `legacy.css` NO se retira aún: quedan en uso los bloques de
+  chat/shell/header/composer y `.journey-*` (fuera del scope de este incremento).
+- Briefing: `agentes/ui2/u1-rediseno-ui2-fases3-6.md`. Ver CHANGELOG 1.26.0.
+
+### 37.2 HECHO (V1.27) — Code-splitting (frontend)
+- ✅ Dividido por rutas con `React.lazy`/`Suspense` (`HomeScreen`, `CourseScreen`, `ProgressScreen`,
+  `PracticeView`) + `AnalysisPanel` diferido. Chunk inicial **537 kB → 425 kB** (gzip 134 kB) y ya
+  sin aviso de bundle >500 kB.
+- Briefing: `agentes/ui2/u2-code-splitting.md`. Ver CHANGELOG 1.27.0.
+
+### 37.3 PARCIAL — Contenido: biblioteca de audio humano (P1.5–P1.8)
+- ✅ **Código hecho**: la infraestructura (manifest + resolución + servido + validación), el
+  importador `backend/scripts/import_audio.py`, la escalera de velocidad oculta en ítems `recorded`
+  (`ListeningPractice.tsx`) y, desde **V1.35**, la **gestión en-app** (Ajustes → Audio) para
+  subir/reemplazar/quitar WAV con metadatos.
+- ⏳ **Contenido pendiente del usuario**: incorporar **WAV reales** de varios hablantes (connected
+  speech real, acentos reales, ruido real). Ahora se hace desde la propia app: **Ajustes → Audio →
+  subir WAV** (sin terminal). El agente **no** puede fabricar audio real (premisa 2/21).
+- **Notas**: el corpus ya reserva 9 slots (`l15`–`l23` → `audio-l15`…`audio-l23`) con `transcript`,
+  `clean_transcript`, `speech_rate`, `noise_level` y `duration` declarados en
+  `services/listening.py::QUESTION_BANK`. Los WAV deben ser **PCM sin comprimir** (el backend usa
+  `wave`; no hay `ffmpeg`). Subir un WAV convierte el ítem de TTS a grabado automáticamente (el
+  manifest es la fuente de verdad); borrarlo lo revierte. Empezar por el subconjunto que el usuario
+  aporte.
+
+### 37.4 (Diferido por decisión) Vercel / despliegue
+- **Vercel** se barajó para la **UI** (previews, hosting estático), **no** para sustituir el backend
+  (que es y seguirá siendo 100% local). Aún no se ha ejecutado; se retomará cuando el usuario lo pida.
+- El backend local implica que Vercel solo serviría el frontend; las llamadas `/api` seguirían
+  apuntando a `127.0.0.1:8000` (requiere decidir CORS/entorno, `ALLOWED_ORIGINS`/`ALLOWED_ORIGIN_REGEX`).
+
+### 37.5 Notas de contexto para el nuevo chat
+- Versión estable actual: **2.0.0** (Beta 1.0; todo verificado: backend 926 tests, frontend 240 tests,
+  launcher 64 tests, `ruff` limpio, `tsc`/`build` OK, `check_release_consistency` OK; CI ampliado
+  con jobs `content-validation` y `playwright`; gates de salida 10/10 en `docs/BETA_GATES.md`).
+- Pendiente: **37.3 contenido** (requiere WAV reales del usuario; el pipeline de grabación,
+  importación masiva y QA acústica ya están listos en V1.36–V1.37) y **37.4 Vercel** (diferido por
+  decisión).
+- Premisas relevantes: 19 (análisis por pestañas), 20 (responsive 100% + tests visuales), 21 (IA
+  evidencia / Mastery Engine decide), 22 (paneles redimensionables persistentes).
+
+### 37.6 HECHO (V1.29) — Fiabilidad LAN/HTTPS + audio móvil (P0) + launcher [commit `cb4eec5`]
+- ✅ `utils/browserCapabilities.ts` + `useAudioCapabilities.ts` (detección reactiva de capacidades
+  de audio + `MicUnavailableNotice`), `/api/network` (`hostname`/`local_url`), HTTPS en la LAN
+  (`@vitejs/plugin-basic-ssl`), launcher con estado en color + reinicio + reloj.
+
+### 37.7 HECHO (V1.30) — FASE 1: LAN + Mobile 100%
+- ✅ mDNS real (`local_url_available` en `/api/network` + `mdns_available()` en launcher),
+  recuperación de permisos (`watchMicrophoneAvailability`), test de micrófono con medidor de nivel
+  (`MicrophoneTest.tsx` + `utils/microphoneLevel.ts`), tarjeta de conexión QR (`ConnectDeviceCard`),
+  página `/help/connect` (`features/help/ConnectHelp.tsx`), E2E móvil (`tests/visual/mobile.spec.ts`)
+  y `docs/DEVICE_MATRIX.md`.
+
+### 37.8 HECHO (V1.31) — FASE 2: Adaptive Engine 2.0
+- ✅ Priority Engine (`services/adaptive.py`: `priority_signals`/`priority_score`/`explain_priority`)
+  + `signals`/`why` en `NextBestActivityOut` + "Why this activity?" en `NextBestCard`.
+
+### 37.9 HECHO (V1.32) — FASE 3: Curriculum 2.0
+- ✅ `curriculum/cefr_descriptors.json` + `services/cefr_descriptors.py` (escalera Pre-A1→C2 con
+  bandas "plus" + Can-Do por 9 dimensiones), `/api/academy/cefr-ladder`, visualización en `CourseScreen`.
+
+### 37.10 HECHO (V1.33) — FASE 4: Listening 2.0
+- ✅ `listening_resilience` (precisión por condición de escucha: clara→natural→conectada→rápida→
+  ruido→acentos) + `context` del corpus (`LISTENING_CONTEXTS` + `AudioLibraryEntry.context`) y
+  `resilience` en `ListeningDiagnostic`.
+
+### 37.11 HECHO (V1.34) — FASE 5: Speaking 2.0
+- ✅ `pronunciation` marcado como `proxy` (`PROXY_CRITERIA`), `interaction_quality` por
+  sub-dimensión (initiation/response/follow_up/repair/turn_taking), `conversation_endurance`
+  (hitos 30s–180s) + `/api/academy/speaking/endurance`, campo LLM `initiation`, y render en
+  `SpeakingDiagnostic` (insignia "proxy" + desglose + hitos). Test visual `tests/visual/speaking.spec.ts`.
+
+### 37.12 HECHO (V1.35) — Gestión en-app de la biblioteca de audio humano
+- ✅ Subir/reemplazar/quitar WAV desde **Ajustes → Audio** (`components/AudioLibrary.tsx`): preview
+  del WAV, edición de metadatos (transcripción, hablante, acento, CEFR, velocidad, ruido, género,
+  región, contexto), subida multipart y borrado.
+- ✅ Router `/api/audio-library` (`routers/audio_library.py`): `GET /slots`, `POST /upload`,
+  `GET /{audio_id}/audio` (preview) y `DELETE /{audio_id}`.
+- ✅ `is_recorded` ahora consulta el manifest (switch runtime TTS↔grabado sin tocar el banco de
+  preguntas); `write_entry`/`remove_entry`/`wav_probe_bytes` en `services/audio_library.py`; y
+  `domain/listening.py` expone `audio_type="recorded"` cuando el manifest respalda el ítem.
+  Ver CHANGELOG 1.35.0.
+
+### 37.13 HECHO (V1.36) — Audio Corpus 1.0 (autorar + pipeline)
+- ✅ **Corpus versionado en JSON** (`backend/curriculum/listening_corpus.json`, versión `1.0.0`): 40
+  ítems grabables (`c001`–`c040`, A1/A2/B1/B2) con la matriz multidimensional del auditor (nivel ×
+  hablante × contexto × condiciones de escucha): `gender`, `age_band`, `region`, `accent`,
+  `speaker_count`, `noise_level`, `speech_rate`, `spontaneity`, `recording_environment`, `overlap`,
+  `connected_speech`, `prosody`, `task_type`, `cefr` y `context`. Diversidad real: 10 hablantes, 8
+  acentos/regiones, 8 contextos y 6+ tipos de tarea.
+- ✅ **Loader del corpus** (`services/listening.py`): `_LEGACY_BANK` (l1–l23) + `_load_corpus_items()`
+  → `QUESTION_BANK` fusionado; los ítems del corpus son `tts` hasta que el manifest respalda su
+  `audio_id`. `LISTENING_BANK_VERSION` → `4.0.0`. `curriculum.py` excluye `listening_corpus.json`
+  de los niveles (`_NON_LEVEL_FILES`).
+- ✅ **Pack de grabación** (`backend/scripts/generate_recording_pack.py`): CSV de guiones por hablante
+  + `recording_pack_summary.json` con el objetivo A1 30–40 / A2 40–50 / B1 60–80 / B2 60–80 y la
+  convención `{cefr}/{speaker_id}/{audio_id}.wav`.
+- ✅ **Importación masiva** (`backend/scripts/import_audio.py --batch`): localiza los WAV por
+  convención, mide su duración real y rellena el manifest (`entry_from_item` mapea los metadatos
+  ampliados; `cefr` deriva del `level`).
+- ✅ **Higiene de release** (`scripts/check_release_consistency.py`): comprueba backend/frontend/
+  README/CHANGELOG/PLAN contra `config.py::VERSION`; añadido como job de CI. `PLAN.md` corregido
+  (dejó de declarar `1.34.0`). Ver CHANGELOG 1.36.0.
+- ⏳ **Pendiente del usuario**: grabar los WAV reales (usar el CSV como guion) e importarlos con
+  `import_audio.py --batch` o desde **Ajustes → Audio**. El agente no fabrica audio real (premisa 2).
+
+### 37.14 HECHO (V1.37) — Audio QA + Content Audit
+- ✅ **QA acústica** (`services/audio_library.py`, solo stdlib): `acoustic_metrics` (decodifica PCM
+  con `array`/`struct`) calcula `peak`, `RMS`, `clipping %`, `DC offset` y `silence ratio`, y
+  `classify_quality` emite `PASS`/`WARNING`/`REJECT`. `wav_quality_bytes`/`wav_quality` devuelven el
+  panel completo (formato, sample rate, canales, duración + métricas + `grade`). `POST /upload`
+  devuelve el panel "AUDIO QUALITY" y aplica límites de MIME (`_WAV_MIME`), duración
+  (`MAX_AUDIO_DURATION_SECONDS`) y tamaño (`MAX_AUDIO_BYTES` via `read_audio_limited`).
+- ✅ **Content integrity check** (`services/content_validation.py` +
+  `scripts/content_validation.py`): recorre `question → audio_id → manifest → WAV → metadata →
+  CEFR → difficulty → subskills` y emite el "CONTENT INTEGRITY CHECK" (ítems, grabados vs TTS,
+  referencias rotas, ids duplicados, transcripciones ausentes, desfase CEFR y desfase de duración).
+  Sale con código 1 si hay issues `error` (guard de CI).
+- ✅ **Content Audit Dashboard** (frontend): pestaña "Content audit" en `AudioLibrary.tsx` con
+  resumen (ítems/grabados/TTS) e issues por severidad.
+- ✅ **Candado admin (PIN local)** (`dependencies.require_admin` + `config.ADMIN_PIN`): protege
+  `POST /upload`, `DELETE /{audio_id}`, `GET /{audio_id}/audio` y `GET /audit`; `GET /status`
+  expone `admin_required`. UI con PIN y desbloqueo en `AudioLibrary.tsx`. Sin OAuth/cloud.
+- ✅ **Backup + auditoría de borrado** (`services/audio_library.py`): `write_entry`/`remove_entry`
+  registran en `audit.log` (JSONL) y `_backup_entry` copia el WAV + su entrada a `_backups` antes
+  de borrar.
+- ✅ **CI**: jobs `content-validation` (script de integridad) y `playwright` (E2E visual) añadidos a
+  `.github/workflows/ci.yml`. Ver CHANGELOG 1.37.0.
+
+### 37.15 HECHO (V1.38) — Course Engine + progreso visible "¿dónde estoy?"
+- ✅ **Course Engine** (`services/course.py`): secuenciación explícita Course→Unit→Lesson→Practice→
+  Assessment→Review→Mastery a partir de `curriculum/a1.json` (y a2/b1/b2). `gate_objective_ids`
+  identifica los objetivos evaluables que actúan como gates; `objective_gated_status` emite
+  `mastered`/`review`/`available`/`locked` (gating lineal, premisa 21); `unit_sequence` construye la
+  estructura de unidades/lecciones con progreso y estado (`done`/`current`/`locked`).
+- ✅ **Posición en el curso** (`current_position` + `course_map`): calcula la unidad y lección
+  actuales, `mastered/total`, progreso y `complete`.
+- ✅ **Endpoint** `GET /api/academy/course/{level_id}` (`routers/academy.py` → `CourseMapOut`),
+  protegido por `enrollment_blocked`; `domain/academy.py::_objective_state` consume ahora el estado
+  gated de `course_svc` (fuente única de gating) y se añadió `get_course_map`.
+- ✅ **Frontend** (`CourseScreen.tsx` + `api/academy.ts` + `types/api.ts` + `utils/i18n.ts`): barra
+  de unidades (✓/●/🔒) y lección actual "¿dónde estoy?" con el porcentaje del nivel.
+- ✅ **Tests**: `backend/tests/test_course.py` (gates, gating de objetivos, secuencia de unidades,
+  posición, forma del course map y endpoint) + ajuste en `test_academy.py` (segundo objetivo `locked`).
+  Ver CHANGELOG 1.38.0.
+
+### 37.16 HECHO (V1.39) — Mastery 2.0 (MasteryRecord transversal + CEFR readiness)
+- ✅ **`MasteryRecord` transversal** (`services/mastery.py`): una sola abstracción de dominio para
+  las 9 destrezas (`MASTERY_SKILLS`: vocabulary/grammar/pronunciation/listening/speaking/reading/
+  writing/interaction/mediation). Cada registro porta `score`, `confidence`, `evidence_count`,
+  `retention`, `stability`, `review_due`, `review_in_days`, `transfer_count`, `novel_count` y
+  `stage`. `mastery_records()` devuelve siempre las 9 destrezas (sin datos → `acquire`).
+- ✅ **Curva de olvido conectada a todo el currículo**: `review_interval_days(score, confidence)`
+  (SRS corto derivado de `forgetting.stability_days`) y `mastery_stage(...)` (timeline
+  acquire→practice→retrieve→transfer→novel→retention).
+- ✅ **CEFR readiness sin media simple** (`services/adaptive.py`): `readiness_band(overall, ready)`
+  emite `developing`/`approaching`/`ready`; `readiness()` ahora incluye `band`. Combina mastery +
+  evidencia + transfer + retención + confianza + gates mínimos.
+- ✅ **Exposición**: `MasteryRecordOut` + `StudentModelOut.mastery`; `/api/academy/student-model`
+  devuelve la vista transversal y la banda; `/api/profile` hereda `band` vía `ReadinessOut`.
+- ✅ **UI de progreso**: banda "B1 developing" (con % secundario) en `ProgressScreen`, `HomeScreen`,
+  `TodayPlan`, `LearningProfile` y `CourseScreen`; "Repasar en N días" desde el `MasteryRecord` en
+  el detalle de destreza de `ProgressScreen`.
+- ✅ **Tests**: `tests/test_mastery.py` (9 destrezas en orden, intervalos de repaso, timeline,
+  anotación desde perfil) + `tests/test_adaptive.py` (`readiness_band`). Ver CHANGELOG 1.39.0.
+
+### 37.17 HECHO (V1.40) — Speaking 3.0 (escenarios comunicativos + proxy honesto)
+- ✅ **Catálogo de escenarios comunicativos** (`curriculum/speaking_scenarios.json` + nuevo
+  `services/speaking_scenarios.py`): 8 escenarios (Restaurant, Doctor, Travel, Telephone,
+  Work meeting, Small talk, Problem solving, Interview) versionados como contenido fuera del código.
+  Cada escenario declara `communicative_objective` y las métricas que observa
+  (`task_completion`/`interaction`/`fluency`/`repair`/`turn_taking`), mapeadas a los criterios del
+  rubric ya existentes (`services/speaking` + `services/interaction`). `validate_scenarios()`
+  comprueba `task_type` ∈ `TASK_TYPES` y métricas ∈ `SCENARIO_METRICS`.
+- ✅ **Endpoint** `GET /api/academy/speaking/scenarios` (`routers/academy.py` →
+  `SpeakingScenariosOut`/`SpeakingScenarioOut`; `domain/academy.py::list_speaking_scenarios`).
+  Registrado `SPEAKING_SCENARIOS_VERSION = "1.0.0"` y el archivo en `_NON_LEVEL_FILES`.
+- ✅ **UI de escenarios** (`features/speaking/SpeakingScenarios.tsx`): pestaña "Speaking scenarios"
+  en el panel de análisis; tarjetas con título/nivel/categoría/objetivo/métricas; al practicar
+  reutiliza `SpeakingRolePlay` (telemetría de turnos `duration_ms`/`latency_ms` → señal objetiva de
+  interacción) y al terminar muestra objetivo + métricas observadas.
+- ✅ **Honestidad del proxy de pronunciación** (`SpeakingDiagnostic.tsx`): el criterio
+  `pronunciation` (`proxy` desde V1.34) muestra ahora "Confidence: alta/media/baja · automated
+  proxy" y una nota que distingue fonética real de la alineación speech/transcript.
+- ✅ **Tests**: `tests/test_speaking_scenarios.py` (catálogo 8 escenarios, métricas canónicas,
+  `validate_scenarios` vacío, `get_scenario` por id y endpoint). Ver CHANGELOG 1.40.0.
+
+### 37.18 HECHO (V1.41) — Beta Hardening (backup/seguridad LAN/a11y/performance)
+- ✅ **Backup/restore/export local** (`services/backup.py` + `routers/system.py`): ZIP determinista
+  del estado local (SQLite `tutor.db` + `audio_library/` con `backup.json` de metadatos). Endpoints
+  admin: `GET /api/system/backup/status`, `POST /api/system/backup`, `GET /api/system/backups`,
+  `GET /api/system/backup/export`, `POST /api/system/restore`. `restore_backup` valida el ZIP,
+  exige `data/tutor.db`, checkpoint de WAL y limpia `-wal`/`-shm`; límite 512 MB y MIME ZIP.
+- ✅ **Auto-backup diario** (keep 7): `_auto_backup_daemon` en el lifespan de `main.py` crea una
+  copia si no hay ninguna del día UTC y poda a `KEEP_BACKUPS = 7` (nombres con microsegundos).
+- ✅ **Seguridad LAN** (`security.py::SecurityMiddleware`, ASGI puro): `origin_allowed` (rechaza
+  métodos no seguros con origen no permitido, CSRF-like) y `_rate_limit_ok` en memoria por IP con
+  límites estrictos en endpoints sensibles; registrado en `main.py`.
+- ✅ **Panel de backup en UI** (`components/BackupPanel.tsx` + `api/system.ts`): Ajustes → Sistema,
+  crear/listar/descargar/restaurar usando el PIN de administración (`X-Admin-Pin`).
+- ✅ **A11y**: skip-link al contenido principal (`AppShell` + `.skip-link`) y sincronización de
+  `document.documentElement.lang` con el idioma (`hooks/useI18n.tsx`).
+- ✅ **Matriz de dispositivos** (`docs/DEVICE_MATRIX.md`): ampliada a PC/Android/iPhone/iPad con
+  columnas HTTPS/mDNS/Mic/Audio/Listening/Speaking/Recuperación.
+- ✅ **Performance**: `manualChunks` en `vite.config.ts` (React, `motion`, `lucide-react`), el
+  bundle principal baja ~505→393 kB (gzip ~160→124 kB) y desaparece el aviso de chunk grande.
+- ✅ **Tests**: `tests/test_backup.py` (create/list/restore roundtrip/rechazo no-backup/prune a 7/
+  auto-if-due/endpoints) y `tests/test_security.py` (origin_allowed, unsafe/safe/no-origin,
+  rate limit). Fixture autouse en `tests/conftest.py` que limpia el estado del rate limiter entre
+  tests (evita 429 espurios). Ver CHANGELOG 1.41.0.
+
+### 37.19 HECHO (Beta 1.0) — 5 gates de salida 10/10
+- ✅ **`docs/BETA_GATES.md`**: evaluación de los 5 gates con evidencia por criterio y puntuación
+  10/10 en cada uno — G1 Infrastructure, G2 Curriculum, G3 Listening+Speaking, G4 Adaptive+Mastery,
+  G5 UX+Reliability.
+- ✅ **Bump de versión mayor** `1.41.0` → `2.0.0` en `config.py`/`package.json`/`package-lock.json`/
+  `README.md`/`CHANGELOG.md`/`PLAN.md` (la app ya tenía `1.0.0` como release inicial en el changelog,
+  por lo que Beta 1.0 se marca con la mayor `2.0.0` para no reutilizar ni retroceder la secuencia).
+- ✅ **CHANGELOG `[2.0.0]`** y **`docs/RELEVO.md`** (posición, notas de contexto y sección 37.19).
+- ✅ **Pre-auditoría interna** (security-review + Bugbot): 1 hallazgo medio corregido (path
+  traversal en `export_backup` → `read_backup` confinado a `backups_dir()`) y 1 bajo corregido
+  (restore ahora reemplaza de verdad, no solo superpone). Tests añadidos: `test_read_backup_rejects_path_traversal`,
+  `test_export_rejects_path_traversal` y `test_restore_removes_stale_files` (backend 929 tests).
+- ✅ **Verificación final**: `check_release_consistency` OK (2.0.0); backend 929 tests + `ruff`
+  limpio; frontend `tsc` + `vitest` 240 tests + `build` OK. El roadmap V1.36 → Beta 1.0 queda cerrado.
+
+### 37.20 HECHO (V2.3) — Personal Dictionary + evidencia por ítem léxico
+- ✅ **Bajar el modelo de evidencia de "destreza" a "palabra/estructura"**: la tabla `vocabulary`
+  gana contexto curricular (`cefr`/`level_id`/`objective_id`/`source`/`lemma`/`kind`) vía migración
+  idempotente en `repositories/db.py` (solo contexto; no toca `appearances`/`exposures`).
+- ✅ **Siembra desde el currículo** (`services/lexicon.items_from_objective` +
+  `repositories/vocabulary.seed_curriculum_items`): `objective.vocabulary` + `objective.concepts`
+  (estructuras "I am"/"My name is" como `kind=structure`) pueblan el diccionario al avanzar, cableada
+  en `submit_objective_assessment` y `record_lesson_completed`.
+- ✅ **Servicio puro `services/lexicon.py`**: `item_mastery`, `item_recall` (reutiliza
+  `forgetting.retrieval_probability`), `item_status` determinista (`mastered`/`known`/`learning`/`weak`),
+  `next_review_days` (reutiliza `mastery.review_interval_days`), `cefr_distribution`, `summary` y
+  `recognized_not_produced` (señal *speaking micro-drill*, sin generación automática — queda V2.4).
+- ✅ **Endpoint `GET /api/vocabulary/lexicon`** → `LexiconOut { summary, items }` con `status`, `recall`
+  y `next_review_days` por ítem (`schemas/vocabulary.py` + `routers/vocabulary.py`).
+- ✅ **Frontend `PersonalDictionary.tsx`**: totales Known/Learning/Weak/Mastered, barra "Vocabulary by
+  CEFR" (A1→C2), lista de ítems con `recall %` y "next review", sección "Recognized but not produced";
+  ruta `vocabulary` + entrada en la navegación + i18n ES/EN (`api/vocabulary.ts`, `dictionary.ts`).
+- ✅ **Tests**: `backend/tests/test_lexicon.py` (invariantes: seed sin incrementar producción, estado
+  determinista, recall monótono, distribución CEFR, señal micro-drill) + `test_vocabulary.py` ampliado
+  (endpoint lexicon); frontend `vocabulary.test.ts` + `dictionary.test.ts`. Backend 962 tests + `ruff`
+  limpio; frontend `tsc` + `vitest` 245 tests + `build` OK; `check_release_consistency` OK (2.3.0).
+
+### 37.21 HECHO (V2.4) — Auditoría de cobertura curricular
+- ✅ **Servicio puro `services/curriculum_coverage.py`**: `coverage_sections(level)` (conteo por las 7
+  secciones a nivel de curso completo), `bank_intersection()` (cruce del banco de listening por `level`
+  y de los escenarios de speaking por `cefr_target` contra A1..C2), tri-estado
+  `complete`/`partial`/`empty`, `level_coverage(level_id)`, `coverage_metric()` (TOTAL CURRICULUM
+  COVERAGE sobre la matriz 7 niveles × 7 secciones = 49 celdas) y `curriculum_coverage_report()`.
+- ✅ **Métrica "TOTAL CURRICULUM COVERAGE"** integrada en `content_stats()` junto a
+  `total_validated_learning_items` (dos métricas que conviven: contenido validado vs. cobertura).
+- ✅ **CLI `scripts/curriculum_coverage.py`**: JSON completo + resumen nivel×sección + `--strict`
+  (exit 1 si hay huecos `empty` en una sección con curso).
+- ✅ **Tests** `test_curriculum_coverage.py` (9 invariantes: 7 niveles × 7 secciones, Pre-A1 banda sin
+  curso, cruce con bancos, determinismo, coexistencia de métricas). Backend **971 tests** + `ruff`
+  limpio; `check_release_consistency` OK (2.4.0).
+- ✅ **Mapa `docs/CURRICULUM_COVERAGE.md`**: tabla Pre-A1→C2 × 7 secciones + huecos priorizados.
+
+**Resultado de la auditoría (37/49 celdas = 75,5%):** huecos reales — Pre-A1 sin curso (marcado);
+interaction 1/7 (solo B1); listening desconectado (29 checks en curso vs 100 en banco) y sin C1/C2;
+speaking declarado sin evaluación y sin C2; review/assessment solo en módulos Final; C1/C2 muy finos
+(7 y 5 objetivos vs 23 en A1). **Estos huecos alimentan V2.5 (contenido)**.
+
+### 37.22 HECHO (V2.5-C1) — Listening C1/C2 (corpus 100→140, LEVEL_ORDER A1..C2)
+- ✅ **Corpus de listening 100 → 140** (`curriculum/listening_corpus.json` v1.1.0): 20 ítems C1
+  (`c101`–`c120`) y 20 C2 (`c121`–`c140`) con registro/temática avanzados (inferencia, intención,
+  actitud, ironía, hablantes múltiples, connected speech, habla rápida). Diversidad mantenida.
+- ✅ **Motor**: `LEVEL_ORDER` → A1..C2 (`services/listening.py`), `LISTENING_BANK_VERSION` 5.0.0 →
+  6.0.0 (`services/curriculum.py`), `QUALITY_THRESHOLDS["min_items_per_level"]` añade C1/C2 (20).
+- ✅ **Métrica**: TOTAL VALIDATED LEARNING ITEMS 143 → 183 (163 listening: 140 corpus + 23 legacy;
+  20 speaking), reflejada en README/CHANGELOG/PLAN y `docs/CURRICULUM_COVERAGE.md`.
+- ✅ **Tests**: `test_curriculum_coverage.py` (hueco C1/C2 invertido + invariante ≥20/nivel),
+  `test_content_quality.py` (umbrales + 6 niveles), `test_listening_corpus.py` (niveles C1/C2),
+  `test_listening.py` (tope C2). Backend 972 tests + `ruff` limpio.
+- Verificado: `content_validation` OK (14/14), `curriculum_coverage` OK (`bank_count` C1/C2 > 0),
+  `check_release_consistency` OK (2.4.0). Sin bump de versión.
+
+### 37.23 HECHO (V2.5-C2) — Speaking C2 (escenarios 20→26, cefr_target C2)
+- ✅ **Escenarios de speaking 20 → 26** (`curriculum/speaking_scenarios.json` v1.0.0 → v2.0.0): 6
+  escenarios C2 (`persuasion`, `conflict_mediation`, `academic_defence`, `abstract_conversation`,
+  `stakes_negotiation`, `diplomatic_talk`) con objetivo comunicativo C2 (persuasión sutil, mediación
+  de conflicto, defensa con evidencia, temas abstractos, negociación delicada y tacto diplomático).
+  Todos usan `task_type` conversacional (invariante de la UI de escenarios).
+- ✅ **`SPEAKING_SCENARIOS_VERSION` 2.0.0 → 3.0.0** (`services/curriculum.py`), alineando la
+  discrepancia JSON↔constante (JSON 1.0.0 → 2.0.0; constante 2.0.0 → 3.0.0).
+- ✅ **Métrica**: TOTAL VALIDATED LEARNING ITEMS 183 → 189 (163 listening + 26 speaking), reflejada
+  en README/CHANGELOG/PLAN y `docs/CURRICULUM_COVERAGE.md`.
+- ✅ **Tests**: `test_curriculum_coverage.py` (hueco C2 invertido), `test_speaking_scenarios.py`
+  (catálogo 26 + invariante ≥1 escenario por `cefr_target` A1..C2). Backend 973 tests + `ruff` limpio.
+- Verificado: `curriculum_coverage` OK (`bank_count` speaking C2 > 0), `check_release_consistency`
+  OK (2.4.0). Sin bump de versión.
+
+### 37.24 HECHO (V2.5-C3) — Interaction A1/A2/B2/C1/C2 (subskills interaction+turn_taking)
+- ✅ **Subskills de interacción en 5 niveles** (`curriculum/a1.json`, `a2.json`, `b2.json`, `c1.json`,
+  `c2.json`): 39 objetivos que declaran `speaking` con actividad `dialogue` añaden
+  `subskills: ["interaction", "turn_taking"]` (18 en A1, 11 en A2, 2 en B2, 5 en C1, 3 en C2). La
+  sección `interaction` deja de estar `empty` en A1/A2/B2/C1/C2 (solo Pre-A1, banda sin curso, queda
+  vacía). Sin tocar `services/course.py` ni el scoring de speaking.
+- ✅ **Métrica**: TOTAL CURRICULUM COVERAGE 37/49 → 42/49 (75,5% → 85,7%); interaction pasa de 1/7 a
+  6/7 poblado. `TOTAL VALIDATED LEARNING ITEMS` sigue en 189 (sin ítems nuevos: interaction se cuenta
+  por subskill, no por check).
+- ✅ **Test invariante nuevo** (`test_curriculum_coverage.py`): `interaction` con `count > 0` y
+  `status != empty` en A1/A2/B2/C1/C2.
+- ✅ **Docs**: `docs/CURRICULUM_COVERAGE.md` (interaction 6/7, cobertura 42/49), CHANGELOG, PLAN,
+  README y este RELEVO actualizados. Backend 974 tests + `ruff` limpio.
+- Verificado: `validate_level` vacío para los 6 niveles, `curriculum_coverage` OK (interaction
+  A1/A2/B2/C1/C2 con `count > 0`), `check_release_consistency` OK (2.4.0). Sin bump de versión.
+
+### 37.25 HECHO (V2.5-C4) — Wiring curso↔bancos (listening_items + scenario_ids por objetivo)
+- ✅ **Modelo `Objective`** (`services/curriculum.py`): dos campos retrocompatibles con default `[]`:
+  `listening_items: list[str]` (IDs del banco de listening) y `scenario_ids: list[str]` (IDs de
+  escenarios de speaking). `load_all_levels()` sigue parseando los 6 niveles sin cambios de firma.
+- ✅ **Conteo** (`services/course.py::unit_sections`): `listening` suma `len(listening_items)` y
+  `speaking` suma `len(scenario_ids)`, de modo que la sección refleja las referencias reales al banco
+  y no solo el `skill` declarado (sin tocar `CourseMapOut`/endpoints). `coverage_sections` lo refleja
+  por delegación (usa `unit_sections`).
+- ✅ **Wiring de contenido** en los 6 niveles (`curriculum/a1.json`–`c2.json`): 18 objetivos con
+  `listening` referencian 4 ítems del banco de su nivel (`c001`–`c140` + legacy `l1`–`l23`); 50
+  objetivos con `speaking` referencian 1 escenario de su `cefr_target` (26 escenarios). Solo
+  referencias por ID (sin duplicar ítems del banco dentro del JSON de nivel).
+- ✅ **Validación** (`services/curriculum.py::validate_level`): cada `listening_items` debe existir y
+  su `level` coincidir con el nivel; cada `scenario_ids` debe existir y su `cefr_target` coincidir.
+  Imports diferidos (anti-ciclo, porque `listening`/`speaking_scenarios` importan `curriculum`).
+- ✅ **Test invariante nuevo** (`tests/test_bank_wiring.py`, 7 tests): conteo con referencias,
+  referencia rota y desfase de nivel (listening y speaking), listening/speaking no `empty` en niveles
+  con curso y `validate_level` vacío para los 6 niveles.
+- ✅ **Docs**: `docs/CURRICULUM_COVERAGE.md` (listening/speaking pasan de "desconectado" a "cableado
+  por unidad", `count` actualizado), CHANGELOG, PLAN, README y este RELEVO. Backend **981 tests** +
+  `ruff` limpio.
+- Verificado: `validate_level` vacío para los 6 niveles, `curriculum_coverage --strict` exit 0 (sin
+  huecos `empty`; `count` de listening/speaking crecido), `check_release_consistency` OK (2.4.0). Sin
+  bump de versión y **sin UI** (la consumición visual de los ítems referenciados es un incremento
+  posterior).
+
+### 37.26 HECHO (V2.6-C1) — Capa de medición: Unit Coverage + CEFR Depth + Unit Learning Loop + Dashboard
+- ✅ **Hallazgo conceptual (auditoría externa):** "cobertura" ≠ "profundidad". `42/49 celdas` no
+  significa "curso al 85,7%": una celda cuenta como poblada si *alguna* unidad tiene contenido en esa
+  sección. Se añaden métricas con grano fino en `services/curriculum_coverage.py`:
+  - `unit_coverage(level)`: por unidad, cuántas de las 7 secciones están pobladas (`coverage_pct`,
+    `missing`, `by_section` con `units`/`with_content`). Media A1..C2 = **61,7%**.
+  - `depth_score(level)` — **CEFR DEPTH SCORE** (0..100): 4 componentes ponderados y auditables
+    (`objective_density` 0.20, `objective_volume` 0.35, `section_coverage` 0.35, `subskill_breadth`
+    0.10; pesos en `DEPTH_WEIGHTS`, suma 1.0). Media **55,7**; por nivel: A1 74,2 · A2 52,3 · B1 55,7
+    · B2 61,7 · C1 48,0 · C2 42,5. Ajuste V2.6-C1b: se sube el peso del *volumen* y se baja el de la
+    *densidad* (la densidad sola premiaba a B2, denso pero con solo 9 objetivos, por encima de A2).
+  - `unit_learning_loop(level, unit)` + `loop_coverage(level)` — **UNIT LEARNING LOOP** (9 fases:
+    introduce, practice, listen, speak, interact, retrieve, transfer, assess, review). Mide qué fases
+    cubre cada unidad. Media **50,6%**; introduce/practice 100%, listen 45,2%, speak 90,3%,
+    interact 83,9%, **retrieve/transfer 0%**, assess/review 19,4% (solo módulos "Final").
+  - `unit_detail(level_id, unit_id)`: drill-down LEVEL → UNIT → LESSON → OBJECTIVE (skills, subskills,
+    activities, checks, `listening_items`, `scenario_ids`) + 7 secciones.
+  - `curriculum_quality_report()` — **Curriculum Quality Dashboard**: 7 dimensiones (coverage, depth,
+    listening, speaking, interaction, assessment, review) + `overall` + `by_level` + bloque `learning_loop`.
+    Overall **56,8**; dimensiones: coverage 85,7 · depth 55,7 · listening 47,8 · speaking 84,7 ·
+    interaction 76,4 · assessment 23,5 · review 23,5.
+  - `quality_report_delta(before, after)`: delta antes/después por dimensión y nivel.
+- ✅ **CLI** (`scripts/curriculum_coverage.py`): imprime dashboard + loop legibles y `--quality` vuelca
+  el JSON completo.
+- ✅ **Hallazgo de datos:** el recuento real de objetivos es A1 23 → A2 11 → B1 10 → B2 9 → C1 7 →
+  C2 5. La caída es más abrupta de lo que sugería la auditoría previa (no solo C1/C2 son finos; A2 y
+  B1/B2 también). Los puntos débiles medidos: Review/Assessment (23,5, solo en módulos "Final"),
+  Listening (47,8, integrado en parte de las unidades) y las fases de cierre del loop (retrieve/transfer
+  0%, assess/review 19,4%).
+- ✅ **Tests** `test_curriculum_quality.py` (18 invariantes: unit coverage, pesos del depth, drill-down,
+  dashboard determinista, delta identidad, 6 del loop). Backend **999 tests** + `ruff` limpio;
+  `content_validation` OK; `check_release_consistency` OK (2.4.0).
+- Verificado: `curriculum_coverage` OK (dashboard + loop), `--strict` exit 0. Sin bump de versión y
+  **sin UI** (la visualización del dashboard/loop es un incremento posterior).
+
+### 37.27 HECHO (V2.6-C2) — Marcador de fase del Unit Learning Loop (`Activity.phase` + validación)
+- ✅ **Modelo** (`services/curriculum.py`): `LEARNING_PHASES` (9 fases canónicas) como fuente de verdad
+  y `Activity.phase: str = ""` (default vacío = `practice`, retrocompatible). `validate_level()` rechaza
+  `phase` no canónico.
+- ✅ **Medición** (`services/curriculum_coverage.py`): re-exporta `LEARNING_LOOP_PHASES = LEARNING_PHASES`
+  (anti-drift) y `unit_learning_loop()` lee `retrieve`/`transfer`/`review`/`assess` desde el `phase` de
+  las actividades (además del módulo Final para assess/review). El hueco deja de ser un 0 hardcodeado y
+  pasa a ser **datos etiquetables**: con el contenido actual sigue en 0 (retrieve/transfer) y 19,4%
+  (assess/review), porque ningún JSON usa aún el marcador.
+- ✅ **Briefing de contenido separado** `agentes/curriculum/c5-loop-phases.md`: etiquetar las fases de
+  cierre por unidad (piloto A1 → escalar), actualizar los invariantes de snapshot y subir el loop de
+  50,6% → ≥ 77%.
+- ✅ **Tests**: `test_bank_wiring.py` (validación: phase no canónico rechazado, canónico y vacío
+  aceptados) + `test_curriculum_quality.py` (medición: retrieve/transfer/review/assess leídos del
+  marcador en unidad no Final, y alias de taxonomía anti-drift). Backend **1005 tests** + `ruff` limpio.
+- Verificado: `curriculum_coverage --strict` exit 0, `validate_level` vacío para los 6 niveles. Sin bump
+  de versión y **sin UI**.
+
+### 37.28 HECHO (V2.6-C5) — Etiquetado de fases del Unit Learning Loop en el contenido
+- ✅ **Contenido** (`backend/curriculum/a1.json`…`c2.json`): las 25 unidades normales (no módulo
+  "Final") etiquetan las 4 fases de cierre con el marcador `phase`:
+  - `retrieve` (recuperación espaciada) y `transfer` (can-do en contexto nuevo): 25/31 unidades (80,6%).
+  - `review` (micro-repaso del can-do) y `assess` (auto-evaluación de cierre): 31/31 (100%), ya no solo
+    en los módulos "Final".
+- ✅ **Loop por unidad**: media **50,6% → 84,7%** (objetivo ≥ 77%). Las 9 fases: introduce/practice
+  100%, listen 45,2%, speak 90,3%, interact 83,9%, retrieve/transfer 80,6%, assess/review 100%.
+- ✅ **Invariantes de snapshot** (`tests/test_curriculum_quality.py`): los 2 tests que codificaban el
+  hueco se actualizan — `test_loop_retrieve_and_transfer_are_tagged` (covered_units > 0) y
+  `test_loop_assess_and_review_cover_every_unit` (covered_units == total_units).
+- Verificado: `curriculum_coverage --strict` exit 0, `validate_level` vacío para los 6 niveles, backend
+  **1005 tests** + `ruff` limpio. Sin bump de versión y **sin UI** (solo contenido + invariantes).
+
+### 37.29 NUEVO (V3.2.x, docs) — Auditoría pedagógica del modelo de nivelación + Constitución CEFR
+- **Dossier desk** `docs/audit/H-NIVELACION-PEDAGOGICA.md` (2026-09-03): inventario del
+  modelo de nivelación (modelo heurístico legacy `services/cefr.py` vs Student Model vivo),
+  hallazgos H1–H7 y veredicto ("el modelo no sabe responder qué ha demostrado el alumno").
+- **Constitución pedagógica** `docs/CONSTITUCION-PEDAGOGICA.md`: especificación normativa
+  Pre-A1→C2. Separa **Practice Level / Mastery / Estimated CEFR / Demonstrated CEFR** con 4
+  estados por competencia (NOT STARTED → DEVELOPING → FUNCTIONAL → DEMONSTRATED), define
+  cobertura léxica como indicador (no puerta), Lexical Units, la progresión de listening y el
+  Mastery Gate general (coverage + accuracy + subskills + retención ≥7d + checkpoint).
+- **Incrementos de código siguientes** (solo documentados; no ejecutados en esta iteración):
+  - P0: eliminar la interpretación palabras→nivel y sus tests; estados Estimado/Demostrado por
+    competencia con una sola fuente de mastery; coherencia Pre-A1 en bandas por destreza.
+  - P0: cablear la práctica de listening al Student Model y consolidar `route_gate` como gate de
+    la competencia Listening (con retención retardada).
+  - P1: extender `cefr_matrix.json` a C1/C2 y 8 destrezas; retención en la certificación;
+    Lexical Units en el Personal Dictionary.
+  - P2: UI de "Entrenamiento A1" vs "A1 — demonstrated"; etiquetado del nivel estimado;
+    eliminar `modeCefrLevel`/`modeCefrBand`.
+
+### 37.30 NUEVO (V3.13, docs) — Calibración de evidencia pedagógica (normativa)
+- **Constitución pedagógica ampliada** (`docs/CONSTITUCION-PEDAGOGICA.md`): nuevas **Reglas
+  inmutables R1–R7** (Practice≠Mastery, Mastery≠CEFR certification, Vocabulary≠nivel,
+  One skill≠Overall, Recognition≠Production, Éxito inmediato≠Retención, Small sample≠
+  Competencia demostrada), **§6.4 Evidence depth** (LOW/MEDIUM/HIGH contra `cefr_matrix.json`;
+  bancos cortos ≤ 12 checks solo declaran "practice coverage · evidence depth LOW") y **§7**
+  reescrita por modalidades (recognition / controlled production / free production) con lo que
+  exige "demostrado" por destreza.
+- **Incrementos de código de la iteración V3.13** (ver §9 de la constitución): P0 (evidence
+  depth por destreza/nivel, claims honestos para bancos cortos, suelo de "demostrado" con
+  mínimo de muestras y producción, `current_level` como sugerencia de material, invariantes
+  pedagógicas) · P1 (Grammar en 3 niveles con producción controlada, cross-skill evidence B1,
+  golden pedagogical dataset) · P2 (LearnRoutePage compartido, parity i18n automática).
+
+### 37.31 HECHO (V3.13) — Calibración de evidencia pedagógica (implementación)
+- **P0 — Motor de evidencia + claims honestos** (`v3.13.0`): nuevo
+  `backend/services/evidence_depth.py` (pure, depth LOW/MEDIUM/HIGH vs
+  `cefr_matrix.json`, expuesto en `/api/profile` vía `domain/profile.py`);
+  evidencia `academy_evidence` con columna `level` en filas nuevas
+  (retrocompatible). Rutas quiz: `stats` por nivel con `bank_size` y
+  `evidence_depth`; UI Grammar/Vocabulary muestra "practice coverage · evidence
+  depth LOW" en bancos cortos (claves i18n nuevas). `services/competence.py`:
+  `demonstrated` = gate funcional + `minimum_evidence` + retención retardada
+  estable ≥7d + producción en grammar/speaking/writing (solo MC nunca
+  demuestra); vocabulary es `SUPPORT_SKILL`, techado en `functional`.
+  `current_level` = sugerencia de material con fallback `review_due`.
+  `backend/tests/test_pedagogical_invariants.py` (R1–R7).
+- **P1 — Producción de Grammar + cross-skill + golden**: ítems
+  `controlled_production` (prompt + `accepted_answers`, corrección determinista
+  `normalize_typed`/`typed_matches`) en currículo A2–C1 y motor `quiz_routes.py`
+  (submit con `typed_answer`); UI "type the answer". Cross-skill B1:
+  `backend/services/cross_skill.py` (registro por estructura, canales
+  recognition/production/listening/speaking/transfer), `/api/cross-skill`,
+  `frontend/src/features/evidence/CrossSkillMatrix.tsx` en Grammar B1. Golden
+  `backend/tests/golden/pedagogy/evidence_depth_cases.json` +
+  `test_golden_pedagogy.py`.
+- **P2 — LearnRoutePage compartido + parity i18n**: shell
+  `frontend/src/features/routes/QuizRoutePage.tsx` (config por skill: API,
+  i18n, LevelPanel, `scene` personalizada, `trailing`, assessment ladder o
+  speaking) + máquina consolidada `features/routes/routeSession.ts` + tipos
+  `quizRouteTypes.ts`. Migradas por oleadas Grammar+Vocabulary (1),
+  Pronunciation+Conversation (2), Speaking con extras y bloques contextuales
+  (3); cada oleada validada con `tsc --noEmit`, vitest y su spec Playwright
+  desktop. Listening (4) **no migra por diseño**: es la única práctica del hub
+  servida dentro del runner `PracticeView` del workspace (línea
+  `WORKSPACE_ACTIVITIES` de `Workspace.tsx`), no una página de ruta standalone.
+  `frontend/src/utils/i18n.parity.test.ts` (claves en/es no vacías, sin
+  duplicados, usadas resueltas).
+- **Cierre**: bump único `3.13.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.31 en `docs/RELEVO.md`, `release-notes-v3.13.0.md`.
+  §9 de la constitución marcada "implementado en v3.13.0". Tests: **pytest
+  1290**, **vitest 382** y Playwright desktop verde.
+
+### 37.32 HECHO (V3.14) — Registro cross-skill A1–C2 (implementación)
+- **Contenido — ítems CP en A1 y C2** (`backend/curriculum/a1.json`,
+  `c2.json`): A1 gana `a1-cp-01..06` (`to be`, present simple 3.ª persona,
+  adverbios de frecuencia, `have/has got`, preposiciones de lugar, past simple;
+  dianas `a1-m01-u01-l01-o01`, `a1-m02-u01-l01-o01/-o03`, `a1-m03-u01-l01-o01`,
+  `a1-m04-u01-l01-o02`, `a1-m08-u01-l01-o02`) y C2 gana `c2-cp-01..04`
+  (inversión enfática + cleft en `c2-m01-u01-l01-o04`, mixed conditional en
+  `c2-m03-u01-l01-o01`, pasiva formal de registro en `c2-m02-u01-l01-o01`),
+  con `accepted_answers` deterministas. El banco Grammar crece (A1 38→44, C2
+  4→8); C2 sigue en banco corto ≤12 → su claim "evidence depth LOW" se
+  conserva (tests pedagógicos actualizados: docstrings 4 MC → 4 MC + 4 CP).
+- **Motor — registro generalizado** (`backend/services/cross_skill.py`):
+  `CROSS_SKILL_LEVELS = ("a1".."c2")`; `structure_registry(level)` sirve
+  cualquier nivel (objetivos con checks MC de grammar); constantes
+  `A1..C2_PRODUCTION_BINDINGS` + `PRODUCTION_BINDINGS_BY_LEVEL` completos
+  (A2/B2/C1 validados contra `can_do`; B1 intacto). Un objetivo agrupa varios
+  CP y `production.evidence` cuenta CP superados. Sin `proto`.
+- **API/schema** (`backend/schemas/cross_skill.py`,
+  `backend/routers/cross_skill.py`): `proto` eliminado de `CrossSkillMatrixOut`;
+  endpoint valida `level ∈ CROSS_SKILL_LEVELS` (400
+  `cross_skill.level_unknown`); default `"b1"` inofensivo se mantiene.
+- **Tests backend** (`backend/tests/test_cross_skill.py` reescrito):
+  invariantes por nivel (registro == objetivos grammar con MC; bindings
+  normativos sin CP huérfanos; oferta de listening/speaking según wiring del
+  currículo; matriz cuenta recognition/transfer/listening/speaking por
+  objetivo y producción por CP superado); invariante de contenido A1/C2;
+  endpoint 200 en los seis niveles + 400 en nivel inválido.
+  `test_grammar_routes.py::test_production_pool_items_present_in_every_level`
+  (todos los niveles aportan CP).
+- **UI** (`frontend`): `GrammarLevelPanel.tsx` monta `CrossSkillMatrix` para
+  cualquier nivel (fuera el gate `B1`); `CrossSkillMatrix.tsx` sin pie de
+  prototipo y copia generalizada; `types/api.ts` sin `proto`; `api/crossSkill.ts`
+  con `level` requerido; `i18n.ts` sin `crossSkill.protoNote`, título/nota
+  genéricos. Playwright `grammarRoutesReview.spec.ts` mockea `/api/cross-skill`
+  (respuesta vacía determinista para el panel A1).
+- **Cierre**: bump único `3.14.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.32 en `docs/RELEVO.md`,
+  `release-notes-v3.14.0.md`. Tests: **pytest 1293**, **vitest 382** y
+  Playwright desktop verde.
+
+### 37.33 HECHO (V3.15) — C1/C2 depth avanzado (implementación)
+- **Contenido — volumen a 20 objetivos en C1 y C2** (`backend/curriculum/c1.json`,
+  `c2.json`): +6 objetivos por nivel con evidencia completa (checks MC + 5
+  activities con fases y wiring conservado). C1: `c1-m02-u01-l01` +2 (matiz e
+  idioms de registro), `c1-m02-u01-l02` +1 y `c1-m03-u01-l01` +3
+  (argumentación: concesión y discourse markers). C2: `c2-m02-u01-l01` +2
+  (Register shifts formal/informal) y lección nueva `c2-m02-u01-l03` +4
+  (elipsis, gramática formal, cohesion discursiva). Módulos Final intactos
+  (`c1-m04` y `c2-m03` con su único objetivo). Activities 68→98 en ambos
+  niveles; checks C1 45→63 y C2 38→57.
+- **Motor — taxonomía avanzada** (`backend/services/curriculum.py`): `SUBSKILLS`
+  añade la capa C1/C2 `register`/`pragmatics`/`discourse`/`nuance`/
+  `argumentation` a speaking, listening, writing, grammar, reading y vocabulary
+  (pronunciation intacta; orden alfabético conservado). Re-etiquetado de
+  objetivos C1/C2 solo donde el contenido lo justifica (C1 3→16 y C2 7→20
+  objetivos con subskill avanzada); A1–B2 sin tocar. `validate_level` vacío en
+  los 6 niveles.
+- **Banco grammar C2 normalizado**: 8 → 15 ítems (11 MC + 4 CP en 3 temas:
+  Register & Cultural Fluency, Rhetoric & Persuasion, C2 Final). Ningún banco
+  real es ya corto (< `QUIZ_SHORT_BANK` 12) y `practice_depth` real deja de
+  leer `low`. La regla R7 (muestra pequeña ≠ competencia) se mantiene
+  verificada con un banco corto **sintético** construido en los propios tests,
+  sin contenido artificial.
+- **Tests**: `test_curriculum_quality.py` reformula el snapshot V2.6
+  (`test_depth_c1_c2_reach_deep_target_after_v315`: depth(C1/C2) ≥ 90 y >
+  depth(A1)); `test_pedagogical_invariants.py` re-apunta R7 a banco sintético
+  (`test_synthetic_short_bank_cannot_prove_level`,
+  `test_short_bank_coverage_does_not_lift_to_medium`); `test_grammar_routes.py`
+  actualiza conteos (8 → 15) con helpers `_synthetic_short_bank`; textos
+  "C2 = 4" retirados de `quiz_routes.py` y `schemas/grammar_routes.py`.
+- **Métricas** (CLI `python -m scripts.curriculum_coverage --strict --quality`,
+  exit 0): `depth(C1) = 93.1`, `depth(C2) = 92.5` (A1 89.4, A2 81.9, B1 89.0,
+  B2 81.0; overall 96.2); unit coverage 100 % (31/31) y Unit Learning Loop
+  100 % en las 9 fases; sin huecos `empty`.
+- **Cierre**: bump único `3.15.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.33 en `docs/RELEVO.md`,
+  `release-notes-v3.15.0.md`. Tests: **pytest 1293**, **vitest 382** y build
+  frontend OK (sin cambios de frontend/launcher ni de la CONSTITUCIÓN).
+
+### 37.34 HECHO (V3.16) — Review/SRS por unidad (micro-review + ventanas 7/30/90)
+- **Motor puro** `backend/services/unit_review.py` (determinista, sin BD/FastAPI):
+  ventanas fijas `UNIT_REVIEW_WINDOWS_DAYS = (7, 30, 90)` desde el ancla de la
+  unidad (D4: completada = todos sus objetivos `mastered`; ancla =
+  `max(updated_at)` de sus filas de mastery); estados
+  `upcoming/due_now/passed/failed` con `now` inyectable (D3: la ventana es un
+  hito fijo, el grade no la recalendariza); `sample_micro_review` determinista
+  y balanceado (semilla `user|unit|window`; máx. 2 ítems/objetivo; target 8;
+  reintento prioriza `failed_items` del último intento); `score_micro_review`
+  puntúa en servidor contra `correct_index` (el cliente solo envía respuestas,
+  premisa 21) y `passed = accuracy ≥ 0.7` (D6). Contenido: checks MC
+  **oficiales** del currículo (D8, cero contenido artificial).
+- **Siembra FSRS `objective`** (`sync_fsrs_cards`, `backend/domain/academy.py`):
+  cartas `target_type="objective"` para los objetivos de las unidades
+  completadas del nivel actual (`_current_level_id`, D2); cartas con `reps > 0`
+  solo refrescan `why`/`label`; nuevas se siembran desde el mastery del objetivo
+  (`fsrs.seed_card_from_evidence`) y se fuerzan a due si su ventana más próxima
+  está `due_now`/`failed`. `fsrs.why_for_objective` añadido (puro):
+  `unit-window-N` / `unit-maintenance`. `TARGET_TYPES` intacto.
+- **Persistencia**: tabla idempotente `unit_review_attempts`
+  (`backend/repositories/db.py`; PK autoincrement, índice de lookup
+  `user/level/unit/window/created_at`) con `per_objective` + `failed_items` en
+  JSON, y repos `insert/list/latest_unit_review_attempt`
+  (`backend/repositories/academy.py`); `list_objective_mastery` ahora expone
+  `updated_at`. El micro-review **no** crea evidencia de mastery/currículo ni
+  declara dominio (D5, E3).
+- **API** (`backend/routers/academy.py` + `backend/domain/academy.py` +
+  schemas en `backend/schemas/academy.py`): `GET /api/academy/review/unit-plan`
+  (unidades completadas o con plan activo + `due_count`), `GET
+  /api/academy/review/unit/{unit_id}/micro-review` (ítems SIN `correct_index`;
+  400 si la ventana no está `due_now`/`failed`, 404 si la unidad es ajena al
+  nivel) y `POST /api/academy/review/unit/{unit_id}/micro-review` (puntúa,
+  persiste el intento y reprograma las cartas FSRS `objective` con el grade por
+  objetivo derivado de su precisión).
+- **UI (INICIO)**: `UnitReviewPanel` (`frontend/src/features/review/`) montado
+  en `HomeScreen.tsx` junto a `FsrsReviewPanel`: lista de unidades con chips de
+  ventana 7/30/90 y color por estado, contador de unidades por repasar, y
+  micro-review por tarjetas (una pregunta a la vez, feedback inmediato y
+  respuesta correcta revelada al terminar) con la nota honesta "Repaso de
+  retención · no cuenta como demostración de dominio". Lógica pura extraída a
+  `unitReviewLogic.ts` (testeable sin DOM); tipos espejo en `types/api.ts`,
+  cliente en `api/academy.ts`, i18n `en`/`es` completa con parity.
+- **Tests**: `backend/tests/test_unit_review.py` (servicio puro: 18 tests),
+  `backend/tests/test_unit_review_endpoints.py` (siembra solo en unidades
+  completadas + idempotencia, sin `correct_index` en GET, D5 sin evidencia
+  nueva, gating passed/upcoming → 400 y failed → reintento, aislamiento entre
+  usuarios); `frontend/src/features/review/unitReviewLogic.test.ts` y tests del
+  cliente API. Backend **pytest 1318** + ruff limpio; frontend **vitest 392** +
+  `tsc`/`vite build` OK.
+- **Cierre**: bump único `3.16.0` (backend `config.py` fuente única, validado
+  con `scripts/check_release_consistency.py`), `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.34 en `docs/RELEVO.md`,
+  `release-notes-v3.16.0.md` (untracked). Sin cambios de CONSTITUCIÓN (v3.16 es
+  mecanismo, no norma) ni de launcher.
+- **Auditoría externa (2026-09-06, read-only)**: veredicto **APROBADO CON
+  OBSERVACIONES** — D1–D8 y criterios 1–8 cumplidos (pytest 1318, ruff,
+  consistencia de release verificados en vivo). Fix aplicado del hallazgo
+  **I1** (bug real: `selected_index` serializaba `-1` al elegir la opción A,
+  índice 0, en `domain/academy.py`; corregido con `item.get("selected_index",
+  -1)` + test de regresión `test_micro_review_audit_keeps_index_zero`). El
+  resto queda como deuda priorizada para v3.17 (ver candidato abierto abajo).
+
+### 37.35 HECHO (V3.17) — Knowledge Graph + Daily Adaptive Plan
+- **D1b — el plan diario deriva del grafo**: `services/evidence_graph.py`
+  gana dos funciones puras — `rank_weakness_objectives` (reordena los
+  candidatos de cada destreza débil: primero los objetivos cuyo nodo declara
+  esa destreza como factor limitante o con la dimensión `missing`, después por
+  `mastery` ascendente, empates estables, ids sin nodo al final) y
+  `enrich_item` (aditivo: copia del ítem que gana
+  `can_do`/`limiting_factor`/`graph_mastery`/`because[]` solo si hay nodo). En
+  `domain/academy.py::_session_steps` se construye el mapa de nodos con la
+  MISMA lectura de perfil/evidencia que el resto del flujo
+  (`_objective_nodes_for` + una única `list_evidence`) y se reordena cada
+  `remediation[].objective_ids` antes de `session_plan`; los pasos con objetivo
+  y nodo se enriquecen. `get_next_best_activity` ya no re-enriquece aparte:
+  copia los campos del primer paso enriquecido → `/session` y `/next-best`
+  nunca divergen (test `test_next_best_graph_fields_never_diverge_from_session`).
+- **D2 — vista de grafo real**: nuevo componente reutilizable
+  `ObjectiveNodeCard.tsx` que consume `getEvidenceGraphNode(userId,
+  objectiveId, levelId?)` con estados loading/error/vacío y sin declarar
+  dominio (refleja la puntuación del servidor). Montado en el **curso**
+  (`Milestone` expansible bajo demanda, con el `level_id` real del detalle de
+  la unidad) y en el **perfil** (Habilidades: el detalle del nodo seleccionado
+  del `EvidenceGraphPanel` pasa por `ObjectiveNodeCard`). Sin endpoint nuevo
+  (D2 backend no añade API). i18n reutilizada de `evidenceGraph.*`.
+- **D3 — `/api/academy/today` eliminado**: endpoint, `get_today_plan`,
+  `TodayPlanOut`/`TodayItemOut`, `adaptive.today_plan` + `TODAY_MIX` y cliente
+  `getTodayPlan` + tipos `TodayPlan`/`TodayItem` fuera; la Home consume solo
+  `/session`. Tests migrados con rationale honesto:
+  `test_endpoint_today_empty…` → `test_endpoint_session_empty…`; los 4 tests
+  puros de `today_plan` pasaron a `session_plan` (ajuste honesto de claves y de
+  la aserción weakness ≥ review, ahora ambos 0.30 en `SESSION_MIX`);
+  `test_today_plan_uses_goal_budget` se retiró porque su invariante ya lo
+  cubre `test_endpoint_session_uses_goal_budget`. Referencia stale en
+  `docs/UI_V3.1.md:160` corregida en el cierre.
+- **Deuda v3.16 (D4b)**: M2 ✅ — `validate_micro_review_answers`
+  (`unit_review.py`) valida claves ⊆ muestra e índices en rango antes de
+  puntuar (`ValueError unit_review.invalid_answers` → 400, sin persistir); M3 ✅
+  — prefijos dinámicos `unitReview.window.`/`unitReview.state.`/`skill.`/
+  `fsrs.whyReason.` registrados en `DYNAMIC_KEY_PREFIXES`; O2 ✅ — test de
+  reintento parcial GET==POST (muestra idéntica entre llamadas y fallidos
+  primero). M1 ✅ **en el cierre** — infraestructura DOM aprobada por el
+  gerente: devDeps `jsdom` + `@testing-library/react` (+`@testing-library/dom`)
+  en `frontend/package.json`, `vitest.config.ts` ampliado a `*.test.tsx` (con
+  alias `@` → `src`; jsdom por archivo vía `// @vitest-environment jsdom`) y 6
+  vitest de componente nuevos: `UnitReviewPanel.test.tsx` (4: vacío, ventana
+  due, submit+refresh con plan mutable, error de red) y `TodayPlan.test.tsx`
+  (2: micro-línea D6 con can-do + chip `%`, y silencio D7 sin nodo).
+- **D5 — versionado**: `GRAPH_VERSION` permanece `"2.12.0"` (helpers nuevos +
+  contrato opcional; no se altera la salida de `objective_node`/
+  `build_level_graph`).
+- **D6 — UI del plan**: `TodayPlan.tsx` pinta en cada fila de sesión con
+  `can_do` + `limiting_factor` dos micro-líneas estáticas informativas dentro
+  de la fila-botón (can-do en itálica + chip del factor limitante con `%` o
+  `missing` vía tokens warning); el `because[]` completo sigue solo en
+  `NextBestCard`. CSS en `legacy.css` (`.today-item-graph`).
+- **D7 — ítems sin nodo**: `enrich_item(nodo=None)` devuelve copia intacta; en
+  `/session` los pasos sin `objective_id` (p. ej. listening) no ganan campos y
+  el esquema los serializa `null`/`[]` (`SessionStepOut` ampliado con campos
+  opcionales); el ranking nunca bloquea (sin nodo → orden original al final).
+- **Tests**: `test_graph_plan.py` (9 puros de `rank_weakness_objectives`/
+  `enrich_item`, incl. fallback D7 y paridad con `enrich_next_best`),
+  `test_session_graph.py` (5 endpoint: campos del grafo en `/session`
+  coherentes con el can-do real del currículo, silencio en pasos sin objetivo,
+  paridad `/next-best`==`/session`, y los 2 de la auditoría v3.17 — camino REAL
+  de remediación enriquecido y paridad con el primer paso CON nodo); migrados
+  `test_academy.py`, `test_academy_goal.py`, `test_adaptive.py`; M2/O2 en
+  `test_unit_review.py`/`test_unit_review_endpoints.py`. Backend **pytest
+  1335** + ruff limpio; frontend **vitest 398** (392 + 6 DOM) +
+  `tsc`/`vite build` OK; `check_release_consistency` exit 0.
+- **Cierre**: bump único `3.17.0` (backend `config.py` fuente única) +
+  `frontend/package.json`/`package-lock.json` (bump + devDeps DOM de M1),
+  `README`, `CHANGELOG`, `PLAN`, Nota superior + entrada 37.35 en
+  `docs/RELEVO.md`, `release-notes-v3.17.0.md` (untracked). Sin cambios de
+  CONSTITUCIÓN (v3.17 conecta el grafo existente al plan: motor + UI, no
+  norma) ni de launcher.
+- **Auditoría externa (2026-09-06, read-only sobre `989658e`)**: veredicto
+  **APROBADO CON OBSERVACIONES** — D1b/D2c/D3a/D4b/D5a/D6a/D7a cumplidos y
+  reproducidos en vivo (pytest 1333, vitest 398, ruff, tsc, consistencia).
+  Fix aplicados tras el veredicto: **H1** — 2 tests de endpoint que fijan el
+  camino REAL de remediación de D1b (paso `weakness` de un examen suspendido
+  enriquecido con el can-do real del currículo, y paridad
+  `/next-best`==`/session` cuando el primer paso CON nodo — antes solo se
+  cubría el null==null de usuario nuevo); **H2** — el panel de Habilidades ya
+  no recorta a 12 nodos (listado completo, criterio 5 de D2); **H3** — el
+  `Milestone` no expande objetivos `locked`; **H4** — typo docs («10 puros» →
+  «9»). Deuda menor (sin fix, decidida por el gerente) → candidato v3.18:
+  **H5** y **H6**.
+
+### 37.36 HECHO (V3.18) — Knowledge Graph remainder + deuda del grafo (P3)
+
+- **I2 — ancla congelada al completar**: nueva tabla `unit_review_anchors`
+  (`user_id/level_id/unit_id` PK, `anchor`, `created_at/updated_at`, índice de
+  lookup por `(user_id, level_id)`) en `repositories/db.py` + repos
+  `get_unit_anchor`/`set_unit_anchor_if_absent` (`INSERT OR IGNORE`, nunca
+  sobrescribe). El servicio puro `build_unit_review_plan` gana `anchor:
+  str | None = None` (ventanas sobre el ancla persistida si viene; si no, lo
+  deriva como antes). `domain/academy.py` persiste el ancla en la primera
+  detección de completitud (backfill lazy en `get_unit_review_plan`,
+  `_unit_review_context` y `sync_fsrs_cards`); una segunda lectura tras tocar
+  `updated_at` devuelve las mismas `due_at` (test de dominio).
+- **O1 — cascade 7→30→90**: `window_due_at` recibe los intentos de la unidad
+  (todas las ventanas) y filtra internamente el "intento propio"; sin intento
+  propio, la ventana queda `passed` si existe un intento superado de la unidad
+  con `created_at >= due_at` de esa ventana. Un intento propio mandado fallido de
+  la 30 gana sobre un superado de la 7; resolver la 7 tarde cierra la 30 vencida
+  y deja la 90 `upcoming`/`due_now` según `now`. Tests puros en
+  `test_unit_review.py` (el que fijaba "otras ventanas no afectan" se retiró con
+  rationale honesto).
+- **M4 — cartas `objective` fuera del panel autograduable (single writer)**:
+  `sync_fsrs_cards` crea cartas `objective` solo si la primera ventana no
+  superada de la unidad está `due_now`/`failed` **o** la carta ya existe con
+  `reps > 0` (continuidad de scheduling), barriendo los niveles del plan
+  agregado; `get_fsrs_due` excluye `objective` de cola y `due_count`;
+  `get_fsrs_summary` conserva `by_type` completo pero excluye `objective` del
+  `due_count`; `review_fsrs_card` rechaza `objective` (devuelve `None` → el
+  router responde 400). El contenido `objective` se repasa solo vía
+  `UnitReviewPanel`; `FsrsReviewPanel` recibe únicamente skill/lexicon.
+- **O3 — plan agregado por niveles**: `UnitReviewPlanOut` evoluciona a
+  `{levels: [UnitReviewLevelOut{level_id, level, due_count, units}], due_count}`
+  (nivel actual + anteriores matriculados con unidades completadas o con plan
+  activo, ordenados asc); `get_unit_micro_review`/`submit_unit_micro_review`
+  aceptan `level_id: str | None = None` y validan la unidad con
+  `_find_review_unit` **en el nivel donde vive** (`MicroReviewSubmitIn` gana
+  `level_id`; routers GET/POST lo aceptan). Frontend: tipos espejo,
+  `flattenReviewLevels` en `unitReviewLogic`, `UnitReviewPanel` agrupa por nivel
+  (cabecera + contador por nivel), micro-review recuerda el `level_id` de la
+  unidad, i18n es/en con parity. Aislamiento por usuario verificado.
+- **H5 — etiquetas humanas de dimensiones del grafo**: `GRAPH_DIMENSION_LABELS`
+  (7 dimensiones en inglés de inmersión, convención V3.6.1) + `dimensionLabel`
+  en `frontend/src/utils/learningLabels.ts`; sustituye `SKILL_LABELS[id] ?? id`
+  y los ids en crudo en el chip del factor limitante de `TodayPlan`,
+  `NextBestCard`, `ObjectiveNodeCard` (dimensiones y `recommended_focus`) y
+  `EvidenceGraphPanel`. `transfer`/`discourse`/`interaction` muestran
+  Transfer/Discourse/Interaction.
+- **H6 — coste lazy de `/session` y `/next-best`**: en `_session_steps` el
+  ranking y la construcción de nodos se limitan a los grupos de remediación que
+  pueden producir pasos (`remediation[:SESSION_CAPS["weakness"]]`, importado de
+  `adaptive`); `list_evidence` se lee una sola vez y solo si `needs_nodes`
+  (grupos con candidatos o `next_objective_id`). Payloads idénticos: la paridad
+  `/next-best`==`/session` y el fallback sin nodo (D7 de v3.17) siguen verdes.
+- **Observaciones auditoría v3.17**: (1) `getJsonNullable` (404 → `null`) en el
+  cliente y `getEvidenceGraphNode` lo usa; `ObjectiveNodeCard` distingue
+  `error` (copia `evidenceGraph.error` + botón reintento con `RotateCcw`) de
+  `empty` (404/sin-datos, copia actual) — vitest del componente; (2) helper
+  `_as_float` con fallback `0.0` en `rank_weakness_objectives` (tolerante a
+  `mastery: None`/`"n/a"`, empate estable) + test puro; (3) Playwright: la spec
+  `homeGraphChip.spec.ts` nueva mockea la red (sesión con `limiting_factor.id =
+  "transfer"`) y fija el chip "Transfer"; ejecutada en desktop junto a
+  `smoke.spec.ts` → verdes, captura `tests/visual/screenshots/desktop/
+  home-graph-chip.png` nueva.
+- **Tests**: `test_unit_review.py` (cascade + ancla override), `test_unit_review_endpoints.py`
+  (plan multi-nivel, ancla congelada tras refuerzo, siembra gated M4, micro-review
+  con `level_id` de nivel anterior, 400 `/fsrs/review` objective, exclusión
+  objective en due/summary), `test_session_graph.py` (coste H6: delta de
+  `list_evidence` 0 vs 1), `test_graph_plan.py` (`_as_float`); frontend
+  `learningLabels.test.ts`, `TodayPlan.test.tsx`, `academy.test.ts`,
+  `client.test.ts`, `ObjectiveNodeCard.test.tsx` (nuevo), `UnitReviewPanel.test.tsx`,
+  `FsrsReviewPanel.test.tsx` (nuevo), `unitReviewLogic.test.ts`. Backend **pytest
+  1345** + ruff limpio; frontend **vitest 414** (52 archivos) + `tsc`/`vite
+  build` OK; Playwright región Home/grafo desktop OK;
+  `check_release_consistency` exit 0.
+- **Cierre**: bump único `3.18.0` (backend `config.py` fuente única) +
+  `frontend/package.json`/`package-lock.json`, `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.36 en `docs/RELEVO.md`,
+  `release-notes-v3.18.0.md` (untracked). Sin cambios de CONSTITUCIÓN (v3.18 es
+  mecanismo/UI, no norma) ni de launcher; `GRAPH_VERSION` permanece `2.12.0`.
+
+### 37.37 HECHO (V3.19) — Léxico por destreza + Speaking micro-drill
+
+- **Refactor previo (CAP-01/REFAC-01)**: `record_words` se generaliza en
+  `repositories/vocabulary.py` a `record_production(user_id, words, channel)`
+  (misma semántica de `appearances`/`first_seen`/`last_seen`/`production_days`/
+  `item_status` + suma de la columna `<channel>_prod`); `analyze_text` la llama
+  con `channel="chat"`. En `domain/vocabulary.py` nace
+  `record_production_text(user_id, text, channel)` (fire-and-forget, registra y
+  no lanza) y en `domain/academy.py` el helper compartido `_capture_production_text`
+  sustituye los ≥7 bloques duplicados y se inserta en los 7 writers.
+- **P0 — modelo (LEX-01) y volcado por destreza**: migración idempotente en
+  `repositories/db.py` (4 columnas `INTEGER NOT NULL DEFAULT 0`) con backfill
+  `UPDATE vocabulary SET chat_prod = appearances WHERE chat_prod = 0 AND
+  appearances > 0` (todo el histórico es chat libre, verificado). Canales:
+  `speaking` ← speaking assessment/misión/routes/task + pronunciación libre y
+  rutas + drill; `writing` ← `submit_writing(_task)`/`objective/writing`;
+  `conversation` ← `submit_attempt` de conversación guiada (texto reconstruido
+  de los turnos, volcado antes del guard de longitud); `chat` ← chat libre.
+  `LexicalItemOut` gana los 4 campos. Test puro: canales mixtos conservan
+  `item_status`/coverage y `sum(columnas) == appearances`; dos canales el mismo
+  día cuentan `production_days` una sola vez.
+- **P1 — speaking micro-drill (1 nivel honesto, sin claims D5/E3)**: en
+  `services/lexicon.py`, `drill_candidates(rows, limit=8)` = `exposures > 0 AND
+  speaking_prod == 0` ordenada por recuerdo ascendente (misma semántica para
+  `recognized_not_produced`; la UI deja de recalcular la señal — premisa 21).
+  Endpoints `GET /api/vocabulary/drill/candidates` (determinista por `user_id`)
+  y `POST /api/vocabulary/drill/attempt` (multipart `word` + audio: transcribe
+  con el helper Whisper y puntúa con `score_pronunciation(expected=word,
+  heard)`; éxito = `ok` y palabra en `breakdown.correct` →
+  `record_production(channel="speaking")`). Sin evidence ni FSRS.
+- **Frontend**: `PersonalDictionary` gana chips con acción real que lanzan el
+  drill in-line (captura de micrófono + feedback de pronunciación existentes);
+  estado de error + reintento (A6-03); al producir, la palabra sale de la lista
+  y el léxico se refresca; el estado del drill vive en el panel para no
+  desmontar la UI al vaciarse las candidatas. `dictionary.ts` elimina el
+  recálculo cliente `recognizedNotProduced`; tipos `DrillCandidates`/`DrillAttempt`
+  y `api/vocabulary.ts` (`getDrillCandidates`/`submitDrillAttempt`); i18n es/en
+  del drill + copy SIGNAL-01 ("aún no producida en práctica de speaking") con
+  parity; `SUBSKILL_LABELS` con los tokens de foco de listening.
+- **R6-01 — retención R6 enforcement**: en `start_assessment_v2`/`submit_assessment_v2`,
+  la retención exige ventana ≥ `RETENTION_MIN_DAYS` (7) desde la sesión formal
+  origen y ratio estable ≥ `RETENTION_STABLE_RATIO` (0.9) antes de escribir la
+  evidencia `delayed`; si no, `RetentionNotDueError` → HTTP 409 (CONSTITUCIÓN
+  §6.3 impuesta en servidor; test HTTP de rechazo + re-apuntado del que fijaba
+  200 el mismo día).
+- **GATE-01 — objetivo `locked` no evaluable**: `_ensure_objective_evaluable`
+  (punto único, usa `objective_gated_status`) antes de evaluar/completar en los
+  8 writers de `domain/academy.py`; `ObjectiveLockedError` → HTTP 409 (test de
+  rechazo + re-apuntado del que fijaba 200).
+- **CLAIM-01/SIGNAL-01 — copy**: Speaking/Pronunciation/Conversation re-etiquetan
+  "nivel oral actual (examen)" con calificador estimado (claves `speaking.*`,
+  `pronRoutes.*`, `convRoutes.*`, `dictionary.recognizedNotProduced*`); la pista
+  del diccionario deja de afirmar producción "al hablar" sobre un modelo de teclado.
+- **ERR-01 — 404→503 transitorio**: los 5 flujos de speaking (assessment parts,
+  misiones attempt/retry, speaking task, writing task) propagan
+  `EvidenceExtractionError` en vez de devolver `None`, traducido a 503 en
+  `routers/academy.py`; el 404 queda para estados reales (tests nuevos +
+  re-apuntados).
+- **LIST-01/02/03 — tokens de foco + corpus**: `word_recognition`/
+  `sound_recognition`/`phrase_recognition` entran en `LISTENING_SUBSKILLS` con
+  test ≥1 ítem servible por nivel del foco; corpus re-etiquetado donde el guion
+  no respaldaba la etiqueta (c007/c141/c316 → detail; c021 → phrase_recognition;
+  c041 → word_recognition; c042 → sound_recognition; c324 → word_recognition) y
+  pares cuasi-duplicados resueltos re-autorando c079 (vs c027) y c086 (vs c031);
+  `normalized_script_key` + unicidad de `script` en `validate_listening_bank`
+  (test de detección). Muestras `golden/listening/samples.json` alineadas.
+- **CONV-01 — reconstrucción por `mode`**: `get_turns` expone `mode` de cada
+  mensaje; `interaction_evidence(turns, typed_modes=frozenset())` excluye la
+  telemetría de duración/latencia/interrupciones de los turnos TECLEADOS (el
+  tiempo es de redacción, no de habla) sin tocar el balance ni los recuentos;
+  en la conversación guiada (`mode="conversation"` en el mini-chat) los segundos
+  de habla y la señal objetiva solo computan turnos orales, y el transcripto
+  sigue alimentando el volcado `conversation`.
+- **Deuda externa — ADMIN-01 + BOOL-01**: `require_admin` fail-closed
+  (`ADMIN_PIN=""` ⇒ 401, nunca abiertos); tests de admin re-apuntados con PIN de
+  test + cabecera. `unit_review.py` endurece a `type(selected) is int`
+  (bool-as-int rechazado; test nuevo).
+- **Tests**: pytest **1371** (migración/backfill, desglose por canales,
+  `drill_candidates`, integración HTTP "exponer → drill → producir → sale de la
+  lista", rechazos 409, 503, fail-closed, BOOL-01, LIST, CONV-01) + ruff limpio;
+  vitest **417** (53 archivos, `PersonalDictionary.test.tsx` del chip/drill)
+  + `tsc`/`vite build` OK; `check_release_consistency` **3.19.0** exit 0;
+  curriculum `--strict --quality` exit 0; i18n parity verde.
+- **Cierre**: bump único `3.19.0` (backend `config.py` fuente única) +
+  `frontend/package.json`/`package-lock.json`, `README`, `CHANGELOG`, `PLAN`,
+  Nota superior + entrada 37.37 en `docs/RELEVO.md`,
+  `release-notes-v3.19.0.md` (untracked). Sin cambios de CONSTITUCIÓN (R8/R9
+  siguen como propuesta abierta) ni de launcher; `GRAPH_VERSION` permanece
+  `2.12.0`. Fuera de alcance V3.19 (decisión (b)/futura): micro-drill 3 niveles
+  + integración con el grafo (GRAPH-01), flag de modalidad oral/tecleo,
+  WR-UI-01, LEX-03 (siembra FSRS sin señal).
+
+### Próximos incrementos (candidatos abiertos, auditados)
+
+> Lista de candidatos con su estado REAL auditado (2026-09-05, subagentes
+> read-only sobre el código y las métricas en vivo). Los que ya se entregaron en
+> V2.7–V2.9 se marcan cerrados abajo; los abiertos se ejecutan en orden con un
+> subagente y un release cada uno (premisa 6: un incremento a la vez).
+
+- ~~**🔴 P0 — Unit Coverage 100%**~~ ✅ **cerrado (V2.7/V2.8)**: las 31 unidades
+  A1–C2 integran hoy las 7 secciones (unit coverage 100 %, Unit Learning Loop
+  100 % 31/31, CLI `--strict --quality` exit 0). Candidato remanente de la era
+  V2.6 pre-V2.7. Caveat: ningún test fija el 100 %; un futuro contenido
+  incompleto lo bajaría sin fallar (`--strict` solo aborta en `empty`).
+- ~~**🔴 P0 — C1/C2 depth avanzado**~~ ✅ **cerrado (V3.15, entrada 37.33)**:
+  densidad avanzada entregada — C1/C2 a 20 objetivos con evidencia completa,
+  `SUBSKILLS` con capa avanzada (`register`/`pragmatics`/`discourse`/`nuance`/
+  `argumentation`) y re-etiquetado honesto de C1/C2, banco grammar C2
+  normalizado a 15 ítems (≥ 12; deja de leer `low`) y `depth(C1) 93.1` /
+  `depth(C2) 92.5` (CLI `--strict --quality` exit 0, unit coverage y loop
+  100 %). La profundidad *estructural* (≥80, V2.7) ya estaba cerrada.
+- ~~**🟠 P1 — Speaking Performance Evidence**~~ ✅ **cerrado (V2.9)**: el bucle
+  attempt → evaluation → weakness → targeted drill → retry → improvement está
+  completo, persistido y testeado como Speaking Mission Performance
+  (`docs/SPEAKING_MISSION.md`, endpoints `/api/academy/speaking/mission/*`).
+  Matices no imprescindibles: audio dentro de la misión (hoy texto), drills
+  dinámicos (hoy plantillas por criterio), puente criterio-débil → plan.
+- ~~**🟠 P1 — Listening Progression**~~ ✅ **cerrado (V2.8)**: progresión
+  A1 recognition → C2 pragmatic interpretation definida
+  (`docs/LISTENING_CURRICULUM.md`), alineación 38/38, operativa por rutas +
+  diagnóstico + UI. Residuo de contenido abierto (B2/B3 de
+  `docs/audit/B-LISTENING-CEFR.md`): re-etiquetar ítems corpus A1/A2
+  (`attitude`/`speaker_intention` vs foco recognition) y techo `fast_speech`
+  180–200 wpm en C2.
+- ~~**🟠 P1 — Review/SRS por unidad**~~ ✅ **cerrado (V3.16, entrada 37.34)**:
+  micro-review + ventanas 7/30/90 días sobre la base FSRS ya operativa. Nuevo
+  `services/unit_review.py` puro (ventanas fijas desde el ancla de la unidad,
+  estados upcoming/due_now/passed/failed, muestreo determinista de checks MC
+  oficiales con reintento priorizando fallidos, puntuación en servidor);
+  `sync_fsrs_cards` siembra/refresca cartas `objective` solo para objetivos de
+  unidades completadas del nivel actual (sin pisar `reps > 0`); tabla
+  `unit_review_attempts` + repos; `/api/academy/review/unit-plan` y
+  `micro-review` GET/POST con gating; `UnitReviewPanel` en INICIO con i18n
+  es/en. El micro-review no declara dominio ni crea evidencia (D5, E3).
+  Tests: pytest 1318, vitest 392, build OK.
+- ~~**🟡 P2 — Knowledge Graph + Daily Adaptive Plan**~~ ✅ **cerrado (V3.17,
+  entrada 37.35)**: el plan diario deriva del grafo (D1b), vista de grafo real
+  en curso y perfil (`ObjectiveNodeCard`, D2), `/api/academy/today` eliminado
+  de extremo a extremo (D3), deuda v3.16 M2/M3/O2 ✅ y M1 ✅ en el cierre
+  (infra DOM + 6 vitest de componente), D6 micro-líneas en la fila de sesión y
+  D7 fallback silencioso sin nodo. Tests: pytest 1333, vitest 398, ruff/build/
+  consistencia OK. Deuda restante del grafo + auditoría v3.17 → candidato
+  abierto v3.18 abajo.
+- ~~**🟡 P3 — Knowledge Graph remainder + deuda del grafo**~~ ✅ **cerrado (V3.18,
+  entrada 37.36)**: resto del candidato P2 + deuda de la auditoría externa v3.16
+  (37.34) + deuda de la auditoría v3.17 (37.35). **I2** ✅ — ancla de unidad
+  congelada al completar (tabla `unit_review_anchors` de escritura única +
+  backfill lazy; los refuerzos/decay ya no desplazan las ventanas 7/30/90) ·
+  **M4** ✅ — cartas `objective` fuera del panel autograduable (single writer con
+  el micro-review: siembra solo en ventana due/failed o con `reps > 0`;
+  `get_fsrs_due`/`due_count` las excluyen y `/fsrs/review` → 400) · **O1** ✅ —
+  cascade 7→30→90 (un intento superado tardío cierra las ventanas vencidas sin
+  intento propio; el propio manda) · **O3** ✅ — plan de repaso agregado por
+  niveles (`{levels, due_count}`; micro-review valida la unidad donde vive; UI
+  agrupada por nivel) · **H5** ✅ — etiquetas humanas de las dimensiones del
+  grafo (`GRAPH_DIMENSION_LABELS` + `dimensionLabel` en chip/`NextBestCard`/
+  `ObjectiveNodeCard`/`EvidenceGraphPanel`) · **H6** ✅ — `/session`/`/next-best`
+  lazy (una sola `list_evidence` y solo si hay nodos; payloads idénticos) ·
+  **auditoría v3.17** ✅ — `ObjectiveNodeCard` error vs 404/sin-datos con
+  reintento, `_as_float` defensivo, spec Playwright `homeGraphChip` nueva. Tests:
+  pytest 1345, vitest 414, ruff/build/Playwright región desktop/consistencia OK.
+- ~~**🟢 Candidato V3.19 — Léxico por destreza + Speaking micro-drill**~~ ✅
+  **cerrado (V3.19, entrada 37.37, 2026-09-07)**: implementado con las
+  decisiones cerradas de diseño del gerente — LEX-01 (contadores por destreza,
+  no ledger), backfill idempotente `chat_prod = appearances`, micro-drill de 1
+  nivel honesto con señal determinista en servidor, fixes P1 del dossier
+  (R6-01/GATE-01/CLAIM-01/SIGNAL-01/ERR-01/LIST-01/02/03/CONV-01) y deuda
+  ADMIN-01/BOOL-01; liberado como backend `3.18.0 → 3.19.0` (detalle completo y
+  tests en la entrada 37.37, `release-notes-v3.19.0.md` y la Nota superior).
+  Historia del problema que lo motivó (verificado en el código): la producción
+  al léxico solo la volcaba el **chat libre** —
+  `useChat.sendText` → `/api/vocabulary/analyze` →
+  `domain.vocabulary.analyze_text` → `record_words` (`routers/vocabulary.py`) —
+  y las **exposiciones** solo llegan de la respuesta del tutor
+  (`routers/chat.py` → `record_exposure`). Ningún `submit_*` de speaking ni de
+  writing vuelca el texto del alumno (`heard`/`text`) y la tabla `vocabulary`
+  **no tiene columna de destreza** (`source` solo distingue
+  user/curriculum/imported). Por tanto `recognized_not_produced`
+  (`services/lexicon.py`, señal hoy sin consumidor) se calcula sobre producción
+  *tecleada*, no *oral*: una palabra que el alumno escribió en el chat ya no
+  aparece como candidata aunque jamás la haya pronunciado.
+  **P0 — volcado de producción por destreza**: representación a decidir en la
+  implementación (columna/contadores por destreza o ledger de eventos); el
+  **invariante** es que la producción agregada (`appearances`/`production_days`),
+  `item_status` y `coverage_indicator` actuales **no cambian** de semántica y el
+  desglose por destreza queda derivable. Puntos de inserción naturales —las
+  funciones de dominio que ya reciben el texto del alumno—:
+  `submit_speaking`/`submit_speaking_task`/assessment/mission en
+  `domain/academy.py`, `submit_attempt` en `domain/speaking_routes.py`,
+  `domain/conversation_routes.py` (reconstruye los turnos) y
+  `domain/pronunciation_routes.py`, y `submit_writing`/`submit_writing_task` en
+  `domain/academy.py`; el chat queda etiquetado `chat`. Caveat honesto: los
+  flujos reales de práctica oral del frontend son rutas/assessment/mission/
+  conversación guiada (los endpoints `objective/speaking`/`objective/writing`
+  hoy no se llaman desde la UI).
+  **P1 — Speaking micro-drill** (consumidor honesto de la señal): los
+  candidatos pasan a ser "expuestas y **nunca producidas oralmente**"
+  (exposures > 0 y spoken == 0); generador determinista en servidor (premisa
+  21) que sirve una mini-práctica reutilizando el scorer de pronunciación
+  existente (`POST /api/pronunciation`, texto esperado + audio) y, al producir
+  la palabra, la marca como producida por speaking y sale de la lista (cierra
+  el bucle exposición → producción). El drill **no** declara dominio ni crea
+  evidencia curricular (mecanismos separados, igual que el micro-review — D5/E3
+  de v3.16). UI: los chips de `recognizedNotProduced` en `PersonalDictionary`
+  (hoy inertes) ganan una acción real de práctica.
+  **Tests/verificación**: puros backend del desglose y del generador,
+  integración "exponer → drill → producir → sale de la lista", endpoints y
+  vitest de la UI; gate igual que v3.18 (hoy pytest 1345, vitest 414, ruff/
+  `tsc`/build limpios y `check_release_consistency`). **Caveats**: sin el
+  desglose el micro-drill no puede distinguir hablar de teclear; el histórico
+  previo a la migración no tiene destreza (etiquetado por defecto o excluido
+  del drill, a decidir en implementación).
+  > **Auditoría profunda V3.18 (2026-09-07)**: el alcance P0/P1 de este candidato
+  > queda **congelado** hasta cerrar el diseño apoyado en el dossier
+  > `docs/audit/I-AUDITORIA-PROFUNDA-V318.md` (eventos léxicos → destreza →
+  > transfer gap → micro-drill 3 niveles → integración con el grafo). La
+  > implementación debe incluir los fixes P1 marcados **(a)** en el dossier:
+  > **R6-01** (retención R6), **GATE-01** (gating de objetivo), **CLAIM-01**
+  > (copy "demostrado" oral), **SIGNAL-01**, **ERR-01**, **LIST-01/02**,
+  > **CONV-01**, más la deuda externa **ADMIN-01** (`ADMIN_PIN=""` fail-closed,
+  > `config.py:47` + `dependencies.py:19`) y **BOOL-01** (bool-as-int,
+  > `unit_review.py:325/356/371`). Precondición de diseño: **CAP-01/REFAC-01**
+  > (captura y punto único del volcado del texto producido). Sin cambios de
+  > código ni de CONSTITUCIÓN (R8/R9 propuesta abierta).
+> *(Histórico: requerimientos superados por la implementación V3.19 — entrada
+> 37.37 y Nota superior.)*
+
+---
+
+## 38. RELEVO HACIA V3.24 — pendientes consolidados (2026-09-08)
+
+> ⛔ **CERRADO (2026-09-08, release v3.24.0 = `8970634`).** Sección histórica:
+> el alcance V3.24 (F-K1 + F-K2 + F-K8) se implementó, verificó y publicó. Ver
+> Nota superior (13:35). Los P2/P3 del dossier K (F-K3…F-K7) quedan como
+> candidatos del siguiente incremento.
+
+> **Para el agente/contexto que retome ahora.** Condensa TODO lo pendiente
+> conocido para avanzar de v3.23.0 a v3.24. Fuentes: dossier K
+> (`docs/audit/K-AUDITORIA-STUDENT-MODEL-V323.md`, Eje 1, nuevo), dossier J
+> (`docs/audit/J-AUDITORIA-TOTAL-V323.md`, total v3.23), dossier I
+> (`docs/audit/I-AUDITORIA-PROFUNDA-V318.md`, profunda V3.18), `PARKED.md` y las
+> notas superiores de este documento. Leer primero la Nota superior (12:30).
+
+### 38.1 Posición actual (verificada 2026-09-08)
+
+- HEAD `main` = **`bb3f253`** (fix documental P1-04→P1-03) sobre release
+  **v3.23.0 = `f3739a9`**; versión declarada `3.23.0` (`backend/config.py`).
+- Gates en verde reproducidos: pytest total **1455** (dossier J G1) ·
+  baterías del Eje 1 **G1 310** + **G2 328** (dossier K, 638 tests del eje) ·
+  vitest **450**/57 archivos · ruff · `tsc`/`vite build` ·
+  `check_release_consistency` 3.23.0 exit 0 · CI GitHub Actions success.
+- Árbol limpio; única escritura de la auditoría = dossier K (untracked).
+- Estado del árbol a 2026-09-08 13:35: **release v3.24.0 `8970634` publicado**
+  en `main` con CI green (sección 38 cerrada como histórico). Suite backend
+  **1457 passed** · Eje 1 **G1 311** + **G2 329** (640, +2 tests e2e) · ruff
+  limpio. Detalle: Nota superior y `agentes/v324-calibracion-salida.md`.
+- CONSTITUCIÓN sin cambios V3.19→V3.23; **R8/R9 siguen como propuesta abierta**
+  (no tocar código si no se cierra la propuesta).
+
+### 38.2 Veredicto que motiva V3.24
+
+El dossier K **NO aprueba el cierre del Eje 1**: cadena actividad →
+`academy_evidence` → mastery por objetivo → perfil → CEFR determinista y sólida
+(escritor único, kinds canónicos, no contagio, certificación con `delayed`
+≥7 días), pero **F-K1** y **F-K2** (P1) deben decidirse antes de cerrar el
+Student Model. `PLAN.md` ("Siguiente incremento") sigue sin briefing: el
+candidato V3.24 sale de este bloque.
+
+### 38.3 Alcance P1 recomendado para V3.24 (decisión del gerente)
+
+| # | Problema (1 línea) | Evidencia clave | Opciones / acción | Test que fija hoy |
+|---|---|---|---|---|
+| **F-K1** | `novel` sin emisor: solo se emiten `familiar`/`transfer`/`delayed`, pero MASTERED, readiness B2+ y el grafo exigen `novel` → `mastery_missing: novel` permanente en la escalera Assessment 2.0 | `assessment_v2.py:543-548`; `adaptive.py:177-206`; `cefr_matrix.json` (`novel_required`); `AssessmentLadder.tsx:155-157`; dossier K G1/G2 | (a) crear emisor real de `novel` (modalidad de escalera/tarea = uso en contexto nunca practicado); o (b) relajar/renombrar gate + matriz CEFR a lo emisible y documentar frontera. Premisa 12: test e2e del emisor | `test_assessment_v2.py:156-164` (solo pasa con `novel` inyectado a mano) |
+| **F-K2** | El estimado vive en un único nivel con escala `numeric = 1 + 5·overall` no calibrada y re-basa al matricular nivel nuevo | `domain/academy.py:580-591,619-627`; `adaptive.py:59-88`; dossier K **G4** (dominar A1 → **B2**; aprobar examen A1 → **Pre-A1**) | Anclar la etiqueta a niveles completados/certificados + tramo actual (no proyección lineal del mastery de un nivel). Tests e2e: (a) dominar A1 completo no estima ≥ B2; (b) aprobar A1 no baja de A1 | `test_academy.py:1389-1408` (solo usuario vacío; no fija el salto) |
+
+Opcionales ampliables al mismo release (P2, dossier K): **F-K3** separar por
+`source` la evidencia de speaking assessment/misión (hoy `objective_id=""`) y
+persistir `cefr_target`; **F-K4** marcar la etiqueta por destreza
+(`SkillState.band`) como `estimated_band`. **F-K8** (tests del salto de nivel)
+es prerequisito del fix F-K2.
+
+### 38.4 Backlog consolidado de pendientes
+
+#### Eje 1 — dossier K (todos abiertos)
+
+| ID | Sev | Qué es (resumen) | Dónde (clave) | Nota para V3.24 |
+|---|---|---|---|---|
+| F-K1 | P1 | `novel` sin emisor; gates que lo exigen | ver 38.3 | alcance P1 recomendado |
+| F-K2 | P1 | escala del estimado por nivel + rebase | ver 38.3 | alcance P1 recomendado |
+| F-K3 | P2 | doble vía speaking assessment/misión no mueve `score` por objetivos | `academy.py:968-973,1167-1174`; `services/academy.py:398-445` | decidir con F-K1/K2 o release siguiente |
+| F-K4 | P2 | `band` por destreza = estimado sin marca | `profile.py:65-110`; `schemas/profile.py` | renombrar a `estimated_band` |
+| F-K5 | P2 | colisión semántica `transfer`/`retention` léxica (señal) vs académica (gate §6.3) | `lexicon.py:442-495` vs `assessment_v2.py:370-410,543-548` | documentar en schemas/tooltips |
+| F-K6 | P2 | modelo léxico agregado sin historia de eventos fina | `repositories/vocabulary.py`; deuda `lexicon.py:468-472` | = frontera `support_level` por evento |
+| F-K7 | P3 | nomenclatura heredada `appearances`/`exposures` | `lexicon.py:470-471`; `schemas/vocabulary.py` | renombrado conceptual no destructivo |
+| F-K8 | P3 | sin test de salto de nivel | `test_academy.py:1389-1408` | prerequisito de F-K2 |
+
+#### Dossier J — observaciones abiertas (total v3.23)
+
+| ID | Sev | Qué es | Dónde | Acción |
+|---|---|---|---|---|
+| H1 | baja | docstrings P1-04→P1-03 | `lexicon.py:229-231`, `test_lexicon.py:148-149` | ✅ **cerrado por `bb3f253`** (no reabrir) |
+| H2 | baja | umbrales léxicos de 1 día acreditan chip "Retention" (≠ §6.3 ≥7 días) | `lexicon.py:44-63`; i18n tooltip | documentar distinción señal vs gate; calibrar con datos |
+| H3 | informativa | 190 claves i18n "sin uso" (higiene, no error) | `generated/i18n-report.md` | deuda de higiene opcional |
+| H4 | informativa | warning deprecación upstream (`httpx`→`httpx2`) en pytest | salida G1 (warnings summary) | revisar en la próxima subida de dependencias |
+
+#### Dossier I — ítems abiertos que tocan el eje (estado verificado en K)
+
+| Ítem | Estado en v3.23 | Nota |
+|---|---|---|
+| GRAPH-01 | abierta | grafo no distingue REC de producción; `transfer` = kind, no modalidad (`evidence_graph.py:159-240`); subirá GRAPH_VERSION cuando se toque |
+| CP-01 | abierta | doble vía de "producción" (relacionada con F-K3) |
+| LEX-02 | abierta (parcial) | la práctica académica no genera `record_exposure` (solo chat); sí hay volcados de producción/retrievals |
+| LEX-03 | mitigada parcial | la siembra curricular (`seed_objective_vocabulary`) crea filas `learning` sin señal tras lección/assessment; decidir si no sembrar sin evento |
+| TOK-01/USE-01 | abiertas | `lexical_tokens` del LLM se descartan; frontera V3.24 (support_level) |
+| SKILL-01 | abierta (ver F-K3) | misión+assessment mezcladas en el pool `skill=speaking` |
+| CONV-02 | abierta | conversación guiada sin evidencia formal de interaction (decisión: emitir o documentar como práctica D5/E3) |
+
+> Ítems del dossier I **fuera del eje** (A1-04/A1-05, A2-06/A2-07, A3-06/
+> A3-07, A5-05/A5-06, A6-04, WR-UI-01…): muchos se cubrieron en V3.19–V3.23
+> (p. ej. A2-07 → endpoint `drill_candidates`, A6-03 → estado error del
+> diccionario, R6-01/GATE-01/CLAIM-01/SIGNAL-01/ERR-01/LIST-01/02/03/CONV-01/
+> ADMIN-01/BOOL-01 en V3.19). **Estado no re-verificado en v3.23**: comprobar
+> contra el árbol antes de implementar cualquiera de ellos.
+
+#### Fronteras V3.24 y deuda declarada (no son bugs)
+
+- **`support_level` por evento** (copied/guided/cued/independent/spontaneous):
+  inferible tras el mapeo de actividades; frontera explícita en release-notes
+  v3.23, dossieres J/K y PARKED. Si V3.24 lo aborda, resolver antes F-K6
+  (ledger léxico por evento) y TOK-01/USE-01.
+- **Backfill de retrieval histórico**: NO (decisión firme, ancla retrospectiva
+  injusta; ver Nota 11:15 v3.23).
+- **Telemetría ASR persistente + frontera `LANGUAGE_MISMATCH`**: fuera de
+  alcance desde V3.22 (Nota 10:30).
+- **Superficie de "recuerdo de significado"** (Recall → Sentence → Context →
+  Free Transfer): preparación de la escalera, fuera de alcance V3.22.
+- **Renombre `appearances → production_count`**: frontera asumida (F-K7).
+- **Micro-drill 3 niveles + integración con el grafo** y **flag de modalidad
+  oral/tecleo**: fuera de alcance V3.19.
+- **F6.3 Contexto/Transfer libre** (Speaking/Listening): aplazado a auditoría
+  pedagógica (Nota V3.21).
+- **R8/R9 de la CONSTITUCIÓN**: propuesta abierta (documento, sin código).
+- **PARKED** (`docs/audit/PARKED.md`): calibración con alumnos reales, FSRS por
+  tipo de memoria, KPI de transfer, audio humano real, 50 claves i18n huérfanas
+  (candidatas legacy), patrón loading/error en paneles profundos (F4), sesgo
+  posicional MC en corpus/checks (fix mecánico pendiente de tu aprobación),
+  matriz de dispositivos (G) y variabilidad LLM de speaking con Ollama real.
+
+### 38.5 Reglas de proceso (premisas 5/6/12/21)
+
+- Un incremento a la vez, con su release; briefing de subagente en `agentes/`.
+- **Premisa 12**: cualquier fix de F-K1/F-K2 va precedido de test de extremo a
+  extremo que falle hoy; read-only durante auditorías.
+- **Premisa 21**: las señales se deciden en servidor; la UI no recalcula.
+- Cierre de release: bump `backend/config.py` (fuente única) + frontend
+  `package.json`/lock, `README`, `CHANGELOG`, `PLAN`, Nota superior + entrada
+  en `docs/RELEVO.md`, `release-notes-v3.24.0.md`, `check_release_consistency`.
+
+### 38.6 Primeros pasos sugeridos para la sesión que retome
+
+> ✅ **CERRADO (2026-09-08, release v3.24.0 `8970634`).** Lista histórica; el
+> siguiente incremento parte de los P2/P3 del dossier K (F-K3…F-K7).
+
+1. Leer: Nota superior de este documento (13:00) → sección 38 → dossier K
+   (Hallazgos, Veredicto, G4) → dossier J (si se quiere el contexto total).
+2. **Estado de V3.24 (2026-09-08 13:00):** alcance cerrado (F-K1 b relajar +
+   F-K2 a anclaje + F-K8) e implementado en el árbol — decisiones, tests-first y
+   detalle en `agentes/v324-calibracion-salida.md` y el PLAN. Suite backend
+   completa **1457 passed** + ruff limpio (sin commit ni bump).
+3. Siguiente paso: cerrar el release V3.24 — baterías G1/G2 del dossier K (638)
+   + frontend (sin cambios de código) + CI y la higiene de cierre de la sección
+   38.5 (bump `3.23.0 → 3.24.0`, `README`, `CHANGELOG`, `PLAN`, entrada en este
+   documento, `release-notes-v3.24.0.md`).
+
+
+

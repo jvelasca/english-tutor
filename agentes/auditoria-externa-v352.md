@@ -1,7 +1,7 @@
 # Briefing de auditoría EXTERNA — V3.52.1 (Student Skill State + Difficulty Engine 2.0 + hotfix de producto)
 
 > **ESTADO: EJECUTADA** (2026-09-11). Informe entregado en
-> [`docs/audit/Q-AUDITORIA-TOTAL-V352.md`](../docs/audit/Q-AUDITORIA-TOTAL-V352.md).
+> [`docs/audit/Q-AUDITORIA-TOTAL-V352.md`](../docs/archive/audit/Q-AUDITORIA-TOTAL-V352.md).
 > Se conserva este briefing como histórico del método.
 >
 > **Para quién:** un agente/auditor EXTERNO que solo tiene acceso al repositorio
