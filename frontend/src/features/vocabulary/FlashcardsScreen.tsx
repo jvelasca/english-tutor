@@ -754,14 +754,10 @@ function StudyTab({
         deckName={deckName}
         onComplete={async (close) => {
           await completeStudyLesson(userId, {
-            word: close.word,
-            cefr: close.cefr,
+            item_id: close.item_id,
             grade: close.grade,
             translation: close.translation,
             facets: close.facets,
-            deck_id: close.deck_id,
-            card_type: close.card_type,
-            card_id: close.card_id,
           });
         }}
         onExit={() => {

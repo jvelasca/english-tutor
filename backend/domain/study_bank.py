@@ -9,7 +9,8 @@ Los contadores cambian con el ámbito:
 
 - total: tamaño del banco en ese ámbito
 - estudiadas: alguna vez calificadas en el libro de repasos
-- aprendidas: estado FSRS ``review`` y los pasos obligatorios no están pendientes
+- aprendidas: estado FSRS ``review`` y los pasos obligatorios no están pendientes.
+  Es un recuento respecto de ``required_facets`` actual, no un hecho histórico.
 - a repasar: vencidas según FSRS
 - veces estudiada: filas del libro, sin recorte de 30 días
 
@@ -40,6 +41,7 @@ from repositories import academy as academy_repo
 from repositories import collections as collections_repo
 from repositories import dictionary as dictionary_repo
 from repositories import flashcards as flashcards_repo
+from repositories import study_lessons as study_lessons_repo
 from repositories import vocabulary as vocabulary_repo
 from services import fsrs
 from services.cefr import CEFR_LEVELS
@@ -85,7 +87,17 @@ def facet_status_ok(facets: dict, name: str) -> bool:
 
 
 def is_learned(card: dict | None, facets: dict, required: list[str]) -> bool:
-    """FSRS en repaso y ningún paso obligatorio pendiente."""
+    """Si la carta está en repaso y ningún paso obligatorio sigue pendiente.
+
+    Es un estado derivado de la configuración vigente, no un hecho histórico.
+    ``required`` son los ``required_facets`` de ahora: vaciar esa lista puede
+    marcar aprendida una palabra sin un repaso nuevo. ``state == review`` no
+    basta: faltan el significado y los pasos que el alumno haya exigido.
+
+    Los ``facets`` los afirma el cliente al cerrar la lección. El servidor no
+    comprueba que el paso se haya mostrado. Un paso saltado sigue en
+    ``pending`` y, si es obligatorio, impide este recuento.
+    """
     if not card or str(card.get("state") or "") != "review":
         return False
     if not facet_status_ok(facets, "meaning"):
@@ -524,6 +536,15 @@ async def _assemble(
         if row.get("back") and not item.get("translation"):
             item["translation"] = str(row.get("back") or "")
     items = await _with_faces(user_id, items)
+    items = await run_in_threadpool(
+        study_lessons_repo.insert_served_items,
+        user_id,
+        items,
+        scope,
+        mode,
+        level_code,
+        None if published_deck else collection_id,
+    )
     config = snap["config"]
     return {
         **body,
@@ -574,90 +595,46 @@ async def study_queue(
     )
 
 
+class LessonUnavailable:
+    """La ficha que sirvió la cola ya no pertenece a ese mazo."""
+
+
+LESSON_UNAVAILABLE = LessonUnavailable()
+
+
 async def complete_lesson(
     user_id: str,
     *,
-    word: str,
-    cefr: str = "",
+    item_id: str,
     grade: int,
     translation: str = "",
     facets: dict | None = None,
-    deck_id: int = 0,
-    card_type: str = "lexicon",
-    card_id: str = "",
-) -> dict | None:
-    """Da de alta la palabra en el léxico, guarda los pasos y califica el FSRS.
+) -> dict | None | LessonUnavailable:
+    """Cierra el ítem servido: una nota, una carta FSRS.
 
-    La carta que leen el resto de módulos es la de tipo ``lexicon``. Si la
-    sesión venía de una ficha manual, esa ficha también se califica para que
-    el mazo avance; la nota del léxico no escribe una segunda fila en el libro.
+    La identidad sale de la fila de la cola. Una ficha manual agenda
+    ``flashcard:<id>`` y deja la carta léxico sin calificar. El léxico agenda
+    solo ``lexicon:<palabra>``. Repetir el mismo ``item_id`` devuelve el
+    resultado ya guardado.
+
+    ``LESSON_UNAVAILABLE`` si la ficha manual ya no está en el mazo: no se
+    escribe nada. ``None`` si el id o la nota no valen.
     """
-    normalized = normalize_word(word)
-    if not normalized or grade not in fsrs.GRADES:
+    if grade not in fsrs.GRADES or not str(item_id or "").strip():
         return None
-    stored = await run_in_threadpool(vocabulary_repo.lesson_facets_by_word, user_id)
-    merged = merge_facets(stored.get(normalized), facets)
-    added = await retention_domain.add_item(
-        user_id,
-        normalized,
-        translation=translation,
-        cefr=cefr,
-    )
-    if added is None:
-        return None
-    await run_in_threadpool(
-        vocabulary_repo.set_lesson_facets, user_id, normalized, merged
-    )
-
-    manual = (
-        card_type == flashcards_domain.CARD_TYPE_FLASHCARD
-        and int(deck_id) != flashcards_repo.AUTO_DECK_ID
-        and str(card_id or "").strip()
-    )
-    if manual:
-        reviewed = await flashcards_domain.review_card(
-            user_id, int(deck_id), flashcards_domain.CARD_TYPE_FLASHCARD, str(card_id), grade
-        )
-        lexicon = await retention_domain.retention_review(user_id, normalized, grade)
-        if reviewed is None and lexicon is None:
-            return None
-        due_at = (reviewed or lexicon or {}).get("due_at") or ""
-        next_days = float((reviewed or lexicon or {}).get("next_in_days") or 0)
-        resolved_type = (
-            flashcards_domain.CARD_TYPE_FLASHCARD
-            if reviewed is not None
-            else flashcards_domain.CARD_TYPE_LEXICON
-        )
-        resolved_id = str(card_id) if reviewed is not None else normalized
-        resolved_deck = int(deck_id) if reviewed is not None else flashcards_repo.AUTO_DECK_ID
-    else:
-        reviewed = await flashcards_domain.review_card(
-            user_id,
-            flashcards_repo.AUTO_DECK_ID,
-            flashcards_domain.CARD_TYPE_LEXICON,
-            normalized,
-            grade,
-        )
-        if reviewed is None:
-            return None
-        due_at = reviewed.get("due_at") or ""
-        next_days = float(reviewed.get("next_in_days") or 0)
-        resolved_type = flashcards_domain.CARD_TYPE_LEXICON
-        resolved_id = normalized
-        resolved_deck = flashcards_repo.AUTO_DECK_ID
-
     study = await study_config_domain.get_study_config(user_id)
-    card = await run_in_threadpool(
-        academy_repo.get_fsrs_card, user_id, flashcards_domain.CARD_TYPE_LEXICON, normalized
+    required = list(study["config"].get("required_facets") or [])
+    code, result = await run_in_threadpool(
+        study_lessons_repo.complete_item,
+        user_id,
+        str(item_id).strip(),
+        int(grade),
+        dict(facets or {}),
+        translation,
+        required,
     )
-    return {
-        "word": normalized,
-        "grade": grade,
-        "card_type": resolved_type,
-        "card_id": resolved_id,
-        "deck_id": resolved_deck,
-        "due_at": due_at,
-        "next_in_days": next_days,
-        "facets": merged,
-        "learned": is_learned(card, merged, list(study["config"].get("required_facets") or [])),
-    }
+    if code == study_lessons_repo.GONE:
+        return LESSON_UNAVAILABLE
+    if code != study_lessons_repo.OK or result is None:
+        return None
+    return result

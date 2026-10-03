@@ -23,6 +23,7 @@ vi.mock("../../components/ItemReplayButton", () => ({
 }));
 
 const item: StudyLessonItem = {
+  item_id: "item-bank",
   word: "bank",
   cefr: "A2",
   card_type: "lexicon",
@@ -64,7 +65,7 @@ describe("WordLesson", () => {
 
     expect(onComplete).toHaveBeenCalledWith(
       expect.objectContaining({
-        word: "bank",
+        item_id: "item-bank",
         grade: 3,
         facets: expect.objectContaining({
           meaning: "done",

@@ -634,18 +634,14 @@ export function getStudyQueue(
   );
 }
 
-/** Cierra una palabra de la lección: léxico + nota FSRS + pasos pendientes. */
+/** Cierra el ítem servido: una nota FSRS y los pasos que el alumno afirma. */
 export function completeStudyLesson(
   _userId: string,
   body: {
-    word: string;
-    cefr?: string;
+    item_id: string;
     grade: number;
     translation?: string;
     facets: Record<string, string>;
-    deck_id: number;
-    card_type: FlashcardCardType;
-    card_id: string;
   },
 ): Promise<{ word: string; learned: boolean; facets: Record<string, string> }> {
   return postJson(`/api/vocabulary/study/complete`, body);

@@ -1046,18 +1046,18 @@ async def study_queue(
 async def study_complete(
     body: StudyCompleteIn, user: dict = Depends(current_user)
 ) -> dict:
-    """Cierra una palabra: entra en el léxico y se califica su carta FSRS."""
+    """Cierra el ítem servido: una nota y una sola carta FSRS."""
     result = await study_bank_service.complete_lesson(
         user["id"],
-        word=body.word,
-        cefr=body.cefr,
+        item_id=body.item_id,
         grade=body.grade,
         translation=body.translation,
         facets=body.facets,
-        deck_id=body.deck_id,
-        card_type=body.card_type,
-        card_id=body.card_id,
     )
+    if result is study_bank_service.LESSON_UNAVAILABLE:
+        raise HTTPException(
+            status_code=404, detail="La ficha de esta lección ya no está en el mazo"
+        )
     if result is None:
         raise HTTPException(status_code=400, detail="Lección de palabra no válida")
     return result

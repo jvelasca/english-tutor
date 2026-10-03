@@ -46,14 +46,10 @@ const STEP_LABEL: Record<LessonFacet, string> = {
 };
 
 export interface LessonClose {
-  word: string;
+  item_id: string;
   grade: number;
   facets: Record<string, string>;
   translation: string;
-  cefr: string;
-  card_type: StudyLessonItem["card_type"];
-  card_id: string;
-  deck_id: number;
 }
 
 /** Pasos extra solo cuando el diccionario tiene con qué enseñarlos. */
@@ -202,14 +198,10 @@ export function WordLesson({
     setError(false);
     try {
       await onComplete({
-        word: item.word,
+        item_id: item.item_id,
         grade: value,
         facets: facetsForGrade(),
         translation,
-        cefr: item.cefr,
-        card_type: item.card_type,
-        card_id: item.card_id,
-        deck_id: item.deck_id,
       });
       const next = index + 1;
       setReviewed((count) => count + 1);

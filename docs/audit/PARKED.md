@@ -2525,6 +2525,24 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.94.5 — Un ítem de Estudiar, una transición FSRS · 2026-10-03
+
+> **Naturaleza:** patch de producto. No toca el Sense Resolver, ni
+> `PROVEN_OTHER_OVERLAP`, ni el ledger de Listening. **No abre V3.95.**
+> **`v3.94.4` no se etiqueta como cierre.**
+
+- **Una nota, una carta.** `GET /study/queue` persiste `item_id`. El complete
+  resuelve la identidad desde esa fila. Repetir el id no vuelve a agendar.
+  Una ficha manual califica `flashcard:<id>` y da de alta la carta léxico sin
+  nota. El alta, las facetas, el FSRS y el libro van en una transacción.
+- **`learned` es derivado.** Depende de `required_facets` actual. `state ==
+  review` no es mastery. Los `facets` los afirma el cliente.
+- **Sigue aparcado.** Colección y nivel a la vez: el backend lo acepta y la
+  UI, con una colección activa, fuerza «todo el léxico».
+- **V3.95 sigue cerrada.** El ledger de producción de Listening sigue a 0 filas.
+- **Publicación.** El tag `v3.94.5` **no** existe todavía. La *Latest* sigue
+  siendo `v3.94.2`.
+
 ## V3.94.4 — Banco de Estudiar y una sola siembra del léxico · 2026-10-03
 
 > **Naturaleza:** patch de producto. No toca el Sense Resolver, ni

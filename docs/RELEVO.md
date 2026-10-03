@@ -9,10 +9,13 @@
 ## Estado vigente
 
 - **Versión publicada:** `v3.94.2` (tag anotado sobre `5ce978a`, GitHub Release
-  *Latest*, CI 12/12). **`v3.94.4` es la versión a auditar**, en la rama
-  `release/v3.94.4`: incluye el árbol de `v3.94.3` (PR #28, aún sin tag) y el
-  banco de Estudiar. Aún **sin tag** y **sin** Release. El tag espera al verde
-  de esa PR. Fuente de verdad de la versión: `backend/config.py`
+  *Latest*, CI 12/12). **`v3.94.5` es la versión a auditar**, en la rama
+  `release/v3.94.5`. El diff de cierre es `dce752ba...release/v3.94.5`. Incluye
+  el árbol de `v3.94.3` (PR #28, aún sin tag) y el banco de Estudiar
+  (`v3.94.4`, que **no** se etiqueta como cierre). `release/v3.94.4` sigue en
+  `dce752ba` y no es el artefacto de este cierre. La integridad del cierre es
+  un `item_id` y una transición FSRS. Aún **sin tag** y **sin** Release: el
+  tag espera al verde de la CI. Fuente de verdad de la versión: `backend/config.py`
   `VERSION`; `scripts/check_release_consistency.py` exige la misma en
   `frontend/package.json`, `frontend/package-lock.json`, `README.md`,
   `CHANGELOG.md` y `PLAN.md`.
@@ -24,13 +27,13 @@
   medida con alumnos. Es lo que bloquea V3.95.
 - **Los ocho gates humanos siguen `pending`.** `docs/audit/validation-evidence.json`
   no existe.
-- **Deuda abierta:** [`audit/PARKED.md`](audit/PARKED.md) (sección V3.94.2 y
+- **Deuda abierta:** [`audit/PARKED.md`](audit/PARKED.md) (sección V3.94.5 y
   anteriores).
 
 ## Cómo retomar
 
 1. Leer [`PREMISAS.md`](PREMISAS.md) y [`ARQUITECTURA.md`](ARQUITECTURA.md).
-2. Leer este documento y la sección V3.94.2 de [`audit/PARKED.md`](audit/PARKED.md).
+2. Leer este documento y la sección V3.94.5 de [`audit/PARKED.md`](audit/PARKED.md).
 3. Verificar el árbol: `git status`, `git log -5 --oneline`, y desde `backend/`
    `python -m pytest -q`.
 4. Trabajar en subagentes con instrucciones cerradas y revisar su diff antes de
@@ -70,6 +73,8 @@ entra en V3.95 con su propia política (ver `PARKED.md §V3.94.2`).
 
 ## Notas de las últimas versiones
 
+> **Nota (2026-10-03 · V3.94.5 — Estudiar cierra el ítem servido una sola vez, y esa nota mueve una sola carta): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`study_lesson_items`) y **CON cambio de contrato** en `POST /api/vocabulary/study/complete` (hace falta el `item_id` de la cola). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **`v3.94.4` no se etiqueta como cierre.** **(A)** Un ítem servido admite 0 o 1 completion. Repetirlo no vuelve a agendar. Una ficha manual califica `flashcard` y deja la carta léxico en `reps=0`. El alta, las facetas, el FSRS y el libro son una transacción. **(B)** `learned` depende de `required_facets` actual; `state == review` no es mastery; los pasos los afirma el cliente. **(C)** Colección y nivel juntos siguen sin pintarse. **Publicación:** pendiente de CI. Detalle en `docs/releases/release-notes-v3.94.5.md`.
+>
 > **Nota (2026-10-03 · V3.94.4 — Estudiar lee el ámbito y Flashcards deja de resembrar el léxico): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`vocabulary.cefr`, `vocabulary.lesson_facets`, `dictionary_entries.cefr`) y **CON endpoints nuevos** de la cola de Estudiar. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **(A)** Un mazo manual no estudia el léxico vencido ajeno. **(B)** Pendientes, Falladas y Todas de nuevo, con un solo inicio. **(C)** Una sincronización por listado de mazos. **Publicación:** pendiente de CI y de la auditoría externa. Detalle en `docs/releases/release-notes-v3.94.4.md`.
 >
 > **Nota (2026-10-01 · V3.94.3 — Formación muestra la ruta de Listening de Aprender, y un acierto de Listening ya no pide un segundo toque): release de PRODUCTO (patch) CON backend y CON frontend**, **SIN migración de BD**, **SIN endpoints nuevos** y **SIN cambio de contrato incompatible** (`listening_route` es aditivo en `CourseMap`). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95:** el ledger de producción sigue a 0 filas; la sonda de telemetría usa una BD temporal. **(A)** La sección de Listening de Formación lee el `route_gate` del mismo nivel y no certifica. **(B)** «Repaso pendiente» se refresca al acertar y el botón solo cuenta frases aún falladas; lo aplazado vuelve al vencer. **(C)** **Siguiente** salta el shadowing opcional; en móvil el botón precede a la transcripción. **Publicación:** pendiente de CI y de la auditoría externa. Detalle en `docs/releases/release-notes-v3.94.3.md`.

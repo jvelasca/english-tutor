@@ -1218,6 +1218,8 @@ export interface StudyConfig {
 }
 
 export interface StudyLessonItem {
+  /** Identidad opaca que emitió esta cola. El cierre solo envía este id. */
+  item_id: string;
   word: string;
   cefr: string;
   card_type: FlashcardCardType;

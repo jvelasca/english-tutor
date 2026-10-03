@@ -125,6 +125,7 @@ function studyQueue(overrides: Partial<StudyQueue> = {}): StudyQueue {
     collection_id: null,
     items: [
       {
+        item_id: "item-airport",
         word: "airport",
         cefr: "A1",
         card_type: "lexicon",
@@ -386,10 +387,8 @@ describe("FlashcardsScreen", () => {
       expect(completeStudyLesson).toHaveBeenCalledWith(
         "u1",
         expect.objectContaining({
-          word: "airport",
+          item_id: "item-airport",
           grade: 3,
-          card_type: "lexicon",
-          card_id: "airport",
         }),
       ),
     );

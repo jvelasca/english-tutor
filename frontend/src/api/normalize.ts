@@ -500,6 +500,7 @@ export function normalizeStudyLessonQueue(raw: unknown): StudyQueue {
         ? null
         : asNumber(data.collection_id),
     items: asRecordArray(data.items).map((item) => ({
+      item_id: asString(item.item_id),
       word: asString(item.word),
       cefr: asString(item.cefr),
       card_type: item.card_type === "flashcard" ? "flashcard" : "lexicon",

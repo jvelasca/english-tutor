@@ -2472,6 +2472,35 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_flashcard_deck_cards_deck "
             "ON flashcard_deck_cards(deck_id)"
         )
+        # V3.94.5: cada ítem que sirve GET /study/queue. El complete solo puede
+        # cerrar uno de estos ids, y solo una vez. Aditiva: una instalación
+        # anterior no tiene la tabla y no pierde filas al crearla.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS study_lesson_items (
+                item_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                word TEXT NOT NULL,
+                cefr TEXT NOT NULL DEFAULT '',
+                card_type TEXT NOT NULL,
+                card_id TEXT NOT NULL,
+                deck_id INTEGER NOT NULL DEFAULT 0,
+                scope TEXT NOT NULL DEFAULT '',
+                mode TEXT NOT NULL DEFAULT '',
+                level TEXT NOT NULL DEFAULT '',
+                collection_id INTEGER,
+                status TEXT NOT NULL DEFAULT 'open',
+                result_json TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                completed_at TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_study_lesson_items_user "
+            "ON study_lesson_items(user_id, status)"
+        )
 
         # V3.77: solicitudes de perfil. Son **estado del producto**, no un aviso
         # efímero: por eso viven en la BD y no en un fichero suelto — sobreviven

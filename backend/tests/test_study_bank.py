@@ -101,17 +101,43 @@ def test_queue_caps_at_words_per_day_and_mixes_levels(monkeypatch, tmp_path):
     assert all(item["is_new"] for item in items)
 
 
+def _queue_course_word(client: TestClient, user_id: str) -> dict:
+    """Un ítem de léxico servido de verdad: una colección de una palabra del curso."""
+    from repositories import collections as collections_repo
+
+    word = next(item for item in sorted(study_bank.course_words()) if item.isalpha())
+    coll = collections_repo.create_user_list(user_id, title="Una")
+    assert coll is not None
+    collections_repo.add_membership(user_id, int(coll["id"]), word)
+    queued = client.get(
+        "/api/vocabulary/study/queue",
+        params={
+            "user_id": user_id,
+            "scope": "all",
+            "mode": "all",
+            "collection_id": coll["id"],
+        },
+    )
+    assert queued.status_code == 200, queued.text
+    items = queued.json()["items"]
+    assert [item["word"] for item in items] == [word]
+    assert items[0]["item_id"]
+    return items[0]
+
+
 def test_complete_enrolls_the_word_and_keeps_a_skipped_step_pending(monkeypatch, tmp_path):
     user_id = _setup(monkeypatch, tmp_path)
     client = TestClient(app)
+    served = _queue_course_word(client, user_id)
+    assert served["word"] not in vocabulary_repo.words_of(user_id)
     done = client.post(
         "/api/vocabulary/study/complete",
         params={"user_id": user_id},
         json={
-            "word": "quarkling",
-            "cefr": "B1",
+            "item_id": served["item_id"],
             "grade": 3,
             "translation": "una cosa",
+            "word": "mentira",
             "facets": {
                 "meaning": "done",
                 "pronunciation": "pending",
@@ -123,17 +149,18 @@ def test_complete_enrolls_the_word_and_keeps_a_skipped_step_pending(monkeypatch,
     )
     assert done.status_code == 200, done.text
     body = done.json()
-    assert body["word"] == "quarkling"
+    assert body["word"] == served["word"]
+    assert "mentira" not in vocabulary_repo.words_of(user_id)
     assert body["facets"]["pronunciation"] == "pending"
     # La casilla de pronunciación viene apagada: el paso queda pendiente y,
     # aun así, la palabra puede contar como aprendida.
     assert body["learned"] is True
-    assert "quarkling" in vocabulary_repo.words_of(user_id)
+    assert served["word"] in vocabulary_repo.words_of(user_id)
     assert (
-        vocabulary_repo.lesson_facets_by_word(user_id)["quarkling"]["pronunciation"]
+        vocabulary_repo.lesson_facets_by_word(user_id)[served["word"]]["pronunciation"]
         == "pending"
     )
-    card = academy_repo.get_fsrs_card(user_id, "lexicon", "quarkling")
+    card = academy_repo.get_fsrs_card(user_id, "lexicon", served["word"])
     assert card is not None
 
     # Con la pronunciación obligatoria, un repaso FSRS no basta para «aprendida».

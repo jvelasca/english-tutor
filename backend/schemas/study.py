@@ -60,6 +60,8 @@ class StudySummaryOut(BaseModel):
 
 
 class StudyLessonItemOut(BaseModel):
+    #: Identidad opaca que emitió esta cola. El complete solo acepta este id.
+    item_id: str
     word: str
     cefr: str = ""
     card_type: str
@@ -91,19 +93,31 @@ class StudyQueueOut(BaseModel):
 
 
 class StudyCompleteIn(BaseModel):
-    """Cierre de una palabra: nota FSRS y estado de cada paso de la lección."""
+    """Cierre del ítem que sirvió la cola.
 
-    word: str = Field(min_length=1, max_length=80)
-    cefr: str = ""
+    ``item_id`` lo emitió ``GET /study/queue``. Palabra, tipo de carta, id y
+    mazo salen de esa fila: si el cuerpo los trae, se ignoran.
+
+    ``facets`` son lo que el cliente afirma al cerrar. El servidor no comprueba
+    que el paso se haya mostrado. Un paso saltado sigue en ``pending``.
+
+    ``learned`` de la respuesta se calcula sobre la carta que recibió esta nota
+    y los ``required_facets`` vigentes en ese momento. No es un hecho histórico.
+    """
+
+    item_id: str = Field(min_length=1, max_length=80)
     grade: int = Field(ge=1, le=4)
     translation: str = ""
     facets: dict[str, str] = Field(default_factory=dict)
-    deck_id: int = 0
-    card_type: str = "lexicon"
-    card_id: str = ""
 
 
 class StudyCompleteOut(BaseModel):
+    """``learned`` mira la carta calificada y la configuración de ahora.
+
+    ``state == review`` no es mastery: hacen falta además los pasos obligatorios.
+    Cambiar ``required_facets`` puede cambiar este booleano sin un repaso nuevo.
+    """
+
     word: str
     grade: int
     card_type: str
