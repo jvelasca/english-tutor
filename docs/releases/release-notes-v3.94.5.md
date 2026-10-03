@@ -51,5 +51,10 @@ el alumno afirma. Palabra, tipo, id de carta y mazo salen de la fila servida.
 - `vitest` de `FlashcardsScreen.test.tsx` y `wordLesson.test.tsx`: **30/30**.
 
 El pytest completo, el vitest completo y el contraste los corre la CI.
-El tag anotado `v3.94.5` espera a que esa CI esté verde. Hasta entonces la
-*Latest* sigue siendo `v3.94.2`.
+La integridad auditada en `d5f350a` se mantiene. El run `37116482054` falló
+por ruff, por 17 claves i18n sin uso y por dos expectativas de
+`addVocabularyItem`; el commit de higiene las corrige y no toca la
+transacción. El job de Playwright de ese run también falló (53) en
+selectores de la pantalla anterior de Estudiar y no entra aquí. El tag
+anotado `v3.94.5` espera un CI 12/12 sobre ese commit. No se abre V3.95.
+Hasta entonces la *Latest* sigue siendo `v3.94.2`.

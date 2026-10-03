@@ -393,17 +393,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Today's review",
     es: "Repaso de hoy",
   },
-  // V3.85.0: «Repasar hoy» deja de ser una lista y pasa a resumen + una sola
-  // acción que encadena la cola del día. `dictionary.review.empty` sigue siendo
-  // el estado vacío y `loadError` el fallo de carga.
-  "dictionary.review.todaySummary": {
-    en: "{count} words are due. One session, one step each.",
-    es: "{count} palabras vencidas. Una sesión, un paso por palabra.",
-  },
-  "dictionary.review.todayAction": {
-    en: "Review now ({count})",
-    es: "Repasar ahora ({count})",
-  },
   "dictionary.review.sessionProgress": {
     en: "{index} of {total}",
     es: "{index} de {total}",
@@ -415,14 +404,6 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.review.sessionFinish": {
     en: "Finish",
     es: "Terminar",
-  },
-  "dictionary.review.empty": {
-    en: "Nothing to review right now — come back later.",
-    es: "No hay nada que repasar ahora mismo — vuelve más tarde.",
-  },
-  "dictionary.review.loadError": {
-    en: "Could not load the review queue. ",
-    es: "No se pudo cargar la cola de repaso. ",
   },
   // V3.35.1 (P1-03): en Recall/Sentence la forma esperada se OCULTA hasta el
   // intento (el drill ya la oculta). V3.85.0 ya no hay lista que la enseñe: el
@@ -832,10 +813,6 @@ const STRINGS: Record<string, Entry> = {
   // V3.78.0: la sesión de tarjetas deja de ser una tarjeta incrustada en Personal
   // y pasa a ser el modo Flashcards. Las claves se RENOMBRAN (no se duplican) de
   // `dictionary.retention.*` a `flashcards.study.*`, que es donde vive ahora.
-  "flashcards.study.title": {
-    en: "Study",
-    es: "Estudiar",
-  },
   "flashcards.study.hint": {
     en: "Study the course bank: everything, one level, or a deck. A new word walks through meaning, pronunciation and context. One you already studied comes back as a short review.",
     es: "Estudia el banco del curso: todas, un nivel o un mazo. Una palabra nueva pasa por significado, pronunciación y contexto. Una ya estudiada vuelve como repaso corto.",
@@ -934,18 +911,6 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.study.addCards": {
     en: "Add cards",
     es: "Añadir tarjetas",
-  },
-  // V3.85.0: el bloque de estudio ofrece DOS acciones etiquetadas. La de
-  // tarjetas dice explícitamente que es la sesión FSRS, para no confundirla con
-  // el repaso de competencia («Repasar ahora (N)»). Antes era «Iniciar sesión
-  // (N)», que no distinguía una superficie de la otra.
-  "flashcards.study.cardsTitle": {
-    en: "Cards",
-    es: "Tarjetas",
-  },
-  "flashcards.study.startCards": {
-    en: "Study cards ({n})",
-    es: "Estudiar tarjetas ({n})",
   },
   "flashcards.study.finished": {
     en: "Session done — {n} cards reviewed.",
@@ -1081,12 +1046,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Whole dictionary",
     es: "Todo el diccionario",
   },
-  "flashcards.study.allLevels": { en: "All", es: "Todos" },
-  "flashcards.study.learnedOf": {
-    en: "{learned} of {total} learned",
-    es: "{learned} de {total} aprendidas",
-  },
-  "flashcards.study.deckChips": { en: "Deck", es: "Mazo" },
   "flashcards.study.levelChips": { en: "Level", es: "Nivel" },
   "flashcards.study.productionPrompt": {
     en: "Write the answer, then check it.",
@@ -1103,10 +1062,6 @@ const STRINGS: Record<string, Entry> = {
     es: "No era eso — esta es la respuesta.",
   },
   "flashcards.study.continue": { en: "Continue", es: "Continuar" },
-  "flashcards.study.pendingToday": {
-    en: "{n} cards due",
-    es: "{n} tarjetas pendientes",
-  },
   "flashcards.study.deck": { en: "Deck", es: "Mazo" },
   "flashcards.study.filtered": {
     en: "Filter: {name}",
@@ -1115,31 +1070,6 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.study.clearFilter": {
     en: "Study the whole dictionary",
     es: "Estudiar todo el diccionario",
-  },
-  // V3.84.0: filtro de la ruta genérica (mazo automático).
-  "flashcards.study.filterLabel": {
-    en: "Study what",
-    es: "Estudiar qué",
-  },
-  "flashcards.study.filterAll": {
-    en: "All my words",
-    es: "Todas mis palabras",
-  },
-  "flashcards.study.filterPacks": {
-    en: "Themed packs",
-    es: "Packs temáticos",
-  },
-  "flashcards.study.filterLists": {
-    en: "My lists",
-    es: "Mis listas",
-  },
-  "flashcards.study.deckHint": {
-    en: "The auto deck is everything the app has registered for you; a manual deck is only what you put in it.",
-    es: "El mazo automático es todo lo que la app ha registrado por ti; un mazo manual es solo lo que tú metes en él.",
-  },
-  "flashcards.study.limitsNote": {
-    en: "Today's limits: {new} new and {review} reviews.",
-    es: "Límites de hoy: {new} nuevas y {review} repasos.",
   },
   // Subpestañas del modo Flashcards.
   "flashcards.viewsLabel": {

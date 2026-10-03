@@ -46,7 +46,6 @@ from repositories import vocabulary as vocabulary_repo
 from services import fsrs
 from services.cefr import CEFR_LEVELS
 from services.curriculum import load_all_levels
-from services.study_config import OPTIONAL_FACETS
 
 _WORD_RE = re.compile(r"^[a-zA-Z][a-zA-Z'\- ]{0,79}$")
 _PACKS_DIR = Path(__file__).resolve().parent.parent / "curriculum" / "vocab_packs"
@@ -238,7 +237,9 @@ def _counts(
     }
 
 
-async def _bank_rows(user_id: str, *, level: str, collection_id: int | None) -> list[dict]:
+async def _bank_rows(
+    user_id: str, *, level: str, collection_id: int | None
+) -> list[dict]:
     user_words = await run_in_threadpool(vocabulary_repo.cefr_by_word, user_id)
     index = bank_index(user_words)
     if collection_id is not None:
@@ -278,7 +279,9 @@ def _classify(
     Una palabra nunca calificada no es un repaso vencido: entra en el resto,
     que es lo que sirve el modo «todas».
     """
-    horizon = (now + timedelta(hours=flashcards_domain.INTENSIVE_HORIZON_HOURS)).isoformat()
+    horizon = (
+        now + timedelta(hours=flashcards_domain.INTENSIVE_HORIZON_HOURS)
+    ).isoformat()
     now_iso = now.isoformat()
     due: list[dict] = []
     upcoming: list[dict] = []
@@ -382,7 +385,9 @@ def _lesson_item(row: dict, snap: dict, *, is_new: bool, deck_id: int) -> dict:
 
 async def _with_faces(user_id: str, items: list[dict]) -> list[dict]:
     """Traducción y definición solo de las palabras de la sesión, en un lote."""
-    missing = [str(item.get("word") or "") for item in items if not item.get("translation")]
+    missing = [
+        str(item.get("word") or "") for item in items if not item.get("translation")
+    ]
     faces = await run_in_threadpool(retention_domain.card_faces, user_id, missing)
     out = []
     for item in items:
@@ -532,7 +537,7 @@ async def _assemble(
         )
         for row in chosen
     ]
-    for item, row in zip(items, chosen):
+    for item, row in zip(items, chosen, strict=True):
         if row.get("back") and not item.get("translation"):
             item["translation"] = str(row.get("back") or "")
     items = await _with_faces(user_id, items)

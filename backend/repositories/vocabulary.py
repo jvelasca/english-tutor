@@ -449,7 +449,9 @@ def _with_sense(row: dict) -> dict:
 
 def translations_for_words(user_id: str, words: list[str]) -> dict[str, str]:
     """Traducciones propias de esas palabras, en una consulta."""
-    wanted = [str(word or "").strip().lower() for word in words if str(word or "").strip()]
+    wanted = [
+        str(word or "").strip().lower() for word in words if str(word or "").strip()
+    ]
     out: dict[str, str] = {}
     if not wanted:
         return out

@@ -19,13 +19,18 @@ import config
 from dependencies import current_user, read_audio_limited
 from domain import dictionary_warmup as dictionary_warmup_service
 from domain import flashcards as flashcards_service
-from domain import study_bank as study_bank_service
 from domain import learning as learning_service
 from domain import retention as retention_service
+from domain import study_bank as study_bank_service
 from domain import vocabulary as vocabulary_service
 from repositories import decision_records as decision_records_repo
 from repositories import flashcards as flashcards_repo
-from schemas.study import StudyCompleteIn, StudyCompleteOut, StudyQueueOut, StudySummaryOut
+from schemas.study import (
+    StudyCompleteIn,
+    StudyCompleteOut,
+    StudyQueueOut,
+    StudySummaryOut,
+)
 from schemas.vocabulary import (
     DecisionLifecycleIn,
     DecisionLifecycleOut,

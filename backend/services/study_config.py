@@ -97,7 +97,10 @@ def _one_of(value: object, allowed: tuple[str, ...], default: str) -> str:
 
 
 def _words_per_day(value: object) -> int:
-    """Entero dentro del tope. Un valor ilegible cae al defecto; uno fuera, se recorta."""
+    """Entero dentro del tope.
+
+    Un valor ilegible cae al defecto; uno fuera, se recorta.
+    """
     try:
         number = int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):

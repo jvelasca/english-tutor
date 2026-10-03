@@ -159,7 +159,9 @@ def card_faces(user_id: str, words: list[str]) -> dict[str, dict]:
     out: dict[str, dict] = {}
     for word in wanted:
         entry = cached.get(word) or {}
-        translation = own.get(word) or packs.get(word) or str(entry.get("translation") or "")
+        translation = (
+            own.get(word) or packs.get(word) or str(entry.get("translation") or "")
+        )
         out[word] = {
             "word": word,
             "translation": translation,

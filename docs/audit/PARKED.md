@@ -2540,7 +2540,11 @@ release **sí** tiene Release, precisamente para no repetir el silencio de `v3.8
 - **Sigue aparcado.** Colección y nivel a la vez: el backend lo acepta y la
   UI, con una colección activa, fuerza «todo el léxico».
 - **V3.95 sigue cerrada.** El ledger de producción de Listening sigue a 0 filas.
-- **Publicación.** El tag `v3.94.5` **no** existe todavía. La *Latest* sigue
+- **Publicación.** La integridad auditada en `d5f350a` se mantiene. El tag
+  `v3.94.5` **no** existe todavía: espera un CI 12/12 sobre el commit de
+  higiene (ruff, 17 claves i18n sin uso y el cuerpo de `addVocabularyItem`).
+  Playwright del run `37116482054` falló (53) en selectores de la pantalla
+  anterior y no entra en ese commit. No se abre V3.95. La *Latest* sigue
   siendo `v3.94.2`.
 
 ## V3.94.4 — Banco de Estudiar y una sola siembra del léxico · 2026-10-03

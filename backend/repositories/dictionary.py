@@ -187,7 +187,9 @@ def _entry_dict(row: object) -> dict:
 
 def brief_for_words(words: list[str]) -> dict[str, dict]:
     """Traducción y definición de caché para esas palabras, sin el artículo entero."""
-    wanted = [str(word or "").strip().lower() for word in words if str(word or "").strip()]
+    wanted = [
+        str(word or "").strip().lower() for word in words if str(word or "").strip()
+    ]
     out: dict[str, dict] = {}
     if not wanted:
         return out

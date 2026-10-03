@@ -36,10 +36,13 @@ def test_learned_ignores_a_pending_step_until_the_learner_requires_it():
     assert study_bank.is_learned(card, pending, ["pronunciation"]) is False
     # Sin JSON de lección no se retira un repaso ya consolidado.
     assert study_bank.is_learned(card, {}, []) is True
-    assert study_bank.is_learned({"state": "learning"}, {"meaning": "done"}, []) is False
+    learning = {"state": "learning"}
+    assert study_bank.is_learned(learning, {"meaning": "done"}, []) is False
 
 
-def test_summary_scopes_the_bank_and_picks_up_a_cefr_dictionary_row(monkeypatch, tmp_path):
+def test_summary_scopes_the_bank_and_picks_up_a_cefr_dictionary_row(
+    monkeypatch, tmp_path
+):
     user_id = _setup(monkeypatch, tmp_path)
     with db._conn() as conn:
         conn.execute(
@@ -69,7 +72,8 @@ def test_summary_scopes_the_bank_and_picks_up_a_cefr_dictionary_row(monkeypatch,
         params={"user_id": user_id, "scope": "level", "level": "B2"},
     )
     assert b2.status_code == 200
-    assert study_bank.bank_index(vocabulary_repo.cefr_by_word(user_id))["zzxquark"] == "B2"
+    index = study_bank.bank_index(vocabulary_repo.cefr_by_word(user_id))
+    assert index["zzxquark"] == "B2"
     assert b2.json()["total"] >= 1
 
     missing = client.get(
@@ -125,7 +129,9 @@ def _queue_course_word(client: TestClient, user_id: str) -> dict:
     return items[0]
 
 
-def test_complete_enrolls_the_word_and_keeps_a_skipped_step_pending(monkeypatch, tmp_path):
+def test_complete_enrolls_the_word_and_keeps_a_skipped_step_pending(
+    monkeypatch, tmp_path
+):
     user_id = _setup(monkeypatch, tmp_path)
     client = TestClient(app)
     served = _queue_course_word(client, user_id)

@@ -14,8 +14,13 @@
   el árbol de `v3.94.3` (PR #28, aún sin tag) y el banco de Estudiar
   (`v3.94.4`, que **no** se etiqueta como cierre). `release/v3.94.4` sigue en
   `dce752ba` y no es el artefacto de este cierre. La integridad del cierre es
-  un `item_id` y una transición FSRS. Aún **sin tag** y **sin** Release: el
-  tag espera al verde de la CI. Fuente de verdad de la versión: `backend/config.py`
+  un `item_id` y una transición FSRS. La auditoría de integridad sobre
+  `d5f350a` queda aceptada. El run `37116482054` falló por higiene (ruff,
+  i18n estricto y dos tests de `addVocabularyItem`); un commit posterior la
+  corrige sin reabrir la transacción. Playwright de ese run falló aparte
+  (53, selectores de la pantalla anterior) y no entra en ese commit. Aún
+  **sin tag** y **sin** Release: el tag espera un CI 12/12. Fuente de verdad
+  de la versión: `backend/config.py`
   `VERSION`; `scripts/check_release_consistency.py` exige la misma en
   `frontend/package.json`, `frontend/package-lock.json`, `README.md`,
   `CHANGELOG.md` y `PLAN.md`.
@@ -73,7 +78,7 @@ entra en V3.95 con su propia política (ver `PARKED.md §V3.94.2`).
 
 ## Notas de las últimas versiones
 
-> **Nota (2026-10-03 · V3.94.5 — Estudiar cierra el ítem servido una sola vez, y esa nota mueve una sola carta): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`study_lesson_items`) y **CON cambio de contrato** en `POST /api/vocabulary/study/complete` (hace falta el `item_id` de la cola). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **`v3.94.4` no se etiqueta como cierre.** **(A)** Un ítem servido admite 0 o 1 completion. Repetirlo no vuelve a agendar. Una ficha manual califica `flashcard` y deja la carta léxico en `reps=0`. El alta, las facetas, el FSRS y el libro son una transacción. **(B)** `learned` depende de `required_facets` actual; `state == review` no es mastery; los pasos los afirma el cliente. **(C)** Colección y nivel juntos siguen sin pintarse. **Publicación:** pendiente de CI. Detalle en `docs/releases/release-notes-v3.94.5.md`.
+> **Nota (2026-10-03 · V3.94.5 — Estudiar cierra el ítem servido una sola vez, y esa nota mueve una sola carta): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`study_lesson_items`) y **CON cambio de contrato** en `POST /api/vocabulary/study/complete` (hace falta el `item_id` de la cola). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **`v3.94.4` no se etiqueta como cierre.** **(A)** Un ítem servido admite 0 o 1 completion. Repetirlo no vuelve a agendar. Una ficha manual califica `flashcard` y deja la carta léxico en `reps=0`. El alta, las facetas, el FSRS y el libro son una transacción. **(B)** `learned` depende de `required_facets` actual; `state == review` no es mastery; los pasos los afirma el cliente. **(C)** Colección y nivel juntos siguen sin pintarse. **Publicación:** la integridad de `d5f350a` queda aceptada; el tag sigue esperando un CI 12/12 sobre el commit de higiene (ruff, i18n y el cuerpo de `addVocabularyItem`). No se abre V3.95. Detalle en `docs/releases/release-notes-v3.94.5.md`.
 >
 > **Nota (2026-10-03 · V3.94.4 — Estudiar lee el ámbito y Flashcards deja de resembrar el léxico): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`vocabulary.cefr`, `vocabulary.lesson_facets`, `dictionary_entries.cefr`) y **CON endpoints nuevos** de la cola de Estudiar. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **(A)** Un mazo manual no estudia el léxico vencido ajeno. **(B)** Pendientes, Falladas y Todas de nuevo, con un solo inicio. **(C)** Una sincronización por listado de mazos. **Publicación:** pendiente de CI y de la auditoría externa. Detalle en `docs/releases/release-notes-v3.94.4.md`.
 >

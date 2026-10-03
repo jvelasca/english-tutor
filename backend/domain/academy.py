@@ -2020,7 +2020,9 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         if prev and int(prev.get("reps") or 0) > 0:
             # Conserva scheduling; solo refresca la razón pedagógica.
             label = entry["skill"]
-            if str(prev.get("why") or "") == why and str(prev.get("label") or "") == label:
+            same_why = str(prev.get("why") or "") == why
+            same_label = str(prev.get("label") or "") == label
+            if same_why and same_label:
                 continue
             updated = dict(prev)
             updated["why"] = why
@@ -2088,7 +2090,9 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         )
         if prev and (int(prev.get("reps") or 0) > 0 or bridge_flagged):
             next_why = str(prev.get("why") or "") if bridge_flagged else why
-            if str(prev.get("why") or "") == next_why and str(prev.get("label") or "") == word:
+            same_why = str(prev.get("why") or "") == next_why
+            same_label = str(prev.get("label") or "") == word
+            if same_why and same_label:
                 continue
             updated = dict(prev)
             updated["why"] = next_why

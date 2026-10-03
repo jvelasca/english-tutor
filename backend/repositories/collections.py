@@ -313,7 +313,9 @@ def list_pack_items() -> list[dict]:
 
 def translations_for_words(words: list[str]) -> dict[str, str]:
     """Primera traducción de catálogo de cada palabra, en una consulta."""
-    wanted = [str(word or "").strip().lower() for word in words if str(word or "").strip()]
+    wanted = [
+        str(word or "").strip().lower() for word in words if str(word or "").strip()
+    ]
     out: dict[str, str] = {}
     if not wanted:
         return out
