@@ -837,8 +837,85 @@ const STRINGS: Record<string, Entry> = {
     es: "Estudiar",
   },
   "flashcards.study.hint": {
-    en: "Flashcards with spaced repetition (FSRS). Grades only schedule the next review — they do not certify mastery.",
-    es: "Tarjetas con repetición espaciada (FSRS). Los grades solo programan el próximo repaso — no certifican dominio.",
+    en: "Study the course bank: everything, one level, or a deck. A new word walks through meaning, pronunciation and context. One you already studied comes back as a short review.",
+    es: "Estudia el banco del curso: todas, un nivel o un mazo. Una palabra nueva pasa por significado, pronunciación y contexto. Una ya estudiada vuelve como repaso corto.",
+  },
+  "flashcards.study.scopeLabel": { en: "What to study", es: "Qué estudiar" },
+  "flashcards.study.scopeAll": { en: "All", es: "Todas" },
+  "flashcards.study.scopeLevel": { en: "By level", es: "Por nivel" },
+  "flashcards.study.scopeDeck": { en: "By deck", es: "Por mazo" },
+  "flashcards.study.pickLabel": { en: "What to practice", es: "Qué repasar" },
+  "flashcards.study.pickPending": { en: "Due", es: "Pendientes" },
+  "flashcards.study.pickFailed": { en: "Missed", es: "Falladas" },
+  "flashcards.study.pickAll": { en: "Whole set", es: "Todas de nuevo" },
+  "flashcards.study.emptyFailed": {
+    en: "No missed words in this view.",
+    es: "No hay falladas en esta vista.",
+  },
+  "flashcards.study.statTotal": { en: "Total", es: "Total" },
+  "flashcards.study.statStudied": { en: "Studied", es: "Estudiadas" },
+  "flashcards.study.statLearned": { en: "Learned", es: "Aprendidas" },
+  "flashcards.study.statDue": { en: "To review", es: "A repasar" },
+  "flashcards.study.statTimes": { en: "Times studied", es: "Veces estudiada" },
+  "flashcards.study.start": { en: "Study ({n})", es: "Estudiar ({n})" },
+  "flashcards.study.wordsToday": { en: "Words today", es: "Palabras hoy" },
+  "flashcards.study.requiredTitle": {
+    en: "What counts as learned",
+    es: "Qué cuenta como aprendida",
+  },
+  "flashcards.study.meaningAlways": {
+    en: "Meaning always counts.",
+    es: "El significado siempre cuenta.",
+  },
+  "flashcards.study.requirePronunciation": { en: "Pronunciation", es: "Pronunciación" },
+  "flashcards.study.requireContext": { en: "Context", es: "Contexto" },
+  "flashcards.study.requireSenses": {
+    en: "Several meanings",
+    es: "Varios significados",
+  },
+  "flashcards.study.requireRelated": { en: "Related words", es: "Palabras relacionadas" },
+  "flashcards.study.shortcuts": { en: "Open another section", es: "Abrir otra sección" },
+  "flashcards.lesson.meaning": { en: "Meaning", es: "Significado" },
+  "flashcards.lesson.pronunciation": { en: "Pronunciation", es: "Pronunciación" },
+  "flashcards.lesson.context": { en: "Context", es: "Contexto" },
+  "flashcards.lesson.senses": {
+    en: "Meanings in context",
+    es: "Significados según el contexto",
+  },
+  "flashcards.lesson.related": { en: "Related word", es: "Palabra relacionada" },
+  "flashcards.lesson.relatedTo": {
+    en: "Related to {lemma}.",
+    es: "Relacionada con {lemma}.",
+  },
+  "flashcards.lesson.continue": { en: "Continue", es: "Continuar" },
+  "flashcards.lesson.skip": { en: "Skip", es: "Saltar" },
+  "flashcards.lesson.recall": { en: "Recall", es: "Evocar" },
+  "flashcards.lesson.deeper": { en: "Go deeper", es: "Profundizar" },
+  "flashcards.lesson.progress": { en: "{n} / {total}", es: "{n} / {total}" },
+  "flashcards.lesson.noMeaning": {
+    en: "No saved translation yet.",
+    es: "Aún no hay traducción guardada.",
+  },
+  "flashcards.lesson.noContext": {
+    en: "No saved example yet. You can skip this step.",
+    es: "Aún no hay ejemplo guardado. Puedes saltar este paso.",
+  },
+  "flashcards.lesson.saveError": {
+    en: "Could not save this word. Try again.",
+    es: "No se ha podido guardar esta palabra. Inténtalo de nuevo.",
+  },
+  "flashcards.lesson.reveal": { en: "Show the word", es: "Mostrar la palabra" },
+  "flashcards.lesson.recallPrompt": {
+    en: "Recall the English word.",
+    es: "Evoca la palabra en inglés.",
+  },
+  "flashcards.lesson.pendingLine": {
+    en: "Still pending: {steps}",
+    es: "Sigue pendiente: {steps}",
+  },
+  "flashcards.lesson.gradePrompt": {
+    en: "How well do you know it?",
+    es: "¿Cómo de bien la sabes?",
   },
   "flashcards.study.empty": {
     en: "Nothing due right now. Add words or come back later.",
@@ -851,8 +928,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Este mazo aún no tiene tarjetas. Añade la primera y podrá estudiarse enseguida.",
   },
   "flashcards.study.emptyAuto": {
-    en: "Your dictionary has no words yet. Add them in My lexicon and they will show up here.",
-    es: "Tu diccionario aún no tiene palabras. Añádelas en Mi léxico y aparecerán aquí.",
+    en: "This view of the bank is empty.",
+    es: "Esta vista del banco está vacía.",
   },
   "flashcards.study.addCards": {
     en: "Add cards",
@@ -893,8 +970,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Toca para revelar",
   },
   "flashcards.study.reveal": {
-    en: "Show answer",
-    es: "Mostrar respuesta",
+    en: "See answer",
+    es: "Ver respuesta",
   },
   "flashcards.study.noFace": {
     en: "No reverse side yet — write it with the pencil, or grade to schedule the review anyway.",
@@ -1000,6 +1077,17 @@ const STRINGS: Record<string, Entry> = {
     es: "Se guarda en tu perfil. La sesión de estudio y la cola de repaso la usan.",
   },
   "flashcards.study.hintLabel": { en: "Hint", es: "Pista" },
+  "flashcards.study.wholeDictionary": {
+    en: "Whole dictionary",
+    es: "Todo el diccionario",
+  },
+  "flashcards.study.allLevels": { en: "All", es: "Todos" },
+  "flashcards.study.learnedOf": {
+    en: "{learned} of {total} learned",
+    es: "{learned} de {total} aprendidas",
+  },
+  "flashcards.study.deckChips": { en: "Deck", es: "Mazo" },
+  "flashcards.study.levelChips": { en: "Level", es: "Nivel" },
   "flashcards.study.productionPrompt": {
     en: "Write the answer, then check it.",
     es: "Escribe la respuesta y compruébala.",

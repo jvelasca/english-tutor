@@ -311,6 +311,28 @@ def list_pack_items() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def translations_for_words(words: list[str]) -> dict[str, str]:
+    """Primera traducción de catálogo de cada palabra, en una consulta."""
+    wanted = [str(word or "").strip().lower() for word in words if str(word or "").strip()]
+    out: dict[str, str] = {}
+    if not wanted:
+        return out
+    with closing(_conn()) as conn:
+        for start in range(0, len(wanted), 200):
+            chunk = wanted[start : start + 200]
+            marks = ",".join("?" for _ in chunk)
+            rows = conn.execute(
+                "SELECT word, translation FROM vocab_collection_items "
+                f"WHERE word IN ({marks}) AND translation != '' ORDER BY id",
+                tuple(chunk),
+            ).fetchall()
+            for row in rows:
+                key = str(row["word"])
+                if key not in out and row["translation"]:
+                    out[key] = str(row["translation"])
+    return out
+
+
 def translation_for_word(word: str, collection_id: int | None = None) -> str:
     """Traducción del catálogo de colección o cadena vacía."""
     w = word.strip().lower()

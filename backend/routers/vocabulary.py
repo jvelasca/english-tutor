@@ -19,11 +19,13 @@ import config
 from dependencies import current_user, read_audio_limited
 from domain import dictionary_warmup as dictionary_warmup_service
 from domain import flashcards as flashcards_service
+from domain import study_bank as study_bank_service
 from domain import learning as learning_service
 from domain import retention as retention_service
 from domain import vocabulary as vocabulary_service
 from repositories import decision_records as decision_records_repo
 from repositories import flashcards as flashcards_repo
+from schemas.study import StudyCompleteIn, StudyCompleteOut, StudyQueueOut, StudySummaryOut
 from schemas.vocabulary import (
     DecisionLifecycleIn,
     DecisionLifecycleOut,
@@ -791,6 +793,9 @@ async def add_vocabulary_item(
         translation=body.translation,
         sense=body.sense.model_dump() if body.sense is not None else None,
         collection_id=body.collection_id,
+        mnemonic=body.mnemonic,
+        deck_ids=body.deck_ids,
+        cefr=body.cefr,
     )
     if result is None:
         raise HTTPException(status_code=400, detail="Palabra no válida")
@@ -983,6 +988,81 @@ async def delete_flashcard_deck(
     return result
 
 
+@router.get("/api/vocabulary/study/summary", response_model=StudySummaryOut)
+async def study_summary(
+    scope: str = Query("all"),
+    mode: str = Query("pending"),
+    level: str = "",
+    deck_id: int = 0,
+    collection_id: int | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Contadores de Estudiar para el ámbito activo (banco, nivel o mazo)."""
+    parsed = study_bank_service.parse_scope(scope)
+    parsed_mode = study_bank_service.parse_mode(mode)
+    if parsed is None or parsed_mode is None:
+        raise HTTPException(status_code=400, detail="Ámbito de estudio no válido")
+    result = await study_bank_service.study_summary(
+        user["id"],
+        scope=parsed,
+        mode=parsed_mode,
+        level=level,
+        deck_id=deck_id,
+        collection_id=collection_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Mazo no encontrado")
+    return result
+
+
+@router.get("/api/vocabulary/study/queue", response_model=StudyQueueOut)
+async def study_queue(
+    scope: str = Query("all"),
+    mode: str = Query("pending"),
+    level: str = "",
+    deck_id: int = 0,
+    collection_id: int | None = None,
+    user: dict = Depends(current_user),
+) -> dict:
+    """Cola de la lección en el mismo ámbito que el resumen."""
+    parsed = study_bank_service.parse_scope(scope)
+    parsed_mode = study_bank_service.parse_mode(mode)
+    if parsed is None or parsed_mode is None:
+        raise HTTPException(status_code=400, detail="Ámbito de estudio no válido")
+    result = await study_bank_service.study_queue(
+        user["id"],
+        scope=parsed,
+        mode=parsed_mode,
+        level=level,
+        deck_id=deck_id,
+        collection_id=collection_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Mazo no encontrado")
+    return result
+
+
+@router.post("/api/vocabulary/study/complete", response_model=StudyCompleteOut)
+async def study_complete(
+    body: StudyCompleteIn, user: dict = Depends(current_user)
+) -> dict:
+    """Cierra una palabra: entra en el léxico y se califica su carta FSRS."""
+    result = await study_bank_service.complete_lesson(
+        user["id"],
+        word=body.word,
+        cefr=body.cefr,
+        grade=body.grade,
+        translation=body.translation,
+        facets=body.facets,
+        deck_id=body.deck_id,
+        card_type=body.card_type,
+        card_id=body.card_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Lección de palabra no válida")
+    return result
+
+
 @router.get(
     "/api/vocabulary/decks/{deck_id}/queue", response_model=FlashcardQueueOut
 )
@@ -990,12 +1070,18 @@ async def flashcard_queue(
     deck_id: int,
     limit: int = Query(100, ge=1, le=100),
     collection_id: int | None = None,
+    level: str | None = None,
     user: dict = Depends(current_user),
 ) -> dict:
     """Cola de estudio: repasos vencidos primero, después las nuevas, recortada
-    por los límites del día del mazo."""
+    por los límites del día del mazo. `level` (A1–C2) solo filtra el diccionario
+    entero; un mazo concreto ya es su propio recorte."""
     result = await flashcards_service.deck_queue(
-        user["id"], deck_id, collection_id=collection_id, limit=limit
+        user["id"],
+        deck_id,
+        collection_id=collection_id,
+        level=level,
+        limit=limit,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Mazo no encontrado")

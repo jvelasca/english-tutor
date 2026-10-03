@@ -370,6 +370,13 @@ def init_db() -> None:
                 "ALTER TABLE dictionary_entries ADD COLUMN "
                 "meanings_json TEXT NOT NULL DEFAULT ''"
             )
+        # Nivel CEFR opcional de una entrada ya generada. Vacío hasta que una
+        # importación lo rellene: el banco de Estudiar la recoge sin otra pantalla.
+        if "cefr" not in dict_cols:
+            conn.execute(
+                "ALTER TABLE dictionary_entries ADD COLUMN "
+                "cefr TEXT NOT NULL DEFAULT ''"
+            )
         # V3.31: el contenido sin versión (creado antes de V3.30.1) se etiqueta
         # con la marca LEGACY `1.0.0`, deliberadamente DISTINTA de la
         # `GENERATOR_VERSION` actual del prompt/parseador. El dominio solo
@@ -1262,6 +1269,13 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE vocabulary ADD COLUMN cefr TEXT NOT NULL DEFAULT ''"
             )
+        # Estado de los pasos de la lección de Estudiar (done / pending / na),
+        # JSON por palabra. Vacío = aún no hay lección registrada.
+        if "lesson_facets" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN lesson_facets TEXT "
+                "NOT NULL DEFAULT ''"
+            )
         if "level_id" not in vocab_cols:
             conn.execute(
                 "ALTER TABLE vocabulary ADD COLUMN level_id TEXT NOT NULL DEFAULT ''"
@@ -1300,6 +1314,14 @@ def init_db() -> None:
         if "translation" not in vocab_cols:
             conn.execute(
                 "ALTER TABLE vocabulary ADD COLUMN translation TEXT "
+                "NOT NULL DEFAULT ''"
+            )
+        # Recordatorio personal de la palabra (una frase por palabra inglesa).
+        # Vive en el diccionario, no en una ficha paralela, para que sirva de
+        # pista tanto en un mazo como al estudiar todo el léxico.
+        if "mnemonic" not in vocab_cols:
+            conn.execute(
+                "ALTER TABLE vocabulary ADD COLUMN mnemonic TEXT "
                 "NOT NULL DEFAULT ''"
             )
 
@@ -2306,6 +2328,19 @@ def init_db() -> None:
         # que el esquema viejo siga abriendo, y la pertenencia real pasa a esta
         # tabla puente. `ON DELETE CASCADE` en la ficha: borrar una ficha no deja
         # pertenencias huérfanas.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lexicon_deck_words (
+                user_id TEXT NOT NULL,
+                deck_id INTEGER NOT NULL,
+                word TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, deck_id, word),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (deck_id) REFERENCES flashcard_decks(id)
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS flashcard_deck_cards (

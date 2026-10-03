@@ -2019,9 +2019,12 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         prev = existing.get(key)
         if prev and int(prev.get("reps") or 0) > 0:
             # Conserva scheduling; solo refresca la razón pedagógica.
+            label = entry["skill"]
+            if str(prev.get("why") or "") == why and str(prev.get("label") or "") == label:
+                continue
             updated = dict(prev)
             updated["why"] = why
-            updated["label"] = entry["skill"]
+            updated["label"] = label
             await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
             continue
         card = fsrs.seed_card_from_evidence(
@@ -2084,9 +2087,11 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
             str(prev.get("why") or "") == LISTENING_BRIDGE_SOURCE if prev else False
         )
         if prev and (int(prev.get("reps") or 0) > 0 or bridge_flagged):
+            next_why = str(prev.get("why") or "") if bridge_flagged else why
+            if str(prev.get("why") or "") == next_why and str(prev.get("label") or "") == word:
+                continue
             updated = dict(prev)
-            if not bridge_flagged:
-                updated["why"] = why
+            updated["why"] = next_why
             updated["label"] = word
             await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, updated)
             continue
@@ -2179,9 +2184,15 @@ async def _sync_objective_cards_for_level(
                     key = ("objective", obj.id)
                     prev = existing.get(key)
                     if prev and int(prev.get("reps") or 0) > 0:
+                        label = obj.title or obj.id
+                        if (
+                            str(prev.get("why") or "") == why
+                            and str(prev.get("label") or "") == label
+                        ):
+                            continue
                         updated = dict(prev)
                         updated["why"] = why
-                        updated["label"] = obj.title or obj.id
+                        updated["label"] = label
                         await run_in_threadpool(
                             academy_repo.upsert_fsrs_card, user_id, updated
                         )

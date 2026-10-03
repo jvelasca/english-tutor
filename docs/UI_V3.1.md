@@ -310,6 +310,7 @@ distinguirse **de un vistazo por su color**.
     ahora `showHeader` (por defecto `true`, para las superficies que la montan suelta) y
     `DictionaryScreen` lo apaga; el ancho y el relleno de página los pone ya el contenedor de la
     pantalla, así que la vista dejó de aplicarlos por segunda vez.
+- **Consulta ES→EN: el significado en español va primero.** Cada acepción se lee al revés del término inglés: el título es la glosa («herramienta de corte») y debajo va la palabra (`saw`). Añadirla a un mazo escribe la palabra en el diccionario del alumno y la enlaza al mazo; no crea una segunda ficha. El recordatorio vive en esa palabra y, en la sesión, «Pista» lo descubre por trozos. El anillo del mazo es aprendidas / total (carta FSRS en repaso); la sesión de hoy sigue teniendo tope.
 - **Medido, no mirado.** El par de direcciones entra en el **arnés de contraste** (`--strict`, 0
   bloqueantes de 444) midiendo la tinta de cada sentido **sobre su relleno compuesto** en los dos
   temas y sobre los dos fondos, con el porcentaje **leído del CSS** en vez de supuesto: 5.99–8.02:1

@@ -112,6 +112,8 @@ def test_normalize_falls_back_to_defaults_and_accepts_case():
         "mode": "recognition",
         "hints": "off",
         "difficulty": "auto",
+        "words_per_day": 20,
+        "required_facets": [],
     }
     # Basura y valores fuera del contrato → defecto, sin lanzar.
     assert study_config.normalize_study_config(["no", "es", "un", "dict"])[
@@ -206,6 +208,8 @@ def test_config_endpoint_defaults_partial_merge_and_persistence(monkeypatch, tmp
             "mode": "recognition",
             "hints": "off",
             "difficulty": "auto",
+            "words_per_day": 20,
+            "required_facets": [],
             "configured": False,
         }
         # PATCH parcial: solo cambia lo enviado.

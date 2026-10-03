@@ -4,13 +4,14 @@
 > hilo (premisas 8 y 12). Si el chat se satura o hay riesgo de alucinación, este
 > documento es el ancla para reanudar. Las notas anteriores a V3.94 están en
 > [`archive/RELEVO-historico.md`](archive/RELEVO-historico.md), sin cambios.
-> Actualizado por última vez: 2026-10-01 (UTC+2).
+> Actualizado por última vez: 2026-10-03 (UTC+2).
 
 ## Estado vigente
 
 - **Versión publicada:** `v3.94.2` (tag anotado sobre `5ce978a`, GitHub Release
-  *Latest*, CI 12/12). **`v3.94.3` está en auditoría** en la rama
-  `release/v3.94.3`: aún **sin tag** y **sin** Release. El tag espera al verde
+  *Latest*, CI 12/12). **`v3.94.4` es la versión a auditar**, en la rama
+  `release/v3.94.4`: incluye el árbol de `v3.94.3` (PR #28, aún sin tag) y el
+  banco de Estudiar. Aún **sin tag** y **sin** Release. El tag espera al verde
   de esa PR. Fuente de verdad de la versión: `backend/config.py`
   `VERSION`; `scripts/check_release_consistency.py` exige la misma en
   `frontend/package.json`, `frontend/package-lock.json`, `README.md`,
@@ -69,6 +70,8 @@ entra en V3.95 con su propia política (ver `PARKED.md §V3.94.2`).
 
 ## Notas de las últimas versiones
 
+> **Nota (2026-10-03 · V3.94.4 — Estudiar lee el ámbito y Flashcards deja de resembrar el léxico): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`vocabulary.cefr`, `vocabulary.lesson_facets`, `dictionary_entries.cefr`) y **CON endpoints nuevos** de la cola de Estudiar. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **(A)** Un mazo manual no estudia el léxico vencido ajeno. **(B)** Pendientes, Falladas y Todas de nuevo, con un solo inicio. **(C)** Una sincronización por listado de mazos. **Publicación:** pendiente de CI y de la auditoría externa. Detalle en `docs/releases/release-notes-v3.94.4.md`.
+>
 > **Nota (2026-10-01 · V3.94.3 — Formación muestra la ruta de Listening de Aprender, y un acierto de Listening ya no pide un segundo toque): release de PRODUCTO (patch) CON backend y CON frontend**, **SIN migración de BD**, **SIN endpoints nuevos** y **SIN cambio de contrato incompatible** (`listening_route` es aditivo en `CourseMap`). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95:** el ledger de producción sigue a 0 filas; la sonda de telemetría usa una BD temporal. **(A)** La sección de Listening de Formación lee el `route_gate` del mismo nivel y no certifica. **(B)** «Repaso pendiente» se refresca al acertar y el botón solo cuenta frases aún falladas; lo aplazado vuelve al vencer. **(C)** **Siguiente** salta el shadowing opcional; en móvil el botón precede a la transcripción. **Publicación:** pendiente de CI y de la auditoría externa. Detalle en `docs/releases/release-notes-v3.94.3.md`.
 >
 > **Nota (2026-10-01 · V3.94.2 — Dos sentidos de la misma palabra en una frase no se colapsan, y un corpus de polisemia fija la heurística en CI): release de PRODUCTO (patch) CON backend y CON frontend** (Ayuda: textos largos y correo parten línea; el barrido responsive incluye Formación), **SIN migración de BD**, **SIN endpoints nuevos** y **SIN cambio de contrato incompatible** (`sense_match` conserva `matched`/`mismatch`/`ambiguous`; razón nueva `occurrence:split`; `new_sense_exposure: {words, count}` conserva su forma). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**; **no se añade ni se retira gate** (siguen los **ocho**, todos `pending`; `validation-evidence.json` sigue sin existir). **(A) Conflicto de ocurrencias.** Si una aparición es `mismatch` probado y otra no, el agregado es `ambiguous` / `occurrence:split` / `mismatch_strength="possible"`. No es `new_sense_exposure`. La carta débil **sí** sube; la fuerte deja fila con `difficulty_before == difficulty_after` sin tocar FSRS, y `day_metrics` no la cuenta ni como dificultad ni como exposición. `occurrences` vive en memoria. **(B) Corpus.** `backend/tests/fixtures/sense_regression_corpus.json`: 95 frases, 15 familias. CI fija `resolver_expected`. El `gold` discrepa hoy en `bank-07`, `bank-08`, `bank-10` y `run-07`. **(C) Telemetría.** `sense_shadow_report.py` cuenta `occurrence_split`. **(D) Ayuda.** `break-words` / `break-all`; `/#/formacion` entra en `responsiveOverflow`. **QA local:** `ruff` limpio en lo tocado · `pytest` **3496/3496** · `vitest` de la Ayuda **3/3** · Playwright overflow **4 passed · 2 skipped**. **Publicación:** el estado verificado está en el párrafo siguiente. **Honestidad:** (i) el 2 sigue siendo solape, no confianza semántica; (ii) el ledger sigue sin volumen: política **declarada, no medida** con alumnos; (iii) el frontend sigue **sin pintar** `new_sense_exposure`; (iv) no hay `sense_id` ni FSRS por acepción; (v) los **ocho gates humanos siguen `pending`**. Detalle en `release-notes-v3.94.2.md`.

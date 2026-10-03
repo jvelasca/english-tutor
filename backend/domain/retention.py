@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from repositories import academy as academy_repo
 from repositories import collections as collections_repo
 from repositories import dictionary as dictionary_repo
+from repositories import flashcards as flashcards_repo
 from repositories import learning as learning_repo
 from repositories import vocabulary as vocabulary_repo
 from services import fsrs
@@ -141,6 +142,32 @@ def _ensure_fsrs_lexicon(user_id: str, words: list[str], *, why: str) -> None:
         academy_repo.upsert_fsrs_cards(user_id, pending)
 
 
+def card_faces(user_id: str, words: list[str]) -> dict[str, dict]:
+    """La misma precedencia que ``card_face``, para varias palabras a la vez."""
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for raw in words:
+        word = str(raw or "").strip().lower()
+        if word and word not in seen:
+            seen.add(word)
+            wanted.append(word)
+    if not wanted:
+        return {}
+    own = vocabulary_repo.translations_for_words(user_id, wanted)
+    packs = collections_repo.translations_for_words(wanted)
+    cached = dictionary_repo.brief_for_words(wanted)
+    out: dict[str, dict] = {}
+    for word in wanted:
+        entry = cached.get(word) or {}
+        translation = own.get(word) or packs.get(word) or str(entry.get("translation") or "")
+        out[word] = {
+            "word": word,
+            "translation": translation,
+            "definition": str(entry.get("definition") or ""),
+        }
+    return out
+
+
 def card_face(
     user_id: str, word: str, collection_id: int | None = None
 ) -> dict:
@@ -221,6 +248,9 @@ async def add_item(
     translation: str = "",
     sense: dict | None = None,
     collection_id: int | None = None,
+    mnemonic: str = "",
+    deck_ids: list[int] | None = None,
+    cefr: str = "",
 ) -> dict | None:
     """Añade una palabra suelta al léxico personal + FSRS. Sin evidencia de skill.
 
@@ -244,6 +274,7 @@ async def add_item(
             "translation": (translation or "").strip(),
             "kind": "word",
             "sense": sense,
+            "cefr": (cefr or "").strip(),
         }
     ]
     touched = await run_in_threadpool(
@@ -253,6 +284,18 @@ async def add_item(
     )
     if not touched:
         return None
+    if (mnemonic or "").strip():
+        await run_in_threadpool(
+            vocabulary_repo.set_mnemonic, user_id, normalized, mnemonic
+        )
+    for raw_deck in deck_ids or []:
+        try:
+            deck_id = int(raw_deck)
+        except (TypeError, ValueError):
+            continue
+        await run_in_threadpool(
+            flashcards_repo.link_lexicon_word, user_id, deck_id, normalized
+        )
     if collection_id is not None:
         await run_in_threadpool(
             collections_repo.add_membership, user_id, collection_id, normalized

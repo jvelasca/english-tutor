@@ -447,6 +447,28 @@ def _with_sense(row: dict) -> dict:
     return row
 
 
+def translations_for_words(user_id: str, words: list[str]) -> dict[str, str]:
+    """Traducciones propias de esas palabras, en una consulta."""
+    wanted = [str(word or "").strip().lower() for word in words if str(word or "").strip()]
+    out: dict[str, str] = {}
+    if not wanted:
+        return out
+    with closing(_conn()) as conn:
+        for start in range(0, len(wanted), 200):
+            chunk = wanted[start : start + 200]
+            marks = ",".join("?" for _ in chunk)
+            rows = conn.execute(
+                f"SELECT word, translation FROM vocabulary "
+                f"WHERE user_id = ? AND word IN ({marks})",
+                (user_id, *chunk),
+            ).fetchall()
+            for row in rows:
+                text = str(row["translation"] or "").strip()
+                if text:
+                    out[str(row["word"])] = text
+    return out
+
+
 def translation_for_word(user_id: str, word: str) -> str:
     """Traducción que escribió el ALUMNO para esta palabra (V3.80.0). `''` si no hay."""
     with closing(_conn()) as conn:
@@ -697,6 +719,91 @@ _SENSE_FIELDS: tuple[tuple[str, int], ...] = (
     ("source", 40),
     ("domain", 60),
 )
+
+
+def set_mnemonic(user_id: str, word: str, mnemonic: str) -> bool:
+    """Guarda el recordatorio de una palabra del diccionario del alumno.
+
+    No crea la fila: si la palabra no está en el léxico, no hay dónde colgar
+    la frase. El vacío no borra un recordatorio ya escrito.
+    """
+    text = " ".join((mnemonic or "").split())[:400]
+    key = (word or "").strip().lower()
+    if not text or not key:
+        return False
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "UPDATE vocabulary SET mnemonic = ? WHERE user_id = ? AND word = ?",
+            (text, user_id, key),
+        )
+        return cur.rowcount > 0
+
+
+def mnemonic_by_word(user_id: str) -> dict[str, str]:
+    """`palabra → recordatorio` de las que tienen frase (el resto no aparece)."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word, mnemonic FROM vocabulary "
+            "WHERE user_id = ? AND mnemonic != ''",
+            (user_id,),
+        ).fetchall()
+    return {str(r["word"]): str(r["mnemonic"]) for r in rows}
+
+
+def lesson_facets_by_word(user_id: str) -> dict[str, dict]:
+    """`palabra → {paso: done|pending|na}` de las que ya tienen lección."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word, lesson_facets FROM vocabulary "
+            "WHERE user_id = ? AND lesson_facets != ''",
+            (user_id,),
+        ).fetchall()
+    out: dict[str, dict] = {}
+    for row in rows:
+        try:
+            parsed = json.loads(row["lesson_facets"] or "")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(parsed, dict):
+            out[str(row["word"])] = {
+                str(key): str(value) for key, value in parsed.items()
+            }
+    return out
+
+
+def set_lesson_facets(user_id: str, word: str, facets: dict) -> bool:
+    """Sustituye el JSON de pasos de una palabra que ya está en el léxico."""
+    key = (word or "").strip().lower()
+    if not key:
+        return False
+    payload = json.dumps(facets, ensure_ascii=False, sort_keys=True)
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "UPDATE vocabulary SET lesson_facets = ? "
+            "WHERE user_id = ? AND word = ?",
+            (payload, user_id, key),
+        )
+        return cur.rowcount > 0
+
+
+def cefr_by_word(user_id: str) -> dict[str, str]:
+    """`palabra → CEFR` declarado en el léxico ('' si no consta)."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word, cefr FROM vocabulary WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    return {str(r["word"]): str(r["cefr"] or "") for r in rows}
+
+
+def words_of(user_id: str) -> set[str]:
+    """Superficies que ya están en el diccionario del alumno."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word FROM vocabulary WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    return {str(r["word"]) for r in rows}
 
 
 def _sense_json(sense: object) -> str:
