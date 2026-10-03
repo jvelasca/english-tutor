@@ -31,6 +31,7 @@ vi.mock("../../api/vocabulary", () => ({
   getStudyQueue: vi.fn(),
   completeStudyLesson: vi.fn(),
   lookupDictionaryWord: vi.fn(),
+  requestStudyExample: vi.fn(),
   // V3.86.0: la pestaña Fichas es ficha-primero (una ficha vive en N mazos).
   listVocabularyCards: vi.fn(),
   createVocabularyCard: vi.fn(),
@@ -134,6 +135,7 @@ function studyQueue(overrides: Partial<StudyQueue> = {}): StudyQueue {
         is_new: true,
         translation: "aeropuerto",
         definition: "",
+        mnemonic: "",
         facets: {},
         state: "new",
       },
@@ -377,10 +379,11 @@ describe("FlashcardsScreen", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Study (1)" }));
 
     expect(screen.getByText("airport")).toBeTruthy();
-    for (let step = 0; step < 6; step += 1) {
-      if (screen.queryByRole("button", { name: "Good" })) break;
-      fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    }
+    fireEvent.click(await screen.findByRole("button", { name: "Show the meaning" }));
+    await waitFor(() => {
+      const good = screen.getByRole("button", { name: "Good" }) as HTMLButtonElement;
+      expect(good.disabled).toBe(false);
+    });
     fireEvent.click(screen.getByRole("button", { name: "Good" }));
 
     await waitFor(() =>

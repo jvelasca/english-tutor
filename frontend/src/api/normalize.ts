@@ -509,6 +509,7 @@ export function normalizeStudyLessonQueue(raw: unknown): StudyQueue {
       is_new: asBoolean(item.is_new),
       translation: asString(item.translation),
       definition: asString(item.definition),
+      mnemonic: asString(item.mnemonic),
       facets: normalizeLessonFacets(item.facets),
       state: asString(item.state) || "new",
     })),

@@ -28,6 +28,8 @@ from repositories import flashcards as flashcards_repo
 from schemas.study import (
     StudyCompleteIn,
     StudyCompleteOut,
+    StudyExampleIn,
+    StudyExampleOut,
     StudyQueueOut,
     StudySummaryOut,
 )
@@ -87,6 +89,7 @@ from schemas.vocabulary import (
     WriteAttemptIn,
     WriteAttemptOut,
 )
+from services import study_example as study_example_service
 from services.stt import exceeds_max_duration, transcribe_with_timing
 
 logger = logging.getLogger(__name__)
@@ -1044,6 +1047,23 @@ async def study_queue(
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Mazo no encontrado")
+    return result
+
+
+@router.post("/api/vocabulary/study/example", response_model=StudyExampleOut)
+async def study_example(
+    body: StudyExampleIn, user: dict = Depends(current_user)
+) -> dict:
+    """Otra frase con la palabra. No cierra la lección ni agenda FSRS."""
+    del user
+    try:
+        result = await study_example_service.fresh_example(body.word, body.avoid)
+    except study_example_service.ExampleUnavailable as exc:
+        raise HTTPException(
+            status_code=503, detail="No se pudo crear otra frase"
+        ) from exc
+    if result is None:
+        raise HTTPException(status_code=400, detail="Palabra no válida")
     return result
 
 

@@ -129,6 +129,48 @@ def _queue_course_word(client: TestClient, user_id: str) -> dict:
     return items[0]
 
 
+def test_queue_item_carries_the_lexicon_mnemonic(monkeypatch, tmp_path):
+    user_id = _setup(monkeypatch, tmp_path)
+    word = next(item for item in sorted(study_bank.course_words()) if item.isalpha())
+    assert vocabulary_repo.seed_study_items(user_id, [{"word": word}])
+    assert vocabulary_repo.set_mnemonic(user_id, word, "money by the river")
+    client = TestClient(app)
+    from repositories import collections as collections_repo
+
+    coll = collections_repo.create_user_list(user_id, title="Una")
+    assert coll is not None
+    collections_repo.add_membership(user_id, int(coll["id"]), word)
+    queued = client.get(
+        "/api/vocabulary/study/queue",
+        params={
+            "user_id": user_id,
+            "scope": "all",
+            "mode": "all",
+            "collection_id": coll["id"],
+        },
+    )
+    assert queued.status_code == 200, queued.text
+    assert queued.json()["items"][0]["mnemonic"] == "money by the river"
+
+
+def test_lesson_item_prefers_the_card_reminder():
+    snap = {"mnemonics": {"bank": "from the lexicon"}, "cards": {}, "facets": {}}
+    manual = study_bank._lesson_item(
+        {
+            "word": "bank",
+            "mnemonic": "from the card",
+            "card_type": "flashcard",
+            "card_id": "9",
+        },
+        snap,
+        is_new=True,
+        deck_id=3,
+    )
+    assert manual["mnemonic"] == "from the card"
+    lexicon = study_bank._lesson_item({"word": "bank"}, snap, is_new=True, deck_id=0)
+    assert lexicon["mnemonic"] == "from the lexicon"
+
+
 def test_complete_enrolls_the_word_and_keeps_a_skipped_step_pending(
     monkeypatch, tmp_path
 ):

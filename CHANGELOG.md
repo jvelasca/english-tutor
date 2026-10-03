@@ -4,6 +4,18 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.94.6] — 2026-10-03
+
+**Estudiar muestra la palabra y el significado se revela.** Release de **PRODUCTO (patch)** **CON backend y CON frontend**, **SIN migración de BD** y **CON un endpoint nuevo** (`POST /api/vocabulary/study/example`). El cierre `POST /api/vocabulary/study/complete` no cambia: sigue el `item_id`, una nota y una sola carta FSRS. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.**
+
+**(A) Una tarjeta.** Se lee la palabra en inglés. Oír no revela el significado. Una pista descubre un trozo de la traducción. El recordatorio sale si la ficha o el léxico lo tienen (campo aditivo `mnemonic` en la cola). Seis opciones solo si la sesión tiene seis traducciones distintas: fallar no cierra; acertar revela. La nota la ponen Otra vez, Difícil, Bien y Fácil.
+
+**(B) Otra frase.** Si el diccionario ya tiene ejemplo, se muestra al momento. «Otra frase» pide al modelo local una frase nueva y su traducción. Si no responde, se conserva la anterior. No escribe léxico, FSRS, repasos ni `study_lesson_items`.
+
+**(C) Qué no cambia.** La transacción del cierre, `study_lesson_items` y la regla de una sola carta FSRS. Colección y nivel juntos siguen sin pintarse.
+
+**Verificación local:** `pytest` de la lección, el ejemplo y el cierre de integridad · `vitest` de la lección y de Estudiar. **Honestidad:** (i) el ledger de producción de Listening sigue sin volumen; (ii) el frontend **sigue sin pintar** `new_sense_exposure`; (iii) FSRS sigue **sin cartas por acepción**; (iv) los **ocho gates humanos siguen `pending`**; (v) el tag espera al verde de la CI. Detalle en `docs/releases/release-notes-v3.94.6.md`.
+
 ## [3.94.5] — 2026-10-03
 
 **Estudiar cierra cada palabra una sola vez, y esa nota mueve una sola carta FSRS.** Release de **PRODUCTO (patch)** **CON backend y CON frontend**, **CON migración aditiva** (`study_lesson_items`) y **CON cambio de contrato** en `POST /api/vocabulary/study/complete`: el cuerpo lleva el `item_id` que sirvió la cola, no la identidad de la carta. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.** `v3.94.4` no se etiqueta como cierre.

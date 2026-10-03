@@ -346,6 +346,7 @@ async def _snapshot(user_id: str) -> dict:
     facets = await run_in_threadpool(vocabulary_repo.lesson_facets_by_word, user_id)
     cards = await _lexicon_cards(user_id)
     grades = await run_in_threadpool(flashcards_repo.latest_grades, user_id)
+    mnemonics = await run_in_threadpool(vocabulary_repo.mnemonic_by_word, user_id)
     day = await run_in_threadpool(
         flashcards_repo.day_state,
         user_id,
@@ -360,6 +361,7 @@ async def _snapshot(user_id: str) -> dict:
         "facets": facets,
         "cards": cards,
         "grades": grades,
+        "mnemonics": mnemonics,
         "day": day,
         "required": list(config.get("required_facets") or []),
         "now": _now(),
@@ -369,6 +371,9 @@ async def _snapshot(user_id: str) -> dict:
 def _lesson_item(row: dict, snap: dict, *, is_new: bool, deck_id: int) -> dict:
     word = str(row.get("word") or "")
     card = snap["cards"].get(word) or row.get("card") or {}
+    reminder = str(row.get("mnemonic") or "").strip()
+    if not reminder:
+        reminder = str((snap.get("mnemonics") or {}).get(word) or "").strip()
     return {
         "word": word,
         "cefr": str(row.get("cefr") or ""),
@@ -378,6 +383,7 @@ def _lesson_item(row: dict, snap: dict, *, is_new: bool, deck_id: int) -> dict:
         "is_new": is_new,
         "translation": "",
         "definition": "",
+        "mnemonic": reminder,
         "facets": dict(snap["facets"].get(word) or {}),
         "state": str((card or {}).get("state") or "new"),
     }

@@ -27,6 +27,8 @@ interface ItemReplayButtonProps {
   userId?: string | null;
   /** Idioma de la síntesis; inglés por defecto. */
   language?: VoiceLanguage;
+  /** Avisa al pulsar, también si el audio no llega a sonar. */
+  onPlay?: () => void;
   className?: string;
 }
 
@@ -51,6 +53,7 @@ export function ItemReplayButton({
   correctIndex = null,
   userId,
   language = "en",
+  onPlay,
   className,
 }: ItemReplayButtonProps) {
   const { t } = useI18n();
@@ -79,6 +82,7 @@ export function ItemReplayButton({
 
   async function play(accent: VoiceAccent) {
     if (busy) return;
+    onPlay?.();
     setBusy(accent);
     try {
       const voice = choice.voiceFor(accent);

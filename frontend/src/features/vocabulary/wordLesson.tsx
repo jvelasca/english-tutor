@@ -1,48 +1,23 @@
 /**
  * Lección de una palabra en Estudiar.
  *
- * Palabra nueva: significado, pronunciación, contexto y, si el diccionario los
- * trae, acepciones y una forma relacionada. Cada paso se puede saltar: queda
- * pendiente, no es un fallo. Palabra ya estudiada: evocación corta y la nota
- * FSRS, con un enlace para abrir los pasos que sigan pendientes.
+ * Se lee la palabra en inglés. El significado se revela cuando el alumno lo
+ * pide, acierta entre las opciones o agota la pista. La nota FSRS sigue
+ * saliendo solo por los cuatro botones, con el `item_id` de la cola.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
-import { cn } from "../../lib/utils";
 import { ItemReplayButton } from "../../components/ItemReplayButton";
-import { LoadingNotice } from "../../components/LoadingNotice";
-import { lookupDictionaryWord } from "../../api/vocabulary";
+import { lookupDictionaryWord, requestStudyExample } from "../../api/vocabulary";
 import { useI18n } from "../../hooks/useI18n";
-import type {
-  DictionaryEntry,
-  LessonFacet,
-  LessonFacetStatus,
-  StudyLessonItem,
-} from "../../types/api";
-
-const CORE_STEPS: LessonFacet[] = ["meaning", "pronunciation", "context"];
-const ALL_FACETS: LessonFacet[] = [
-  "meaning",
-  "pronunciation",
-  "context",
-  "senses",
-  "related",
-];
+import type { DictionaryEntry, LessonFacet, StudyLessonItem } from "../../types/api";
 
 const GRADE_KEY: Record<number, string> = {
   1: "fsrs.grade.again",
   2: "fsrs.grade.hard",
   3: "fsrs.grade.good",
   4: "fsrs.grade.easy",
-};
-
-const STEP_LABEL: Record<LessonFacet, string> = {
-  meaning: "flashcards.lesson.meaning",
-  pronunciation: "flashcards.lesson.pronunciation",
-  context: "flashcards.lesson.context",
-  senses: "flashcards.lesson.senses",
-  related: "flashcards.lesson.related",
 };
 
 export interface LessonClose {
@@ -52,10 +27,17 @@ export interface LessonClose {
   translation: string;
 }
 
+interface ExampleLine {
+  phrase: string;
+  translation: string;
+}
+
 /** Pasos extra solo cuando el diccionario tiene con qué enseñarlos. */
 export function extraSteps(entry: DictionaryEntry | null, word: string): LessonFacet[] {
   const extras: LessonFacet[] = [];
-  const meanings = (entry?.meanings ?? []).filter((meaning) => meaning.term && !meaning.proper_noun);
+  const meanings = (entry?.meanings ?? []).filter(
+    (meaning) => meaning.term && !meaning.proper_noun,
+  );
   if (meanings.length > 1) extras.push("senses");
   const related = (entry?.senses ?? []).find(
     (sense) => sense.lemma && sense.lemma.toLowerCase() !== word.toLowerCase(),
@@ -64,8 +46,55 @@ export function extraSteps(entry: DictionaryEntry | null, word: string): LessonF
   return extras;
 }
 
-function offeredSteps(entry: DictionaryEntry | null, word: string, ready: boolean): LessonFacet[] {
-  return ready ? [...CORE_STEPS, ...extraSteps(entry, word)] : [...CORE_STEPS];
+/** Cuántos caracteres de la traducción quedan a la vista tras una pista más. */
+export function hintEnd(translation: string, shown: number): number {
+  const text = translation.trim();
+  if (!text || shown >= text.length) return text.length;
+  const words = text.split(/\s+/);
+  if (words.length > 1) {
+    let cursor = 0;
+    for (const word of words) {
+      const at = text.indexOf(word, cursor);
+      const end = at + word.length;
+      if (end > shown) return end;
+      cursor = end;
+    }
+    return text.length;
+  }
+  return Math.min(text.length, shown + 3);
+}
+
+/** Seis traducciones distintas, o null si la sesión no llega. */
+export function quizChoices(items: StudyLessonItem[], current: StudyLessonItem): string[] | null {
+  const correct = current.translation.trim();
+  if (!correct) return null;
+  const seen = new Set([correct.toLowerCase()]);
+  const others: string[] = [];
+  for (const item of items) {
+    if (item.item_id === current.item_id) continue;
+    const text = item.translation.trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    others.push(text);
+    if (others.length >= 5) break;
+  }
+  if (others.length < 5) return null;
+  return shuffle([correct, ...others], current.item_id);
+}
+
+function shuffle(values: string[], seed: string): string[] {
+  const out = [...values];
+  let state = 0;
+  for (const ch of seed) state = (Math.imul(state, 33) + ch.charCodeAt(0)) >>> 0;
+  for (let index = out.length - 1; index > 0; index -= 1) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    const swap = state % (index + 1);
+    const left = out[index];
+    out[index] = out[swap];
+    out[swap] = left;
+  }
+  return out;
 }
 
 interface WordLessonProps {
@@ -85,46 +114,45 @@ export function WordLesson({
 }: WordLessonProps) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [outcomes, setOutcomes] = useState<Partial<Record<LessonFacet, LessonFacetStatus>>>({});
   const [entry, setEntry] = useState<DictionaryEntry | null>(null);
   const [lookupReady, setLookupReady] = useState(false);
-  const [deepen, setDeepen] = useState(false);
-  const [phase, setPhase] = useState<"steps" | "grade" | "done">("steps");
+  const [revealed, setRevealed] = useState(false);
+  const [hintShown, setHintShown] = useState(0);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [missed, setMissed] = useState<string[]>([]);
+  const [heard, setHeard] = useState(false);
+  const [sawExample, setSawExample] = useState(false);
+  const [openedMore, setOpenedMore] = useState(false);
+  const [example, setExample] = useState<ExampleLine | null>(null);
+  const [generated, setGenerated] = useState(false);
+  const [avoid, setAvoid] = useState<string[]>([]);
+  const [exampleBusy, setExampleBusy] = useState(false);
+  const [exampleError, setExampleError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const [reviewed, setReviewed] = useState(0);
-  const [revealed, setRevealed] = useState(false);
 
   const item = items[index];
-  const steps = useMemo(() => {
-    if (!item) return CORE_STEPS;
-    const offered = offeredSteps(entry, item.word, lookupReady);
-    if (item.is_new || deepen) return offered;
-    return offered;
-  }, [item, entry, lookupReady, deepen]);
-
-  const deepSteps = useMemo(() => {
-    if (!item) return CORE_STEPS;
-    const offered = offeredSteps(entry, item.word, lookupReady);
-    const pending = offered.filter(
-      (step) => item.facets[step] === "pending" || !item.facets[step],
-    );
-    return pending.length > 0 ? pending : offered;
-  }, [item, entry, lookupReady]);
-
-  const activeSteps = item && !item.is_new && deepen ? deepSteps : steps;
 
   useEffect(() => {
     if (!item) return;
     let alive = true;
     setEntry(null);
     setLookupReady(false);
-    setStepIndex(0);
-    setOutcomes({});
-    setDeepen(false);
-    setPhase(item.is_new ? "steps" : "grade");
     setRevealed(false);
+    setHintShown(0);
+    setReminderOpen(false);
+    setQuizOpen(false);
+    setMissed([]);
+    setHeard(false);
+    setSawExample(false);
+    setOpenedMore(false);
+    setExample(null);
+    setGenerated(false);
+    setAvoid([]);
+    setExampleBusy(false);
+    setExampleError(false);
     setError(false);
     void lookupDictionaryWord(userId, item.word)
       .then((found) => {
@@ -141,7 +169,21 @@ export function WordLesson({
     };
   }, [item, userId]);
 
-  if (!item || phase === "done" && index >= items.length) {
+  useEffect(() => {
+    if (!lookupReady || generated) return;
+    const phrase = entry?.example?.phrase?.trim() || "";
+    if (!phrase) return;
+    setExample({ phrase, translation: "" });
+    setSawExample(true);
+    setAvoid([phrase]);
+  }, [lookupReady, entry, generated]);
+
+  const choices = useMemo(
+    () => (item ? quizChoices(items, item) : null),
+    [items, item],
+  );
+
+  if (!item) {
     return (
       <Card className="gap-3 p-5">
         <p className="text-sm font-medium">
@@ -155,42 +197,23 @@ export function WordLesson({
   }
 
   const translation = item.translation || entry?.translation || "";
-  const example =
-    entry?.example?.phrase ||
-    entry?.situation ||
-    entry?.senses?.find((sense) => sense.example)?.example ||
-    "";
-  const meanings = (entry?.meanings ?? []).filter((meaning) => meaning.term && !meaning.proper_noun);
+  const hint = translation.trim().slice(0, hintShown);
+  const extras = extraSteps(entry, item.word);
+  const meanings = (entry?.meanings ?? []).filter(
+    (meaning) => meaning.term && !meaning.proper_noun,
+  );
   const related = (entry?.senses ?? []).find(
     (sense) => sense.lemma && sense.lemma.toLowerCase() !== item.word.toLowerCase(),
   );
 
-  function mark(status: LessonFacetStatus) {
-    const step = activeSteps[stepIndex];
-    if (!step) return;
-    const next = { ...outcomes, [step]: status };
-    setOutcomes(next);
-    const moreComing = !lookupReady && stepIndex >= activeSteps.length - 1;
-    if (moreComing) return;
-    if (stepIndex >= activeSteps.length - 1) {
-      setPhase("grade");
-      return;
-    }
-    setStepIndex((current) => current + 1);
-  }
-
   function facetsForGrade(): Record<string, string> {
-    if (!item.is_new && !deepen) {
-      return { ...item.facets, meaning: "done" };
-    }
-    const offered = new Set(activeSteps);
-    const out: Record<string, string> = {};
-    for (const name of ALL_FACETS) {
-      if (outcomes[name]) out[name] = outcomes[name] as string;
-      else if (!offered.has(name)) out[name] = "na";
-      else out[name] = "pending";
-    }
-    return out;
+    return {
+      meaning: "done",
+      pronunciation: heard ? "done" : "pending",
+      context: sawExample ? "done" : "pending",
+      senses: extras.includes("senses") ? (openedMore ? "done" : "pending") : "na",
+      related: extras.includes("related") ? (openedMore ? "done" : "pending") : "na",
+    };
   }
 
   async function grade(value: number) {
@@ -205,12 +228,8 @@ export function WordLesson({
       });
       const next = index + 1;
       setReviewed((count) => count + 1);
-      if (next >= items.length) {
-        setIndex(next);
-        setPhase("done");
-      } else {
-        setIndex(next);
-      }
+      if (next >= items.length) setIndex(items.length);
+      else setIndex(next);
     } catch {
       setError(true);
     } finally {
@@ -218,35 +237,32 @@ export function WordLesson({
     }
   }
 
-  const showSteps = item.is_new || deepen;
-  const step = activeSteps[stepIndex] ?? "meaning";
-  const waiting = showSteps && !lookupReady && stepIndex >= activeSteps.length - 1 && phase === "steps";
-  const pendingNames = ALL_FACETS.filter((name) => {
-    if (outcomes[name] === "pending") return true;
-    return !showSteps && item.facets[name] === "pending";
-  }).map((name) => t(STEP_LABEL[name]));
+  async function anotherSentence() {
+    setExampleBusy(true);
+    setExampleError(false);
+    try {
+      const next = await requestStudyExample(item.word, avoid);
+      if (!next.phrase) {
+        setExampleError(true);
+        return;
+      }
+      setGenerated(true);
+      setExample({ phrase: next.phrase, translation: next.translation });
+      setSawExample(true);
+      setAvoid((current) => [...current, next.phrase]);
+    } catch {
+      setExampleError(true);
+    } finally {
+      setExampleBusy(false);
+    }
+  }
 
-  function GradeRow() {
-    return (
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("flashcards.lesson.gradePrompt")}
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[1, 2, 3, 4].map((value) => (
-            <Button
-              key={value}
-              type="button"
-              variant={value === 3 ? "default" : "outline"}
-              disabled={saving}
-              onClick={() => void grade(value)}
-            >
-              {t(GRADE_KEY[value])}
-            </Button>
-          ))}
-        </div>
-      </div>
-    );
+  function pickChoice(choice: string) {
+    if (choice.trim().toLowerCase() === translation.trim().toLowerCase()) {
+      setRevealed(true);
+      return;
+    }
+    setMissed((current) => (current.includes(choice) ? current : [...current, choice]));
   }
 
   return (
@@ -272,137 +288,166 @@ export function WordLesson({
         </div>
       </div>
 
-      {showSteps ? (
-        <ol className="flex items-center gap-2" aria-label={t(STEP_LABEL[step])}>
-          {activeSteps.map((name, stepNumber) => {
-            const current = phase === "steps" && stepNumber === stepIndex;
-            const skipped = outcomes[name] === "pending";
-            const passed = phase === "grade" || stepNumber < stepIndex;
-            return (
-              <li key={name} className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-full text-xs font-semibold",
-                    current && "bg-primary text-primary-foreground",
-                    !current && skipped && "border border-dashed border-primary text-primary",
-                    !current && !skipped && passed && "bg-primary/15 text-primary",
-                    !current && !skipped && !passed && "border border-border text-muted-foreground",
-                  )}
-                >
-                  {stepNumber + 1}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      ) : null}
+      <div className="flex items-center gap-3">
+        <p className="text-4xl font-semibold tracking-tight" lang="en">
+          {item.word}
+        </p>
+        <ItemReplayButton userId={userId} prompt={item.word} onPlay={() => setHeard(true)} />
+      </div>
 
-      {showSteps && phase === "grade" ? (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-3xl font-semibold tracking-tight" lang="en">{item.word}</p>
+      {revealed ? (
+        <p className="text-lg text-muted-foreground">{translation}</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {hint ? (
+            <p className="text-lg tracking-wide text-muted-foreground" aria-live="polite">
+              {hint}
+              {hint.length < translation.trim().length ? "…" : ""}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => setRevealed(true)}>
+              {t("flashcards.lesson.reveal")}
+            </Button>
             {translation ? (
-              <p className="text-sm text-muted-foreground">{translation}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setHintShown((shown) => hintEnd(translation, shown))}
+              >
+                {t("flashcards.lesson.hint")}
+              </Button>
+            ) : null}
+            {item.mnemonic ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setReminderOpen((open) => !open)}
+              >
+                {t("flashcards.lesson.mnemonic")}
+              </Button>
+            ) : null}
+            {choices ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setQuizOpen((open) => !open)}
+              >
+                {t("flashcards.lesson.quiz")}
+              </Button>
             ) : null}
           </div>
-          {pendingNames.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {t("flashcards.lesson.pendingLine").replace("{steps}", pendingNames.join(", "))}
-            </p>
+          {reminderOpen && item.mnemonic ? (
+            <p className="text-sm text-muted-foreground">{item.mnemonic}</p>
           ) : null}
-          <GradeRow />
-        </div>
-      ) : showSteps && phase === "steps" ? (
-        <div className="flex min-h-40 flex-col gap-4">
-          <p className="text-sm font-semibold text-primary">{t(STEP_LABEL[step])}</p>
-          {step === "meaning" ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-4xl font-semibold tracking-tight" lang="en">{item.word}</p>
-              {translation ? (
-                <p className="text-lg text-muted-foreground">{translation}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">{t("flashcards.lesson.noMeaning")}</p>
-              )}
+          {quizOpen && choices ? (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {choices.map((choice) => {
+                const wrong = missed.includes(choice);
+                return (
+                  <Button
+                    key={choice}
+                    type="button"
+                    variant="outline"
+                    disabled={wrong}
+                    onClick={() => pickChoice(choice)}
+                  >
+                    {choice}
+                  </Button>
+                );
+              })}
             </div>
           ) : null}
-          {step === "pronunciation" ? (
-            <div className="flex items-center gap-3">
-              <p className="text-4xl font-semibold tracking-tight" lang="en">{item.word}</p>
-              <ItemReplayButton userId={userId} prompt={item.word} />
-            </div>
-          ) : null}
-          {step === "context" ? (
-            <p className="text-lg leading-relaxed">
-              {example || t("flashcards.lesson.noContext")}
-            </p>
-          ) : null}
-          {step === "senses" ? (
-            <ul className="flex flex-col gap-2 text-base">
-              {meanings.map((meaning) => (
-                <li key={`${meaning.term}-${meaning.pos}`}>
-                  <span className="font-medium">{meaning.term}</span>
-                  {meaning.gloss ? ` — ${meaning.gloss}` : ""}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {step === "related" ? (
-            <p className="text-lg">
-              {t("flashcards.lesson.relatedTo").replace("{lemma}", related?.lemma || item.word)}
-            </p>
-          ) : null}
-          {waiting ? <LoadingNotice className="text-[11px]" /> : null}
-          <div className="mt-auto flex flex-wrap gap-2">
-            <Button type="button" disabled={waiting} onClick={() => mark("done")}>
-              {t("flashcards.lesson.continue")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={waiting}
-              onClick={() => mark("pending")}
-            >
-              {t("flashcards.lesson.skip")}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex min-h-40 flex-col gap-4">
-          <p className="text-sm font-semibold text-primary">{t("flashcards.lesson.recall")}</p>
-          <p className="text-xs text-muted-foreground">{t("flashcards.lesson.recallPrompt")}</p>
-          <p className="text-2xl font-semibold">{translation || item.definition}</p>
-          <div className="flex items-center gap-3">
-            <ItemReplayButton userId={userId} prompt={item.word} />
-            {revealed ? (
-              <p className="text-4xl font-semibold tracking-tight" lang="en">{item.word}</p>
-            ) : (
-              <Button type="button" variant="outline" onClick={() => setRevealed(true)}>
-                {t("flashcards.lesson.reveal")}
-              </Button>
-            )}
-          </div>
-          {!deepen ? (
-            <button
-              type="button"
-              className="w-fit text-sm font-medium text-primary underline-offset-2 hover:underline"
-              onClick={() => {
-                setDeepen(true);
-                setPhase("steps");
-                setStepIndex(0);
-                setOutcomes({});
-              }}
-            >
-              {t("flashcards.lesson.deeper")}
-            </button>
-          ) : null}
-          {pendingNames.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {t("flashcards.lesson.pendingLine").replace("{steps}", pendingNames.join(", "))}
-            </p>
-          ) : null}
-          {revealed ? <GradeRow /> : null}
         </div>
       )}
+
+      {revealed ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            {example ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-start gap-2">
+                  <p className="text-base leading-relaxed" lang="en">
+                    {example.phrase}
+                  </p>
+                  <ItemReplayButton userId={userId} prompt={example.phrase} />
+                </div>
+                {example.translation ? (
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm text-muted-foreground">{example.translation}</p>
+                    <ItemReplayButton
+                      userId={userId}
+                      prompt={example.translation}
+                      language="es"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-fit"
+              disabled={exampleBusy || !lookupReady}
+              onClick={() => void anotherSentence()}
+            >
+              {t("flashcards.lesson.another")}
+            </Button>
+            {exampleError ? (
+              <p className="text-[11px] text-destructive">
+                {t("flashcards.lesson.exampleError")}
+              </p>
+            ) : null}
+          </div>
+
+          {extras.length > 0 ? (
+            <details
+              onToggle={(event) => {
+                if ((event.currentTarget as HTMLDetailsElement).open) setOpenedMore(true);
+              }}
+            >
+              <summary className="cursor-pointer text-sm font-medium text-primary">
+                {t("flashcards.lesson.more")}
+              </summary>
+              {extras.includes("senses") ? (
+                <ul className="mt-2 flex flex-col gap-1 text-sm">
+                  {meanings.map((meaning) => (
+                    <li key={`${meaning.term}-${meaning.pos}`}>
+                      <span className="font-medium">{meaning.term}</span>
+                      {meaning.gloss ? ` — ${meaning.gloss}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {extras.includes("related") && related?.lemma ? (
+                <p className="mt-2 text-sm">
+                  {t("flashcards.lesson.relatedTo").replace("{lemma}", related.lemma)}
+                </p>
+              ) : null}
+            </details>
+          ) : null}
+
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("flashcards.lesson.gradePrompt")}
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[1, 2, 3, 4].map((value) => (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={value === 3 ? "default" : "outline"}
+                  disabled={saving || !lookupReady}
+                  onClick={() => void grade(value)}
+                >
+                  {t(GRADE_KEY[value])}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="text-[11px] text-destructive">{t("flashcards.lesson.saveError")}</p>
