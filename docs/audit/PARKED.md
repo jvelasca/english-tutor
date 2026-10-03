@@ -2525,6 +2525,36 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.94.4 — Banco de Estudiar y una sola siembra del léxico · 2026-10-03
+
+> **Naturaleza:** patch de producto. No toca el Sense Resolver, ni
+> `PROVEN_OTHER_OVERLAP`, ni el ledger de Listening. **No abre V3.95.**
+
+- **El mazo no hereda el repaso global.** Pendientes, Falladas y Todas de nuevo
+  se calculan dentro del ámbito elegido.
+- **Migración aditiva.** `vocabulary.cefr`, `vocabulary.lesson_facets` y
+  `dictionary_entries.cefr` nacen vacías. No hay borrado de filas.
+- **V3.95 sigue cerrada.** El ledger de producción de Listening sigue a 0 filas.
+- **Publicación.** El tag `v3.94.4` **no** existe todavía: espera al verde de
+  la PR de `release/v3.94.4` y a la auditoría externa. La *Latest* sigue siendo
+  `v3.94.2`. La rama incluye el árbol de `v3.94.3`.
+
+## V3.94.3 — Ruta de Listening visible en Formación, y un acierto no pide otro toque · 2026-10-01
+
+> **Naturaleza:** patch de producto. No toca el Sense Resolver, ni
+> `PROVEN_OTHER_OVERLAP`, ni el ledger. **No abre V3.95.**
+
+- **La proyección no certifica.** `listening_route` en el mapa del curso es
+  lectura del `route_gate` del mismo nivel. No escribe
+  `academy_objective_mastery`, no abre el nivel siguiente y no imprime un
+  certificado CEFR.
+- **V3.95 sigue cerrada.** El ledger de producción sigue a 0 filas. La sonda
+  `backend/tests/test_sense_telemetry_probe.py` usa una BD temporal y no
+  escribe en `tutor.db`.
+- **Publicación.** El tag `v3.94.3` **no** existe todavía: espera al verde de
+  la PR de `release/v3.94.3` y a la auditoría externa. La *Latest* sigue siendo
+  `v3.94.2`.
+
 ## V3.94.2 — Conflicto de ocurrencias y corpus de polisemia · 2026-10-01
 
 > **Naturaleza:** patch de la política ENFORCE. Una palabra con un `mismatch`

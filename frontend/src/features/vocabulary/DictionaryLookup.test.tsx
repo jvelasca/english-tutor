@@ -1014,25 +1014,20 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     >;
     expect(addBody).toEqual({
       word: "nebula",
-      translation: "",
+      translation: "nebulosa",
       collection_id: null,
-    });
-    // V3.92: sin acepción elegida NO se manda `sense` (ni null): el alta queda
-    // exactamente como antes de que existiera el contrato de sentido.
-    expect("sense" in addBody).toBe(false);
-
-    // 2) La tarjeta manual: UNA escritura que la crea en TODOS los mazos
-    //    marcados (tabla puente), con su recordatorio.
-    const cardCall = fn.mock.calls.find((call) =>
-      String(call[0]).includes("/api/vocabulary/cards"),
-    );
-    expect(cardCall).toBeTruthy();
-    expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
-      front: "nebula",
-      back: "nebulosa",
       mnemonic: "",
       deck_ids: [7],
+      cefr: "",
     });
+    // V3.92: sin acepción elegida NO se manda `sense` (ni null).
+    expect("sense" in addBody).toBe(false);
+    // La pertenencia al mazo viaja en el mismo alta: no hay una segunda ficha.
+    expect(
+      fn.mock.calls.some((call) =>
+        String(call[0]).includes("/api/vocabulary/cards"),
+      ),
+    ).toBe(false);
 
     // Éxito honesto: «ya está en aprendizaje» + dónde se guardó + salida a
     // estudiar ESE mazo.
@@ -1260,10 +1255,10 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     // El defecto es el primer significado que NO es nombre propio, aunque el
     // nombre propio venga el último (y estaría disponible a un clic).
     const fileRadio = (await screen.findByRole("radio", {
-      name: "Meaning: file · noun",
+      name: "Meaning: Herramienta con superficie rugosa. · file · noun",
     })) as HTMLInputElement;
     const properRadio = screen.getByRole("radio", {
-      name: "Meaning: Lima · noun",
+      name: "Meaning: Capital del Perú. · Lima · noun",
     }) as HTMLInputElement;
     expect(fileRadio.checked).toBe(true);
     expect(properRadio.checked).toBe(false);
@@ -1273,7 +1268,9 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     // Elegir «Lima» cambia el equivalente de la tarjeta…
     fireEvent.click(properRadio);
     expect(
-      (screen.getByRole("radio", { name: "Meaning: Lima · noun" }) as HTMLInputElement)
+      (screen.getByRole("radio", {
+        name: "Meaning: Capital del Perú. · Lima · noun",
+      }) as HTMLInputElement)
         .checked,
     ).toBe(true);
 
@@ -1286,15 +1283,6 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     );
     expect(await screen.findByText("Lima is now learning.")).toBeTruthy();
 
-    const cardCall = fn.mock.calls.find((call) =>
-      String(call[0]).includes("/api/vocabulary/cards"),
-    );
-    expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
-      front: "Lima",
-      back: "lima",
-      mnemonic: "",
-      deck_ids: [7],
-    });
     const addCall = fn.mock.calls.find((call) =>
       String(call[0]).includes("/api/vocabulary/items"),
     );
@@ -1312,6 +1300,9 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
         source: "dictionary",
       },
       collection_id: null,
+      mnemonic: "",
+      deck_ids: [7],
+      cefr: "A1",
     });
     // Y se le dice al alumno, sin obligarle a adivinar, qué significado quedó.
     expect(screen.getByText("Saved meaning: noun · Capital del Perú.")).toBeTruthy();
@@ -1375,6 +1366,13 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     const fn = routeFetch([
       { url: "/api/vocabulary/dictionary", data: COFFEE },
       {
+        url: "/api/vocabulary/items",
+        data: {
+          added: ["coffee"],
+          item: { word: "coffee", translation: "café", definition: "" },
+        },
+      },
+      {
         url: "/api/vocabulary/cards",
         data: {
           id: 31,
@@ -1414,56 +1412,39 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
       screen.getByRole("button", { name: "Add and start learning" }),
     );
 
-    const cardCall = await waitFor(() => {
+    const addCall = await waitFor(() => {
       const call = fn.mock.calls.find((c) =>
-        String(c[0]).includes("/api/vocabulary/cards"),
+        String(c[0]).includes("/api/vocabulary/items"),
       );
       expect(call).toBeTruthy();
       return call;
     });
-    // El recordatorio se recorta y los DOS mazos viajan en una sola escritura.
-    expect(JSON.parse(String(cardCall?.[1]?.body))).toEqual({
-      front: "coffee",
-      back: "café",
+    // El recordatorio se recorta y los DOS mazos viajan en la misma escritura
+    // del diccionario: no nace una ficha paralela.
+    expect(JSON.parse(String(addCall?.[1]?.body))).toEqual({
+      word: "coffee",
+      translation: "café",
       mnemonic: "café con leche",
       deck_ids: [7, 8],
+      cefr: "A1",
+      collection_id: null,
     });
-    // Palabra rastreada: el léxico NO se vuelve a dar de alta.
     expect(
-      fn.mock.calls.filter((call) =>
-        String(call[0]).includes("/api/vocabulary/items"),
+      fn.mock.calls.some((call) =>
+        String(call[0]).includes("/api/vocabulary/cards"),
       ),
-    ).toHaveLength(0);
+    ).toBe(false);
     // El éxito nombra los dos mazos y abre el principal en el estudio.
     expect(await screen.findByText(/Saved as a card in/)).toBeTruthy();
     expect(screen.getByText(/“Mi mazo, Cocina”/)).toBeTruthy();
   });
 
-  it("V3.84.1/V3.86.0: si falla la tarjeta, declara el estado PARCIAL y reintenta solo la tarjeta", async () => {
-    const onOpenFlashcards = vi.fn();
-    // La PRIMERA llamada de la tarjeta falla y la segunda entra: es justo el
-    // reintento que ofrece el panel. El alta del léxico nunca falla.
-    let cardCalls = 0;
-    const fn = routeFetch([
+  it("si falla el alta, no da por guardada la palabra ni el mazo", async () => {
+    routeFetch([
       { url: "/api/vocabulary/dictionary", data: NEBULA },
       {
-        url: "/api/vocabulary/cards",
-        error: () => {
-          cardCalls += 1;
-          return cardCalls === 1 ? { status: 500, detail: "boom" } : null;
-        },
-        data: {
-          id: 11,
-          deck_id: 7,
-          deck_ids: [7],
-          front: "nebula",
-          back: "",
-          mnemonic: "",
-          state: "new",
-          reps: 0,
-          due_at: "",
-          created_at: "2026-09-25T10:00:00Z",
-        },
+        url: "/api/vocabulary/items",
+        error: { status: 500, detail: "boom" },
       },
       {
         url: "/api/vocabulary/decks",
@@ -1473,15 +1454,8 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
           fsrs_version: "test",
         },
       },
-      {
-        url: "/api/vocabulary/items",
-        data: {
-          added: ["nebula"],
-          item: { word: "nebula", translation: "", definition: "" },
-        },
-      },
     ]);
-    renderPanel(<DictionaryLookup userId="u1" onOpenFlashcards={onOpenFlashcards} />);
+    renderPanel(<DictionaryLookup userId="u1" />);
 
     fillAndSubmit("nebula");
     fireEvent.click(
@@ -1495,39 +1469,8 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
       screen.getByRole("button", { name: "Add and start learning" }),
     );
 
-    // Estado PARCIAL declarado: ni «ok» (mentiría) ni un «error» genérico que
-    // oculta que el aprendizaje sí se completó.
-    expect(
-      await screen.findByText(/is now learning, but it could not be saved in/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Your word is saved in learning and follows the study flow/),
-    ).toBeTruthy();
-    // La primera escritura (léxico) sí ocurrió y la segunda falló una vez.
-    expect(
-      fn.mock.calls.filter((call) =>
-        String(call[0]).includes("/api/vocabulary/items"),
-      ),
-    ).toHaveLength(1);
-    expect(cardCalls).toBe(1);
-    // El estudio sigue disponible: la palabra ya está en el flujo.
-    fireEvent.click(screen.getByRole("button", { name: "Study in Flashcards" }));
-    expect(onOpenFlashcards).toHaveBeenCalledTimes(1);
-    expect(onOpenFlashcards.mock.calls[0][0]).toBeUndefined();
-
-    // Reintento: SOLO la tarjeta del mazo, y cierra en el éxito completo.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Retry saving to the deck" }),
-    );
-    expect(await screen.findByText("nebula is now learning.")).toBeTruthy();
-    expect(screen.getByText(/Saved as a card in/)).toBeTruthy();
-    expect(cardCalls).toBe(2);
-    // El reintento no repite el alta del léxico: sigue habiendo UNA sola.
-    expect(
-      fn.mock.calls.filter((call) =>
-        String(call[0]).includes("/api/vocabulary/items"),
-      ),
-    ).toHaveLength(1);
+    expect(await screen.findByText("Could not add the word.")).toBeTruthy();
+    expect(screen.queryByText("nebula is now learning.")).toBeNull();
   });
 
   it("V3.84.1/V3.86.0: un nombre de mazo duplicado se declara y NO oculta los mazos", async () => {

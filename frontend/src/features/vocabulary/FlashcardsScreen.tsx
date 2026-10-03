@@ -3,9 +3,9 @@
  *
  * Cinco subpestañas, en el orden en que se usan:
  *
- * - **Estudiar**: las dos superficies de estudio, cada una con su acción
- *   etiquetada —«Repasar hoy (N)» (drill de competencia) y «Estudiar tarjetas
- *   (N)» (cola FSRS)— más los límites del día.
+ * - **Estudiar**: el banco (todas, un nivel o un mazo), los contadores de ese
+ *   ámbito y una sola lección —profunda si la palabra es nueva, corta si ya
+ *   está en seguimiento—.
  * - **Mi léxico** (V3.85.0): el inventario que antes era la pestaña PERSONAL
  *   del diccionario (buscador, filtros, estadísticas, añadir).
  * - **Mazos**: el mazo automático (todo el léxico, no editable ni borrable) y
@@ -13,9 +13,9 @@
  * - **Tarjetas**: navegador y CRUD de las tarjetas de un mazo manual.
  * - **Estadísticas**: repasos por día, acierto y previsión.
  *
- * El contenedor es quien pide la cola y quien califica: `StudySession` solo
- * pinta y avisa. Así el mismo componente sirve para el mazo automático y para
- * uno manual sin saber cuál es.
+ * El contenedor pide la cola del ámbito y cierra cada palabra (`complete`):
+ * `WordLesson` pinta los pasos y la nota. El mazo elegido sigue siendo uno
+ * solo para Tarjetas, Mazos y el ámbito «Por mazo».
  *
  * V3.80.0 — **el mazo es UNA selección, no una por pestaña.** Antes `deckId`
  * vivía en Estudiar/Estadísticas y `CardsTab` tenía el suyo, que además
@@ -46,13 +46,13 @@ import {
   createVocabularyCard,
   deleteFlashcardDeck,
   deleteVocabularyCard,
+  completeStudyLesson,
   enrollVocabCollection,
-  getFlashcardQueue,
   getFlashcardStats,
+  getStudyQueue,
   listFlashcardDecks,
   listVocabCollections,
   listVocabularyCards,
-  reviewFlashcard,
   updateFlashcardDeck,
   updateVocabularyCard,
 } from "../../api/vocabulary";
@@ -61,10 +61,11 @@ import type {
   FlashcardDeck,
   FlashcardDeckDeleteResult,
   FlashcardDecks,
-  FlashcardQueue,
   FlashcardStats,
-  FlashcardStudyItem,
   StudyConfig,
+  StudyQueue,
+  StudyQueueMode,
+  StudyScope,
   VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
@@ -76,9 +77,10 @@ import { Badge } from "../../components/ui/badge";
 import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { LoadingNotice } from "../../components/LoadingNotice";
 import { cn } from "../../lib/utils";
-import { StudySession } from "./StudySession";
 import { LexiconInventory } from "./LexiconInventory";
-import { ReviewSession, useReviewToday } from "./ReviewToday";
+import { WordLesson } from "./wordLesson";
+
+const STUDY_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
 const INPUT =
   "rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground";
@@ -340,8 +342,8 @@ export function FlashcardsScreen({
           deckId={deckId}
           onPick={setDeckId}
           collection={collection}
-          onPickCollection={setCollection}
           autoStart={autoStart}
+          onOpenTab={setTab}
           onAutoStarted={() => setAutoStart(false)}
           onClearCollection={() => setCollection(null)}
           reloadNonce={reloadNonce}
@@ -436,8 +438,17 @@ const STUDY_CONFIG_FALLBACK: StudyConfig = {
   mode: "recognition",
   hints: "off",
   difficulty: "auto",
+  words_per_day: 20,
+  required_facets: [],
   configured: false,
 };
+
+const REQUIRED_FACET_OPTIONS = [
+  ["pronunciation", "flashcards.study.requirePronunciation"],
+  ["context", "flashcards.study.requireContext"],
+  ["senses", "flashcards.study.requireSenses"],
+  ["related", "flashcards.study.requireRelated"],
+] as const;
 
 /**
  * Configuración de estudio (V3.87.0 · FASE 2, incremento 1), **plegada** tras el
@@ -540,7 +551,49 @@ function StudyConfigPanel({
             </option>
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+          {t("flashcards.study.wordsToday")}
+          <input
+            type="number"
+            min={1}
+            max={200}
+            aria-label={t("flashcards.study.wordsToday")}
+            defaultValue={value.words_per_day}
+            key={value.words_per_day}
+            onBlur={(e) => {
+              const parsed = Number.parseInt(e.target.value, 10);
+              if (!Number.isFinite(parsed)) return;
+              onChange({ words_per_day: Math.max(1, Math.min(200, parsed)) });
+            }}
+            className={cn(INPUT, "w-full")}
+          />
+        </label>
       </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-[11px] font-medium text-foreground">
+          {t("flashcards.study.requiredTitle")}
+        </legend>
+        <p className="text-[11px] text-muted-foreground">
+          {t("flashcards.study.meaningAlways")}
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {REQUIRED_FACET_OPTIONS.map(([name, labelKey]) => (
+            <label key={name} className="inline-flex items-center gap-2 text-[11px]">
+              <input
+                type="checkbox"
+                checked={value.required_facets.includes(name)}
+                onChange={() => {
+                  const next = value.required_facets.includes(name)
+                    ? value.required_facets.filter((facet) => facet !== name)
+                    : [...value.required_facets, name];
+                  onChange({ required_facets: next });
+                }}
+              />
+              {t(labelKey)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {t("flashcards.study.configHint")}
       </p>
@@ -554,89 +607,91 @@ function StudyTab({
   deckId,
   onPick,
   collection,
-  onPickCollection,
   autoStart,
   onAutoStarted,
   onClearCollection,
   reloadNonce,
   onAddCards,
   onExit,
+  onOpenTab,
 }: {
   userId: string;
   decks: FlashcardDecks | null;
   deckId: number | null;
   onPick: (id: number) => void;
   collection: CollectionFilter | null;
-  /** V3.84.0: la ruta genérica (mazo automático) se acota a un pack o lista. */
-  onPickCollection: (filter: CollectionFilter | null) => void;
   autoStart: boolean;
   onAutoStarted: () => void;
   onClearCollection: () => void;
   reloadNonce: number;
-  /** V3.80.0: abre Tarjetas con este mazo listo para escribir su primera carta. */
   onAddCards: (id: number) => void;
   onExit: () => void;
+  onOpenTab: (tab: FlashcardsTab) => void;
 }) {
-  const { t, lang } = useI18n();
-  const [queue, setQueue] = useState<FlashcardQueue | null>(null);
+  const { t } = useI18n();
+  const autoId = decks?.auto_deck_id ?? 0;
+  const deck = deckId ?? autoId;
+  const isAuto = deck === autoId;
+  const [scope, setScope] = useState<StudyScope>(
+    () => (autoStart && !isAuto && !collection ? "deck" : "all"),
+  );
+  const [pick, setPick] = useState<StudyQueueMode>("pending");
+  const [level, setLevel] = useState("A1");
+  const [queue, setQueue] = useState<StudyQueue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [studying, setStudying] = useState(false);
   const [sessionNonce, setSessionNonce] = useState(0);
-  // V3.84.0: catálogo para el filtro de la ruta genérica (Todas / pack / lista).
-  // Se carga al montar; si falla, el filtro queda solo en «Todas» y la ruta
-  // sigue funcionando (degradación honesta, no una pantalla rota).
-  const [catalog, setCatalog] = useState<VocabCollection[]>([]);
-  // V3.85.0: la cola de repaso del día (drill de competencia). Es una superficie
-  // distinta de la cola de tarjetas: la primera pide a `GET /api/learning/review`
-  // —qué palabra toca y en qué peldaño—, la segunda la cola FSRS del mazo. Se
-  // desestructura para que `refreshReview` (estable) sea la dependencia real y
-  // no el objeto que se recrea en cada render.
-  const {
-    items: reviewItems,
-    dueCount: reviewDue,
-    loadError: reviewError,
-    loading: reviewLoading,
-    refresh: refreshReview,
-  } = useReviewToday(userId);
-  const [reviewing, setReviewing] = useState(false);
+  const [studyConfig, setStudyConfig] = useState<StudyConfig | null>(null);
+  const requestId = useRef(0);
 
-  /** Cierra la sesión encadenada y refresca el recuento del día. */
-  const exitReview = useCallback(() => {
-    setReviewing(false);
-    void refreshReview();
-  }, [refreshReview]);
+  const launchScope: StudyScope = collection ? "all" : !isAuto && autoStart ? "deck" : scope;
 
   useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const data = await listVocabCollections(userId);
-        if (alive) {
-          setCatalog(Array.isArray(data?.collections) ? data.collections : []);
-        }
-      } catch {
-        if (alive) setCatalog([]);
+    if (!autoStart) return;
+    const next: StudyScope = collection ? "all" : !isAuto ? "deck" : "all";
+    setScope(next);
+    setPick("pending");
+  }, [autoStart, collection, isAuto]);
+
+  const wantedCollection =
+    scope === "deck" && !isAuto ? null : collection?.id ?? null;
+
+  const load = useCallback(async () => {
+    const id = ++requestId.current;
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await getStudyQueue(userId, {
+        scope,
+        mode: pick,
+        level: scope === "level" ? level : null,
+        deckId: scope === "deck" ? deck : 0,
+        collectionId: wantedCollection,
+      });
+      if (id !== requestId.current) return null;
+      setQueue(data);
+      return data;
+    } catch {
+      if (id === requestId.current) {
+        setError(true);
+        setQueue(null);
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [userId, reloadNonce]);
+      return null;
+    } finally {
+      if (id === requestId.current) setLoading(false);
+    }
+  }, [userId, scope, pick, level, deck, wantedCollection]);
 
-  const deck = deckId ?? 0;
-  const isAuto = deck === (decks?.auto_deck_id ?? 0);
+  useEffect(() => {
+    void load();
+  }, [load, reloadNonce]);
 
-  // V3.87.0: configuración de estudio vigente (dirección/modo/ayudas/carga). La
-  // cola la trae ya normalizada; se refleja aquí para pintar el panel.
-  const [studyConfig, setStudyConfig] = useState<StudyConfig | null>(null);
   useEffect(() => {
     if (queue?.study_config) {
       setStudyConfig(queue.study_config);
       return;
     }
-    // Sin cola (aún cargando o error) el panel igualmente muestra la preferencia
-    // guardada; si esa petición falla, el panel cae a los defectos.
     let alive = true;
     void (async () => {
       try {
@@ -651,33 +706,6 @@ function StudyTab({
     };
   }, [queue?.study_config, userId]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const data = await getFlashcardQueue(userId, deck, {
-        collectionId: isAuto ? collection?.id ?? null : null,
-      });
-      setQueue(data);
-      return data;
-    } catch {
-      setError(true);
-      setQueue(null);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, deck, isAuto, collection?.id]);
-
-  useEffect(() => {
-    void load();
-  }, [load, reloadNonce]);
-
-  /**
-   * V3.87.0: guarda un cambio del panel y RECARGA la cola. La sesión en curso no
-   * se reescribe a medias: la configuración nueva entra en la PRÓXIMA cola, que
-   * es lo que evita que una tarjeta ya visible cambie de cara por detrás.
-   */
   const changeStudyConfig = useCallback(
     async (patch: Partial<Omit<StudyConfig, "configured">>) => {
       try {
@@ -690,66 +718,51 @@ function StudyTab({
     [userId, load],
   );
 
-  const items = queue?.items ?? [];
+  const queueMatches =
+    queue != null &&
+    queue.scope === scope &&
+    queue.mode === pick &&
+    (scope !== "level" || queue.level === level) &&
+    (scope !== "deck" || queue.deck_id === deck) &&
+    (queue.collection_id ?? null) === wantedCollection;
 
-  // El arranque automático espera a que la cola esté cargada: si se abriera la
-  // sesión con la lista vacía, el alumno vería el resumen de «0 repasadas».
-  // V3.86.0: y espera a que la cola sea la del mazo PEDIDO. Al llegar del
-  // diccionario con un mazo manual, la primera carga (la del mazo automático,
-  // que aún estaba seleccionado) puede resolverse después del foco; arrancar
-  // ahí gastaría el encargo con una cola ajena y el alumno se quedaría en el
-  // panel, sin sesión, aunque su mazo sí tenía tarjetas.
   useEffect(() => {
-    if (!autoStart || loading || !queue || queue.deck.id !== deck) return;
+    if (!autoStart || loading || !queueMatches || !queue) return;
+    if (scope !== launchScope) return;
     onAutoStarted();
-    if (items.length > 0) {
+    if (queue.items.length > 0) {
       setStudying(true);
       setSessionNonce((n) => n + 1);
     }
-    // `items` se deriva de `queue`, que ya está en las dependencias.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, loading, queue, deck]);
+  }, [autoStart, loading, queueMatches, queue, onAutoStarted, scope, launchScope]);
 
   const deckName = useMemo(() => {
-    if (queue?.deck) {
-      return queue.deck.is_auto ? t("flashcards.decks.auto") : queue.deck.name;
-    }
-    const found = decks?.decks.find((d) => d.id === deck);
+    if (scope !== "deck") return t("flashcards.study.wholeDictionary");
+    const found = decks?.decks.find((item) => item.id === deck);
     return found?.is_auto ? t("flashcards.decks.auto") : found?.name ?? "";
-  }, [queue?.deck, decks, deck, t]);
+  }, [scope, decks, deck, t]);
 
-  const handleGrade = useCallback(
-    async (item: FlashcardStudyItem, grade: number) => {
-      // La cola es de UN mazo, así que el endpoint es el mismo para el léxico y
-      // para las tarjetas a mano: lo que cambia es `card_type`.
-      await reviewFlashcard(userId, deck, {
-        card_type: item.card_type,
-        card_id: item.card_id,
-        grade,
-      });
-    },
-    [userId, deck],
-  );
+  const scopeTitle =
+    scope === "level" ? level : scope === "deck" ? deckName : t("flashcards.study.scopeAll");
 
-  if (studying && queue) {
+  if (studying && queue && queue.items.length > 0) {
     return (
-      <StudySession
+      <WordLesson
         key={sessionNonce}
         userId={userId}
         items={queue.items}
         deckName={deckName}
-        studyConfig={queue.study_config}
-        onGrade={handleGrade}
-        onRestart={async () => {
-          // La sesión NO se reinicia sobre la cola vieja: se pide una nueva y,
-          // si aún queda algo, se abre otra sesión con la `key` remontada. Si no
-          // queda nada, se queda el panel con el recuento, que es la respuesta.
-          setStudying(false);
-          const data = await load();
-          if (data && data.items.length > 0) {
-            setSessionNonce((n) => n + 1);
-            setStudying(true);
-          }
+        onComplete={async (close) => {
+          await completeStudyLesson(userId, {
+            word: close.word,
+            cefr: close.cefr,
+            grade: close.grade,
+            translation: close.translation,
+            facets: close.facets,
+            deck_id: close.deck_id,
+            card_type: close.card_type,
+            card_id: close.card_id,
+          });
         }}
         onExit={() => {
           setStudying(false);
@@ -759,253 +772,216 @@ function StudyTab({
     );
   }
 
-  // La sesión de repaso encadenada sustituye al bloque entero: mientras se
-  // repasa no se ofrecen las otras acciones, igual que hace la sesión FSRS.
-  if (reviewing && reviewItems.length > 0) {
-    return (
-      <ReviewSession userId={userId} items={reviewItems} onExit={exitReview} />
-    );
-  }
+  const items = queueMatches ? queue?.items ?? [] : [];
+  const total = queueMatches ? queue?.total ?? 0 : 0;
 
   return (
-    <Card className="gap-3 p-5">
-      <div className="flex flex-col gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Layers className="size-4 text-primary" aria-hidden="true" />
-          {t("flashcards.study.title")}
-        </h2>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("flashcards.study.hint")}
-        </p>
+    <Card className="gap-5 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {t("flashcards.study.scopeLabel")}
+          </p>
+          <h2 className="text-xl font-semibold tracking-tight">{scopeTitle}</h2>
+          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+            {t("flashcards.study.hint")}
+          </p>
+        </div>
+        <StudyConfigPanel
+          config={studyConfig}
+          onChange={(patch) => void changeStudyConfig(patch)}
+        />
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <DeckSelect decks={decks} value={deck} onChange={onPick} />
-        {/* V3.84.0: la ruta genérica. Sobre el mazo automático («Mi
-            diccionario», todo el léxico) se elige estudiar TODAS las palabras,
-            las de un pack o las de una lista. Reutiliza el `collection_id` que
-            la cola ya soportaba: no hay backend nuevo. */}
-        {isAuto ? (
-          <select
-            aria-label={t("flashcards.study.filterLabel")}
-            value={collection?.id ?? ""}
-            onChange={(e) => {
-              const id = Number(e.target.value);
-              if (!id) {
-                onPickCollection(null);
-                return;
-              }
-              const found = catalog.find((c) => c.id === id);
-              if (found) {
-                onPickCollection({
-                  id: found.id,
-                  label:
-                    lang === "es" && found.title_es
-                      ? found.title_es
-                      : found.title,
-                });
-              }
-            }}
-            className={cn(INPUT, "w-full sm:w-56")}
+      <div
+        className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1"
+        role="group"
+        aria-label={t("flashcards.study.scopeLabel")}
+      >
+        {(
+          [
+            ["all", "flashcards.study.scopeAll"],
+            ["level", "flashcards.study.scopeLevel"],
+            ["deck", "flashcards.study.scopeDeck"],
+          ] as const
+        ).map(([id, labelKey]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={scope === id}
+            onClick={() => setScope(id)}
+            className={cn(
+              "min-h-11 rounded-lg px-2 py-2 text-sm",
+              scope === id
+                ? "bg-background font-semibold text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <option value="">{t("flashcards.study.filterAll")}</option>
-            {catalog.some((c) => c.kind === "theme_pack") ? (
-              <optgroup label={t("flashcards.study.filterPacks")}>
-                {catalog
-                  .filter((c) => c.kind === "theme_pack")
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {lang === "es" && c.title_es ? c.title_es : c.title}
-                    </option>
-                  ))}
-              </optgroup>
-            ) : null}
-            {catalog.some((c) => c.kind === "user_list") ? (
-              <optgroup label={t("flashcards.study.filterLists")}>
-                {catalog
-                  .filter((c) => c.kind === "user_list")
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                    </option>
-                  ))}
-              </optgroup>
-            ) : null}
-          </select>
-        ) : null}
-        {collection ? (
-          <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-xs">
-            {t("flashcards.study.filtered").replace("{name}", collection.label)}
+            {t(labelKey)}
+          </button>
+        ))}
+      </div>
+
+      {scope === "level" ? (
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label={t("flashcards.study.levelChips")}
+        >
+          {STUDY_LEVELS.map((code) => (
             <button
+              key={code}
               type="button"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={onClearCollection}
+              aria-pressed={level === code}
+              onClick={() => setLevel(code)}
+              className={cn(
+                "min-h-11 rounded-full border px-3 py-2 text-sm",
+                level === code
+                  ? "border-primary bg-primary/10 font-semibold text-primary"
+                  : "border-border",
+              )}
             >
-              {t("flashcards.study.clearFilter")}
+              {code}
             </button>
-          </span>
-        ) : null}
-        {!isAuto ? (
-          <p className="text-[11px] text-muted-foreground">
-            {t("flashcards.study.deckHint")}
-          </p>
-        ) : null}
-      </div>
-
-      {/* V3.87.0: configuración de estudio, plegada tras el «...» (V3.87.1).
-          Cada cambio se guarda y recarga la cola (ver `changeStudyConfig`). */}
-      <StudyConfigPanel
-        config={studyConfig}
-        onChange={(patch) => void changeStudyConfig(patch)}
-      />
-
-      {/* V3.85.0: DOS acciones, una por superficie, cada una rotulada y con su
-          recuento. Antes había un solo botón («Iniciar sesión») y el repaso
-          vivía al otro lado, en la pestaña Personal, como una lista con un botón
-          que se leía como un estado. En móvil van a ancho completo y en una
-          columna; a partir de `sm` comparten fila. */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold">
-            <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
-            {t("dictionary.review.title")}
-          </span>
-          {reviewError ? (
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {t("dictionary.review.loadError")}
-            </p>
-          ) : reviewLoading ? (
-            /* V3.88.0: la cola del día no tenía estado de carga. Mientras la
-               petición viajaba, el panel decía «nada que repasar» —una mentira
-               mientras no se sabe— y el alumno no veía que algo estaba pasando. */
-            <LoadingNotice className="text-[11px]" />
-          ) : (
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {reviewDue > 0
-                ? t("dictionary.review.todaySummary").replace(
-                    "{count}",
-                    String(reviewDue),
-                  )
-                : t("dictionary.review.empty")}
-            </p>
-          )}
-          {reviewError ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => void refreshReview()}
-            >
-              <RefreshCw className="size-3.5" aria-hidden="true" />
-              {t("common.retry")}
-            </Button>
-          ) : !reviewLoading && reviewDue > 0 ? (
-            <Button
-              type="button"
-              size="sm"
-              className="w-full"
-              onClick={() => setReviewing(true)}
-            >
-              {t("dictionary.review.todayAction").replace(
-                "{count}",
-                String(reviewDue),
-              )}
-            </Button>
-          ) : null}
+          ))}
         </div>
-
-        <div className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold">
-            <Layers className="size-3.5 text-primary" aria-hidden="true" />
-            {t("flashcards.study.cardsTitle")}
-          </span>
-          {error ? (
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {t("dictionary.loadError")}
-            </p>
-          ) : loading ? (
-            /* V3.88.0: la cola FSRS ya avisaba con texto plano; ahora lleva
-               también spinner y, si se alarga, el reloj del aviso. */
-            <LoadingNotice className="text-[11px]" />
-          ) : (
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {t("flashcards.study.pendingToday").replace(
-                "{n}",
-                String(items.length),
-              )}
-            </p>
-          )}
-          {error ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => void load()}
-            >
-              <RefreshCw className="size-3.5" aria-hidden="true" />
-              {t("common.retry")}
-            </Button>
-          ) : !loading && items.length > 0 ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setSessionNonce((n) => n + 1);
-                setStudying(true);
-              }}
-            >
-              {t("flashcards.study.startCards").replace(
-                "{n}",
-                String(items.length),
-              )}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      {!error && !loading && queue ? (
-        <p className="text-[11px] text-muted-foreground">
-          {t("flashcards.study.limitsNote")
-            .replace("{new}", String(queue.limits.new_remaining))
-            .replace("{review}", String(queue.limits.review_remaining))}
-        </p>
       ) : null}
 
-      {/* El mazo no tiene nada que estudiar. «Nada pendiente» y «el mazo está
-          vacío» son cosas distintas y solo una tiene arreglo aquí (V3.80.0). */}
-      {!error && !loading && items.length === 0 ? (
-        queue && queue.deck.card_count === 0 ? (
-          isAuto ? (
-            <p className="text-sm text-muted-foreground">
-              {t("flashcards.study.emptyAuto")}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-muted-foreground">
-                {t("flashcards.study.emptyDeck")}
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="w-fit"
-                onClick={() => onAddCards(deck)}
-              >
-                <Plus className="size-3.5" aria-hidden="true" />
-                {t("flashcards.study.addCards")}
-              </Button>
-            </div>
-          )
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {t("flashcards.study.empty")}
-          </p>
-        )
+      {scope === "deck" ? <DeckSelect decks={decks} value={deck} onChange={onPick} /> : null}
+
+      <div
+        className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1"
+        role="group"
+        aria-label={t("flashcards.study.pickLabel")}
+      >
+        {(
+          [
+            ["pending", "flashcards.study.pickPending"],
+            ["failed", "flashcards.study.pickFailed"],
+            ["all", "flashcards.study.pickAll"],
+          ] as const
+        ).map(([id, labelKey]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={pick === id}
+            onClick={() => setPick(id)}
+            className={cn(
+              "min-h-11 rounded-lg px-2 py-2 text-sm",
+              pick === id
+                ? "bg-background font-semibold text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t(labelKey)}
+          </button>
+        ))}
+      </div>
+
+      {collection && scope !== "deck" ? (
+        <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-xs">
+          {t("flashcards.study.filtered").replace("{name}", collection.label)}
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={onClearCollection}
+          >
+            {t("flashcards.study.clearFilter")}
+          </button>
+        </span>
       ) : null}
+
+      <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-border sm:grid-cols-5">
+        {(
+          [
+            ["flashcards.study.statTotal", queueMatches ? queue?.total : null, false],
+            ["flashcards.study.statStudied", queueMatches ? queue?.studied : null, false],
+            ["flashcards.study.statLearned", queueMatches ? queue?.learned : null, false],
+            ["flashcards.study.statDue", queueMatches ? queue?.due : null, true],
+            ["flashcards.study.statTimes", queueMatches ? queue?.times_studied : null, false],
+          ] as const
+        ).map(([labelKey, value, accent]) => (
+          <div
+            key={labelKey}
+            className={cn(
+              "flex flex-col gap-1 border-border/70 px-3 py-3 [&:nth-child(n+3)]:border-t sm:border-t-0 sm:[&:not(:first-child)]:border-l",
+              accent && "bg-primary/10",
+            )}
+          >
+            <dt className="text-[11px] text-muted-foreground">{t(labelKey)}</dt>
+            <dd className="text-2xl font-semibold tabular-nums tracking-tight">
+              {loading && !queueMatches ? "…" : String(value ?? 0)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {error ? (
+        <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
+          <RefreshCw className="size-3.5" aria-hidden="true" />
+          {t("common.retry")}
+        </Button>
+      ) : loading && !queue ? (
+        <LoadingNotice className="text-[11px]" />
+      ) : items.length > 0 ? (
+        <Button
+          type="button"
+          size="lg"
+          className="w-full sm:w-auto"
+          onClick={() => {
+            setSessionNonce((n) => n + 1);
+            setStudying(true);
+          }}
+        >
+          {t("flashcards.study.start").replace("{n}", String(items.length))}
+        </Button>
+      ) : !loading && queueMatches && total === 0 && scope === "deck" && !isAuto ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted-foreground">{t("flashcards.study.emptyDeck")}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-fit"
+            onClick={() => onAddCards(deck)}
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            {t("flashcards.study.addCards")}
+          </Button>
+        </div>
+      ) : !loading && queueMatches && total === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("flashcards.study.emptyAuto")}</p>
+      ) : !loading && queueMatches && pick === "failed" ? (
+        <p className="text-sm text-muted-foreground">{t("flashcards.study.emptyFailed")}</p>
+      ) : !loading && queueMatches ? (
+        <p className="text-sm text-muted-foreground">{t("flashcards.study.empty")}</p>
+      ) : null}
+
+      <div
+        className="flex items-center gap-1 border-t border-border/70 pt-3"
+        role="group"
+        aria-label={t("flashcards.study.shortcuts")}
+      >
+        {(
+          [
+            ["lexicon", "dictionary.myLexicon", BookOpen],
+            ["decks", "flashcards.tabs.decks", Library],
+            ["cards", "flashcards.tabs.cards", Layers],
+            ["stats", "flashcards.tabs.stats", BarChart3],
+          ] as const
+        ).map(([id, labelKey, Icon]) => (
+          <button
+            key={id}
+            type="button"
+            aria-label={t(labelKey)}
+            title={t(labelKey)}
+            onClick={() => onOpenTab(id)}
+            className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <Icon className="size-4" aria-hidden="true" />
+          </button>
+        ))}
+      </div>
     </Card>
   );
 }

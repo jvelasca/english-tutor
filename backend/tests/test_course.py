@@ -141,6 +141,11 @@ def test_endpoint_course_map(monkeypatch, tmp_path):
     assert body["units"]
     assert body["position"]["objective_id"]
     assert body["progress"]["total"] > 20
+    route = body["listening_route"]
+    assert route["level"] == "A1"
+    assert route["state"] == "not_started"
+    assert route["mastered"] == 0
+    assert route["passed"] is False
 
 
 def test_endpoint_course_map_blocked_level(monkeypatch, tmp_path):
@@ -148,6 +153,42 @@ def test_endpoint_course_map_blocked_level(monkeypatch, tmp_path):
     with TestClient(app) as client:
         r = client.get("/api/academy/course/b1", params={"user_id": a})
     assert r.status_code == 403
+
+
+def test_listening_practice_shows_on_its_level_and_does_not_unlock(
+    monkeypatch, tmp_path
+):
+    """Un acierto en Aprender se ve en la ruta del mismo nivel y no abre el curso."""
+    from repositories import listening as listening_repo
+    from services.listening import questions_for_level
+
+    uid = _setup(monkeypatch, tmp_path)
+    a1 = questions_for_level("A1")[0]
+    a2 = questions_for_level("A2")[0]
+    listening_repo.record_attempt(uid, a2["id"], 0, True)
+    pure = course_svc.course_map(load_level("a1"), set())
+    with TestClient(app) as client:
+        other = client.get("/api/academy/course/a1", params={"user_id": uid})
+        assert other.status_code == 200
+        assert other.json()["listening_route"]["state"] == "not_started"
+        assert other.json()["listening_route"]["mastered"] == 0
+
+        listening_repo.record_attempt(uid, a1["id"], 0, True)
+        opened = client.get("/api/academy/course/a1", params={"user_id": uid})
+        blocked = client.get("/api/academy/course/b1", params={"user_id": uid})
+    assert opened.status_code == 200
+    body = opened.json()
+    route = body["listening_route"]
+    assert route["level"] == "A1"
+    assert route["state"] == "developing"
+    assert route["mastered"] >= 1
+    assert route["total"] >= route["mastered"]
+    assert route["passed"] is False
+    assert [u["status"] for u in body["units"]] == [
+        u["status"] for u in pure["units"]
+    ]
+    assert body["position"]["objective_id"] == pure["position"]["objective_id"]
+    assert blocked.status_code == 403
 
 
 # --- V2.2: plantilla de secciones, objetivos y Mastery Gates ---------------

@@ -55,6 +55,7 @@ import { Card } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
+import { mnemonicSlice } from "./hintReveal";
 
 /**
  * Los cuatro grados FSRS con su identidad visual (V3.83.0): icono, color
@@ -130,6 +131,7 @@ export function StudySession({
 }: StudySessionProps) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
+  const [hintStep, setHintStep] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -235,6 +237,11 @@ export function StudySession({
   // La ayuda solo se enseña si la config la pide y la tarjeta la trae.
   const hint =
     studyConfig && studyConfig.hints !== "off" ? (current?.hint ?? "") : "";
+  const hintPiece = mnemonicSlice(mnemonic, hintStep);
+  const definitionHint =
+    hint && mnemonic && hint.includes(mnemonic.trim())
+      ? ""
+      : hint;
   const production = studyConfig?.mode === "production";
   // El `answer` del backend solo manda en ES→EN; en EN→ES la cara B puede
   // hidratarse en vivo (léxico), así que la verdad es `back`/`face`.
@@ -334,6 +341,7 @@ export function StudySession({
       setDone((n) => n + 1);
       if (g >= 3) setGood((n) => n + 1);
       setFlipped(false);
+      setHintStep(0);
       // Al cambiar de tarjeta se cierra cualquier edición abierta: el campo es
       // de la tarjeta anterior y dejarlo abierto guardaría en la equivocada.
       setEditing(false);
@@ -540,13 +548,13 @@ export function StudySession({
         aria-label={t("flashcards.study.flip")}
       >
         <motion.span
-          className="relative block min-h-40 w-full [transform-style:preserve-3d]"
+          className="relative block min-h-52 w-full [transform-style:preserve-3d]"
           animate={reduceMotion ? undefined : { rotateY: flipped ? 180 : 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-6 text-center [backface-visibility:hidden]">
             <span
-              className="text-2xl font-bold tracking-tight break-words"
+              className="text-3xl font-bold tracking-tight break-words sm:text-4xl"
               lang={promptLang}
             >
               {promptText}
@@ -558,15 +566,9 @@ export function StudySession({
                   : t("flashcards.study.tapReveal")}
               </span>
             ) : null}
-            {/* V3.87.0: ayuda ANTES de voltear (definición y/o recordatorio).
-                Nunca es la respuesta: es lo que permite intentarlo. */}
-            {!flipped && hint ? (
-              <span
-                className="flex items-center gap-1 text-xs text-muted-foreground"
-                aria-label={t("flashcards.study.hintLabel")}
-              >
-                <Lightbulb className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="break-words">{hint}</span>
+            {!flipped && definitionHint ? (
+              <span className="text-xs text-muted-foreground break-words">
+                {definitionHint}
               </span>
             ) : null}
           </span>
@@ -617,6 +619,29 @@ export function StudySession({
           </span>
         </motion.span>
       </button>
+
+      {!flipped && mnemonic.trim() && !productionActive ? (
+        <div className="flex flex-col items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-12 gap-1.5"
+            onClick={() => setHintStep((step) => Math.min(step + 1, 3))}
+            disabled={hintStep >= 3}
+          >
+            <Lightbulb className="size-4" aria-hidden="true" />
+            {t("flashcards.study.hintLabel")}
+          </Button>
+          {hintPiece ? (
+            <p
+              className="max-w-sm text-center text-sm text-muted-foreground break-words"
+              aria-live="polite"
+            >
+              {hintPiece}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {canEdit && flipped ? (
         <div className="flex flex-col gap-2">
@@ -766,7 +791,7 @@ export function StudySession({
                 onClick={() => void grade(g.grade)}
                 aria-keyshortcuts={String(g.grade)}
                 className={cn(
-                  "flex-col gap-0.5 py-2.5 font-semibold sm:flex-row sm:gap-1.5",
+                  "min-h-12 flex-col gap-0.5 py-2.5 font-semibold sm:flex-row sm:gap-1.5",
                   g.tone,
                 )}
               >
@@ -786,8 +811,8 @@ export function StudySession({
           type="button"
           variant="secondary"
           size="sm"
-          className="w-fit self-center"
           onClick={reveal}
+          className="min-h-12 w-full self-center sm:w-fit"
         >
           {t("flashcards.study.reveal")}
         </Button>

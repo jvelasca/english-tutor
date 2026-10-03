@@ -185,6 +185,29 @@ def _entry_dict(row: object) -> dict:
     return entry
 
 
+def brief_for_words(words: list[str]) -> dict[str, dict]:
+    """Traducción y definición de caché para esas palabras, sin el artículo entero."""
+    wanted = [str(word or "").strip().lower() for word in words if str(word or "").strip()]
+    out: dict[str, dict] = {}
+    if not wanted:
+        return out
+    with closing(_conn()) as conn:
+        for start in range(0, len(wanted), 200):
+            chunk = wanted[start : start + 200]
+            marks = ",".join("?" for _ in chunk)
+            rows = conn.execute(
+                "SELECT word, translation, definition FROM dictionary_entries "
+                f"WHERE word IN ({marks})",
+                tuple(chunk),
+            ).fetchall()
+            for row in rows:
+                out[str(row["word"])] = {
+                    "translation": str(row["translation"] or ""),
+                    "definition": str(row["definition"] or ""),
+                }
+    return out
+
+
 def get_entry(word: str) -> dict | None:
     """Devuelve la entrada de diccionario cacheada de `word` (None si no existe).
 
@@ -584,3 +607,21 @@ def list_reverse_entries() -> list[dict]:
             "ORDER BY word"
         ).fetchall()
     return [_entry_dict(row) for row in rows]
+
+
+def cefr_words() -> dict[str, str]:
+    """`palabra → CEFR` de la caché del diccionario, solo donde el nivel consta.
+
+    Es el punto de extensión del banco de Estudiar: una importación que rellene
+    `dictionary_entries.cefr` entra en el mismo recuento sin otra pantalla.
+    """
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word, cefr FROM dictionary_entries "
+            "WHERE cefr IS NOT NULL AND cefr != ''"
+        ).fetchall()
+    return {
+        str(row["word"]).strip().lower(): str(row["cefr"]).strip().upper()
+        for row in rows
+        if str(row["word"] or "").strip()
+    }

@@ -5,6 +5,7 @@ import type {
   ListeningTranscriptPolicy,
 } from "../../types/api";
 import {
+  advancePastOptionalShadowing,
   advanceToNext,
   activeSentenceIndex,
   activeWordIndex,
@@ -18,6 +19,7 @@ import {
   initialFlow,
   isAnswering,
   isProductionFlow,
+  optionalShadowingFollows,
   revealFull,
   revealSentenceIndexes,
   retriesRemain,
@@ -241,6 +243,30 @@ describe("microFlow: revelado manual y shadowing", () => {
     expect(revealed.transcript).toBe("full");
     // Idempotente: ya revelado no cambia.
     expect(revealFull(revealed, A1_POLICY)).toBe(revealed);
+  });
+
+  it("un acierto más «siguiente» salta el shadowing opcional", () => {
+    let state = initialFlow(question({ flow: receptiveFlow }));
+    state = advanceToNext(state, receptiveFlow); // while2
+    state = completeStageWithAnswer(state, true, A1_POLICY, receptiveFlow);
+    expect(state.stage).toBe("post");
+    expect(optionalShadowingFollows(state, receptiveFlow)).toBe(true);
+    const next = advancePastOptionalShadowing(state, receptiveFlow);
+    expect(next.finished).toBe(true);
+    expect(next.stage).toBeNull();
+  });
+
+  it("no salta el shadowing cuando el paso no se puede saltar", () => {
+    const required = receptiveFlow.map((step) =>
+      step.stage === "shadowing" ? { ...step, allow_skip: false } : step,
+    );
+    let state = initialFlow(question({ flow: required }));
+    state = advanceToNext(state, required);
+    state = completeStageWithAnswer(state, true, A1_POLICY, required);
+    expect(optionalShadowingFollows(state, required)).toBe(false);
+    const next = advancePastOptionalShadowing(state, required);
+    expect(next.stage).toBe("shadowing");
+    expect(next.finished).toBe(false);
   });
 
   it("shadowing se completa y luego finaliza el flujo", () => {

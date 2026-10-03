@@ -687,6 +687,23 @@ def get_queue_entry(user_id: str, question_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def promote_due_deferred(user_id: str, now: str) -> int:
+    """Reabre como `pending` las entradas aplazadas cuya fecha ya llegó.
+
+    «Repasar después» no es borrar: la fila queda `deferred` hasta `next_review_at`.
+    Sin este paso la cola nunca la vuelve a servir, porque `list_queue` y
+    `due_queue` solo leen `pending`.
+    """
+    with closing(_conn()) as conn, conn:
+        cur = conn.execute(
+            "UPDATE listening_review_queue "
+            "SET state = 'pending', updated_at = ? "
+            "WHERE user_id = ? AND state = 'deferred' AND next_review_at <= ?",
+            (_now(), user_id, now),
+        )
+        return cur.rowcount
+
+
 def list_queue(user_id: str, state: str | None = "pending") -> list[dict]:
     """Entradas de la cola del usuario, ordenadas por prioridad DESC.
 
