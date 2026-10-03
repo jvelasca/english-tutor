@@ -1099,6 +1099,11 @@ class VocabItemAddIn(BaseModel):
     translation: str = Field(default="", max_length=200)
     sense: VocabSenseIn | None = None
     collection_id: int | None = None
+    #: Recordatorio personal. Vacío no borra el que ya hubiera.
+    mnemonic: str = Field(default="", max_length=400)
+    #: Mazos a los que pertenece la palabra. No crea una segunda ficha FSRS.
+    deck_ids: list[int] = Field(default_factory=list, max_length=20)
+    cefr: str = Field(default="", max_length=8)
 
 
 class VocabItemFaceOut(BaseModel):
@@ -1226,6 +1231,8 @@ class FlashcardDeckOut(BaseModel):
     due_count: int = 0
     new_count: int = 0
     reviewed_today: int = 0
+    #: Palabras del mazo cuya carta FSRS ya está en estado `review`.
+    learned_count: int = 0
     limits: FlashcardLimitsOut | None = None
 
 

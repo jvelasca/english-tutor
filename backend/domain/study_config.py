@@ -24,7 +24,7 @@ from services import study_config as study_config_service
 SETTINGS_KEY = "study_config"
 
 
-def _load(raw: str | None) -> tuple[dict[str, str], bool]:
+def _load(raw: str | None) -> tuple[dict, bool]:
     """`(config normalizada, si el alumno la guardó alguna vez)`."""
     if not raw:
         return study_config_service.normalize_study_config(None), False
@@ -54,7 +54,7 @@ async def set_study_config(user_id: str, patch: dict) -> dict:
     settings = await run_in_threadpool(settings_repo.get_settings, user_id)
     current, _ = _load(settings.get(SETTINGS_KEY))
     merged = dict(current)
-    for key in study_config_service.DEFAULTS:
+    for key in (*study_config_service.DEFAULTS, "words_per_day", "required_facets"):
         value = patch.get(key)
         if value is not None:
             merged[key] = value

@@ -62,6 +62,8 @@ function config(overrides: Partial<StudyConfig> = {}): StudyConfig {
     mode: "recognition",
     hints: "off",
     difficulty: "auto",
+    words_per_day: 20,
+    required_facets: [],
     configured: true,
     ...overrides,
   };

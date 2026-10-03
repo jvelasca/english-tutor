@@ -9,6 +9,7 @@ import {
   normalizeFlashcardStats,
   normalizeLexicon,
   normalizeRetentionDue,
+  normalizeStudyLessonQueue,
   normalizeStudyQueue,
   normalizeVocabBulkAdd,
   normalizeVocabCollections,
@@ -42,6 +43,7 @@ import type {
   FlashcardReviewResult,
   FlashcardStats,
   Lexicon,
+  StudyQueue,
   RetentionDue,
   RetentionReviewResult,
   VocabBulkAddResult,
@@ -453,6 +455,9 @@ export function addVocabularyItem(
     translation?: string;
     collectionId?: number;
     sense?: VocabularySenseInput | null;
+    mnemonic?: string;
+    deckIds?: number[];
+    cefr?: string;
   } = {},
 ): Promise<VocabItemAddResult> {
   return postJson<unknown>("/api/vocabulary/items", {
@@ -460,6 +465,9 @@ export function addVocabularyItem(
     translation: options.translation ?? "",
     ...(options.sense ? { sense: options.sense } : {}),
     collection_id: options.collectionId ?? null,
+    mnemonic: options.mnemonic ?? "",
+    deck_ids: options.deckIds ?? [],
+    cefr: options.cefr ?? "",
   }).then(normalizeVocabItemAdd);
 }
 
@@ -587,16 +595,56 @@ export function deleteFlashcardDeck(
 export function getFlashcardQueue(
   _userId: string,
   deckId: number,
-  options: { collectionId?: number | null } = {},
+  options: { collectionId?: number | null; level?: string | null } = {},
 ): Promise<FlashcardQueue> {
   const params = new URLSearchParams();
   if (options.collectionId != null) {
     params.set("collection_id", String(options.collectionId));
   }
+  if (options.level) {
+    params.set("level", options.level);
+  }
   const q = params.toString();
   return getJson<unknown>(
     `/api/vocabulary/decks/${deckId}/queue${q ? `?${q}` : ""}`,
   ).then(normalizeStudyQueue);
+}
+
+/** Cola de la lección de Estudiar (banco, nivel o mazo) con sus contadores. */
+export function getStudyQueue(
+  _userId: string,
+  options: {
+    scope: "all" | "level" | "deck";
+    mode?: "pending" | "failed" | "all";
+    level?: string | null;
+    deckId?: number | null;
+    collectionId?: number | null;
+  },
+): Promise<StudyQueue> {
+  const params = new URLSearchParams();
+  params.set("scope", options.scope);
+  params.set("mode", options.mode ?? "pending");
+  if (options.level) params.set("level", options.level);
+  if (options.deckId != null) params.set("deck_id", String(options.deckId));
+  if (options.collectionId != null) {
+    params.set("collection_id", String(options.collectionId));
+  }
+  return getJson<unknown>(`/api/vocabulary/study/queue?${params.toString()}`).then(
+    normalizeStudyLessonQueue,
+  );
+}
+
+/** Cierra el ítem servido: una nota FSRS y los pasos que el alumno afirma. */
+export function completeStudyLesson(
+  _userId: string,
+  body: {
+    item_id: string;
+    grade: number;
+    translation?: string;
+    facets: Record<string, string>;
+  },
+): Promise<{ word: string; learned: boolean; facets: Record<string, string> }> {
+  return postJson(`/api/vocabulary/study/complete`, body);
 }
 
 export function reviewFlashcard(

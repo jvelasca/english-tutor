@@ -1011,6 +1011,67 @@ def review_totals(user_id: str, *, since_iso: str) -> dict:
     }
 
 
+def link_lexicon_word(user_id: str, deck_id: int, word: str) -> bool:
+    """El mazo pasa a incluir esta palabra del diccionario.
+
+    No crea una ficha manual: la carta de repaso sigue siendo la del léxico.
+    """
+    key = " ".join((word or "").strip().lower().split())
+    if not key or get_user(user_id) is None or deck_id == AUTO_DECK_ID:
+        return False
+    if get_deck(user_id, deck_id) is None:
+        return False
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO lexicon_deck_words "
+            "(user_id, deck_id, word, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, int(deck_id), key, _now()),
+        )
+    return True
+
+
+def lexicon_words_in_deck(user_id: str, deck_id: int) -> list[str]:
+    """Palabras del diccionario enlazadas a un mazo manual, en orden estable."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word FROM lexicon_deck_words "
+            "WHERE user_id = ? AND deck_id = ? ORDER BY word ASC",
+            (user_id, int(deck_id)),
+        ).fetchall()
+    return [str(r["word"]) for r in rows]
+
+
+def review_counts(user_id: str) -> dict[tuple[str, str], int]:
+    """`(card_type, card_id) → cuántas veces se ha calificado`, sin recorte de días."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT card_type, card_id, COUNT(*) AS n FROM flashcard_reviews "
+            "WHERE user_id = ? GROUP BY card_type, card_id",
+            (user_id,),
+        ).fetchall()
+    return {
+        (str(row["card_type"]), str(row["card_id"])): int(row["n"] or 0)
+        for row in rows
+    }
+
+
+def latest_grades(user_id: str) -> dict[tuple[str, str], int]:
+    """Última nota de cada carta, por el id más alto del libro de repasos."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT card_type, card_id, grade FROM flashcard_reviews "
+            "WHERE user_id = ? AND id IN ("
+            "  SELECT MAX(id) FROM flashcard_reviews WHERE user_id = ? "
+            "  GROUP BY card_type, card_id"
+            ")",
+            (user_id, user_id),
+        ).fetchall()
+    return {
+        (str(row["card_type"]), str(row["card_id"])): int(row["grade"])
+        for row in rows
+    }
+
+
 def studied_cards(user_id: str) -> set[tuple[str, str]]:
     """Pares `(card_type, card_id)` que el alumno YA ha calificado alguna vez.
 

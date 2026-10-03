@@ -17,6 +17,8 @@ __pycache__/
 .DS_Store
 backend/models/
 backend/data/
+# Correos y contraseña de las cuentas de este equipo. No sube a GitHub.
+docs/CUENTAS-LOCALES.md
 launcher/logs/
 launcher/state.json
 # V3.75.3: preferencias del launcher (modo LAN). Por equipo, como state.json.

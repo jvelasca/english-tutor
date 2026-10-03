@@ -583,6 +583,31 @@ export function CourseScreen({
                       </div>
                     ))}
                   </div>
+                  {course.listening_route && (
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        {t("course.listeningRoute").replace(
+                          "{level}",
+                          course.listening_route.level,
+                        )}
+                      </span>
+                      {" · "}
+                      {t(
+                        `listening.routeState.${course.listening_route.state}`,
+                      )}
+                      {course.listening_route.total > 0 && (
+                        <>
+                          {" · "}
+                          <span className="tabular-nums">
+                            {course.listening_route.mastered}/
+                            {course.listening_route.total}
+                          </span>
+                        </>
+                      )}
+                      {". "}
+                      {t("course.listeningRouteNote")}
+                    </p>
+                  )}
                 </div>
               )}
 

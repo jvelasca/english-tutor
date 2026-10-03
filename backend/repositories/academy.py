@@ -1112,6 +1112,25 @@ def upsert_fsrs_card_cas(
         )
 
 
+def write_fsrs_card(conn, user_id: str, card: dict) -> None:
+    """Upsert de una carta sobre una conexión DADA.
+
+    La usa el cierre de Estudiar para que el alta, las facetas, el FSRS y el
+    libro de repasos compartan una transacción. No abre ni cierra conexión.
+    """
+    conn.execute(_FSRS_UPSERT_SQL, _fsrs_row(user_id, card, _now()))
+
+
+def read_fsrs_card(conn, user_id: str, target_type: str, target_id: str) -> dict | None:
+    """Lee una carta FSRS usando la conexión del que llama."""
+    row = conn.execute(
+        f"SELECT {_FSRS_CARD_COLUMNS} FROM fsrs_cards "
+        "WHERE user_id = ? AND target_type = ? AND target_id = ?",
+        (user_id, target_type, target_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
 def write_fsrs_card_cas(
     conn, user_id: str, card: dict, *, expected_version: int
 ) -> bool:

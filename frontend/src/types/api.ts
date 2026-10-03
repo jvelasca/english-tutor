@@ -1142,6 +1142,8 @@ export interface FlashcardDeck {
   new_per_day: number;
   review_per_day: number;
   card_count: number;
+  /** Palabras cuya carta FSRS ya está en repaso (`review`). */
+  learned_count?: number;
   /** V3.86.0: cuántas de `card_count` están también en otro mazo. */
   shared_count: number;
   due_count: number;
@@ -1195,13 +1197,55 @@ export type StudyMode = "recognition" | "production" | "mixed";
 export type StudyHints = "off" | "definition" | "mnemonic" | "all";
 export type StudyDifficulty = "gentle" | "auto" | "intensive";
 
+export type StudyScope = "all" | "level" | "deck";
+export type StudyQueueMode = "pending" | "failed" | "all";
+export type LessonFacet = "meaning" | "pronunciation" | "context" | "senses" | "related";
+export type LessonFacetStatus = "done" | "pending" | "na";
+/** Pasos que el alumno puede exigir para contar una palabra como aprendida. */
+export type RequiredLessonFacet = Exclude<LessonFacet, "meaning">;
+
 export interface StudyConfig {
   direction: StudyDirection;
   mode: StudyMode;
   hints: StudyHints;
   difficulty: StudyDifficulty;
+  /** Tope de la sesión de hoy en el banco (nuevas + repasos). */
+  words_per_day: number;
+  /** Pasos opcionales que, pendientes, impiden contar la palabra como aprendida. */
+  required_facets: RequiredLessonFacet[];
   /** `false` mientras el alumno no ha guardado nunca su configuración. */
   configured: boolean;
+}
+
+export interface StudyLessonItem {
+  /** Identidad opaca que emitió esta cola. El cierre solo envía este id. */
+  item_id: string;
+  word: string;
+  cefr: string;
+  card_type: FlashcardCardType;
+  card_id: string;
+  deck_id: number;
+  is_new: boolean;
+  translation: string;
+  definition: string;
+  facets: Partial<Record<LessonFacet, LessonFacetStatus>>;
+  state: string;
+}
+
+export interface StudyQueue {
+  scope: StudyScope;
+  mode: StudyQueueMode;
+  level: string;
+  deck_id: number;
+  collection_id: number | null;
+  items: StudyLessonItem[];
+  total: number;
+  studied: number;
+  learned: number;
+  due: number;
+  times_studied: number;
+  queued: number;
+  study_config?: StudyConfig | null;
 }
 
 export interface FlashcardStudyItem {
@@ -3220,6 +3264,16 @@ export interface CourseProgress {
   progress: number;
 }
 
+/** Ruta de práctica de Listening del nivel del curso. Informa; no desbloquea. */
+export interface ListeningRouteProjection {
+  level: string;
+  state: "not_started" | "developing" | "functional" | "demonstrated";
+  mastered: number;
+  total: number;
+  coverage_pct: number;
+  passed: boolean;
+}
+
 export interface CourseMap {
   level_id: string;
   level: string;
@@ -3228,6 +3282,7 @@ export interface CourseMap {
   units: CourseUnit[];
   position: CoursePosition;
   progress: CourseProgress;
+  listening_route?: ListeningRouteProjection | null;
 }
 
 export interface Enrollment {

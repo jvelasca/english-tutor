@@ -19,7 +19,6 @@ import { normalizeDictionaryEntry } from "../../api/normalize";
 import {
   addVocabularyItem,
   createFlashcardDeck,
-  createVocabularyCard,
   listFlashcardDecks,
   lookupDictionaryWord,
 } from "../../api/vocabulary";
@@ -34,6 +33,7 @@ import type {
   LexicalCompetence,
   LexicalStatus,
 } from "../../types/api";
+import { meaningLines } from "./meaningDisplay";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
 import { ItemReplayButton } from "../../components/ItemReplayButton";
@@ -291,9 +291,8 @@ export function DictionaryLookup({
   async function saveDeckCard(target: DeckCardTarget): Promise<boolean> {
     if (!userId) return false;
     try {
-      await createVocabularyCard(userId, {
-        front: target.front,
-        back: target.back,
+      await addVocabularyItem(userId, target.front, {
+        translation: target.back,
         mnemonic: target.mnemonic,
         deckIds: target.deckIds,
       });
@@ -346,56 +345,37 @@ export function DictionaryLookup({
     setPendingDeck(null);
     const term = cardFront;
     const back = payload.back.trim() || cardBack;
-    // 1) El alta del léxico + carta FSRS + estado `learning`. Si la palabra ya
-    //    está rastreada, NO se reescribe: solo se añade la ficha a sus mazos.
-    if (!tracked) {
-      const translation =
-        entry?.direction === "en-es" ? equivalent : entry?.word ?? "";
-      try {
-        // V3.92: la ACEPCIÓN elegida viaja con el alta. Elegir un significado no
-        // es solo elegir la palabra de práctica: es la decisión de QUÉ se
-        // aprende, y sin registrarla la práctica y el repaso no podrían
-        // distinguir «bank» (institución) de «bank» (orilla).
-        await addVocabularyItem(userId, term, {
-          translation,
-          sense: chosenMeaning
-            ? {
-                term: chosenMeaning.term,
-                pos: chosenMeaning.pos,
-                gloss: chosenMeaning.gloss,
-                domain: chosenMeaning.domain,
-                source: "dictionary",
-              }
-            : null,
-        });
-      } catch {
-        setAddStatus("error");
-        setAdding(false);
-        return;
-      }
-      // El alta deja la palabra en el léxico: se refresca en silencio para que
-      // la marca de uso lo refleje sin desmontar la tarjeta.
-      void refreshEntry(lastQuery, lastDirection);
-    }
-    // 2) La tarjeta manual: una sola escritura crea la ficha en TODOS los mazos
-    //    marcados (V3.86.0, tabla puente). Si falla, el aprendizaje YA está
-    //    hecho: se declara el estado PARCIAL y se ofrece reintentar solo esto.
-    if (payload.deckIds.length > 0) {
-      const target: DeckCardTarget = {
-        deckIds: payload.deckIds,
-        deckName:
-          decks?.find((d) => d.id === payload.deckIds[0])?.name ?? term,
-        front: term,
-        back,
+    const translation =
+      entry?.direction === "en-es" ? equivalent : (entry?.word ?? "");
+    try {
+      await addVocabularyItem(userId, term, {
+        translation: back || translation,
         mnemonic: payload.mnemonic.trim(),
-      };
-      const saved = await saveDeckCard(target);
+        deckIds: payload.deckIds,
+        cefr: entry?.cefr ?? "",
+        sense: chosenMeaning
+          ? {
+              term: chosenMeaning.term,
+              pos: chosenMeaning.pos,
+              gloss: chosenMeaning.gloss,
+              domain: chosenMeaning.domain,
+              source: "dictionary",
+            }
+          : null,
+      });
+    } catch {
+      setAddStatus("error");
       setAdding(false);
-      if (!saved) {
-        setPendingDeck(target);
-        setAddStatus("partial");
-        return;
-      }
+      return;
+    }
+    void refreshEntry(lastQuery, lastDirection);
+    if (payload.deckIds.length > 0) {
+      setSavedDecks(
+        payload.deckIds.map((id) => ({
+          id,
+          name: decks?.find((d) => d.id === id)?.name ?? term,
+        })),
+      );
     }
     setAdding(false);
     setAddStatus("ok");
@@ -1376,7 +1356,11 @@ function MeaningOption({
   onPick?: (index: number) => void;
 }) {
   const { t } = useI18n();
-  const label = `${meaning.term}${meaning.pos ? ` · ${meaning.pos}` : ""}`;
+  const lines = meaningLines(meaning, isReverse);
+  const label =
+    isReverse && lines.subtitle
+      ? `${lines.title} · ${lines.subtitle}${meaning.pos ? ` · ${meaning.pos}` : ""}`
+      : `${meaning.term}${meaning.pos ? ` · ${meaning.pos}` : ""}`;
   return (
     <li>
       <label
@@ -1397,8 +1381,8 @@ function MeaningOption({
         />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-sm font-semibold" lang={isReverse ? "en" : "es"}>
-              {meaning.term}
+            <span className="text-sm font-semibold" lang={lines.titleLang}>
+              {lines.title}
             </span>
             {meaning.pos ? (
               <Badge
@@ -1422,9 +1406,12 @@ function MeaningOption({
               </Badge>
             ) : null}
           </span>
-          {meaning.gloss ? (
-            <span className="text-[11px] leading-relaxed text-muted-foreground">
-              {meaning.gloss}
+          {lines.subtitle ? (
+            <span
+              className="text-[11px] leading-relaxed text-muted-foreground"
+              lang={lines.subtitleLang}
+            >
+              {lines.subtitle}
             </span>
           ) : null}
         </span>

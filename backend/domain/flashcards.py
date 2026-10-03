@@ -194,7 +194,35 @@ async def _manual_cards(user_id: str, deck_id: int) -> list[dict]:
     return cards
 
 
-async def _deck_entries(user_id: str, deck_id: int) -> list[dict]:
+def _lexicon_entry(word: str, card: dict | None, mnemonic: str) -> dict:
+    """Una palabra del diccionario, con SU carta FSRS (nunca una ficha paralela)."""
+    key = word.strip().lower()
+    scheduled = card
+    if scheduled is None:
+        scheduled = fsrs.empty_card(
+            target_type=CARD_TYPE_LEXICON,
+            target_id=key,
+            label=key,
+            why=fsrs.why_for_flashcard(),
+            now=_now(),
+        )
+    return {
+        "card_type": CARD_TYPE_LEXICON,
+        "card_id": key,
+        "front": key,
+        "back": "",
+        "mnemonic": mnemonic,
+        "definition": "",
+        "card": scheduled,
+    }
+
+
+async def _deck_entries(
+    user_id: str,
+    deck_id: int,
+    *,
+    lexicon: list[dict] | None = None,
+) -> list[dict]:
     """Tarjetas del mazo en la forma común de la cola, SIN la cara B del léxico.
 
     Forma común: `card_type`, `card_id`, `front`, `back` (y `definition` cuando
@@ -205,22 +233,50 @@ async def _deck_entries(user_id: str, deck_id: int) -> list[dict]:
     de verdad en la sesión: son dos consultas por palabra y resolverlas para los
     cientos de palabras del léxico solo para descartarlas después era trabajo
     tirado (y el mazo automático tiene el léxico entero).
+
+    Un mazo manual es una pertenencia. Si la palabra ya está en el diccionario
+    del alumno, la cola sirve la carta `lexicon` (la misma que «todo el
+    diccionario»), no una segunda ficha FSRS. El recordatorio sale de esa
+    palabra.
     """
+    from repositories import vocabulary as vocabulary_repo
+
+    mnemonics = await run_in_threadpool(vocabulary_repo.mnemonic_by_word, user_id)
+    if lexicon is None:
+        lexicon = await _lexicon_cards(user_id)
+    by_word = {
+        str(card.get("target_id") or ""): card
+        for card in lexicon
+        if card.get("target_id")
+    }
     if deck_id == flashcards_repo.AUTO_DECK_ID:
         return [
-            {
-                "card_type": CARD_TYPE_LEXICON,
-                "card_id": str(card.get("target_id") or ""),
-                "front": str(card.get("target_id") or ""),
-                "back": "",
-                "mnemonic": "",
-                "definition": "",
-                "card": card,
-            }
-            for card in await _lexicon_cards(user_id)
-            if card.get("target_id")
+            _lexicon_entry(word, card, mnemonics.get(word, ""))
+            for word, card in by_word.items()
         ]
-    return await _manual_cards(user_id, deck_id)
+    known = await run_in_threadpool(vocabulary_repo.words_of, user_id)
+    linked = await run_in_threadpool(
+        flashcards_repo.lexicon_words_in_deck, user_id, deck_id
+    )
+    manual = await _manual_cards(user_id, deck_id)
+    entries: list[dict] = []
+    seen: set[str] = set()
+    for entry in manual:
+        word = str(entry.get("front") or "").strip().lower()
+        if word and word in known:
+            phrase = mnemonics.get(word) or str(entry.get("mnemonic") or "")
+            entries.append(_lexicon_entry(word, by_word.get(word), phrase))
+            seen.add(word)
+        else:
+            entries.append(entry)
+    for word in linked:
+        if word in seen or word not in known:
+            continue
+        entries.append(
+            _lexicon_entry(word, by_word.get(word), mnemonics.get(word, ""))
+        )
+        seen.add(word)
+    return entries
 
 
 async def _with_face(entry: dict, user_id: str) -> dict:
@@ -260,7 +316,11 @@ def _split(
 
 
 async def _due_entries(
-    user_id: str, deck_id: int, *, collection_id: int | None = None
+    user_id: str,
+    deck_id: int,
+    *,
+    collection_id: int | None = None,
+    level: str | None = None,
 ) -> tuple[list[dict], list[dict], list[dict], set[tuple[str, str]]]:
     """Devuelve `(vencidas, próximas 24 h, nuevas, ya estudiadas)`.
 
@@ -276,6 +336,16 @@ async def _due_entries(
             collections_repo.words_in_collection, user_id, collection_id
         )
         cards = [c for c in cards if c["card_id"] in allowed]
+    code = str(level or "").strip().upper()
+    if code and code != "ALL" and deck_id == flashcards_repo.AUTO_DECK_ID:
+        from repositories import vocabulary as vocabulary_repo
+
+        cefrs = await run_in_threadpool(vocabulary_repo.cefr_by_word, user_id)
+        cards = [
+            c
+            for c in cards
+            if str(cefrs.get(c["card_id"], "")).strip().upper() == code
+        ]
     reviews, fresh = _split(cards, studied)
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
@@ -327,6 +397,9 @@ async def list_decks(user_id: str) -> dict:
         )
     )
     auto["card_count"] = len(lexicon)
+    auto["learned_count"] = sum(
+        1 for card in lexicon if str(card.get("state") or "") == "review"
+    )
 
     rows = await run_in_threadpool(flashcards_repo.list_decks, user_id)
     counts = await run_in_threadpool(flashcards_repo.count_cards, user_id)
@@ -337,7 +410,7 @@ async def list_decks(user_id: str) -> dict:
         state = await run_in_threadpool(
             flashcards_repo.day_state, user_id, day, deck_id
         )
-        cards = await _manual_cards(user_id, deck_id)
+        cards = await _deck_entries(user_id, deck_id, lexicon=lexicon)
         deck = {
             "id": deck_id,
             "name": row["name"],
@@ -356,7 +429,12 @@ async def list_decks(user_id: str) -> dict:
                 now_iso=now_iso,
             )
         )
-        deck["card_count"] = counts.get(deck_id, 0)
+        deck["card_count"] = len(cards) or counts.get(deck_id, 0)
+        deck["learned_count"] = sum(
+            1
+            for entry in cards
+            if str((entry.get("card") or {}).get("state") or "") == "review"
+        )
         # V3.86.0: cuántas de esas fichas sobrevivirán al borrar el mazo por
         # estar también en otro. Es lo que hace honesto el aviso de borrado.
         deck["shared_count"] = shared.get(deck_id, 0)
@@ -798,6 +876,7 @@ async def deck_queue(
     deck_id: int,
     *,
     collection_id: int | None = None,
+    level: str | None = None,
     limit: int = QUEUE_MAX,
 ) -> dict | None:
     """Cola de estudio de un mazo, ya recortada por los límites del día.
@@ -834,7 +913,7 @@ async def deck_queue(
         flashcards_repo.day_state, user_id, _today_prefix(), deck_id
     )
     due, upcoming, fresh, _studied = await _due_entries(
-        user_id, deck_id, collection_id=collection_id
+        user_id, deck_id, collection_id=collection_id, level=level
     )
 
     # V3.87.0: la configuración de estudio matiza la sesión. `intensive` ensancha
@@ -1047,7 +1126,6 @@ async def deck_stats(user_id: str, deck_id: int) -> dict | None:
     """Estadísticas del mazo: hoy, total, acierto, 14 días y previsión a 7."""
     if deck_id == flashcards_repo.AUTO_DECK_ID:
         deck = _auto_deck()
-        cards = await _lexicon_cards(user_id)
     else:
         row = await run_in_threadpool(flashcards_repo.get_deck, user_id, deck_id)
         if row is None:
@@ -1059,7 +1137,15 @@ async def deck_stats(user_id: str, deck_id: int) -> dict | None:
             "new_per_day": int(row["new_per_day"]),
             "review_per_day": int(row["review_per_day"]),
         }
-        cards = await _manual_cards(user_id, deck_id)
+    # La previsión lee `card_type` y `card_id`. El léxico crudo de FSRS no trae
+    # esa forma: hay que usar la misma lista que la cola (una carta por palabra).
+    cards = await _deck_entries(user_id, deck_id)
+    deck["card_count"] = len(cards)
+    deck["learned_count"] = sum(
+        1
+        for entry in cards
+        if str((entry.get("card") or {}).get("state") or "") == "review"
+    )
 
     now = datetime.now(timezone.utc)
     day = _today_prefix()
