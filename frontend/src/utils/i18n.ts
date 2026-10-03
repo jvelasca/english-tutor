@@ -852,44 +852,25 @@ const STRINGS: Record<string, Entry> = {
   },
   "flashcards.study.requireRelated": { en: "Related words", es: "Palabras relacionadas" },
   "flashcards.study.shortcuts": { en: "Open another section", es: "Abrir otra sección" },
-  "flashcards.lesson.meaning": { en: "Meaning", es: "Significado" },
-  "flashcards.lesson.pronunciation": { en: "Pronunciation", es: "Pronunciación" },
-  "flashcards.lesson.context": { en: "Context", es: "Contexto" },
-  "flashcards.lesson.senses": {
-    en: "Meanings in context",
-    es: "Significados según el contexto",
-  },
-  "flashcards.lesson.related": { en: "Related word", es: "Palabra relacionada" },
   "flashcards.lesson.relatedTo": {
     en: "Related to {lemma}.",
     es: "Relacionada con {lemma}.",
   },
-  "flashcards.lesson.continue": { en: "Continue", es: "Continuar" },
-  "flashcards.lesson.skip": { en: "Skip", es: "Saltar" },
-  "flashcards.lesson.recall": { en: "Recall", es: "Evocar" },
-  "flashcards.lesson.deeper": { en: "Go deeper", es: "Profundizar" },
   "flashcards.lesson.progress": { en: "{n} / {total}", es: "{n} / {total}" },
-  "flashcards.lesson.noMeaning": {
-    en: "No saved translation yet.",
-    es: "Aún no hay traducción guardada.",
-  },
-  "flashcards.lesson.noContext": {
-    en: "No saved example yet. You can skip this step.",
-    es: "Aún no hay ejemplo guardado. Puedes saltar este paso.",
-  },
   "flashcards.lesson.saveError": {
     en: "Could not save this word. Try again.",
     es: "No se ha podido guardar esta palabra. Inténtalo de nuevo.",
   },
-  "flashcards.lesson.reveal": { en: "Show the word", es: "Mostrar la palabra" },
-  "flashcards.lesson.recallPrompt": {
-    en: "Recall the English word.",
-    es: "Evoca la palabra en inglés.",
+  "flashcards.lesson.reveal": { en: "Show the meaning", es: "Mostrar el significado" },
+  "flashcards.lesson.hint": { en: "Hint", es: "Pista" },
+  "flashcards.lesson.mnemonic": { en: "Reminder", es: "Recordatorio" },
+  "flashcards.lesson.quiz": { en: "Which meaning?", es: "¿Cuál es?" },
+  "flashcards.lesson.another": { en: "Another sentence", es: "Otra frase" },
+  "flashcards.lesson.exampleError": {
+    en: "Could not make another sentence.",
+    es: "No se pudo crear otra frase.",
   },
-  "flashcards.lesson.pendingLine": {
-    en: "Still pending: {steps}",
-    es: "Sigue pendiente: {steps}",
-  },
+  "flashcards.lesson.more": { en: "More about this word", es: "Más sobre esta palabra" },
   "flashcards.lesson.gradePrompt": {
     en: "How well do you know it?",
     es: "¿Cómo de bien la sabes?",

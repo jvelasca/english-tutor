@@ -86,6 +86,26 @@ export function lookupDictionaryWord(
   );
 }
 
+/** Otra frase de la lección. No cierra la carta ni agenda FSRS. */
+export function requestStudyExample(
+  word: string,
+  avoid: string[],
+): Promise<{ word: string; phrase: string; translation: string }> {
+  return withTimeout(
+    postJson<unknown>("/api/vocabulary/study/example", { word, avoid }).then((raw) => {
+      const data =
+        raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      return {
+        word: typeof data.word === "string" ? data.word : word,
+        phrase: typeof data.phrase === "string" ? data.phrase : "",
+        translation: typeof data.translation === "string" ? data.translation : "",
+      };
+    }),
+    120_000,
+    "study example",
+  );
+}
+
 /** Arranca el precalentado del diccionario del alumno (V3.88.0).
  *
  * El backend responde 202 con el estado inicial del trabajo y lo ejecuta en

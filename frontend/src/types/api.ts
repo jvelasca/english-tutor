@@ -1228,6 +1228,8 @@ export interface StudyLessonItem {
   is_new: boolean;
   translation: string;
   definition: string;
+  /** Recordatorio de la ficha o del léxico. Vacío si no hay. */
+  mnemonic: string;
   facets: Partial<Record<LessonFacet, LessonFacetStatus>>;
   state: string;
 }

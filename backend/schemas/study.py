@@ -70,6 +70,8 @@ class StudyLessonItemOut(BaseModel):
     is_new: bool = True
     translation: str = ""
     definition: str = ""
+    #: Recordatorio de la ficha o del léxico. El complete no lo lee.
+    mnemonic: str = ""
     facets: dict[str, str] = Field(default_factory=dict)
     state: str = "new"
 
@@ -109,6 +111,19 @@ class StudyCompleteIn(BaseModel):
     grade: int = Field(ge=1, le=4)
     translation: str = ""
     facets: dict[str, str] = Field(default_factory=dict)
+
+
+class StudyExampleIn(BaseModel):
+    """Pide otra frase de ejemplo. No cierra la lección ni agenda FSRS."""
+
+    word: str = Field(min_length=1, max_length=80)
+    avoid: list[str] = Field(default_factory=list, max_length=12)
+
+
+class StudyExampleOut(BaseModel):
+    word: str
+    phrase: str
+    translation: str
 
 
 class StudyCompleteOut(BaseModel):
