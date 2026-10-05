@@ -12,7 +12,7 @@ StudyMode = Literal["recognition", "production", "mixed"]
 StudyHints = Literal["off", "definition", "mnemonic", "all"]
 StudyDifficulty = Literal["gentle", "auto", "intensive"]
 StudyScope = Literal["all", "level", "deck"]
-StudyQueueMode = Literal["pending", "failed", "all"]
+StudyQueueMode = Literal["pending", "unlearned", "hard", "good", "failed", "all"]
 LessonFacetName = Literal["pronunciation", "context", "senses", "related"]
 LessonFacetStatus = Literal["done", "pending", "na"]
 
@@ -44,7 +44,7 @@ class StudyConfigUpdate(BaseModel):
 
 
 class StudySummaryOut(BaseModel):
-    """Cinco contadores del ámbito activo de Estudiar, más lo que entra hoy."""
+    """Contadores del ámbito activo de Estudiar, más lo que entra hoy."""
 
     scope: StudyScope = "all"
     mode: StudyQueueMode = "pending"
@@ -54,7 +54,10 @@ class StudySummaryOut(BaseModel):
     total: int = 0
     studied: int = 0
     learned: int = 0
+    unlearned: int = 0
     due: int = 0
+    hard: int = 0
+    good: int = 0
     times_studied: int = 0
     queued: int = 0
 
@@ -88,7 +91,10 @@ class StudyQueueOut(BaseModel):
     total: int = 0
     studied: int = 0
     learned: int = 0
+    unlearned: int = 0
     due: int = 0
+    hard: int = 0
+    good: int = 0
     times_studied: int = 0
     queued: int = 0
     study_config: StudyConfigOut | None = None
@@ -124,6 +130,43 @@ class StudyExampleOut(BaseModel):
     word: str
     phrase: str
     translation: str
+
+
+class StudyQuizIn(BaseModel):
+    """Pide las opciones de «¿Cuál es?». No cierra la lección ni agenda FSRS.
+
+    ``exclude`` son las respuestas de las otras palabras de esta sesión
+    (traducciones en EN→ES, palabras inglesas en ES→EN), para no volver a
+    ofrecer el mazo que se está estudiando.
+    """
+
+    word: str = Field(min_length=1, max_length=80)
+    translation: str = Field(min_length=1, max_length=500)
+    exclude: list[str] = Field(default_factory=list, max_length=40)
+    direction: StudyDirection = "en-es"
+
+
+class StudyQuizOut(BaseModel):
+    choices: list[str]
+
+
+class StudyHintIn(BaseModel):
+    """Pide una pista. No cierra la lección ni agenda FSRS.
+
+    Si llega una ficha manual, la pista se guarda en su recordatorio. Si no,
+    se guarda en la palabra del léxico.
+    """
+
+    word: str = Field(min_length=1, max_length=80)
+    translation: str = ""
+    card_type: str = ""
+    card_id: str = ""
+    direction: StudyDirection = "en-es"
+
+
+class StudyHintOut(BaseModel):
+    word: str
+    hint: str
 
 
 class StudyCompleteOut(BaseModel):

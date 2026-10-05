@@ -269,6 +269,10 @@ export function normalizeVocabBulkAdd(raw: unknown): VocabBulkAddResult {
     ...(data as unknown as VocabBulkAddResult),
     added: asStringArray(data.added),
     count: asNumber(data.count),
+    deck_id:
+      data.deck_id == null || data.deck_id === ""
+        ? null
+        : asNumber(data.deck_id),
   };
 }
 
@@ -279,6 +283,10 @@ export function normalizeVocabEnroll(raw: unknown): VocabEnrollResult {
     ...(data as unknown as VocabEnrollResult),
     added: asStringArray(data.added),
     count: asNumber(data.count),
+    deck_id:
+      data.deck_id == null || data.deck_id === ""
+        ? null
+        : asNumber(data.deck_id),
   };
 }
 
@@ -337,6 +345,10 @@ function normalizeFlashcardDeck(raw: Raw): FlashcardDeck {
     name: asString(raw.name),
     slug: asString(raw.slug),
     is_auto: asBoolean(raw.is_auto),
+    source_collection_id:
+      raw.source_collection_id == null || raw.source_collection_id === ""
+        ? null
+        : asNumber(raw.source_collection_id),
     new_per_day: asNumber(raw.new_per_day),
     review_per_day: asNumber(raw.review_per_day),
     card_count: asNumber(raw.card_count),
@@ -492,7 +504,11 @@ export function normalizeStudyLessonQueue(raw: unknown): StudyQueue {
   const scope = asOneOf(data.scope, ["all", "level", "deck"] as const, "all");
   return {
     scope,
-    mode: asOneOf(data.mode, ["pending", "failed", "all"] as const, "pending"),
+    mode: asOneOf(
+      data.mode,
+      ["pending", "unlearned", "hard", "good", "failed", "all"] as const,
+      "pending",
+    ),
     level: asString(data.level),
     deck_id: asNumber(data.deck_id),
     collection_id:
@@ -516,7 +532,10 @@ export function normalizeStudyLessonQueue(raw: unknown): StudyQueue {
     total: asNumber(data.total),
     studied: asNumber(data.studied),
     learned: asNumber(data.learned),
+    unlearned: asNumber(data.unlearned),
     due: asNumber(data.due),
+    hard: asNumber(data.hard),
+    good: asNumber(data.good),
     times_studied: asNumber(data.times_studied),
     queued: asNumber(data.queued),
     study_config: normalizeStudyConfig(data.study_config),

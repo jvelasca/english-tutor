@@ -94,9 +94,58 @@ def test_bulk_and_enroll_theme_pack(monkeypatch, tmp_path):
         data = enroll.json()
         assert data["count"] > 0
         assert "airport" in data["added"]
+        assert data["deck_id"]
+
+        from repositories import flashcards as flashcards_repo
+
+        linked = flashcards_repo.lexicon_words_in_deck(a, data["deck_id"])
+        assert "airport" in linked
+        decks = client.get("/api/vocabulary/decks", params={"user_id": a})
+        assert decks.status_code == 200
+        pack_decks = [
+            d
+            for d in decks.json()["decks"]
+            if d.get("source_collection_id") == travel["id"]
+        ]
+        assert len(pack_decks) == 1
+        assert pack_decks[0]["id"] == data["deck_id"]
+        assert pack_decks[0]["card_count"] == data["count"]
+        assert pack_decks[0]["slug"] == "travel"
+
+        again = client.post(
+            f"/api/vocabulary/collections/{travel['id']}/enroll",
+            params={"user_id": a},
+        )
+        assert again.status_code == 200
+        assert again.json()["deck_id"] == data["deck_id"]
+
+        queue = client.get(
+            "/api/vocabulary/study/queue",
+            params={
+                "user_id": a,
+                "scope": "deck",
+                "deck_id": data["deck_id"],
+                "mode": "all",
+            },
+        )
+        assert queue.status_code == 200, queue.text
+        assert queue.json()["total"] == data["count"]
+
+        removed = client.delete(
+            f"/api/vocabulary/decks/{data['deck_id']}",
+            params={"user_id": a},
+        )
+        assert removed.status_code == 400, removed.text
+        assert removed.json()["detail"] == "DECK_IS_THEME"
+        assert "airport" in flashcards_repo.lexicon_words_in_deck(a, data["deck_id"])
+        still = client.get("/api/vocabulary/collections", params={"user_id": a})
+        travel_after = next(
+            c for c in still.json()["collections"] if c["id"] == travel["id"]
+        )
+        assert travel_after["enrolled"] is True
 
         rows = vocabulary_repo.get_vocabulary(a)
-        assert len(rows) == data["count"]
+        assert any(r["word"] == "airport" for r in rows)
         assert all(int(r["production_count"] or 0) == 0 for r in rows)
 
         bulk = client.post(
@@ -107,6 +156,12 @@ def test_bulk_and_enroll_theme_pack(monkeypatch, tmp_path):
         assert bulk.status_code == 200, bulk.text
         assert bulk.json()["count"] == 3
         assert set(bulk.json()["added"]) == {"hello", "world", "good morning"}
+        assert bulk.json()["deck_id"]
+        basics = client.get("/api/vocabulary/decks", params={"user_id": a})
+        assert any(
+            d["name"] == "Basics" and not d.get("source_collection_id")
+            for d in basics.json()["decks"]
+        )
 
 
 def test_retention_review_reschedules_and_informative_event(monkeypatch, tmp_path):

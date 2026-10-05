@@ -23,20 +23,33 @@ PACKS_DIR = Path(__file__).resolve().parent.parent / "curriculum" / "vocab_packs
 BULK_MAX_WORDS = 200
 
 
+def _pack_item_row(raw: object, index: int) -> tuple[str, str, str, str, int] | None:
+    """Normaliza un ítem de pack. El vacío no entra en el catálogo."""
+    if not isinstance(raw, dict):
+        return None
+    word = str(raw.get("word") or "").strip().lower()
+    if not word:
+        return None
+    lemma = str(raw.get("lemma") or word).strip().lower()
+    return (
+        word,
+        lemma,
+        str(raw.get("translation") or "").strip(),
+        str(raw.get("pos") or "").strip(),
+        index,
+    )
+
+
 def ensure_theme_packs_seeded() -> int:
-    """Idempotente: carga packs JSON globales si el slug aún no existe.
+    """Carga packs nuevos y añade palabras nuevas a los ya sembrados.
 
     Devuelve el número de packs recién insertados.
 
-    **Política de actualización (V3.84.1).** El seed es **append-only por
-    `slug`**: si el slug ya existe no se compara ni se actualiza el contenido, de
-    modo que editar un `*.json` de `curriculum/vocab_packs/` **no** propaga nada a
-    las filas ya sembradas (título, hint, palabras, traducciones o POS). Los packs
-    publicados son, por tanto, **inmutables en la práctica** mientras no exista un
-    proceso explícito de actualización de catálogo: corregir o ampliar un pack ya
-    sembrado exige una migración/reconciliación propia (comparar y actualizar por
-    `slug`, o versionar el pack con un slug nuevo). No se hace aquí a propósito:
-    un `UPDATE` ciego en el arranque pisaría contenido y membresías de alumnos.
+    Un slug nuevo crea la colección y sus ítems. Un slug ya sembrado solo hace
+    ``INSERT OR IGNORE`` de las palabras que aún no están: no reescribe
+    traducción, lemma ni categoría de una palabra existente, no borra ítems y
+    no toca matrículas, membresías ni tarjetas. Así se puede ampliar un JSON
+    sin pisar lo que el alumno ya estudia.
     """
     if not PACKS_DIR.is_dir():
         return 0
@@ -56,45 +69,36 @@ def ensure_theme_packs_seeded() -> int:
                 "WHERE user_id = '' AND slug = ?",
                 (slug,),
             ).fetchone()
-            if existing is not None:
-                continue
-            now = _now()
-            cur = conn.execute(
-                "INSERT INTO vocab_collections "
-                "(user_id, kind, slug, title, title_es, cefr_hint, created_at) "
-                "VALUES ('', ?, ?, ?, ?, ?, ?)",
-                (
-                    str(payload.get("kind") or "theme_pack"),
-                    slug,
-                    str(payload.get("title") or slug),
-                    str(payload.get("title_es") or ""),
-                    str(payload.get("cefr_hint") or ""),
-                    now,
-                ),
-            )
-            coll_id = int(cur.lastrowid)
             items = payload.get("items") or []
+            if existing is None:
+                now = _now()
+                cur = conn.execute(
+                    "INSERT INTO vocab_collections "
+                    "(user_id, kind, slug, title, title_es, cefr_hint, created_at) "
+                    "VALUES ('', ?, ?, ?, ?, ?, ?)",
+                    (
+                        str(payload.get("kind") or "theme_pack"),
+                        slug,
+                        str(payload.get("title") or slug),
+                        str(payload.get("title_es") or ""),
+                        str(payload.get("cefr_hint") or ""),
+                        now,
+                    ),
+                )
+                coll_id = int(cur.lastrowid)
+                inserted += 1
+            else:
+                coll_id = int(existing["id"])
             for idx, raw in enumerate(items):
-                if not isinstance(raw, dict):
+                row = _pack_item_row(raw, idx)
+                if row is None:
                     continue
-                word = str(raw.get("word") or "").strip().lower()
-                if not word:
-                    continue
-                lemma = str(raw.get("lemma") or word).strip().lower()
                 conn.execute(
                     "INSERT OR IGNORE INTO vocab_collection_items "
                     "(collection_id, word, lemma, translation, pos, order_index) "
                     "VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        coll_id,
-                        word,
-                        lemma,
-                        str(raw.get("translation") or "").strip(),
-                        str(raw.get("pos") or "").strip(),
-                        idx,
-                    ),
+                    (coll_id, *row),
                 )
-            inserted += 1
     return inserted
 
 
@@ -217,6 +221,16 @@ def is_enrolled(user_id: str, collection_id: int) -> bool:
             (user_id, collection_id),
         ).fetchone()
     return row is not None
+
+
+def unenroll(user_id: str, collection_id: int) -> None:
+    """Quita la marca de pack cogido. Las palabras del diccionario se quedan."""
+    with closing(_conn()) as conn, conn:
+        conn.execute(
+            "DELETE FROM vocab_collection_enrollments "
+            "WHERE user_id = ? AND collection_id = ?",
+            (user_id, int(collection_id)),
+        )
 
 
 def mark_enrolled(user_id: str, collection_id: int) -> bool:

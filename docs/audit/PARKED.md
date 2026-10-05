@@ -2525,6 +2525,64 @@ recientes, y `v3.75.0`, `v3.75.1`, `v3.75.2`, `v3.75.7`, `v3.75.8`, `v3.76.0`, `
 significa «no hay release»: el ancla es el **tag**, y `git fetch --tags` los trae todos. Esta
 release **sí** tiene Release, precisamente para no repetir el silencio de `v3.85.1`.
 
+## V3.94.10 — Dos sentidos, temas como mazos y rejilla · 2026-10-05
+
+> **Naturaleza:** patch de producto. Migración aditiva
+> `flashcard_decks.source_collection_id`. El complete sigue siendo `item_id`,
+> una nota y una sola carta FSRS. No toca el Sense Resolver, ni
+> `PROVEN_OTHER_OVERLAP`, ni el ledger de Listening. **No abre V3.95.**
+> `CURRICULUM_VERSION` sigue `1.3.1`.
+
+- **Alcance enviado a GitHub.** Este árbol incluye también `v3.94.7`,
+  `v3.94.8` y `v3.94.9`, que no tenían commit. La versión de la app es
+  `3.94.10`.
+- **Qué queda fuera a propósito.** Los tres P2 de V3.94.6 siguen aparcados y
+  no se reabren. Estadísticas no vuelve a filtrar por mazo. Un tema no se
+  borra (`400 DECK_IS_THEME`); un mazo del alumno sí. «Herramientas» (mazo
+  propio) y «Herramientas y bricolaje» (tema) siguen siendo dos mazos.
+- **Crecimiento.** Listar mazos materializa los dieciocho temas que falten.
+  Una palabra nueva del JSON entra con `INSERT OR IGNORE` y no pisa la
+  traducción ni la nota ya guardadas. La primera lista puede ser pesada; una
+  carta `retention-import` con `reps == 0` no se reescribe en cada listado.
+- **Publicación.** El tag `v3.94.10` **no** existe. La *Latest* sigue siendo
+  `v3.94.2`. El tag espera el verde de la CI de esta PR. No hay verde que
+  inventar.
+
+## V3.94.6 — Estudiar muestra la palabra y el significado se revela · 2026-10-03
+
+> **Naturaleza:** patch de producto. El complete sigue siendo `item_id`, una
+> nota y una sola carta FSRS. No toca el Sense Resolver, ni
+> `PROVEN_OTHER_OVERLAP`, ni el ledger de Listening. **No abre V3.95.**
+> **No abre V3.94.7.**
+
+- **Veredicto (auditoría externa, 2026-10-03).** Funcionalmente aprobada. No
+  hay P0 ni P1. La integridad de V3.94.5 se conserva: el complete lleva
+  `item_id`, `grade`, `facets` y `translation`. Revelar el significado no
+  agenda. Las facetas registran el uso real (oír, ver un ejemplo, abrir
+  acepciones o related). «Otra frase»
+  (`POST /api/vocabulary/study/example`) no escribe léxico, FSRS, repasos ni
+  `study_lesson_items`.
+- **P2 — Traducción del ejemplo (aparcado).** `parse_example` en
+  `backend/services/study_example.py` exige JSON, longitudes, que `phrase`
+  contenga la palabra y que no repita una frase de `avoid`. No comprueba que
+  `translation` sea esa frase en español.
+- **P2 — Ejemplo cargado y ejemplo visto (aparcado).** El efecto de
+  `frontend/src/features/vocabulary/wordLesson.tsx` pone `sawExample` al
+  cargar el ejemplo del diccionario, antes de que el bloque sea visible. El
+  ejemplo solo se pinta tras revelar, así que el efecto pedagógico de la
+  pantalla actual se mantiene.
+- **P2 — Cupo de «Otra frase» (aparcado).**
+  `/api/vocabulary/study/example` no está en `_PATH_LIMITS` de
+  `backend/security.py`. Cae en el cupo general (1200/min por IP). La sesión
+  sigue siendo obligatoria.
+- **Sigue aparcado desde V3.94.5.** Colección y nivel a la vez: el backend lo
+  acepta y la UI, con una colección activa, fuerza «todo el léxico».
+- **V3.95 sigue cerrada.** El ledger de producción de Listening sigue a 0 filas.
+- **Publicación.** El tag `v3.94.6` **no** existe todavía. El CI **#343**
+  (run `37122650155`, commit `4711ac80`, PR de `release/v3.94.6`) está **en
+  curso**: once jobs en verde y Playwright E2E aún sin concluir. No hay verde
+  final. La *Latest* sigue siendo `v3.94.2`.
+
 ## V3.94.5 — Un ítem de Estudiar, una transición FSRS · 2026-10-03
 
 > **Naturaleza:** patch de producto. No toca el Sense Resolver, ni

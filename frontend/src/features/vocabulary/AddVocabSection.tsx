@@ -255,31 +255,6 @@ export function AddVocabSection({
                       >
                         {t("dictionary.add.enrolled")}
                       </Badge>
-                    ) : null}
-                    {pack.enrolled ? (
-                      /* V3.77.2: un pack ya activo no se «reactiva» (la
-                         activación es idempotente y añadía 0). La acción útil
-                         es repasarlo; «Actualizar» se retira para no prometer
-                         una operación que no cambia nada.
-                         V3.78.0: repasar = saltar a Flashcards con este mazo
-                         filtrado. Aquí no se califica ninguna tarjeta. */
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy || !onStudy}
-                        onClick={() =>
-                          onStudy?.({
-                            collectionId: pack.id,
-                            label:
-                              lang === "es" && pack.title_es
-                                ? pack.title_es
-                                : pack.title,
-                          })
-                        }
-                      >
-                        {t("dictionary.add.review")}
-                      </Button>
                     ) : (
                       <Button
                         type="button"

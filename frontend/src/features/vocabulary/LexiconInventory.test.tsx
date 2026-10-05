@@ -485,10 +485,7 @@ describe("LexiconInventory · V3.78.0 inventario (buscador, filtros, memoria)", 
     expect(screen.queryByText("Today's review")).toBeNull();
   });
 
-  it("«Repasar» una lista o un pack salta al estudio con la colección filtrada", async () => {
-    // El salto lo ejecuta el dueño de la navegación (Flashcards), no el
-    // inventario: aquí solo se comprueba que el inventario lo pide con el id y
-    // la etiqueta correctos.
+  it("un pack ya cogido no se estudia desde el inventario", async () => {
     routeFetch([
       { url: "/api/vocabulary/lexicon", data: INVENTORY },
       {
@@ -518,11 +515,9 @@ describe("LexiconInventory · V3.78.0 inventario (buscador, filtros, memoria)", 
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Review" }));
-    expect(onStudyCollection).toHaveBeenCalledWith({
-      collectionId: 7,
-      label: "Travel",
-    });
+    expect(await screen.findByText("In my dictionary")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Review" })).toBeNull();
+    expect(onStudyCollection).not.toHaveBeenCalled();
   });
 
   it("sin contenedor de estudio no ofrece un botón muerto para repasar", async () => {
@@ -536,12 +531,12 @@ describe("LexiconInventory · V3.78.0 inventario (buscador, filtros, memoria)", 
           collections: [
             {
               id: 7,
-              slug: "travel",
-              title: "Travel",
-              title_es: "Viajes",
-              kind: "theme_pack",
+              slug: "basics",
+              title: "Basics",
+              title_es: "",
+              kind: "user_list",
               item_count: 12,
-              cefr_hint: "A2",
+              cefr_hint: "",
               enrolled: true,
             },
           ],
@@ -550,7 +545,7 @@ describe("LexiconInventory · V3.78.0 inventario (buscador, filtros, memoria)", 
     ]);
     renderPanel(<LexiconInventory userId="u1" showHeader={false} />);
 
-    const review = await screen.findByRole("button", { name: "Review" });
+    const review = await screen.findByRole("button", { name: "Review list" });
     expect((review as HTMLButtonElement).disabled).toBe(true);
   });
 

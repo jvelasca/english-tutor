@@ -365,7 +365,17 @@ async def add_bulk(
         user_id,
         touched,
     )
-    return {"added": touched, "collection_id": coll_id, "count": len(touched)}
+    deck_id = None
+    if collection_id is None:
+        deck_id = await run_in_threadpool(
+            _user_list_deck, user_id, title.strip() or "My list", touched
+        )
+    return {
+        "added": touched,
+        "collection_id": coll_id,
+        "count": len(touched),
+        "deck_id": deck_id,
+    }
 
 
 async def list_collections(user_id: str) -> dict:
@@ -408,6 +418,130 @@ async def create_collection(user_id: str, title: str) -> dict | None:
     }
 
 
+def _user_list_deck(user_id: str, title: str, words: list[str]) -> int | None:
+    """Una lista pegada pasa a ser un mazo del alumno, borrable y renombrable."""
+    base = (title or "My list").strip()[:110] or "My list"
+    created = None
+    for n in range(1, 6):
+        candidate = base if n == 1 else f"{base} ({n})"
+        created = flashcards_repo.create_deck(user_id, name=candidate)
+        if created is not None:
+            break
+    if created is None:
+        return None
+    flashcards_repo.link_lexicon_words(user_id, int(created["id"]), list(words))
+    return int(created["id"])
+
+
+def _pack_deck_name(coll: dict) -> str:
+    """Nombre del mazo: el título en español si el pack lo trae."""
+    title = str(coll.get("title_es") or "").strip() or str(coll.get("title") or "").strip()
+    return title or "Pack"
+
+
+def _create_pack_deck(user_id: str, coll: dict) -> dict | None:
+    """Crea el mazo de un pack, o devuelve el que ya existía.
+
+    Si el alumno ya tiene un mazo con ese nombre, se prueba un sufijo. No se
+    reutiliza el mazo ajeno: un pack no se fusiona con uno que él creó.
+    """
+    collection_id = int(coll["id"])
+    existing = flashcards_repo.deck_for_collection(user_id, collection_id)
+    if existing is not None:
+        return existing
+    base = _pack_deck_name(coll)[:110]
+    for n in range(1, 6):
+        candidate = base if n == 1 else f"{base} ({n})"
+        created = flashcards_repo.create_deck(
+            user_id,
+            name=candidate,
+            source_collection_id=collection_id,
+        )
+        if created is not None:
+            return created
+        raced = flashcards_repo.deck_for_collection(user_id, collection_id)
+        if raced is not None:
+            return raced
+    return None
+
+
+async def ensure_theme_pack_decks(user_id: str) -> None:
+    """Cada tema del diccionario es un mazo, también los que el alumno no había cogido.
+
+    Un tema nuevo entra en el diccionario (las mismas palabras, la misma tarjeta).
+    Uno ya cogido solo recibe las palabras que el catálogo haya ganado después:
+    no se reescriben traducciones ni notas. El mazo, si falta, se vuelve a crear.
+    """
+    rows = await run_in_threadpool(collections_repo.list_collections, user_id)
+    for row in rows:
+        if str(row.get("kind") or "") != "theme_pack":
+            continue
+        if not row.get("enrolled"):
+            await enroll_collection(user_id, int(row["id"]))
+            continue
+        await _sync_pack_growth(user_id, row)
+
+
+async def ensure_enrolled_pack_decks(user_id: str) -> None:
+    """Nombre antiguo: ahora todos los temas forman parte del diccionario."""
+    await ensure_theme_pack_decks(user_id)
+
+
+async def _sync_pack_growth(user_id: str, coll: dict) -> None:
+    """Añade al diccionario las palabras nuevas de un tema ya cogido."""
+    collection_id = int(coll["id"])
+    catalog = await run_in_threadpool(
+        collections_repo.list_collection_items, collection_id
+    )
+    member = await run_in_threadpool(
+        collections_repo.words_in_collection, user_id, collection_id
+    )
+    missing = [row for row in catalog if str(row.get("word") or "") not in member]
+    if missing:
+        cefr = str(coll.get("cefr_hint") or "")
+        items = [
+            {
+                "word": row["word"],
+                "lemma": row.get("lemma") or row["word"],
+                "translation": row.get("translation") or "",
+                "cefr": cefr,
+                "kind": "word",
+            }
+            for row in missing
+        ]
+        touched = await run_in_threadpool(
+            partial(vocabulary_repo.seed_study_items, source="imported"),
+            user_id,
+            items,
+        )
+        await run_in_threadpool(
+            collections_repo.add_memberships, user_id, collection_id, touched
+        )
+        await run_in_threadpool(
+            partial(_ensure_fsrs_lexicon, why="retention-import"),
+            user_id,
+            touched,
+        )
+    deck = await run_in_threadpool(
+        flashcards_repo.deck_for_collection, user_id, collection_id
+    )
+    if deck is None or missing:
+        await _materialize_pack_deck(user_id, coll)
+
+
+async def _materialize_pack_deck(user_id: str, coll: dict) -> int | None:
+    deck = await run_in_threadpool(_create_pack_deck, user_id, coll)
+    if deck is None:
+        return None
+    words = await run_in_threadpool(
+        collections_repo.words_in_collection, user_id, int(coll["id"])
+    )
+    await run_in_threadpool(
+        flashcards_repo.link_lexicon_words, user_id, int(deck["id"]), list(words)
+    )
+    return int(deck["id"])
+
+
 async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
     """Activa un pack/lista: materializa ítems en vocabulary + FSRS + membership."""
     coll = await run_in_threadpool(collections_repo.get_collection, collection_id)
@@ -423,7 +557,15 @@ async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
         await run_in_threadpool(
             collections_repo.mark_enrolled, user_id, collection_id
         )
-        return {"collection_id": collection_id, "added": [], "count": 0}
+        deck_id = None
+        if str(coll.get("kind") or "") == "theme_pack":
+            deck_id = await _materialize_pack_deck(user_id, coll)
+        return {
+            "collection_id": collection_id,
+            "added": [],
+            "count": 0,
+            "deck_id": deck_id,
+        }
 
     cefr = str(coll.get("cefr_hint") or "")
     items = [
@@ -454,10 +596,14 @@ async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
         user_id,
         touched,
     )
+    deck_id = None
+    if str(coll.get("kind") or "") == "theme_pack":
+        deck_id = await _materialize_pack_deck(user_id, coll)
     return {
         "collection_id": collection_id,
         "added": touched,
         "count": len(touched),
+        "deck_id": deck_id,
     }
 
 

@@ -9,7 +9,7 @@ Se comprueba, por cada archivo:
 
 - que parsea y tiene `slug`, `title` e `items`;
 - que `slug` es único en todo el directorio y coincide con el nombre del fichero;
-- que hay entre 40 y 60 ítems (decisión de V3.84.0: packs «grandes»);
+- que hay 100 ítems (cada tema es un mazo de estudio);
 - que cada ítem tiene `word`, `lemma`, `translation` y `pos` no vacíos;
 - que no hay palabras normalizadas repetidas dentro del mismo pack.
 """
@@ -24,10 +24,10 @@ PACKS_DIR = (
     Path(__file__).resolve().parent.parent / "curriculum" / "vocab_packs"
 )
 
-MIN_ITEMS = 40
-MAX_ITEMS = 60
+MIN_ITEMS = 100
+MAX_ITEMS = 100
 
-# Packs que V3.84.0 debe dejar disponibles (ampliables sin tocar el test).
+# Temas del diccionario. Añadir uno nuevo exige incluirlo aquí.
 REQUIRED_SLUGS = {
     "food",
     "travel",
@@ -44,6 +44,9 @@ REQUIRED_SLUGS = {
     "feelings",
     "school",
     "business",
+    "family",
+    "weather",
+    "numbers",
 }
 
 

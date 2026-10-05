@@ -829,10 +829,25 @@ const STRINGS: Record<string, Entry> = {
     en: "No missed words in this view.",
     es: "No hay falladas en esta vista.",
   },
-  "flashcards.study.statTotal": { en: "Total", es: "Total" },
+  "flashcards.study.emptyUnlearned": {
+    en: "Nothing left to learn in this view.",
+    es: "En esta vista no queda ninguna por aprender.",
+  },
+  "flashcards.study.emptyHard": {
+    en: "None have Hard as the last grade.",
+    es: "Ninguna tiene la última nota Difícil.",
+  },
+  "flashcards.study.emptyGood": {
+    en: "None have Good as the last grade.",
+    es: "Ninguna tiene la última nota Bien.",
+  },
+  "flashcards.study.statTotal": { en: "All", es: "Todas" },
   "flashcards.study.statStudied": { en: "Studied", es: "Estudiadas" },
   "flashcards.study.statLearned": { en: "Learned", es: "Aprendidas" },
+  "flashcards.study.statUnlearned": { en: "Not learned", es: "No aprendidas" },
   "flashcards.study.statDue": { en: "To review", es: "A repasar" },
+  "flashcards.study.statHard": { en: "Hard", es: "Difíciles" },
+  "flashcards.study.statGood": { en: "Good", es: "Bien" },
   "flashcards.study.statTimes": { en: "Times studied", es: "Veces estudiada" },
   "flashcards.study.start": { en: "Study ({n})", es: "Estudiar ({n})" },
   "flashcards.study.wordsToday": { en: "Words today", es: "Palabras hoy" },
@@ -862,9 +877,29 @@ const STRINGS: Record<string, Entry> = {
     es: "No se ha podido guardar esta palabra. Inténtalo de nuevo.",
   },
   "flashcards.lesson.reveal": { en: "Show the meaning", es: "Mostrar el significado" },
-  "flashcards.lesson.hint": { en: "Hint", es: "Pista" },
-  "flashcards.lesson.mnemonic": { en: "Reminder", es: "Recordatorio" },
+  "flashcards.lesson.revealWord": { en: "Show the word", es: "Mostrar la palabra" },
+  "flashcards.lesson.hint": { en: "Syllable", es: "Sílaba" },
+  "flashcards.lesson.write": { en: "Write", es: "Escribir" },
+  "flashcards.lesson.writeLabel": { en: "Type the word", es: "Escribe la palabra" },
+  "flashcards.lesson.writeCheck": { en: "Check", es: "Comprobar" },
+  "flashcards.lesson.writeWrong": {
+    en: "That's not the word. Try again.",
+    es: "No es esa palabra. Prueba otra vez.",
+  },
+  "flashcards.lesson.mnemonic": { en: "Hint", es: "Pista" },
+  "flashcards.lesson.hintError": {
+    en: "The hint could not be created.",
+    es: "No se ha podido crear la pista.",
+  },
+  "flashcards.lesson.quizError": {
+    en: "The choices could not be loaded.",
+    es: "No se han podido cargar las opciones.",
+  },
   "flashcards.lesson.quiz": { en: "Which meaning?", es: "¿Cuál es?" },
+  "flashcards.lesson.phrase": { en: "Sentence", es: "Frase" },
+  "flashcards.lesson.next": { en: "Next", es: "Siguiente" },
+  "flashcards.lesson.edit": { en: "Edit this card", es: "Editar esta ficha" },
+  "flashcards.lesson.missed": { en: "Marked to repeat.", es: "Anotada para repetirla." },
   "flashcards.lesson.another": { en: "Another sentence", es: "Otra frase" },
   "flashcards.lesson.exampleError": {
     en: "Could not make another sentence.",
@@ -1067,6 +1102,18 @@ const STRINGS: Record<string, Entry> = {
     en: "My dictionary",
     es: "Mi diccionario",
   },
+  "flashcards.decks.theme": { en: "Theme", es: "Tema" },
+  "flashcards.decks.addLabel": { en: "Add", es: "Añadir" },
+  "flashcards.decks.pick": { en: "Choose a deck", es: "Elegir un mazo" },
+  "flashcards.decks.pasteHint": {
+    en: "One word per line. Optional: word,translation. The list becomes a deck you can rename or delete.",
+    es: "Una palabra por línea. Opcional: palabra,traducción. La lista pasa a ser un mazo que puedes renombrar o borrar.",
+  },
+  "dictionary.reviewPending": { en: "Review", es: "Repasar" },
+  "dictionary.reviewUnlearned": {
+    en: "Study the ones not learned",
+    es: "Estudiar las no aprendidas",
+  },
   "flashcards.decks.autoHint": {
     en: "Everything the app has registered for you: curriculum, lessons, chat, speaking — and whatever you added by hand.",
     es: "Todo lo que la app ha registrado por ti: currículum, lecciones, chat, speaking — y lo que has añadido a mano.",
@@ -1085,6 +1132,11 @@ const STRINGS: Record<string, Entry> = {
     es: "Aún no hay mazos manuales. Crea uno para lo que la app no conoce.",
   },
   "flashcards.decks.cards": { en: "{n} cards", es: "{n} tarjetas" },
+  "flashcards.decks.words": { en: "Words", es: "Palabras" },
+  "flashcards.decks.sharedShort": {
+    en: "Also in another deck",
+    es: "También en otro mazo",
+  },
   "flashcards.decks.shared": {
     en: "{n} also in other decks",
     es: "{n} también en otros mazos",
@@ -1117,8 +1169,8 @@ const STRINGS: Record<string, Entry> = {
   // V3.80.0: «Mazos listos» — los packs que ya existen, ofrecidos como mazo.
   "flashcards.decks.readyTitle": { en: "Ready-made decks", es: "Mazos listos" },
   "flashcards.decks.readyHint": {
-    en: "Word packs already in the app. Add one and its words join your dictionary with their review schedule; then study it filtered, without copying anything.",
-    es: "Packs de palabras que ya trae la app. Añade uno y sus palabras entran en tu diccionario con su plan de repaso; luego lo estudias filtrado, sin copiar nada.",
+    en: "Word packs already in the app. Add one and it becomes a deck: the words join your dictionary on the same review schedule, and you can add your own.",
+    es: "Packs de palabras que ya trae la app. Añade uno y pasa a ser un mazo: las palabras entran en tu diccionario, con el mismo plan de repaso, y puedes añadir las tuyas.",
   },
   "flashcards.decks.readyItems": {
     en: "{n} words · {cefr}",
@@ -1129,6 +1181,10 @@ const STRINGS: Record<string, Entry> = {
   "flashcards.decks.readyEnrolled": { en: "In your dictionary", es: "En tu diccionario" },
   // Tarjetas.
   "flashcards.cards.title": { en: "Cards", es: "Tarjetas" },
+  "flashcards.cards.backToLesson": {
+    en: "Back to the lesson",
+    es: "Volver a la lección",
+  },
   "flashcards.cards.add": { en: "Add card", es: "Añadir tarjeta" },
   "flashcards.cards.front": { en: "Front", es: "Anverso" },
   "flashcards.cards.back": { en: "Back", es: "Reverso" },
@@ -1307,8 +1363,8 @@ const STRINGS: Record<string, Entry> = {
     es: "Packs por tema",
   },
   "dictionary.add.packsHint": {
-    en: "Activate a pack to study its words with retention flashcards.",
-    es: "Activa un pack para estudiar sus palabras con tarjetas de retención.",
+    en: "Activate a pack and it becomes a deck. Study it from Study, next to the decks you created.",
+    es: "Activa un pack y pasa a ser un mazo. Lo estudias desde Estudiar, junto a los mazos que creaste.",
   },
   "dictionary.add.enroll": {
     en: "Activate",
@@ -1939,6 +1995,7 @@ const STRINGS: Record<string, Entry> = {
   "voice.accent.ca": { en: "Canadian", es: "canadiense" },
   "voice.accent.ie": { en: "Irish", es: "irlandesa" },
   "voice.accent.nz": { en: "New Zealand", es: "neozelandesa" },
+  "voice.accent.es": { en: "Spain", es: "España" },
   "voice.tryA": { en: "Try A", es: "Probar A" },
   "voice.tryB": { en: "Try B", es: "Probar B" },
   "voice.pickerHint": {
@@ -1964,6 +2021,10 @@ const STRINGS: Record<string, Entry> = {
   "voice.replayItemB": {
     en: "Repeat with accent B",
     es: "Repetir con el acento B",
+  },
+  "voice.replaySpain": {
+    en: "Listen in Spanish from Spain",
+    es: "Escuchar en español de España",
   },
   "voice.previewing": { en: "Testing…", es: "Probando…" },
   // V3.75.6: el STOP de la repetición (lecturas largas) y la composición de lo
@@ -2192,6 +2253,8 @@ const STRINGS: Record<string, Entry> = {
   // Cabecera / navegación
   "nav.aria": { en: "Main navigation", es: "Navegación principal" },
   "header.goHome": { en: "Go to Home", es: "Ir a Inicio" },
+  "header.back": { en: "Back", es: "Atrás" },
+  "header.forward": { en: "Forward", es: "Adelante" },
   "header.openSettings": { en: "Open settings", es: "Abrir ajustes" },
 
   // Ajustes (apariencia)

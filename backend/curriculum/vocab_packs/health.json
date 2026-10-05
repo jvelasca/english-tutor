@@ -5,52 +5,605 @@
   "title_es": "Salud y medicina",
   "cefr_hint": "A2",
   "items": [
-    {"word": "doctor", "lemma": "doctor", "translation": "médico", "pos": "noun"},
-    {"word": "nurse", "lemma": "nurse", "translation": "enfermero", "pos": "noun"},
-    {"word": "hospital", "lemma": "hospital", "translation": "hospital", "pos": "noun"},
-    {"word": "clinic", "lemma": "clinic", "translation": "clínica", "pos": "noun"},
-    {"word": "patient", "lemma": "patient", "translation": "paciente", "pos": "noun"},
-    {"word": "medicine", "lemma": "medicine", "translation": "medicina", "pos": "noun"},
-    {"word": "pill", "lemma": "pill", "translation": "pastilla", "pos": "noun"},
-    {"word": "prescription", "lemma": "prescription", "translation": "receta médica", "pos": "noun"},
-    {"word": "pain", "lemma": "pain", "translation": "dolor", "pos": "noun"},
-    {"word": "fever", "lemma": "fever", "translation": "fiebre", "pos": "noun"},
-    {"word": "cough", "lemma": "cough", "translation": "tos", "pos": "noun"},
-    {"word": "cold", "lemma": "cold", "translation": "resfriado", "pos": "noun"},
-    {"word": "flu", "lemma": "flu", "translation": "gripe", "pos": "noun"},
-    {"word": "headache", "lemma": "headache", "translation": "dolor de cabeza", "pos": "noun"},
-    {"word": "toothache", "lemma": "toothache", "translation": "dolor de muelas", "pos": "noun"},
-    {"word": "stomachache", "lemma": "stomachache", "translation": "dolor de estómago", "pos": "noun"},
-    {"word": "allergy", "lemma": "allergy", "translation": "alergia", "pos": "noun"},
-    {"word": "wound", "lemma": "wound", "translation": "herida", "pos": "noun"},
-    {"word": "bandage", "lemma": "bandage", "translation": "venda", "pos": "noun"},
-    {"word": "injection", "lemma": "injection", "translation": "inyección", "pos": "noun"},
-    {"word": "vaccine", "lemma": "vaccine", "translation": "vacuna", "pos": "noun"},
-    {"word": "blood", "lemma": "blood", "translation": "sangre", "pos": "noun"},
-    {"word": "pressure", "lemma": "pressure", "translation": "presión", "pos": "noun"},
-    {"word": "breathing", "lemma": "breathing", "translation": "respiración", "pos": "noun"},
-    {"word": "symptom", "lemma": "symptom", "translation": "síntoma", "pos": "noun"},
-    {"word": "diagnosis", "lemma": "diagnosis", "translation": "diagnóstico", "pos": "noun"},
-    {"word": "treatment", "lemma": "treatment", "translation": "tratamiento", "pos": "noun"},
-    {"word": "surgery", "lemma": "surgery", "translation": "cirugía", "pos": "noun"},
-    {"word": "therapy", "lemma": "therapy", "translation": "terapia", "pos": "noun"},
-    {"word": "pharmacy", "lemma": "pharmacy", "translation": "farmacia", "pos": "noun"},
-    {"word": "dose", "lemma": "dose", "translation": "dosis", "pos": "noun"},
-    {"word": "side effect", "lemma": "side effect", "translation": "efecto secundario", "pos": "noun"},
-    {"word": "appointment", "lemma": "appointment", "translation": "cita", "pos": "noun"},
-    {"word": "emergency", "lemma": "emergency", "translation": "urgencia", "pos": "noun"},
-    {"word": "ambulance", "lemma": "ambulance", "translation": "ambulancia", "pos": "noun"},
-    {"word": "crutch", "lemma": "crutch", "translation": "muleta", "pos": "noun"},
-    {"word": "wheelchair", "lemma": "wheelchair", "translation": "silla de ruedas", "pos": "noun"},
-    {"word": "thermometer", "lemma": "thermometer", "translation": "termómetro", "pos": "noun"},
-    {"word": "stethoscope", "lemma": "stethoscope", "translation": "estetoscopio", "pos": "noun"},
-    {"word": "infection", "lemma": "infection", "translation": "infección", "pos": "noun"},
-    {"word": "virus", "lemma": "virus", "translation": "virus", "pos": "noun"},
-    {"word": "bacteria", "lemma": "bacteria", "translation": "bacterias", "pos": "noun"},
-    {"word": "ill", "lemma": "ill", "translation": "enfermo", "pos": "adjective"},
-    {"word": "healthy", "lemma": "healthy", "translation": "sano", "pos": "adjective"},
-    {"word": "to recover", "lemma": "recover", "translation": "recuperarse", "pos": "verb"},
-    {"word": "to heal", "lemma": "heal", "translation": "curar", "pos": "verb"},
-    {"word": "to hurt", "lemma": "hurt", "translation": "doler", "pos": "verb"}
+    {
+      "word": "doctor",
+      "lemma": "doctor",
+      "translation": "médico",
+      "pos": "noun"
+    },
+    {
+      "word": "nurse",
+      "lemma": "nurse",
+      "translation": "enfermero",
+      "pos": "noun"
+    },
+    {
+      "word": "hospital",
+      "lemma": "hospital",
+      "translation": "hospital",
+      "pos": "noun"
+    },
+    {
+      "word": "clinic",
+      "lemma": "clinic",
+      "translation": "clínica",
+      "pos": "noun"
+    },
+    {
+      "word": "patient",
+      "lemma": "patient",
+      "translation": "paciente",
+      "pos": "noun"
+    },
+    {
+      "word": "medicine",
+      "lemma": "medicine",
+      "translation": "medicina",
+      "pos": "noun"
+    },
+    {
+      "word": "pill",
+      "lemma": "pill",
+      "translation": "pastilla",
+      "pos": "noun"
+    },
+    {
+      "word": "prescription",
+      "lemma": "prescription",
+      "translation": "receta médica",
+      "pos": "noun"
+    },
+    {
+      "word": "pain",
+      "lemma": "pain",
+      "translation": "dolor",
+      "pos": "noun"
+    },
+    {
+      "word": "fever",
+      "lemma": "fever",
+      "translation": "fiebre",
+      "pos": "noun"
+    },
+    {
+      "word": "cough",
+      "lemma": "cough",
+      "translation": "tos",
+      "pos": "noun"
+    },
+    {
+      "word": "cold",
+      "lemma": "cold",
+      "translation": "resfriado",
+      "pos": "noun"
+    },
+    {
+      "word": "flu",
+      "lemma": "flu",
+      "translation": "gripe",
+      "pos": "noun"
+    },
+    {
+      "word": "headache",
+      "lemma": "headache",
+      "translation": "dolor de cabeza",
+      "pos": "noun"
+    },
+    {
+      "word": "toothache",
+      "lemma": "toothache",
+      "translation": "dolor de muelas",
+      "pos": "noun"
+    },
+    {
+      "word": "stomachache",
+      "lemma": "stomachache",
+      "translation": "dolor de estómago",
+      "pos": "noun"
+    },
+    {
+      "word": "allergy",
+      "lemma": "allergy",
+      "translation": "alergia",
+      "pos": "noun"
+    },
+    {
+      "word": "wound",
+      "lemma": "wound",
+      "translation": "herida",
+      "pos": "noun"
+    },
+    {
+      "word": "bandage",
+      "lemma": "bandage",
+      "translation": "venda",
+      "pos": "noun"
+    },
+    {
+      "word": "injection",
+      "lemma": "injection",
+      "translation": "inyección",
+      "pos": "noun"
+    },
+    {
+      "word": "vaccine",
+      "lemma": "vaccine",
+      "translation": "vacuna",
+      "pos": "noun"
+    },
+    {
+      "word": "blood",
+      "lemma": "blood",
+      "translation": "sangre",
+      "pos": "noun"
+    },
+    {
+      "word": "pressure",
+      "lemma": "pressure",
+      "translation": "presión",
+      "pos": "noun"
+    },
+    {
+      "word": "breathing",
+      "lemma": "breathing",
+      "translation": "respiración",
+      "pos": "noun"
+    },
+    {
+      "word": "symptom",
+      "lemma": "symptom",
+      "translation": "síntoma",
+      "pos": "noun"
+    },
+    {
+      "word": "diagnosis",
+      "lemma": "diagnosis",
+      "translation": "diagnóstico",
+      "pos": "noun"
+    },
+    {
+      "word": "treatment",
+      "lemma": "treatment",
+      "translation": "tratamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "surgery",
+      "lemma": "surgery",
+      "translation": "cirugía",
+      "pos": "noun"
+    },
+    {
+      "word": "therapy",
+      "lemma": "therapy",
+      "translation": "terapia",
+      "pos": "noun"
+    },
+    {
+      "word": "pharmacy",
+      "lemma": "pharmacy",
+      "translation": "farmacia",
+      "pos": "noun"
+    },
+    {
+      "word": "dose",
+      "lemma": "dose",
+      "translation": "dosis",
+      "pos": "noun"
+    },
+    {
+      "word": "side effect",
+      "lemma": "side effect",
+      "translation": "efecto secundario",
+      "pos": "noun"
+    },
+    {
+      "word": "appointment",
+      "lemma": "appointment",
+      "translation": "cita",
+      "pos": "noun"
+    },
+    {
+      "word": "emergency",
+      "lemma": "emergency",
+      "translation": "urgencia",
+      "pos": "noun"
+    },
+    {
+      "word": "ambulance",
+      "lemma": "ambulance",
+      "translation": "ambulancia",
+      "pos": "noun"
+    },
+    {
+      "word": "crutch",
+      "lemma": "crutch",
+      "translation": "muleta",
+      "pos": "noun"
+    },
+    {
+      "word": "wheelchair",
+      "lemma": "wheelchair",
+      "translation": "silla de ruedas",
+      "pos": "noun"
+    },
+    {
+      "word": "thermometer",
+      "lemma": "thermometer",
+      "translation": "termómetro",
+      "pos": "noun"
+    },
+    {
+      "word": "stethoscope",
+      "lemma": "stethoscope",
+      "translation": "estetoscopio",
+      "pos": "noun"
+    },
+    {
+      "word": "infection",
+      "lemma": "infection",
+      "translation": "infección",
+      "pos": "noun"
+    },
+    {
+      "word": "virus",
+      "lemma": "virus",
+      "translation": "virus",
+      "pos": "noun"
+    },
+    {
+      "word": "bacteria",
+      "lemma": "bacteria",
+      "translation": "bacterias",
+      "pos": "noun"
+    },
+    {
+      "word": "ill",
+      "lemma": "ill",
+      "translation": "enfermo",
+      "pos": "adjective"
+    },
+    {
+      "word": "healthy",
+      "lemma": "healthy",
+      "translation": "sano",
+      "pos": "adjective"
+    },
+    {
+      "word": "to recover",
+      "lemma": "recover",
+      "translation": "recuperarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to heal",
+      "lemma": "heal",
+      "translation": "curar",
+      "pos": "verb"
+    },
+    {
+      "word": "to hurt",
+      "lemma": "hurt",
+      "translation": "doler",
+      "pos": "verb"
+    },
+    {
+      "word": "gp",
+      "lemma": "gp",
+      "translation": "médico de cabecera",
+      "pos": "noun"
+    },
+    {
+      "word": "specialist",
+      "lemma": "specialist",
+      "translation": "especialista",
+      "pos": "noun"
+    },
+    {
+      "word": "surgeon",
+      "lemma": "surgeon",
+      "translation": "cirujano",
+      "pos": "noun"
+    },
+    {
+      "word": "dentist",
+      "lemma": "dentist",
+      "translation": "dentista",
+      "pos": "noun"
+    },
+    {
+      "word": "optician",
+      "lemma": "optician",
+      "translation": "óptico",
+      "pos": "noun"
+    },
+    {
+      "word": "midwife",
+      "lemma": "midwife",
+      "translation": "matrona",
+      "pos": "noun"
+    },
+    {
+      "word": "paramedic",
+      "lemma": "paramedic",
+      "translation": "técnico de emergencias",
+      "pos": "noun"
+    },
+    {
+      "word": "waiting room",
+      "lemma": "waiting room",
+      "translation": "sala de espera",
+      "pos": "noun"
+    },
+    {
+      "word": "ward",
+      "lemma": "ward",
+      "translation": "planta del hospital",
+      "pos": "noun"
+    },
+    {
+      "word": "a&e",
+      "lemma": "a&e",
+      "translation": "urgencias",
+      "pos": "noun"
+    },
+    {
+      "word": "operating theatre",
+      "lemma": "operating theatre",
+      "translation": "quirófano",
+      "pos": "noun"
+    },
+    {
+      "word": "plaster cast",
+      "lemma": "plaster cast",
+      "translation": "escayola",
+      "pos": "noun"
+    },
+    {
+      "word": "sling",
+      "lemma": "sling",
+      "translation": "cabestrillo",
+      "pos": "noun"
+    },
+    {
+      "word": "stitches",
+      "lemma": "stitches",
+      "translation": "puntos de sutura",
+      "pos": "noun"
+    },
+    {
+      "word": "bruise",
+      "lemma": "bruise",
+      "translation": "moratón",
+      "pos": "noun"
+    },
+    {
+      "word": "sprain",
+      "lemma": "sprain",
+      "translation": "esguince",
+      "pos": "noun"
+    },
+    {
+      "word": "fracture",
+      "lemma": "fracture",
+      "translation": "fractura",
+      "pos": "noun"
+    },
+    {
+      "word": "burn",
+      "lemma": "burn",
+      "translation": "quemadura",
+      "pos": "noun"
+    },
+    {
+      "word": "rash",
+      "lemma": "rash",
+      "translation": "sarpullido",
+      "pos": "noun"
+    },
+    {
+      "word": "swelling",
+      "lemma": "swelling",
+      "translation": "hinchazón",
+      "pos": "noun"
+    },
+    {
+      "word": "nausea",
+      "lemma": "nausea",
+      "translation": "náuseas",
+      "pos": "noun"
+    },
+    {
+      "word": "dizziness",
+      "lemma": "dizziness",
+      "translation": "mareo",
+      "pos": "noun"
+    },
+    {
+      "word": "insomnia",
+      "lemma": "insomnia",
+      "translation": "insomnio",
+      "pos": "noun"
+    },
+    {
+      "word": "blood test",
+      "lemma": "blood test",
+      "translation": "análisis de sangre",
+      "pos": "noun"
+    },
+    {
+      "word": "x-ray",
+      "lemma": "x-ray",
+      "translation": "radiografía",
+      "pos": "noun"
+    },
+    {
+      "word": "ultrasound",
+      "lemma": "ultrasound",
+      "translation": "ecografía",
+      "pos": "noun"
+    },
+    {
+      "word": "check-up",
+      "lemma": "check-up",
+      "translation": "revisión",
+      "pos": "noun"
+    },
+    {
+      "word": "referral",
+      "lemma": "referral",
+      "translation": "derivación",
+      "pos": "noun"
+    },
+    {
+      "word": "sick note",
+      "lemma": "sick note",
+      "translation": "parte de baja",
+      "pos": "noun"
+    },
+    {
+      "word": "painkiller",
+      "lemma": "painkiller",
+      "translation": "analgésico",
+      "pos": "noun"
+    },
+    {
+      "word": "antibiotic",
+      "lemma": "antibiotic",
+      "translation": "antibiótico",
+      "pos": "noun"
+    },
+    {
+      "word": "ointment",
+      "lemma": "ointment",
+      "translation": "pomada",
+      "pos": "noun"
+    },
+    {
+      "word": "syrup",
+      "lemma": "syrup",
+      "translation": "jarabe",
+      "pos": "noun"
+    },
+    {
+      "word": "inhaler",
+      "lemma": "inhaler",
+      "translation": "inhalador",
+      "pos": "noun"
+    },
+    {
+      "word": "plaster",
+      "lemma": "plaster",
+      "translation": "tirita",
+      "pos": "noun"
+    },
+    {
+      "word": "to prescribe",
+      "lemma": "prescribe",
+      "translation": "recetar",
+      "pos": "verb"
+    },
+    {
+      "word": "to examine",
+      "lemma": "examine",
+      "translation": "explorar",
+      "pos": "verb"
+    },
+    {
+      "word": "to vomit",
+      "lemma": "vomit",
+      "translation": "vomitar",
+      "pos": "verb"
+    },
+    {
+      "word": "to faint",
+      "lemma": "faint",
+      "translation": "desmayarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to bleed",
+      "lemma": "bleed",
+      "translation": "sangrar",
+      "pos": "verb"
+    },
+    {
+      "word": "to rest",
+      "lemma": "rest",
+      "translation": "descansar",
+      "pos": "verb"
+    },
+    {
+      "word": "itch",
+      "lemma": "itch",
+      "translation": "picor",
+      "pos": "noun"
+    },
+    {
+      "word": "drops",
+      "lemma": "drops",
+      "translation": "gotas",
+      "pos": "noun"
+    },
+    {
+      "word": "cotton wool",
+      "lemma": "cotton wool",
+      "translation": "algodón hidrófilo",
+      "pos": "noun"
+    },
+    {
+      "word": "to swell",
+      "lemma": "swell",
+      "translation": "hincharse",
+      "pos": "verb"
+    },
+    {
+      "word": "to itch",
+      "lemma": "itch",
+      "translation": "picar",
+      "pos": "verb"
+    },
+    {
+      "word": "sore throat",
+      "lemma": "sore throat",
+      "translation": "dolor de garganta",
+      "pos": "noun"
+    },
+    {
+      "word": "runny nose",
+      "lemma": "runny nose",
+      "translation": "moqueo",
+      "pos": "noun"
+    },
+    {
+      "word": "dosage",
+      "lemma": "dosage",
+      "translation": "dosis",
+      "pos": "noun"
+    },
+    {
+      "word": "convalescence",
+      "lemma": "convalescence",
+      "translation": "convalecencia",
+      "pos": "noun"
+    },
+    {
+      "word": "diet",
+      "lemma": "diet",
+      "translation": "dieta",
+      "pos": "noun"
+    },
+    {
+      "word": "walking stick",
+      "lemma": "walking stick",
+      "translation": "bastón",
+      "pos": "noun"
+    },
+    {
+      "word": "first aid",
+      "lemma": "first aid",
+      "translation": "primeros auxilios",
+      "pos": "noun"
+    }
   ]
 }

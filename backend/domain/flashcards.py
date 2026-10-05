@@ -373,6 +373,9 @@ async def list_decks(user_id: str) -> dict:
     """
     day = _today_prefix()
     now_iso = _now()
+    # Los temas entran en el diccionario antes de contar, para que el primer
+    # listado ya traiga sus palabras y sus mazos.
+    await retention_domain.ensure_theme_pack_decks(user_id)
     lexicon = await _lexicon_cards(user_id)
     studied = await run_in_threadpool(flashcards_repo.studied_cards, user_id)
     auto_state = await run_in_threadpool(
@@ -401,6 +404,12 @@ async def list_decks(user_id: str) -> dict:
         1 for card in lexicon if str(card.get("state") or "") == "review"
     )
 
+    coll_rows = await run_in_threadpool(collections_repo.list_collections, user_id)
+    slug_of = {
+        int(item["id"]): str(item.get("slug") or "")
+        for item in coll_rows
+        if str(item.get("kind") or "") == "theme_pack"
+    }
     rows = await run_in_threadpool(flashcards_repo.list_decks, user_id)
     counts = await run_in_threadpool(flashcards_repo.count_cards, user_id)
     shared = await run_in_threadpool(flashcards_repo.shared_cards_by_deck, user_id)
@@ -411,11 +420,13 @@ async def list_decks(user_id: str) -> dict:
             flashcards_repo.day_state, user_id, day, deck_id
         )
         cards = await _deck_entries(user_id, deck_id, lexicon=lexicon)
+        source = row.get("source_collection_id")
         deck = {
             "id": deck_id,
             "name": row["name"],
-            "slug": "",
+            "slug": slug_of.get(int(source), "") if source else "",
             "is_auto": False,
+            "source_collection_id": row.get("source_collection_id"),
             "new_per_day": int(row["new_per_day"]),
             "review_per_day": int(row["review_per_day"]),
         }
@@ -550,6 +561,12 @@ async def delete_deck(user_id: str, deck_id: int) -> dict | None:
     """
     if deck_id == flashcards_repo.AUTO_DECK_ID:
         return None
+    current = await run_in_threadpool(flashcards_repo.get_deck, user_id, deck_id)
+    if current is None:
+        return None
+    # Un tema sale del diccionario: borrarlo lo volvería a crear al listar.
+    if current.get("source_collection_id"):
+        return {"refused": True}
     # La lista de huérfanas se recolecta ANTES de borrar (el repo la devuelve en
     # la misma transacción), para no dejar cartas FSRS de fichas ya inexistentes.
     result = await run_in_threadpool(flashcards_repo.delete_deck, user_id, deck_id)

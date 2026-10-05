@@ -4,23 +4,23 @@
 > hilo (premisas 8 y 12). Si el chat se satura o hay riesgo de alucinación, este
 > documento es el ancla para reanudar. Las notas anteriores a V3.94 están en
 > [`archive/RELEVO-historico.md`](archive/RELEVO-historico.md), sin cambios.
-> Actualizado por última vez: 2026-10-03 (UTC+2).
+> Actualizado por última vez: 2026-10-05 (UTC+2).
 
 ## Estado vigente
 
 - **Versión publicada:** `v3.94.2` (tag anotado sobre `5ce978a`, GitHub Release
-  *Latest*, CI 12/12). **`v3.94.5` es la versión a auditar**, en la rama
-  `release/v3.94.5`. El diff de cierre es `dce752ba...release/v3.94.5`. Incluye
-  el árbol de `v3.94.3` (PR #28, aún sin tag) y el banco de Estudiar
-  (`v3.94.4`, que **no** se etiqueta como cierre). `release/v3.94.4` sigue en
-  `dce752ba` y no es el artefacto de este cierre. La integridad del cierre es
-  un `item_id` y una transición FSRS. La auditoría de integridad sobre
-  `d5f350a` queda aceptada. El run `37116482054` falló por higiene (ruff,
-  i18n estricto y dos tests de `addVocabularyItem`); un commit posterior la
-  corrige sin reabrir la transacción. Playwright de ese run falló aparte
-  (53, selectores de la pantalla anterior) y no entra en ese commit. Aún
-  **sin tag** y **sin** Release: el tag espera un CI 12/12. Fuente de verdad
-  de la versión: `backend/config.py`
+  *Latest*, CI 12/12). **`v3.94.10` es la versión de trabajo** (app `3.94.9 →
+  3.94.10`): Estudiar va en los dos sentidos, los temas son mazos y Mazos se
+  elige en una rejilla. El complete no cambia. Aún **sin tag**. La auditoría
+  externa de `v3.94.6` queda **aceptada**: no hay P0 ni P1; la integridad de
+  V3.94.5 (`item_id`, una nota, una carta FSRS) se conserva; revelar no
+  agenda. Los tres P2 (traducción del ejemplo, ejemplo cargado frente a visto,
+  cupo de «Otra frase») quedan en `PARKED.md §V3.94.6` y no reabren la
+  pantalla. `v3.94.7`, `v3.94.8` y `v3.94.9` viajan en el mismo envío porque
+  no tenían commit. Aún **sin tag** y **sin** Release de esta versión: el tag
+  espera un CI 12/12 de su PR. La *Latest* sigue siendo `v3.94.2`.
+  `v3.94.4` **no** se etiqueta como cierre.
+  Fuente de verdad de la versión: `backend/config.py`
   `VERSION`; `scripts/check_release_consistency.py` exige la misma en
   `frontend/package.json`, `frontend/package-lock.json`, `README.md`,
   `CHANGELOG.md` y `PLAN.md`.
@@ -32,13 +32,13 @@
   medida con alumnos. Es lo que bloquea V3.95.
 - **Los ocho gates humanos siguen `pending`.** `docs/audit/validation-evidence.json`
   no existe.
-- **Deuda abierta:** [`audit/PARKED.md`](audit/PARKED.md) (sección V3.94.5 y
+- **Deuda abierta:** [`audit/PARKED.md`](audit/PARKED.md) (sección V3.94.6 y
   anteriores).
 
 ## Cómo retomar
 
 1. Leer [`PREMISAS.md`](PREMISAS.md) y [`ARQUITECTURA.md`](ARQUITECTURA.md).
-2. Leer este documento y la sección V3.94.5 de [`audit/PARKED.md`](audit/PARKED.md).
+2. Leer este documento y la sección V3.94.6 de [`audit/PARKED.md`](audit/PARKED.md).
 3. Verificar el árbol: `git status`, `git log -5 --oneline`, y desde `backend/`
    `python -m pytest -q`.
 4. Trabajar en subagentes con instrucciones cerradas y revisar su diff antes de
@@ -76,8 +76,16 @@ Si la mayoría de los `mismatch` probados son falsos positivos, V3.95 empieza po
 las glosas, no por el `sense_id`. El P1 de dos `mismatch` hacia sentidos distintos
 entra en V3.95 con su propia política (ver `PARKED.md §V3.94.2`).
 
+La línea de integridad e interacción básica de Estudiar se considera cerrada
+en producto en cuanto el CI de `v3.94.6` esté verde y se pueda etiquetar. Los
+tres P2 de `PARKED.md §V3.94.6` no reabren esa pantalla.
+
 ## Notas de las últimas versiones
 
+> **Nota (2026-10-05 · V3.94.10 — Estudiar en los dos sentidos, los temas son mazos y Mazos se elige en una rejilla): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`flashcard_decks.source_collection_id`) y **SIN cambio de contrato** en el complete. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **(A)** Español → Inglés escribe y silabea el lema inglés. **(B)** Los donuts eligen A repasar, No aprendidas, Difíciles, Bien y Todas. Fácil sigue siendo la nota. **(C)** Dieciocho temas de cien palabras, cada uno un mazo que no se borra. Rejilla en Mazos y en Tarjetas. **Publicación:** sin tag. La *Latest* sigue siendo `v3.94.2`. El tag espera el CI de la PR. `v3.94.7`, `v3.94.8` y `v3.94.9` van en el mismo commit. Detalle en `docs/releases/release-notes-v3.94.10.md`.
+>
+> **Nota (2026-10-03 · V3.94.6 — Estudiar muestra la palabra y el significado se revela): release de PRODUCTO (patch) CON backend y CON frontend**, **SIN migración de BD** y **CON un endpoint nuevo** (`POST /api/vocabulary/study/example`). El complete no cambia. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **No abre V3.94.7.** **(A)** Se lee la palabra. Oír, una pista, el recordatorio y seis opciones no agendan. La nota sigue siendo Otra vez / Difícil / Bien / Fácil. **(B)** «Otra frase» pide una frase nueva al modelo local; si falla, se conserva la anterior y no hay escrituras de estudio. **(C)** Colección y nivel juntos siguen sin pintarse. **Auditoría externa:** aceptada. Sin P0 ni P1. Tres P2 aparcados (traducción del ejemplo sin contraste semántico, `sawExample` al cargar el ejemplo, cupo general de «Otra frase»). **Publicación:** el CI **#343** (run `37122650155`, commit `4711ac80`) está en curso; el tag espera el verde. La *Latest* sigue siendo `v3.94.2`. Detalle en `docs/releases/release-notes-v3.94.6.md` y `docs/audit/PARKED.md §V3.94.6`.
+>
 > **Nota (2026-10-03 · V3.94.5 — Estudiar cierra el ítem servido una sola vez, y esa nota mueve una sola carta): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`study_lesson_items`) y **CON cambio de contrato** en `POST /api/vocabulary/study/complete` (hace falta el `item_id` de la cola). `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **`v3.94.4` no se etiqueta como cierre.** **(A)** Un ítem servido admite 0 o 1 completion. Repetirlo no vuelve a agendar. Una ficha manual califica `flashcard` y deja la carta léxico en `reps=0`. El alta, las facetas, el FSRS y el libro son una transacción. **(B)** `learned` depende de `required_facets` actual; `state == review` no es mastery; los pasos los afirma el cliente. **(C)** Colección y nivel juntos siguen sin pintarse. **Publicación:** la integridad de `d5f350a` queda aceptada; el tag sigue esperando un CI 12/12 sobre el commit de higiene (ruff, i18n y el cuerpo de `addVocabularyItem`). No se abre V3.95. Detalle en `docs/releases/release-notes-v3.94.5.md`.
 >
 > **Nota (2026-10-03 · V3.94.4 — Estudiar lee el ámbito y Flashcards deja de resembrar el léxico): release de PRODUCTO (patch) CON backend y CON frontend**, **CON migración aditiva** (`vocabulary.cefr`, `vocabulary.lesson_facets`, `dictionary_entries.cefr`) y **CON endpoints nuevos** de la cola de Estudiar. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION`, `DECISION_POLICY_VERSION`, `CURRICULUM_VERSION` y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate.** **No abre V3.95.** **(A)** Un mazo manual no estudia el léxico vencido ajeno. **(B)** Pendientes, Falladas y Todas de nuevo, con un solo inicio. **(C)** Una sincronización por listado de mazos. **Publicación:** pendiente de CI y de la auditoría externa. Detalle en `docs/releases/release-notes-v3.94.4.md`.

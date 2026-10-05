@@ -4,6 +4,56 @@ Todas las versiones notables de English Tutor. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/) y este proyecto usa
 [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.94.10] — 2026-10-05
+
+**Estudiar funciona en los dos sentidos, los temas del diccionario son mazos y Mazos se elige en una rejilla.** Release de **PRODUCTO (patch)** **CON backend y CON frontend**, **CON migración aditiva** (`flashcard_decks.source_collection_id`) y **SIN cambio de contrato** en `POST /api/vocabulary/study/complete`. El cierre sigue siendo el `item_id` de la cola, una nota y una sola carta FSRS. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.** Los tres P2 de V3.94.6 siguen aparcados.
+
+**(A) Los dos sentidos.** Español → Inglés es simétrico al sentido contrario: se estudia la palabra inglesa. Escribir compara con el lema inglés. La sílaba, mientras se escribe, parte el inglés. El español se oye solo en la voz de España. El sentido se elige en la cabecera.
+
+**(B) Qué estudiar.** Cinco donuts eligen la cola: A repasar, No aprendidas, Difíciles, Bien y Todas. La nota sigue siendo Otra vez, Difícil, Bien y Fácil. Aprendida sigue siendo el estado derivado.
+
+**(C) El diccionario y sus mazos.** Dieciocho temas de cien palabras. Un tema tomado es un mazo y no se borra. Un mazo creado por el alumno sí. Mi léxico resume y manda a Estudiar. Mazos y Tarjetas eligen el mazo en una rejilla con icono; el panel de abajo lleva los datos y las acciones. Estadísticas sigue siendo el diccionario entero. Pegar una lista crea un mazo propio.
+
+**Verificación local:** `vitest` de Flashcards **34/34** · `pytest` del alta de un tema (`slug` del mazo) **1/1**. El pytest y el vitest completos los corre la CI. **Honestidad:** (i) el ledger de producción de Listening sigue sin volumen; (ii) el frontend **sigue sin pintar** `new_sense_exposure`; (iii) FSRS sigue **sin cartas por acepción**; (iv) los **ocho gates humanos siguen `pending`**; (v) el tag espera al verde de la CI; (vi) el catálogo crece sin subir `CURRICULUM_VERSION`: las palabras nuevas entran con `INSERT OR IGNORE` y no reescriben traducciones ya guardadas. Detalle en `docs/releases/release-notes-v3.94.10.md`.
+
+## [3.94.9] — 2026-10-04
+
+**Atrás y adelante junto al título, «¿Cuál es?» sale del diccionario, el lápiz abre esa ficha y Pista muestra o crea el recordatorio.** Release de **PRODUCTO (patch)** **CON backend y CON frontend**, **SIN migración de BD** y **SIN cambio de contrato**. `POST /api/vocabulary/study/complete` no cambia. Se añaden `POST /api/vocabulary/study/quiz` y `POST /api/vocabulary/study/hint`; ninguno cierra la lección ni agenda FSRS. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.**
+
+**(A) Flechas.** A la izquierda y a la derecha de English Tutor. Recorren el historial de pantallas de esta visita y se apagan cuando no hay a dónde ir.
+
+**(B) ¿Cuál es?** Las opciones falsas salen de todo el diccionario, parecidas en sílabas a la traducción, y no son las otras palabras de la sesión. El primer fallo sigue guardando Otra vez una sola vez.
+
+**(C) El lápiz.** En una ficha manual abre su editor y deja el buscador en ese anverso. Una palabra del léxico sigue editando la traducción en la tarjeta.
+
+**(D) Pista.** Muestra el recordatorio guardado. Si no hay, la IA escribe una pista en español que no dice la traducción ni la palabra, y se guarda en la ficha o en el léxico.
+
+**Verificación local:** pytest del quiz y de la pista; vitest de la lección y de Flashcards. **Honestidad:** (i) el ledger de producción de Listening sigue sin volumen; (ii) el frontend **sigue sin pintar** `new_sense_exposure`; (iii) FSRS sigue **sin cartas por acepción**; (iv) los **ocho gates humanos siguen `pending`**; (v) el tag espera al verde de la CI.
+
+## [3.94.8] — 2026-10-03
+
+**La tarjeta de Estudiar lleva iconos, la frase en el anverso, el lápiz de la ficha y anota el fallo de «¿Cuál es?».** Release de **PRODUCTO (patch)** **CON frontend**, **SIN migración de BD** y **SIN cambio de contrato**. `POST /api/vocabulary/study/complete` sigue pidiendo el `item_id` de la cola. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.**
+
+**(A) La tarjeta.** Cada acción lleva icono y su nombre. «Frase» abre el ejemplo del diccionario sin revelar el significado. El lápiz de una ficha manual abre Tarjetas en su editor; el de una palabra del léxico guarda la traducción.
+
+**(B) El fallo.** La primera opción incorrecta de «¿Cuál es?» queda en rojo, muestra el significado y guarda Otra vez una sola vez. «Siguiente» avanza sin otra nota. Escribir mal la palabra sigue sin cerrar.
+
+**(C) Qué no cambia.** El cierre y la regla de una sola carta FSRS. Los tres P2 de V3.94.6 siguen aparcados.
+
+**Verificación local:** `vitest` de la lección, 14/14. **Honestidad:** (i) el ledger de producción de Listening sigue sin volumen; (ii) el frontend **sigue sin pintar** `new_sense_exposure`; (iii) FSRS sigue **sin cartas por acepción**; (iv) los **ocho gates humanos siguen `pending`**; (v) el tag espera al verde de la CI. Detalle en `docs/releases/release-notes-v3.94.8.md`.
+
+## [3.94.7] — 2026-10-03
+
+**Estudiar guarda la nota y la tarjeta deja escribir, revelar una sílaba y conservar varias frases.** Release de **PRODUCTO (patch)** **CON frontend**, **SIN migración de BD** y **SIN cambio de contrato**. `POST /api/vocabulary/study/complete` sigue pidiendo el `item_id` de la cola. El producto servía una interfaz compilada anterior, que cerraba sin ese id: Bien respondía «No se ha podido guardar esta palabra» y no quedaba ninguna nota. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.**
+
+**(A) La nota.** La lección compilada envía `item_id`, la nota y las facetas. Escribir, una sílaba o una frase nueva no llaman al cierre.
+
+**(B) La tarjeta.** «Escribir» oculta la palabra. Acertar la revela; fallar no cierra. «Sílaba» avanza un grupo vocálico: de la traducción mientras se recuerda el significado, y de la palabra inglesa mientras se escribe. «Otra frase» añade a la lista (hasta cuatro) y no borra las anteriores. Cada frase se oye y se puede pasar al español. Si el modelo falla, la lista se queda.
+
+**(C) Qué no cambia.** La transacción del cierre y la regla de una sola carta FSRS. Los tres P2 de V3.94.6 siguen aparcados. Colección y nivel juntos siguen sin pintarse.
+
+**Verificación local:** `vitest` de la lección. **Honestidad:** (i) el ledger de producción de Listening sigue sin volumen; (ii) el frontend **sigue sin pintar** `new_sense_exposure`; (iii) FSRS sigue **sin cartas por acepción**; (iv) los **ocho gates humanos siguen `pending`**; (v) el tag espera al verde de la CI. Detalle en `docs/releases/release-notes-v3.94.7.md`.
+
 ## [3.94.6] — 2026-10-03
 
 **Estudiar muestra la palabra y el significado se revela.** Release de **PRODUCTO (patch)** **CON backend y CON frontend**, **SIN migración de BD** y **CON un endpoint nuevo** (`POST /api/vocabulary/study/example`). El cierre `POST /api/vocabulary/study/complete` no cambia: sigue el `item_id`, una nota y una sola carta FSRS. `PROVEN_OTHER_OVERLAP` **sigue en 2**. `GENERATOR_VERSION` (`1.7.0`), `DECISION_POLICY_VERSION` (`CURRICULUM_VERSION` sigue `1.3.1`) y `LISTENING_BANK_VERSION` **no cambian**. **No se añade ni se retira gate** —siguen los **ocho**, todos `pending`— y `docs/audit/validation-evidence.json` **sigue sin existir**. **No abre V3.95.**

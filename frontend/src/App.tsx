@@ -3,6 +3,7 @@ import { MotionConfig } from "motion/react";
 import { useChat } from "./hooks/useChat";
 import { useHandsFree } from "./hooks/useHandsFree";
 import { useAppearance } from "./hooks/useAppearance";
+import { useLastPath } from "./hooks/useLastPath";
 import { I18nProvider, useLanguage } from "./hooks/useI18n";
 import { AppShell } from "./app/AppShell";
 import { Header } from "./app/Header";
@@ -134,6 +135,9 @@ export default function App() {
     route === "accountActivate" ||
     route === "accountReset" ||
     route === "accountVerify";
+  // Al abrir la raíz (el lanzador no lleva hash) se vuelve a la última ruta de
+  // este usuario. Un enlace que ya trae camino no se sustituye.
+  useLastPath(currentUserId, path, isAccountRoute);
   // Sub-ruta de práctica activa dentro de APRENDER (null = hub u otra raíz).
   const learnActivity = learnActivityFromPath(path);
   // Destreza del chat libre activa (`/chat/lectura`, `/chat/escritura`), o null

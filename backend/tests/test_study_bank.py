@@ -300,6 +300,79 @@ def test_deck_modes_stay_inside_that_deck(monkeypatch, tmp_path):
     assert words("all") == {"hammer", "saw", "wrench"}
 
 
+def test_queue_filters_follow_the_last_grade_and_the_learned_state(
+    monkeypatch, tmp_path
+):
+    user_id = _setup(monkeypatch, tmp_path)
+    from repositories import flashcards as flashcards_repo
+
+    tools = flashcards_repo.create_deck(user_id, name="Herramientas")
+    assert tools is not None
+    hammer = flashcards_repo.create_card(
+        user_id, tools["id"], front="hammer", back="martillo"
+    )
+    saw = flashcards_repo.create_card(user_id, tools["id"], front="saw", back="sierra")
+    wrench = flashcards_repo.create_card(
+        user_id, tools["id"], front="wrench", back="llave"
+    )
+    chisel = flashcards_repo.create_card(
+        user_id, tools["id"], front="chisel", back="cincel"
+    )
+    assert hammer and saw and wrench and chisel
+
+    def remember(card: dict, *, due: str, grade: int) -> None:
+        scheduled = fsrs.empty_card(
+            target_type="flashcard",
+            target_id=str(card["id"]),
+            label=card["front"],
+            now="2020-01-01T00:00:00+00:00",
+        )
+        scheduled["due_at"] = due
+        scheduled["state"] = "review"
+        scheduled["reps"] = 2
+        academy_repo.upsert_fsrs_card(user_id, scheduled)
+        flashcards_repo.record_review(
+            user_id,
+            deck_id=tools["id"],
+            card_type="flashcard",
+            card_id=str(card["id"]),
+            grade=grade,
+            was_new=False,
+        )
+
+    remember(hammer, due="2099-01-01T00:00:00+00:00", grade=3)
+    remember(saw, due="2099-01-01T00:00:00+00:00", grade=1)
+    remember(wrench, due="2020-01-01T00:00:00+00:00", grade=2)
+
+    client = TestClient(app)
+
+    def body(mode: str) -> dict:
+        response = client.get(
+            "/api/vocabulary/study/queue",
+            params={
+                "user_id": user_id,
+                "scope": "deck",
+                "deck_id": tools["id"],
+                "mode": mode,
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    pending = body("pending")
+    assert {item["word"] for item in pending["items"]} == {"wrench"}
+    assert pending["total"] == 4
+    assert pending["learned"] == 3
+    assert pending["unlearned"] == 1
+    assert pending["due"] == 1
+    assert pending["hard"] == 1
+    assert pending["good"] == 1
+    assert {item["word"] for item in body("unlearned")["items"]} == {"chisel"}
+    assert {item["word"] for item in body("hard")["items"]} == {"wrench"}
+    assert {item["word"] for item in body("good")["items"]} == {"hammer"}
+    assert body("hard")["items"][0]["word"] == "wrench"
+
+
 def test_list_decks_syncs_the_lexicon_once(monkeypatch, tmp_path):
     import asyncio
 

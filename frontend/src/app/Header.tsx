@@ -1,4 +1,6 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "../hooks/useI18n";
+import { useHistoryControls } from "../router/historyTrailStore";
 import type { HandsFreeStatus } from "../hooks/useHandsFree";
 import type { MicUnavailableReason } from "../utils/browserCapabilities";
 import type { User } from "../types/api";
@@ -52,9 +54,20 @@ export function Header({
   onOpenAnalysis,
 }: HeaderProps) {
   const { t } = useI18n();
+  const history = useHistoryControls();
   return (
     <header className="sticky top-0 z-40 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/80 px-4 py-2.5 backdrop-blur-xl">
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          className="icon-button"
+          disabled={!history.canBack}
+          aria-label={t("header.back")}
+          title={t("header.back")}
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
         <button
           type="button"
           onClick={() => onNavigate("home")}
@@ -70,6 +83,16 @@ export function Header({
             </span>
             <span className="text-xs text-muted-foreground">{t("brand.subtitle")}</span>
           </span>
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          disabled={!history.canForward}
+          aria-label={t("header.forward")}
+          title={t("header.forward")}
+          onClick={() => window.history.forward()}
+        >
+          <ChevronRight size={18} aria-hidden="true" />
         </button>
         {/* V3.38.1: estado de conexión integrado en la cabecera (sustituye a la
             barra inferior); visible también en móvil, fuera del bloque sm:flex. */}

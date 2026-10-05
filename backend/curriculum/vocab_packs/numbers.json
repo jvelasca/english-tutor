@@ -1,0 +1,609 @@
+{
+  "slug": "numbers",
+  "kind": "theme_pack",
+  "title": "Numbers",
+  "title_es": "Números y cantidades",
+  "cefr_hint": "A1",
+  "items": [
+    {
+      "word": "number",
+      "lemma": "number",
+      "translation": "número",
+      "pos": "noun"
+    },
+    {
+      "word": "digit",
+      "lemma": "digit",
+      "translation": "dígito",
+      "pos": "noun"
+    },
+    {
+      "word": "figure",
+      "lemma": "figure",
+      "translation": "cifra",
+      "pos": "noun"
+    },
+    {
+      "word": "zero",
+      "lemma": "zero",
+      "translation": "cero",
+      "pos": "noun"
+    },
+    {
+      "word": "one",
+      "lemma": "one",
+      "translation": "uno",
+      "pos": "noun"
+    },
+    {
+      "word": "two",
+      "lemma": "two",
+      "translation": "dos",
+      "pos": "noun"
+    },
+    {
+      "word": "three",
+      "lemma": "three",
+      "translation": "tres",
+      "pos": "noun"
+    },
+    {
+      "word": "four",
+      "lemma": "four",
+      "translation": "cuatro",
+      "pos": "noun"
+    },
+    {
+      "word": "five",
+      "lemma": "five",
+      "translation": "cinco",
+      "pos": "noun"
+    },
+    {
+      "word": "six",
+      "lemma": "six",
+      "translation": "seis",
+      "pos": "noun"
+    },
+    {
+      "word": "seven",
+      "lemma": "seven",
+      "translation": "siete",
+      "pos": "noun"
+    },
+    {
+      "word": "eight",
+      "lemma": "eight",
+      "translation": "ocho",
+      "pos": "noun"
+    },
+    {
+      "word": "nine",
+      "lemma": "nine",
+      "translation": "nueve",
+      "pos": "noun"
+    },
+    {
+      "word": "ten",
+      "lemma": "ten",
+      "translation": "diez",
+      "pos": "noun"
+    },
+    {
+      "word": "eleven",
+      "lemma": "eleven",
+      "translation": "once",
+      "pos": "noun"
+    },
+    {
+      "word": "twelve",
+      "lemma": "twelve",
+      "translation": "doce",
+      "pos": "noun"
+    },
+    {
+      "word": "thirteen",
+      "lemma": "thirteen",
+      "translation": "trece",
+      "pos": "noun"
+    },
+    {
+      "word": "twenty",
+      "lemma": "twenty",
+      "translation": "veinte",
+      "pos": "noun"
+    },
+    {
+      "word": "thirty",
+      "lemma": "thirty",
+      "translation": "treinta",
+      "pos": "noun"
+    },
+    {
+      "word": "forty",
+      "lemma": "forty",
+      "translation": "cuarenta",
+      "pos": "noun"
+    },
+    {
+      "word": "fifty",
+      "lemma": "fifty",
+      "translation": "cincuenta",
+      "pos": "noun"
+    },
+    {
+      "word": "hundred",
+      "lemma": "hundred",
+      "translation": "cien",
+      "pos": "noun"
+    },
+    {
+      "word": "thousand",
+      "lemma": "thousand",
+      "translation": "mil",
+      "pos": "noun"
+    },
+    {
+      "word": "million",
+      "lemma": "million",
+      "translation": "millón",
+      "pos": "noun"
+    },
+    {
+      "word": "first",
+      "lemma": "first",
+      "translation": "primero",
+      "pos": "adjective"
+    },
+    {
+      "word": "second",
+      "lemma": "second",
+      "translation": "segundo",
+      "pos": "adjective"
+    },
+    {
+      "word": "third",
+      "lemma": "third",
+      "translation": "tercero",
+      "pos": "adjective"
+    },
+    {
+      "word": "last",
+      "lemma": "last",
+      "translation": "último",
+      "pos": "adjective"
+    },
+    {
+      "word": "half",
+      "lemma": "half",
+      "translation": "mitad",
+      "pos": "noun"
+    },
+    {
+      "word": "quarter",
+      "lemma": "quarter",
+      "translation": "cuarto",
+      "pos": "noun"
+    },
+    {
+      "word": "double",
+      "lemma": "double",
+      "translation": "doble",
+      "pos": "adjective"
+    },
+    {
+      "word": "pair",
+      "lemma": "pair",
+      "translation": "par",
+      "pos": "noun"
+    },
+    {
+      "word": "dozen",
+      "lemma": "dozen",
+      "translation": "docena",
+      "pos": "noun"
+    },
+    {
+      "word": "few",
+      "lemma": "few",
+      "translation": "unos pocos",
+      "pos": "adjective"
+    },
+    {
+      "word": "several",
+      "lemma": "several",
+      "translation": "varios",
+      "pos": "adjective"
+    },
+    {
+      "word": "many",
+      "lemma": "many",
+      "translation": "muchos",
+      "pos": "adjective"
+    },
+    {
+      "word": "enough",
+      "lemma": "enough",
+      "translation": "suficiente",
+      "pos": "adjective"
+    },
+    {
+      "word": "none",
+      "lemma": "none",
+      "translation": "ninguno",
+      "pos": "adjective"
+    },
+    {
+      "word": "once",
+      "lemma": "once",
+      "translation": "una vez",
+      "pos": "adverb"
+    },
+    {
+      "word": "twice",
+      "lemma": "twice",
+      "translation": "dos veces",
+      "pos": "adverb"
+    },
+    {
+      "word": "percent",
+      "lemma": "percent",
+      "translation": "por ciento",
+      "pos": "noun"
+    },
+    {
+      "word": "percentage",
+      "lemma": "percentage",
+      "translation": "porcentaje",
+      "pos": "noun"
+    },
+    {
+      "word": "fraction",
+      "lemma": "fraction",
+      "translation": "fracción",
+      "pos": "noun"
+    },
+    {
+      "word": "decimal",
+      "lemma": "decimal",
+      "translation": "decimal",
+      "pos": "noun"
+    },
+    {
+      "word": "odd",
+      "lemma": "odd",
+      "translation": "impar",
+      "pos": "adjective"
+    },
+    {
+      "word": "even",
+      "lemma": "even",
+      "translation": "par",
+      "pos": "adjective"
+    },
+    {
+      "word": "total",
+      "lemma": "total",
+      "translation": "total",
+      "pos": "noun"
+    },
+    {
+      "word": "sum",
+      "lemma": "sum",
+      "translation": "suma",
+      "pos": "noun"
+    },
+    {
+      "word": "to count",
+      "lemma": "count",
+      "translation": "contar",
+      "pos": "verb"
+    },
+    {
+      "word": "to add",
+      "lemma": "add",
+      "translation": "sumar",
+      "pos": "verb"
+    },
+    {
+      "word": "to subtract",
+      "lemma": "subtract",
+      "translation": "restar",
+      "pos": "verb"
+    },
+    {
+      "word": "to multiply",
+      "lemma": "multiply",
+      "translation": "multiplicar",
+      "pos": "verb"
+    },
+    {
+      "word": "to divide",
+      "lemma": "divide",
+      "translation": "dividir",
+      "pos": "verb"
+    },
+    {
+      "word": "to round",
+      "lemma": "round",
+      "translation": "redondear",
+      "pos": "verb"
+    },
+    {
+      "word": "amount",
+      "lemma": "amount",
+      "translation": "cantidad",
+      "pos": "noun"
+    },
+    {
+      "word": "size",
+      "lemma": "size",
+      "translation": "tamaño",
+      "pos": "noun"
+    },
+    {
+      "word": "weight",
+      "lemma": "weight",
+      "translation": "peso",
+      "pos": "noun"
+    },
+    {
+      "word": "length",
+      "lemma": "length",
+      "translation": "longitud",
+      "pos": "noun"
+    },
+    {
+      "word": "width",
+      "lemma": "width",
+      "translation": "anchura",
+      "pos": "noun"
+    },
+    {
+      "word": "height",
+      "lemma": "height",
+      "translation": "altura",
+      "pos": "noun"
+    },
+    {
+      "word": "depth",
+      "lemma": "depth",
+      "translation": "profundidad",
+      "pos": "noun"
+    },
+    {
+      "word": "distance",
+      "lemma": "distance",
+      "translation": "distancia",
+      "pos": "noun"
+    },
+    {
+      "word": "speed",
+      "lemma": "speed",
+      "translation": "velocidad",
+      "pos": "noun"
+    },
+    {
+      "word": "price",
+      "lemma": "price",
+      "translation": "precio",
+      "pos": "noun"
+    },
+    {
+      "word": "cheap",
+      "lemma": "cheap",
+      "translation": "barato",
+      "pos": "adjective"
+    },
+    {
+      "word": "expensive",
+      "lemma": "expensive",
+      "translation": "caro",
+      "pos": "adjective"
+    },
+    {
+      "word": "to weigh",
+      "lemma": "weigh",
+      "translation": "pesar",
+      "pos": "verb"
+    },
+    {
+      "word": "to measure",
+      "lemma": "measure",
+      "translation": "medir",
+      "pos": "verb"
+    },
+    {
+      "word": "roughly",
+      "lemma": "roughly",
+      "translation": "aproximadamente",
+      "pos": "adverb"
+    },
+    {
+      "word": "exactly",
+      "lemma": "exactly",
+      "translation": "exactamente",
+      "pos": "adverb"
+    },
+    {
+      "word": "almost",
+      "lemma": "almost",
+      "translation": "casi",
+      "pos": "adverb"
+    },
+    {
+      "word": "at least",
+      "lemma": "at least",
+      "translation": "al menos",
+      "pos": "adverb"
+    },
+    {
+      "word": "majority",
+      "lemma": "majority",
+      "translation": "mayoría",
+      "pos": "noun"
+    },
+    {
+      "word": "minority",
+      "lemma": "minority",
+      "translation": "minoría",
+      "pos": "noun"
+    },
+    {
+      "word": "average",
+      "lemma": "average",
+      "translation": "media",
+      "pos": "noun"
+    },
+    {
+      "word": "plus",
+      "lemma": "plus",
+      "translation": "más",
+      "pos": "noun"
+    },
+    {
+      "word": "minus",
+      "lemma": "minus",
+      "translation": "menos",
+      "pos": "noun"
+    },
+    {
+      "word": "equal",
+      "lemma": "equal",
+      "translation": "igual",
+      "pos": "adjective"
+    },
+    {
+      "word": "more",
+      "lemma": "more",
+      "translation": "más",
+      "pos": "adjective"
+    },
+    {
+      "word": "less",
+      "lemma": "less",
+      "translation": "menos",
+      "pos": "adjective"
+    },
+    {
+      "word": "both",
+      "lemma": "both",
+      "translation": "ambos",
+      "pos": "adjective"
+    },
+    {
+      "word": "each",
+      "lemma": "each",
+      "translation": "cada",
+      "pos": "adjective"
+    },
+    {
+      "word": "billion",
+      "lemma": "billion",
+      "translation": "mil millones",
+      "pos": "noun"
+    },
+    {
+      "word": "fourteen",
+      "lemma": "fourteen",
+      "translation": "catorce",
+      "pos": "noun"
+    },
+    {
+      "word": "fifteen",
+      "lemma": "fifteen",
+      "translation": "quince",
+      "pos": "noun"
+    },
+    {
+      "word": "sixty",
+      "lemma": "sixty",
+      "translation": "sesenta",
+      "pos": "noun"
+    },
+    {
+      "word": "seventy",
+      "lemma": "seventy",
+      "translation": "setenta",
+      "pos": "noun"
+    },
+    {
+      "word": "eighty",
+      "lemma": "eighty",
+      "translation": "ochenta",
+      "pos": "noun"
+    },
+    {
+      "word": "ninety",
+      "lemma": "ninety",
+      "translation": "noventa",
+      "pos": "noun"
+    },
+    {
+      "word": "to estimate",
+      "lemma": "estimate",
+      "translation": "estimar",
+      "pos": "verb"
+    },
+    {
+      "word": "quantity",
+      "lemma": "quantity",
+      "translation": "cantidad exacta",
+      "pos": "noun"
+    },
+    {
+      "word": "ratio",
+      "lemma": "ratio",
+      "translation": "proporción",
+      "pos": "noun"
+    },
+    {
+      "word": "too many",
+      "lemma": "too many",
+      "translation": "demasiados",
+      "pos": "adjective"
+    },
+    {
+      "word": "free of charge",
+      "lemma": "free of charge",
+      "translation": "gratis",
+      "pos": "adjective"
+    },
+    {
+      "word": "half price",
+      "lemma": "half price",
+      "translation": "a mitad de precio",
+      "pos": "adjective"
+    },
+    {
+      "word": "change",
+      "lemma": "change",
+      "translation": "cambio",
+      "pos": "noun"
+    },
+    {
+      "word": "receipt",
+      "lemma": "receipt",
+      "translation": "recibo",
+      "pos": "noun"
+    },
+    {
+      "word": "about",
+      "lemma": "about",
+      "translation": "unos",
+      "pos": "adverb"
+    },
+    {
+      "word": "at most",
+      "lemma": "at most",
+      "translation": "como mucho",
+      "pos": "adverb"
+    },
+    {
+      "word": "difference",
+      "lemma": "difference",
+      "translation": "diferencia",
+      "pos": "noun"
+    }
+  ]
+}

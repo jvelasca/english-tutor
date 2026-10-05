@@ -56,6 +56,11 @@ interface LexiconInventoryProps {
    * no sabe cómo se hace ese salto: se lo dice el dueño de la navegación.
    */
   onStudyCollection?: (opts: { collectionId: number; label: string }) => void;
+  /**
+   * En Flashcards, Mi léxico es el resumen: estas acciones abren Estudiar
+   * en el donut pedido y el catálogo de temas no se pinta aquí.
+   */
+  onReview?: (mode: "pending" | "unlearned") => void;
 }
 
 /** Estados del léxico, en el orden en que se ofrecen como filtro. */
@@ -90,6 +95,7 @@ export function LexiconInventory({
   userId,
   showHeader = true,
   onStudyCollection,
+  onReview,
 }: LexiconInventoryProps) {
   const { t } = useI18n();
   const [lexicon, setLexicon] = useState<Lexicon | null>(null);
@@ -235,8 +241,21 @@ export function LexiconInventory({
           </motion.section>
         )}
 
-        {/* Añadir palabras / listas / temas. */}
-        {userId && (
+        {userId && onReview ? (
+          <motion.section variants={item} className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={() => onReview("pending")}>
+              {t("dictionary.reviewPending")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onReview("unlearned")}
+            >
+              {t("dictionary.reviewUnlearned")}
+            </Button>
+          </motion.section>
+        ) : userId ? (
           <motion.section
             variants={item}
             aria-label={t("dictionary.add.section")}
@@ -251,7 +270,7 @@ export function LexiconInventory({
               onStudy={onStudyCollection}
             />
           </motion.section>
-        )}
+        ) : null}
 
         <motion.section variants={item} aria-label={t("dictionary.title")}>
           <div className="mb-3 flex items-center justify-between gap-2">

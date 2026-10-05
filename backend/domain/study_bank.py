@@ -11,12 +11,18 @@ Los contadores cambian con el ámbito:
 - estudiadas: alguna vez calificadas en el libro de repasos
 - aprendidas: estado FSRS ``review`` y los pasos obligatorios no están pendientes.
   Es un recuento respecto de ``required_facets`` actual, no un hecho histórico.
+- no aprendidas: el resto del ámbito
 - a repasar: vencidas según FSRS
+- difíciles: la última nota del libro fue Difícil
+- bien: la última nota del libro fue Bien
 - veces estudiada: filas del libro, sin recorte de 30 días
 
 La cola depende del modo, siempre dentro del ámbito:
 
 - ``pending``: ya estudiadas y vencidas según FSRS
+- ``unlearned``: las que aún no cuentan como aprendidas (vencidas primero)
+- ``hard``: la última nota fue Difícil (vencidas primero)
+- ``good``: la última nota fue Bien (vencidas primero)
 - ``failed``: la última nota del libro fue Otra vez
 - ``all``: todas las palabras del ámbito (las vencidas primero)
 
@@ -53,7 +59,7 @@ _LEVELS = (*CEFR_LEVELS, "")
 FACETS = ("meaning", "pronunciation", "context", "senses", "related")
 FACET_STATUSES = ("done", "pending", "na")
 SCOPES = ("all", "level", "deck")
-MODES = ("pending", "failed", "all")
+MODES = ("pending", "unlearned", "hard", "good", "failed", "all")
 
 
 def normalize_word(raw: object) -> str | None:
@@ -204,6 +210,7 @@ def _counts(
     cards: dict[str, dict],
     studied: set[tuple[str, str]],
     counts: dict[tuple[str, str], int],
+    grades: dict[tuple[str, str], int],
     facets: dict[str, dict],
     required: list[str],
     now_iso: str,
@@ -212,7 +219,10 @@ def _counts(
     total = len(rows)
     studied_n = 0
     learned_n = 0
+    unlearned_n = 0
     due_n = 0
+    hard_n = 0
+    good_n = 0
     times = 0
     for row in rows:
         identity = card_of(row)
@@ -226,13 +236,23 @@ def _counts(
             card = row.get("card")
         if is_learned(card, facets.get(word) or {}, required):
             learned_n += 1
+        else:
+            unlearned_n += 1
+        grade = grades.get(identity)
+        if grade == fsrs.GRADE_HARD:
+            hard_n += 1
+        elif grade == fsrs.GRADE_GOOD:
+            good_n += 1
         if identity in studied and card and fsrs.is_due(card, now=now_iso):
             due_n += 1
     return {
         "total": total,
         "studied": studied_n,
         "learned": learned_n,
+        "unlearned": unlearned_n,
         "due": due_n,
+        "hard": hard_n,
+        "good": good_n,
         "times_studied": times,
     }
 
@@ -319,6 +339,15 @@ def _session_cap(
     return max(0, min(cap, int(deck_review_remaining)))
 
 
+def _due_first(pool: list[dict], due: list[dict]) -> list[dict]:
+    """Las vencidas del grupo van delante; el resto se reparte por nivel."""
+    keys = {_row_key(row) for row in pool}
+    first = [row for row in due if _row_key(row) in keys]
+    seen = {_row_key(row) for row in first}
+    tail = [row for row in pool if _row_key(row) not in seen]
+    return first + interleave_by_level(tail)
+
+
 def _pick(
     *,
     mode: str,
@@ -326,11 +355,20 @@ def _pick(
     upcoming: list[dict],
     rest: list[dict],
     failed: list[dict],
+    unlearned: list[dict],
+    hard: list[dict],
+    good: list[dict],
     intensive: bool,
     cap: int,
 ) -> list[dict]:
     if mode == "failed":
         pool = failed
+    elif mode == "unlearned":
+        pool = unlearned
+    elif mode == "hard":
+        pool = hard
+    elif mode == "good":
+        pool = good
     elif mode == "all":
         pool = due + interleave_by_level(rest)
     else:
@@ -493,6 +531,7 @@ async def _assemble(
         cards=snap["cards"],
         studied=snap["studied"],
         counts=snap["counts"],
+        grades=snap["grades"],
         facets=snap["facets"],
         required=snap["required"],
         now_iso=now_iso,
@@ -505,7 +544,23 @@ async def _assemble(
         studied=snap["studied"],
         now=snap["now"],
     )
-    failed = [row for row in rows if snap["grades"].get(_row_key(row)) == 1]
+    grades = snap["grades"]
+
+    def last_grade(row: dict) -> int | None:
+        return grades.get(_row_key(row))
+
+    def learned_row(row: dict) -> bool:
+        word = str(row.get("word") or "")
+        return is_learned(
+            _row_card(row, snap),
+            snap["facets"].get(word) or {},
+            snap["required"],
+        )
+
+    failed = [row for row in rows if last_grade(row) == fsrs.GRADE_AGAIN]
+    unlearned = _due_first([row for row in rows if not learned_row(row)], due)
+    hard = _due_first([row for row in rows if last_grade(row) == fsrs.GRADE_HARD], due)
+    good = _due_first([row for row in rows if last_grade(row) == fsrs.GRADE_GOOD], due)
     cap = _session_cap(
         mode=mode,
         words_per_day=int(snap["config"].get("words_per_day") or 20),
@@ -519,6 +574,9 @@ async def _assemble(
         upcoming=upcoming,
         rest=rest,
         failed=failed,
+        unlearned=unlearned,
+        hard=hard,
+        good=good,
         intensive=snap["config"].get("difficulty") == "intensive",
         cap=cap,
     )

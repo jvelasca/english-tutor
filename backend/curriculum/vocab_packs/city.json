@@ -5,52 +5,605 @@
   "title_es": "Ciudad y transporte",
   "cefr_hint": "A2",
   "items": [
-    {"word": "city", "lemma": "city", "translation": "ciudad", "pos": "noun"},
-    {"word": "town", "lemma": "town", "translation": "pueblo", "pos": "noun"},
-    {"word": "village", "lemma": "village", "translation": "aldea", "pos": "noun"},
-    {"word": "neighbourhood", "lemma": "neighbourhood", "translation": "barrio", "pos": "noun"},
-    {"word": "street", "lemma": "street", "translation": "calle", "pos": "noun"},
-    {"word": "avenue", "lemma": "avenue", "translation": "avenida", "pos": "noun"},
-    {"word": "square", "lemma": "square", "translation": "plaza", "pos": "noun"},
-    {"word": "road", "lemma": "road", "translation": "carretera", "pos": "noun"},
-    {"word": "pavement", "lemma": "pavement", "translation": "acera", "pos": "noun"},
-    {"word": "crossroads", "lemma": "crossroads", "translation": "cruce", "pos": "noun"},
-    {"word": "traffic light", "lemma": "traffic light", "translation": "semáforo", "pos": "noun"},
-    {"word": "roundabout", "lemma": "roundabout", "translation": "rotonda", "pos": "noun"},
-    {"word": "bridge", "lemma": "bridge", "translation": "puente", "pos": "noun"},
-    {"word": "tunnel", "lemma": "tunnel", "translation": "túnel", "pos": "noun"},
-    {"word": "bus stop", "lemma": "bus stop", "translation": "parada de autobús", "pos": "noun"},
-    {"word": "metro", "lemma": "metro", "translation": "metro", "pos": "noun"},
-    {"word": "tram", "lemma": "tram", "translation": "tranvía", "pos": "noun"},
-    {"word": "train", "lemma": "train", "translation": "tren", "pos": "noun"},
-    {"word": "bus", "lemma": "bus", "translation": "autobús", "pos": "noun"},
-    {"word": "taxi", "lemma": "taxi", "translation": "taxi", "pos": "noun"},
-    {"word": "bicycle", "lemma": "bicycle", "translation": "bicicleta", "pos": "noun"},
-    {"word": "motorbike", "lemma": "motorbike", "translation": "motocicleta", "pos": "noun"},
-    {"word": "car", "lemma": "car", "translation": "coche", "pos": "noun"},
-    {"word": "lorry", "lemma": "lorry", "translation": "camión", "pos": "noun"},
-    {"word": "van", "lemma": "van", "translation": "furgoneta", "pos": "noun"},
-    {"word": "ferry", "lemma": "ferry", "translation": "ferry", "pos": "noun"},
-    {"word": "plane", "lemma": "plane", "translation": "avión", "pos": "noun"},
-    {"word": "airport", "lemma": "airport", "translation": "aeropuerto", "pos": "noun"},
-    {"word": "station", "lemma": "station", "translation": "estación", "pos": "noun"},
-    {"word": "port", "lemma": "port", "translation": "puerto", "pos": "noun"},
-    {"word": "platform", "lemma": "platform", "translation": "andén", "pos": "noun"},
-    {"word": "ticket", "lemma": "ticket", "translation": "billete", "pos": "noun"},
-    {"word": "fare", "lemma": "fare", "translation": "tarifa", "pos": "noun"},
-    {"word": "passenger", "lemma": "passenger", "translation": "pasajero", "pos": "noun"},
-    {"word": "driver", "lemma": "driver", "translation": "conductor", "pos": "noun"},
-    {"word": "traffic jam", "lemma": "traffic jam", "translation": "atasco", "pos": "noun"},
-    {"word": "map", "lemma": "map", "translation": "mapa", "pos": "noun"},
-    {"word": "route", "lemma": "route", "translation": "ruta", "pos": "noun"},
-    {"word": "direction", "lemma": "direction", "translation": "dirección", "pos": "noun"},
-    {"word": "corner", "lemma": "corner", "translation": "esquina", "pos": "noun"},
-    {"word": "parking", "lemma": "parking", "translation": "aparcamiento", "pos": "noun"},
-    {"word": "petrol station", "lemma": "petrol station", "translation": "gasolinera", "pos": "noun"},
-    {"word": "timetable", "lemma": "timetable", "translation": "horario", "pos": "noun"},
-    {"word": "delay", "lemma": "delay", "translation": "retraso", "pos": "noun"},
-    {"word": "to drive", "lemma": "drive", "translation": "conducir", "pos": "verb"},
-    {"word": "to ride", "lemma": "ride", "translation": "montar", "pos": "verb"},
-    {"word": "to walk", "lemma": "walk", "translation": "caminar", "pos": "verb"}
+    {
+      "word": "city",
+      "lemma": "city",
+      "translation": "ciudad",
+      "pos": "noun"
+    },
+    {
+      "word": "town",
+      "lemma": "town",
+      "translation": "pueblo",
+      "pos": "noun"
+    },
+    {
+      "word": "village",
+      "lemma": "village",
+      "translation": "aldea",
+      "pos": "noun"
+    },
+    {
+      "word": "neighbourhood",
+      "lemma": "neighbourhood",
+      "translation": "barrio",
+      "pos": "noun"
+    },
+    {
+      "word": "street",
+      "lemma": "street",
+      "translation": "calle",
+      "pos": "noun"
+    },
+    {
+      "word": "avenue",
+      "lemma": "avenue",
+      "translation": "avenida",
+      "pos": "noun"
+    },
+    {
+      "word": "square",
+      "lemma": "square",
+      "translation": "plaza",
+      "pos": "noun"
+    },
+    {
+      "word": "road",
+      "lemma": "road",
+      "translation": "carretera",
+      "pos": "noun"
+    },
+    {
+      "word": "pavement",
+      "lemma": "pavement",
+      "translation": "acera",
+      "pos": "noun"
+    },
+    {
+      "word": "crossroads",
+      "lemma": "crossroads",
+      "translation": "cruce",
+      "pos": "noun"
+    },
+    {
+      "word": "traffic light",
+      "lemma": "traffic light",
+      "translation": "semáforo",
+      "pos": "noun"
+    },
+    {
+      "word": "roundabout",
+      "lemma": "roundabout",
+      "translation": "rotonda",
+      "pos": "noun"
+    },
+    {
+      "word": "bridge",
+      "lemma": "bridge",
+      "translation": "puente",
+      "pos": "noun"
+    },
+    {
+      "word": "tunnel",
+      "lemma": "tunnel",
+      "translation": "túnel",
+      "pos": "noun"
+    },
+    {
+      "word": "bus stop",
+      "lemma": "bus stop",
+      "translation": "parada de autobús",
+      "pos": "noun"
+    },
+    {
+      "word": "metro",
+      "lemma": "metro",
+      "translation": "metro",
+      "pos": "noun"
+    },
+    {
+      "word": "tram",
+      "lemma": "tram",
+      "translation": "tranvía",
+      "pos": "noun"
+    },
+    {
+      "word": "train",
+      "lemma": "train",
+      "translation": "tren",
+      "pos": "noun"
+    },
+    {
+      "word": "bus",
+      "lemma": "bus",
+      "translation": "autobús",
+      "pos": "noun"
+    },
+    {
+      "word": "taxi",
+      "lemma": "taxi",
+      "translation": "taxi",
+      "pos": "noun"
+    },
+    {
+      "word": "bicycle",
+      "lemma": "bicycle",
+      "translation": "bicicleta",
+      "pos": "noun"
+    },
+    {
+      "word": "motorbike",
+      "lemma": "motorbike",
+      "translation": "motocicleta",
+      "pos": "noun"
+    },
+    {
+      "word": "car",
+      "lemma": "car",
+      "translation": "coche",
+      "pos": "noun"
+    },
+    {
+      "word": "lorry",
+      "lemma": "lorry",
+      "translation": "camión",
+      "pos": "noun"
+    },
+    {
+      "word": "van",
+      "lemma": "van",
+      "translation": "furgoneta",
+      "pos": "noun"
+    },
+    {
+      "word": "ferry",
+      "lemma": "ferry",
+      "translation": "ferry",
+      "pos": "noun"
+    },
+    {
+      "word": "plane",
+      "lemma": "plane",
+      "translation": "avión",
+      "pos": "noun"
+    },
+    {
+      "word": "airport",
+      "lemma": "airport",
+      "translation": "aeropuerto",
+      "pos": "noun"
+    },
+    {
+      "word": "station",
+      "lemma": "station",
+      "translation": "estación",
+      "pos": "noun"
+    },
+    {
+      "word": "port",
+      "lemma": "port",
+      "translation": "puerto",
+      "pos": "noun"
+    },
+    {
+      "word": "platform",
+      "lemma": "platform",
+      "translation": "andén",
+      "pos": "noun"
+    },
+    {
+      "word": "ticket",
+      "lemma": "ticket",
+      "translation": "billete",
+      "pos": "noun"
+    },
+    {
+      "word": "fare",
+      "lemma": "fare",
+      "translation": "tarifa",
+      "pos": "noun"
+    },
+    {
+      "word": "passenger",
+      "lemma": "passenger",
+      "translation": "pasajero",
+      "pos": "noun"
+    },
+    {
+      "word": "driver",
+      "lemma": "driver",
+      "translation": "conductor",
+      "pos": "noun"
+    },
+    {
+      "word": "traffic jam",
+      "lemma": "traffic jam",
+      "translation": "atasco",
+      "pos": "noun"
+    },
+    {
+      "word": "map",
+      "lemma": "map",
+      "translation": "mapa",
+      "pos": "noun"
+    },
+    {
+      "word": "route",
+      "lemma": "route",
+      "translation": "ruta",
+      "pos": "noun"
+    },
+    {
+      "word": "direction",
+      "lemma": "direction",
+      "translation": "dirección",
+      "pos": "noun"
+    },
+    {
+      "word": "corner",
+      "lemma": "corner",
+      "translation": "esquina",
+      "pos": "noun"
+    },
+    {
+      "word": "parking",
+      "lemma": "parking",
+      "translation": "aparcamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "petrol station",
+      "lemma": "petrol station",
+      "translation": "gasolinera",
+      "pos": "noun"
+    },
+    {
+      "word": "timetable",
+      "lemma": "timetable",
+      "translation": "horario",
+      "pos": "noun"
+    },
+    {
+      "word": "delay",
+      "lemma": "delay",
+      "translation": "retraso",
+      "pos": "noun"
+    },
+    {
+      "word": "to drive",
+      "lemma": "drive",
+      "translation": "conducir",
+      "pos": "verb"
+    },
+    {
+      "word": "to ride",
+      "lemma": "ride",
+      "translation": "montar",
+      "pos": "verb"
+    },
+    {
+      "word": "to walk",
+      "lemma": "walk",
+      "translation": "caminar",
+      "pos": "verb"
+    },
+    {
+      "word": "pedestrian",
+      "lemma": "pedestrian",
+      "translation": "peatón",
+      "pos": "noun"
+    },
+    {
+      "word": "zebra crossing",
+      "lemma": "zebra crossing",
+      "translation": "paso de cebra",
+      "pos": "noun"
+    },
+    {
+      "word": "cycle lane",
+      "lemma": "cycle lane",
+      "translation": "carril bici",
+      "pos": "noun"
+    },
+    {
+      "word": "bus lane",
+      "lemma": "bus lane",
+      "translation": "carril bus",
+      "pos": "noun"
+    },
+    {
+      "word": "speed limit",
+      "lemma": "speed limit",
+      "translation": "límite de velocidad",
+      "pos": "noun"
+    },
+    {
+      "word": "fine",
+      "lemma": "fine",
+      "translation": "multa",
+      "pos": "noun"
+    },
+    {
+      "word": "parking meter",
+      "lemma": "parking meter",
+      "translation": "parquímetro",
+      "pos": "noun"
+    },
+    {
+      "word": "car park",
+      "lemma": "car park",
+      "translation": "aparcamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "one-way street",
+      "lemma": "one-way street",
+      "translation": "calle de sentido único",
+      "pos": "noun"
+    },
+    {
+      "word": "dead end",
+      "lemma": "dead end",
+      "translation": "calle sin salida",
+      "pos": "noun"
+    },
+    {
+      "word": "alley",
+      "lemma": "alley",
+      "translation": "callejón",
+      "pos": "noun"
+    },
+    {
+      "word": "suburb",
+      "lemma": "suburb",
+      "translation": "barrio residencial",
+      "pos": "noun"
+    },
+    {
+      "word": "city centre",
+      "lemma": "city centre",
+      "translation": "centro de la ciudad",
+      "pos": "noun"
+    },
+    {
+      "word": "high street",
+      "lemma": "high street",
+      "translation": "calle principal",
+      "pos": "noun"
+    },
+    {
+      "word": "bakery",
+      "lemma": "bakery",
+      "translation": "panadería",
+      "pos": "noun"
+    },
+    {
+      "word": "chemist",
+      "lemma": "chemist",
+      "translation": "farmacia",
+      "pos": "noun"
+    },
+    {
+      "word": "post office",
+      "lemma": "post office",
+      "translation": "oficina de correos",
+      "pos": "noun"
+    },
+    {
+      "word": "town hall",
+      "lemma": "town hall",
+      "translation": "ayuntamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "museum",
+      "lemma": "museum",
+      "translation": "museo",
+      "pos": "noun"
+    },
+    {
+      "word": "theatre",
+      "lemma": "theatre",
+      "translation": "teatro",
+      "pos": "noun"
+    },
+    {
+      "word": "cinema",
+      "lemma": "cinema",
+      "translation": "cine",
+      "pos": "noun"
+    },
+    {
+      "word": "park",
+      "lemma": "park",
+      "translation": "parque",
+      "pos": "noun"
+    },
+    {
+      "word": "fountain",
+      "lemma": "fountain",
+      "translation": "fuente",
+      "pos": "noun"
+    },
+    {
+      "word": "statue",
+      "lemma": "statue",
+      "translation": "estatua",
+      "pos": "noun"
+    },
+    {
+      "word": "bench",
+      "lemma": "bench",
+      "translation": "banco",
+      "pos": "noun"
+    },
+    {
+      "word": "litter bin",
+      "lemma": "litter bin",
+      "translation": "papelera",
+      "pos": "noun"
+    },
+    {
+      "word": "rubbish",
+      "lemma": "rubbish",
+      "translation": "basura",
+      "pos": "noun"
+    },
+    {
+      "word": "streetlight",
+      "lemma": "streetlight",
+      "translation": "farola",
+      "pos": "noun"
+    },
+    {
+      "word": "kerb",
+      "lemma": "kerb",
+      "translation": "bordillo",
+      "pos": "noun"
+    },
+    {
+      "word": "roadworks",
+      "lemma": "roadworks",
+      "translation": "obras",
+      "pos": "noun"
+    },
+    {
+      "word": "diversion",
+      "lemma": "diversion",
+      "translation": "desvío",
+      "pos": "noun"
+    },
+    {
+      "word": "rush hour",
+      "lemma": "rush hour",
+      "translation": "hora punta",
+      "pos": "noun"
+    },
+    {
+      "word": "commute",
+      "lemma": "commute",
+      "translation": "desplazamiento al trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "seatbelt",
+      "lemma": "seatbelt",
+      "translation": "cinturón de seguridad",
+      "pos": "noun"
+    },
+    {
+      "word": "driving licence",
+      "lemma": "driving licence",
+      "translation": "permiso de conducir",
+      "pos": "noun"
+    },
+    {
+      "word": "number plate",
+      "lemma": "number plate",
+      "translation": "matrícula",
+      "pos": "noun"
+    },
+    {
+      "word": "petrol",
+      "lemma": "petrol",
+      "translation": "gasolina",
+      "pos": "noun"
+    },
+    {
+      "word": "diesel",
+      "lemma": "diesel",
+      "translation": "gasóleo",
+      "pos": "noun"
+    },
+    {
+      "word": "coach",
+      "lemma": "coach",
+      "translation": "autocar",
+      "pos": "noun"
+    },
+    {
+      "word": "scooter",
+      "lemma": "scooter",
+      "translation": "patinete",
+      "pos": "noun"
+    },
+    {
+      "word": "to park",
+      "lemma": "park",
+      "translation": "aparcar",
+      "pos": "verb"
+    },
+    {
+      "word": "to overtake",
+      "lemma": "overtake",
+      "translation": "adelantar",
+      "pos": "verb"
+    },
+    {
+      "word": "to brake",
+      "lemma": "brake",
+      "translation": "frenar",
+      "pos": "verb"
+    },
+    {
+      "word": "to accelerate",
+      "lemma": "accelerate",
+      "translation": "acelerar",
+      "pos": "verb"
+    },
+    {
+      "word": "to cross",
+      "lemma": "cross",
+      "translation": "cruzar",
+      "pos": "verb"
+    },
+    {
+      "word": "to get on",
+      "lemma": "get on",
+      "translation": "subir",
+      "pos": "verb"
+    },
+    {
+      "word": "to get off",
+      "lemma": "get off",
+      "translation": "bajarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to commute",
+      "lemma": "commute",
+      "translation": "desplazarse al trabajo",
+      "pos": "verb"
+    },
+    {
+      "word": "crossing",
+      "lemma": "crossing",
+      "translation": "cruce",
+      "pos": "noun"
+    },
+    {
+      "word": "underpass",
+      "lemma": "underpass",
+      "translation": "paso subterráneo",
+      "pos": "noun"
+    },
+    {
+      "word": "ring road",
+      "lemma": "ring road",
+      "translation": "circunvalación",
+      "pos": "noun"
+    },
+    {
+      "word": "taxi rank",
+      "lemma": "taxi rank",
+      "translation": "parada de taxis",
+      "pos": "noun"
+    },
+    {
+      "word": "bus station",
+      "lemma": "bus station",
+      "translation": "estación de autobuses",
+      "pos": "noun"
+    }
   ]
 }
