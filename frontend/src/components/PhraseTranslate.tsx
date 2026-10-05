@@ -27,6 +27,7 @@ export interface PhraseTranslate {
 export function usePhraseTranslation(
   text: string,
   resetKey?: string,
+  options?: { startInSpanish?: boolean; knownSpanish?: string },
 ): PhraseTranslate {
   const [showEs, setShowEs] = useState(false);
   const [translation, setTranslation] = useState<string | null>(null);
@@ -37,19 +38,58 @@ export function usePhraseTranslation(
   const generation = useRef(0);
   const failTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const token = resetKey ?? text;
+  const startInSpanish = options?.startInSpanish ?? false;
+  const knownSpanish = options?.knownSpanish?.trim() ?? "";
 
-  // Nueva frase o ítem → siempre se empieza mostrando el inglés.
+  // Nueva frase o ítem. En EN→ES se empieza en inglés. En ES→EN la frase
+  // visible es el español: el inglés contiene la palabra que se está adivinando.
   useEffect(() => {
     generation.current += 1;
-    setShowEs(false);
-    setTranslation(null);
-    setLoading(false);
+    const gen = generation.current;
     setFailed(false);
     if (failTimer.current) {
       clearTimeout(failTimer.current);
       failTimer.current = null;
     }
-  }, [token]);
+    if (!startInSpanish) {
+      setShowEs(false);
+      setTranslation(null);
+      setLoading(false);
+      return;
+    }
+    if (knownSpanish) {
+      setTranslation(knownSpanish);
+      setShowEs(true);
+      setLoading(false);
+      return;
+    }
+    const source = text.trim();
+    if (!source) {
+      setShowEs(false);
+      setTranslation(null);
+      setLoading(false);
+      return;
+    }
+    setShowEs(true);
+    setTranslation(null);
+    setLoading(true);
+    void translateText(source)
+      .then((es) => {
+        if (gen !== generation.current) return;
+        setTranslation(es);
+      })
+      .catch(() => {
+        if (gen !== generation.current) return;
+        setFailed(true);
+        failTimer.current = setTimeout(() => {
+          setFailed(false);
+          failTimer.current = null;
+        }, 5000);
+      })
+      .finally(() => {
+        if (gen === generation.current) setLoading(false);
+      });
+  }, [token, startInSpanish, knownSpanish, text]);
 
   useEffect(
     () => () => {
@@ -61,10 +101,11 @@ export function usePhraseTranslation(
   async function toggle() {
     const source = text.trim();
     if (!source || loading) return;
-    if (showEs) {
+    if (showEs && translation) {
       setShowEs(false);
       return;
     }
+    if (showEs) return;
     if (translation) {
       setShowEs(true);
       return;
@@ -92,7 +133,7 @@ export function usePhraseTranslation(
 
   return {
     text,
-    display: showEs && translation ? translation : text,
+    display: showEs ? translation || "" : text,
     isSpanish: showEs && translation !== null,
     loading,
     failed,

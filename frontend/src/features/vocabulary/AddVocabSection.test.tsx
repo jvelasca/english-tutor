@@ -132,7 +132,7 @@ describe("AddVocabSection", () => {
     });
   });
 
-  it("un pack ya activo declara el estado y se repasa en Flashcards en vez de reactivarse", async () => {
+  it("un pack ya activo queda en el diccionario y no se estudia desde aquí", async () => {
     vi.mocked(listVocabCollections).mockResolvedValue({
       collections: [{ ...PACK, enrolled: true }],
     } as never);
@@ -141,20 +141,12 @@ describe("AddVocabSection", () => {
     renderSection(<AddVocabSection userId="u1" onStudy={onStudy} />);
 
     expect(await screen.findByText("In my dictionary")).toBeTruthy();
-    // Reactivar era idempotente (añadía 0): ya no se ofrece como acción.
     expect(screen.queryByText("Activate")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Review" }));
-
-    expect(onStudy).toHaveBeenCalledWith({
-      collectionId: 7,
-      label: "Travel",
-    });
+    expect(screen.queryByRole("button", { name: "Review" })).toBeNull();
+    expect(onStudy).not.toHaveBeenCalled();
   });
 
-  it("sin contenedor de estudio el repaso no se ofrece (no hay a dónde ir)", async () => {
-    // El diccionario incrustado en una ruta de destreza no tiene pestaña
-    // Flashcards. Un botón que no lleva a ninguna parte es peor que no tenerlo.
+  it("sin contenedor de estudio el pack activo tampoco ofrece repaso", async () => {
     vi.mocked(listVocabCollections).mockResolvedValue({
       collections: [{ ...PACK, enrolled: true }],
     } as never);
@@ -162,7 +154,6 @@ describe("AddVocabSection", () => {
     renderSection(<AddVocabSection userId="u1" />);
 
     expect(await screen.findByText("In my dictionary")).toBeTruthy();
-    const review = screen.getByRole("button", { name: "Review" }) as HTMLButtonElement;
-    expect(review.disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Review" })).toBeNull();
   });
 });

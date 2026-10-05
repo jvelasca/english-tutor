@@ -1146,6 +1146,7 @@ class VocabBulkAddOut(BaseModel):
     added: list[str]
     collection_id: int | None = None
     count: int = 0
+    deck_id: int | None = None
 
 
 class VocabCollectionOut(BaseModel):
@@ -1172,6 +1173,8 @@ class VocabEnrollOut(BaseModel):
     collection_id: int
     added: list[str]
     count: int = 0
+    #: Mazo creado al coger un pack. `None` si la colección no es un pack.
+    deck_id: int | None = None
 
 
 class RetentionCardOut(BaseModel):
@@ -1222,6 +1225,8 @@ class FlashcardDeckOut(BaseModel):
     name: str
     slug: str = ""
     is_auto: bool = False
+    #: Pack del que salió este mazo. `None` en el diccionario y en los mazos propios.
+    source_collection_id: int | None = None
     new_per_day: int = 0
     review_per_day: int = 0
     card_count: int = 0

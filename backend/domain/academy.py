@@ -2111,6 +2111,24 @@ async def sync_fsrs_cards(user_id: str, *, now: str | None = None) -> list[dict]
         )
         if status == "weak":
             card["due_at"] = now_iso
+        # Una carta nueva que ya coincide no se vuelve a escribir. La que acaba
+        # de nacer al entrar un tema (`retention-import`) tampoco: reescribirla
+        # una transacción por palabra deja colgado el listado de mazos.
+        if (
+            prev
+            and int(prev.get("reps") or 0) == 0
+            and str(prev.get("why") or "") == "retention-import"
+        ):
+            continue
+        if prev and int(prev.get("reps") or 0) == 0:
+            same = (
+                str(prev.get("why") or "") == str(card.get("why") or "")
+                and str(prev.get("label") or "") == word
+                and str(prev.get("due_at") or "") == str(card.get("due_at") or "")
+                and str(prev.get("state") or "") == str(card.get("state") or "")
+            )
+            if same:
+                continue
         await run_in_threadpool(academy_repo.upsert_fsrs_card, user_id, card)
 
     # V3.16+V3.18 (M4/D3): cartas `objective` de las unidades COMPLETADAS. Se

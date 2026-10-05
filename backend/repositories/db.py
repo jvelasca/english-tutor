@@ -2341,6 +2341,21 @@ def init_db() -> None:
             )
             """
         )
+        # Un pack cogido es un mazo. La columna apunta al catálogo de origen;
+        # NULL en los mazos que crea el alumno. Índice parcial: varios NULL caben,
+        # un pack no puede materializarse dos veces para el mismo alumno.
+        deck_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(flashcard_decks)")
+        }
+        if "source_collection_id" not in deck_cols:
+            conn.execute(
+                "ALTER TABLE flashcard_decks ADD COLUMN source_collection_id INTEGER"
+            )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_flashcard_decks_source "
+            "ON flashcard_decks(user_id, source_collection_id) "
+            "WHERE source_collection_id IS NOT NULL"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS flashcard_deck_cards (

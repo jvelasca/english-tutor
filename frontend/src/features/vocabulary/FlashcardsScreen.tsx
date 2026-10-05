@@ -6,12 +6,10 @@
  * - **Estudiar**: el banco (todas, un nivel o un mazo), los contadores de ese
  *   ámbito y una sola lección —profunda si la palabra es nueva, corta si ya
  *   está en seguimiento—.
- * - **Mi léxico** (V3.85.0): el inventario que antes era la pestaña PERSONAL
- *   del diccionario (buscador, filtros, estadísticas, añadir).
- * - **Mazos**: el mazo automático (todo el léxico, no editable ni borrable) y
- *   los manuales, con sus límites.
- * - **Tarjetas**: navegador y CRUD de las tarjetas de un mazo manual.
- * - **Estadísticas**: repasos por día, acierto y previsión.
+ * - **Mi léxico**: resumen de lo aprendido y lo pendiente, con acceso a Estudiar.
+ * - **Mazos**: temas del diccionario (no se borran) y mazos del alumno.
+ * - **Tarjetas**: palabras de cada mazo.
+ * - **Estadísticas**: el aprendizaje del diccionario entero.
  *
  * El contenedor pide la cola del ámbito y cierra cada palabra (`complete`):
  * `WordLesson` pinta los pasos y la nota. El mazo elegido sigue siendo uno
@@ -31,27 +29,26 @@ import {
   BarChart3,
   BookOpen,
   CalendarClock,
+  ChevronLeft,
   Eraser,
   Library,
   Layers,
   Loader2,
   Plus,
   RefreshCw,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import {
   addFlashcardsBulk,
+  addVocabularyBulk,
   createFlashcardDeck,
   createVocabularyCard,
   deleteFlashcardDeck,
   deleteVocabularyCard,
   completeStudyLesson,
-  enrollVocabCollection,
   getFlashcardStats,
   getStudyQueue,
   listFlashcardDecks,
-  listVocabCollections,
   listVocabularyCards,
   updateFlashcardDeck,
   updateVocabularyCard,
@@ -66,10 +63,10 @@ import type {
   StudyQueue,
   StudyQueueMode,
   StudyScope,
-  VocabCollection,
 } from "../../types/api";
 import { useI18n } from "../../hooks/useI18n";
 import { useTabList } from "../../hooks/useTabList";
+import { getSettings } from "../../api/settings";
 import { getStudyConfig, saveStudyConfig } from "../../api/study";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -77,6 +74,15 @@ import { Badge } from "../../components/ui/badge";
 import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { LoadingNotice } from "../../components/LoadingNotice";
 import { cn } from "../../lib/utils";
+import { deckIcon } from "./deckIcon";
+import {
+  readStudyPlace,
+  studyPlaceFromSettings,
+  mergeStudyPlace,
+  type StudyPlace,
+} from "../../utils/lastPlace";
+import { rememberStudyPlace } from "../../utils/studyPlaceMemory";
+import { DIRECTION_OPTIONS, directionClass } from "../../utils/dictionaryDirection";
 import { LexiconInventory } from "./LexiconInventory";
 import { WordLesson } from "./wordLesson";
 
@@ -146,10 +152,14 @@ export function FlashcardsScreen({
   onTabChange,
 }: FlashcardsScreenProps) {
   const { t } = useI18n();
-  const [internalTab, setInternalTab] = useState<FlashcardsTab>("study");
+  const [internalTab, setInternalTab] = useState<FlashcardsTab>(
+    () => (userId ? readStudyPlace(userId)?.tab : null) ?? "study",
+  );
   const tab = controlledTab ?? internalTab;
+  const placeTouched = useRef(false);
   const setTab = useCallback(
     (next: FlashcardsTab) => {
+      placeTouched.current = true;
       setInternalTab(next);
       onTabChange?.(next);
     },
@@ -157,9 +167,19 @@ export function FlashcardsScreen({
   );
   const { onKeyDown, register } = useTabList(TAB_IDS, tab, setTab);
   const [decks, setDecks] = useState<FlashcardDecks | null>(null);
-  const [deckId, setDeckId] = useState<number | null>(null);
+  const [deckId, setDeckId] = useState<number | null>(() =>
+    userId ? (readStudyPlace(userId)?.deckId ?? null) : null,
+  );
+  const [restoredPlace, setRestoredPlace] = useState<StudyPlace | null>(() =>
+    userId ? readStudyPlace(userId) : null,
+  );
   const [collection, setCollection] = useState<CollectionFilter | null>(null);
   const [autoStart, setAutoStart] = useState(false);
+  /** Desde Mi léxico: abrir Estudiar en un donut, sin empezar la carta. */
+  const [reviewRequest, setReviewRequest] = useState<{
+    pick: StudyQueueMode;
+    nonce: number;
+  } | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [error, setError] = useState(false);
   /**
@@ -169,6 +189,10 @@ export function FlashcardsScreen({
    * porque dos peticiones seguidas deben volver a enfocar.
    */
   const [addCardsNonce, setAddCardsNonce] = useState(0);
+  /** Petición desde Estudiar: abrir el editor de esta ficha manual. */
+  const [editCard, setEditCard] = useState<{ id: number; nonce: number } | null>(null);
+  /** La lección sigue montada mientras se edita la ficha, para volver al mismo sitio. */
+  const [heldLesson, setHeldLesson] = useState(false);
 
   /** Abre Tarjetas con `id` seleccionado y el campo del anverso listo. */
   const openCardsFor = useCallback(
@@ -180,6 +204,18 @@ export function FlashcardsScreen({
     },
     [setTab],
   );
+
+  const openCardEditor = useCallback(
+    (cardId: number) => {
+      setHeldLesson(true);
+      setEditCard((current) => ({ id: cardId, nonce: (current?.nonce ?? 0) + 1 }));
+      setTab("cards");
+    },
+    [setTab],
+  );
+  const returnToLesson = useCallback(() => {
+    setTab("study");
+  }, [setTab]);
 
   /**
    * Abre Estudiar con un mazo (y, si procede, filtrado por una lista o pack) y
@@ -194,23 +230,6 @@ export function FlashcardsScreen({
       setTab("study");
     },
     [setTab],
-  );
-
-  /**
-   * V3.85.0: «Mis listas» y los packs se estudian en el mazo AUTOMÁTICO filtrado
-   * por la colección —son sus palabras, no una copia—, igual que hace una fila
-   * de mazo listo en la sub-pestaña Mazos. Vive aquí y no en
-   * `LexiconInventory` porque el salto necesita el mazo automático, que solo
-   * esta pantalla conoce.
-   */
-  const studyCollection = useCallback(
-    (opts: { collectionId: number; label: string }) => {
-      openStudy(decks?.auto_deck_id ?? 0, {
-        id: opts.collectionId,
-        label: opts.label,
-      });
-    },
-    [decks?.auto_deck_id, openStudy],
   );
 
   const loadDecks = useCallback(async () => {
@@ -234,6 +253,47 @@ export function FlashcardsScreen({
   useEffect(() => {
     void loadDecks();
   }, [loadDecks]);
+
+  const rememberPlace = useCallback(
+    (patch: Partial<StudyPlace>) => rememberStudyPlace(userId, patch),
+    [userId],
+  );
+  const touchPlace = useCallback(() => {
+    placeTouched.current = true;
+  }, []);
+
+  // El mazo y la sub-pestaña se guardan al cambiar. El primer valor (el que
+  // acaba de leerse) no se reescribe, para no pisar el del perfil.
+  const seenPlace = useRef<string | null>(null);
+  useEffect(() => {
+    if (!userId || deckId == null) return;
+    const key = `${tab}:${deckId}`;
+    if (seenPlace.current == null) {
+      seenPlace.current = key;
+      return;
+    }
+    if (seenPlace.current === key) return;
+    seenPlace.current = key;
+    rememberStudyPlace(userId, { tab, deckId });
+  }, [userId, tab, deckId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancel = false;
+    void getSettings(userId)
+      .then((res) => {
+        if (cancel || placeTouched.current) return;
+        const place = studyPlaceFromSettings(res.settings);
+        if (!place) return;
+        mergeStudyPlace(userId, place);
+        setRestoredPlace(place);
+        if (place.deckId != null) setDeckId(place.deckId);
+      })
+      .catch(() => {});
+    return () => {
+      cancel = true;
+    };
+  }, [userId]);
 
   // V3.78.0: llegada desde «Mis listas»/packs o desde el botón «Estudiar» de
   // Personal. El foco NO se persiste: es un encargo de un solo salto, no una
@@ -315,7 +375,13 @@ export function FlashcardsScreen({
           <LexiconInventory
             userId={userId}
             showHeader={false}
-            onStudyCollection={studyCollection}
+            onReview={(mode) => {
+              setDeckId(decks?.auto_deck_id ?? 0);
+              setCollection(null);
+              setAutoStart(false);
+              setReviewRequest({ pick: mode, nonce: Date.now() });
+              setTab("study");
+            }}
           />
         ) : error ? (
         <Card className="gap-2 p-4">
@@ -335,28 +401,41 @@ export function FlashcardsScreen({
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">{t("dictionary.noProfile")}</p>
         </Card>
-      ) : tab === "study" ? (
-        <StudyTab
-          userId={userId}
-          decks={decks}
-          deckId={deckId}
-          onPick={setDeckId}
-          collection={collection}
-          autoStart={autoStart}
-          onOpenTab={setTab}
-          onAutoStarted={() => setAutoStart(false)}
-          onClearCollection={() => setCollection(null)}
-          reloadNonce={reloadNonce}
-          onAddCards={openCardsFor}
-          onExit={() => {
-            setAutoStart(false);
-            reload();
-          }}
-        />
-      ) : tab === "decks" ? (
+      ) : tab === "study" || heldLesson ? (
+        <div className={tab === "study" ? "contents" : "hidden"} hidden={tab !== "study"}>
+          <StudyTab
+            userId={userId}
+            decks={decks}
+            deckId={deckId}
+            onPick={(id) => {
+              placeTouched.current = true;
+              setDeckId(id);
+            }}
+            collection={collection}
+            autoStart={autoStart}
+            onOpenTab={setTab}
+            onAutoStarted={() => setAutoStart(false)}
+            onClearCollection={() => setCollection(null)}
+            reloadNonce={reloadNonce}
+            onAddCards={openCardsFor}
+            onEditCard={openCardEditor}
+            restoredPlace={restoredPlace}
+            onRemember={rememberPlace}
+            onTouch={touchPlace}
+            reviewRequest={reviewRequest}
+            onExit={() => {
+              setHeldLesson(false);
+              setAutoStart(false);
+              reload();
+            }}
+          />
+        </div>
+      ) : null}
+      {error || !userId || tab === "lexicon" ? null : tab === "decks" ? (
         <DecksTab
           userId={userId}
           decks={decks}
+          deckId={deckId}
           reloadNonce={reloadNonce}
           onChanged={() => {
             void loadDecks();
@@ -374,11 +453,6 @@ export function FlashcardsScreen({
           onStudyDeck={(id) => {
             openStudy(id, null);
           }}
-          onStudyCollection={(id, label) => {
-            // Un mazo listo se estudia en el mazo AUTOMÁTICO filtrado por el
-            // pack: son sus palabras, no una copia. No se duplica contenido.
-            openStudy(decks?.auto_deck_id ?? 0, { id, label });
-          }}
         />
       ) : tab === "cards" ? (
         <CardsTab
@@ -388,11 +462,13 @@ export function FlashcardsScreen({
           onPick={setDeckId}
           reloadNonce={reloadNonce}
           addCardsNonce={addCardsNonce}
+          editCard={editCard}
           onGoToDecks={() => setTab("decks")}
+          onBackToLesson={heldLesson ? returnToLesson : undefined}
         />
-      ) : (
-        <StatsTab userId={userId} decks={decks} deckId={deckId} onPick={setDeckId} />
-      )}
+      ) : tab === "stats" ? (
+        <StatsTab userId={userId} />
+      ) : null}
       </div>
     </div>
   );
@@ -416,18 +492,15 @@ function DeckSelect({
       onChange={(e) => onChange(Number(e.target.value))}
       className={cn(INPUT, "w-full sm:w-64")}
     >
-      {(decks?.decks ?? []).map((deck) => (
-        <option key={deck.id} value={deck.id}>
-          {deck.is_auto ? t("flashcards.decks.auto") : deck.name}
-        </option>
-      ))}
+      {(decks?.decks ?? [])
+        .filter((deck) => !deck.is_auto)
+        .map((deck) => (
+          <option key={deck.id} value={deck.id}>
+            {deck.name}
+          </option>
+        ))}
     </select>
   );
-}
-
-function DeckLabel({ deck }: { deck: FlashcardDeck }) {
-  const { t } = useI18n();
-  return <>{deck.is_auto ? t("flashcards.decks.auto") : deck.name}</>;
 }
 
 // --- Estudiar ---------------------------------------------------------------
@@ -450,14 +523,87 @@ const REQUIRED_FACET_OPTIONS = [
   ["related", "flashcards.study.requireRelated"],
 ] as const;
 
+/** Anillo de un contador de Estudiar. Pulsarlo elige esa cola. El arco es la parte sobre el total. */
+function StatDonut({
+  label,
+  value,
+  total,
+  kind,
+  pressed,
+  onSelect,
+}: {
+  label: string;
+  value: number | null;
+  total: number;
+  kind: "whole" | "share" | "due";
+  pressed: boolean;
+  onSelect: () => void;
+}) {
+  const size = 44;
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const center = size / 2;
+  const turn = 2 * Math.PI * radius;
+  const share = kind === "whole" ? 1 : total > 0 ? Math.min(1, (value ?? 0) / total) : 0;
+  const drawn = share * turn;
+  const ink = pressed ? "var(--primary)" : "var(--foreground)";
+  const name = value == null ? label : `${label}, ${value}`;
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={name}
+      onClick={onSelect}
+      className={cn(
+        "flex min-w-0 flex-col items-center gap-1 rounded-lg px-1 py-1",
+        pressed ? "bg-primary/10" : "hover:bg-secondary",
+      )}
+    >
+      <span className="relative grid place-items-center">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth={stroke}
+          />
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke={ink}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={`${drawn} ${turn}`}
+            transform={`rotate(-90 ${center} ${center})`}
+          />
+        </svg>
+        <span className="absolute text-xs font-semibold tabular-nums leading-none">
+          {value == null ? "…" : String(value)}
+        </span>
+      </span>
+      <span
+        className={cn(
+          "text-balance text-center text-[11px] leading-tight",
+          pressed ? "font-semibold text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
 /**
  * Configuración de estudio (V3.87.0 · FASE 2, incremento 1), **plegada** tras el
  * disparador «...» (V3.87.1).
  *
- * Cuatro decisiones, no un panel de control: en qué dirección se pregunta
- * (EN↔ES), si se reconoce o se produce, qué ayuda se ve antes de voltear y
- * cuánta carga entra. Cada cambio se guarda en el perfil y recarga la cola; la
- * sesión en curso no se reescribe por detrás.
+ * El sentido se elige en la cabecera. Aquí quedan el modo, la ayuda, la carga,
+ * las palabras de hoy y los pasos. Cada cambio se guarda en el perfil y recarga
+ * la cola; la sesión en curso no se reescribe por detrás.
  *
  * Arranca **cerrado**: en la pestaña Estudiar lo que el alumno viene a pulsar son
  * las dos acciones de estudio, y cuatro selectores abiertos por defecto empujaban
@@ -479,23 +625,10 @@ function StudyConfigPanel({
     <InfoDisclosure
       label={t("flashcards.study.configTitle")}
       content="options"
-      align="end"
+      variant="corner"
       id="study-config-panel"
     >
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-          {t("flashcards.study.direction")}
-          <select
-            value={value.direction}
-            onChange={(e) =>
-              onChange({ direction: e.target.value as StudyConfig["direction"] })
-            }
-            className={cn(INPUT, "w-full")}
-          >
-            <option value="en-es">{t("flashcards.study.directionEnEs")}</option>
-            <option value="es-en">{t("flashcards.study.directionEsEn")}</option>
-          </select>
-        </label>
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
           {t("flashcards.study.mode")}
           <select
@@ -612,8 +745,13 @@ function StudyTab({
   onClearCollection,
   reloadNonce,
   onAddCards,
+  onEditCard,
   onExit,
   onOpenTab,
+  restoredPlace,
+  onRemember,
+  onTouch,
+  reviewRequest,
 }: {
   userId: string;
   decks: FlashcardDecks | null;
@@ -625,18 +763,31 @@ function StudyTab({
   onClearCollection: () => void;
   reloadNonce: number;
   onAddCards: (id: number) => void;
+  onEditCard: (cardId: number) => void;
   onExit: () => void;
   onOpenTab: (tab: FlashcardsTab) => void;
+  restoredPlace: StudyPlace | null;
+  onRemember: (patch: Partial<StudyPlace>) => void;
+  onTouch: () => void;
+  reviewRequest: { pick: StudyQueueMode; nonce: number } | null;
 }) {
   const { t } = useI18n();
   const autoId = decks?.auto_deck_id ?? 0;
   const deck = deckId ?? autoId;
   const isAuto = deck === autoId;
-  const [scope, setScope] = useState<StudyScope>(
-    () => (autoStart && !isAuto && !collection ? "deck" : "all"),
-  );
-  const [pick, setPick] = useState<StudyQueueMode>("pending");
-  const [level, setLevel] = useState("A1");
+  const opening = readStudyPlace(userId);
+  const [scope, setScope] = useState<StudyScope>(() => {
+    const saved =
+      opening?.scope ?? (autoStart && !isAuto && !collection ? "deck" : "all");
+    // El diccionario entero es Todas. Un sitio guardado en el mazo automático
+    // no es un mazo.
+    if (saved === "deck" && isAuto && !autoStart) return "all";
+    return saved;
+  });
+  const [pick, setPick] = useState<StudyQueueMode>(() => opening?.pick ?? "pending");
+  const [level, setLevel] = useState(() => opening?.level ?? "A1");
+  const userTouched = useRef(false);
+  const skipPlaceWrite = useRef(true);
   const [queue, setQueue] = useState<StudyQueue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -648,11 +799,40 @@ function StudyTab({
   const launchScope: StudyScope = collection ? "all" : !isAuto && autoStart ? "deck" : scope;
 
   useEffect(() => {
+    if (!restoredPlace || userTouched.current) return;
+    setScope(restoredPlace.scope);
+    setPick(restoredPlace.pick);
+    setLevel(restoredPlace.level);
+  }, [restoredPlace]);
+
+  useEffect(() => {
+    if (skipPlaceWrite.current) {
+      skipPlaceWrite.current = false;
+      return;
+    }
+    onRemember({ scope, pick, level });
+  }, [scope, pick, level, onRemember]);
+
+  useEffect(() => {
     if (!autoStart) return;
+    onTouch();
     const next: StudyScope = collection ? "all" : !isAuto ? "deck" : "all";
     setScope(next);
     setPick("pending");
-  }, [autoStart, collection, isAuto]);
+  }, [autoStart, collection, isAuto, onTouch]);
+
+  useEffect(() => {
+    if (!reviewRequest) return;
+    userTouched.current = true;
+    setScope("all");
+    setPick(reviewRequest.pick);
+  }, [reviewRequest]);
+
+  useEffect(() => {
+    if (scope !== "deck" || !isAuto) return;
+    const first = (decks?.decks ?? []).find((entry) => !entry.is_auto);
+    if (first) onPick(first.id);
+  }, [scope, isAuto, decks, onPick]);
 
   const wantedCollection =
     scope === "deck" && !isAuto ? null : collection?.id ?? null;
@@ -752,6 +932,7 @@ function StudyTab({
         userId={userId}
         items={queue.items}
         deckName={deckName}
+        direction={studyConfig?.direction ?? "en-es"}
         onComplete={async (close) => {
           await completeStudyLesson(userId, {
             item_id: close.item_id,
@@ -759,6 +940,9 @@ function StudyTab({
             translation: close.translation,
             facets: close.facets,
           });
+        }}
+        onEditCard={(cardId) => {
+          onEditCard(cardId);
         }}
         onExit={() => {
           setStudying(false);
@@ -772,21 +956,50 @@ function StudyTab({
   const total = queueMatches ? queue?.total ?? 0 : 0;
 
   return (
-    <Card className="gap-5 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {t("flashcards.study.scopeLabel")}
-          </p>
-          <h2 className="text-xl font-semibold tracking-tight">{scopeTitle}</h2>
-          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
-            {t("flashcards.study.hint")}
-          </p>
-        </div>
-        <StudyConfigPanel
-          config={studyConfig}
-          onChange={(patch) => void changeStudyConfig(patch)}
-        />
+    <Card className="relative gap-5 p-5">
+      <StudyConfigPanel
+        config={studyConfig}
+        onChange={(patch) => void changeStudyConfig(patch)}
+      />
+      <div className="flex min-w-0 flex-col gap-2 pr-12">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t("flashcards.study.scopeLabel")}
+              </p>
+              <h2 className="text-xl font-semibold tracking-tight">{scopeTitle}</h2>
+            </div>
+            <div
+              className="flex flex-wrap gap-1"
+              role="group"
+              aria-label={t("flashcards.study.direction")}
+            >
+              {DIRECTION_OPTIONS.map((option) => {
+                const active = (studyConfig?.direction ?? "en-es") === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      if (!active) void changeStudyConfig({ direction: option.id });
+                    }}
+                    className={cn(
+                      "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold",
+                      active
+                        ? cn(directionClass(option.id), "dir-chip")
+                        : "border-border text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t(option.labelKey)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+          {t("flashcards.study.hint")}
+        </p>
       </div>
 
       <div
@@ -805,7 +1018,11 @@ function StudyTab({
             key={id}
             type="button"
             aria-pressed={scope === id}
-            onClick={() => setScope(id)}
+            onClick={() => {
+              userTouched.current = true;
+              onTouch();
+              setScope(id);
+            }}
             className={cn(
               "min-h-11 rounded-lg px-2 py-2 text-sm",
               scope === id
@@ -829,7 +1046,11 @@ function StudyTab({
               key={code}
               type="button"
               aria-pressed={level === code}
-              onClick={() => setLevel(code)}
+              onClick={() => {
+                userTouched.current = true;
+                onTouch();
+                setLevel(code);
+              }}
               className={cn(
                 "min-h-11 rounded-full border px-3 py-2 text-sm",
                 level === code
@@ -845,35 +1066,6 @@ function StudyTab({
 
       {scope === "deck" ? <DeckSelect decks={decks} value={deck} onChange={onPick} /> : null}
 
-      <div
-        className="grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1"
-        role="group"
-        aria-label={t("flashcards.study.pickLabel")}
-      >
-        {(
-          [
-            ["pending", "flashcards.study.pickPending"],
-            ["failed", "flashcards.study.pickFailed"],
-            ["all", "flashcards.study.pickAll"],
-          ] as const
-        ).map(([id, labelKey]) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={pick === id}
-            onClick={() => setPick(id)}
-            className={cn(
-              "min-h-11 rounded-lg px-2 py-2 text-sm",
-              pick === id
-                ? "bg-background font-semibold text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t(labelKey)}
-          </button>
-        ))}
-      </div>
-
       {collection && scope !== "deck" ? (
         <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-2 py-1 text-xs">
           {t("flashcards.study.filtered").replace("{name}", collection.label)}
@@ -887,30 +1079,35 @@ function StudyTab({
         </span>
       ) : null}
 
-      <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-border sm:grid-cols-5">
+      <div
+        className="grid grid-cols-3 gap-x-2 gap-y-2 sm:grid-cols-5"
+        role="group"
+        aria-label={t("flashcards.study.pickLabel")}
+      >
         {(
           [
-            ["flashcards.study.statTotal", queueMatches ? queue?.total : null, false],
-            ["flashcards.study.statStudied", queueMatches ? queue?.studied : null, false],
-            ["flashcards.study.statLearned", queueMatches ? queue?.learned : null, false],
-            ["flashcards.study.statDue", queueMatches ? queue?.due : null, true],
-            ["flashcards.study.statTimes", queueMatches ? queue?.times_studied : null, false],
+            ["pending", "flashcards.study.statDue", queue?.due ?? 0, "due"],
+            ["unlearned", "flashcards.study.statUnlearned", queue?.unlearned ?? 0, "share"],
+            ["hard", "flashcards.study.statHard", queue?.hard ?? 0, "share"],
+            ["good", "flashcards.study.statGood", queue?.good ?? 0, "share"],
+            ["all", "flashcards.study.statTotal", queue?.total ?? 0, "whole"],
           ] as const
-        ).map(([labelKey, value, accent]) => (
-          <div
-            key={labelKey}
-            className={cn(
-              "flex flex-col gap-1 border-border/70 px-3 py-3 [&:nth-child(n+3)]:border-t sm:border-t-0 sm:[&:not(:first-child)]:border-l",
-              accent && "bg-primary/10",
-            )}
-          >
-            <dt className="text-[11px] text-muted-foreground">{t(labelKey)}</dt>
-            <dd className="text-2xl font-semibold tabular-nums tracking-tight">
-              {loading && !queueMatches ? "…" : String(value ?? 0)}
-            </dd>
-          </div>
+        ).map(([id, labelKey, value, kind]) => (
+          <StatDonut
+            key={id}
+            label={t(labelKey)}
+            value={loading && !queueMatches ? null : value}
+            total={queueMatches ? queue?.total ?? 0 : 0}
+            kind={kind}
+            pressed={pick === id}
+            onSelect={() => {
+              userTouched.current = true;
+              onTouch();
+              setPick(id);
+            }}
+          />
         ))}
-      </dl>
+      </div>
 
       {error ? (
         <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
@@ -947,10 +1144,20 @@ function StudyTab({
         </div>
       ) : !loading && queueMatches && total === 0 ? (
         <p className="text-sm text-muted-foreground">{t("flashcards.study.emptyAuto")}</p>
-      ) : !loading && queueMatches && pick === "failed" ? (
-        <p className="text-sm text-muted-foreground">{t("flashcards.study.emptyFailed")}</p>
-      ) : !loading && queueMatches ? (
-        <p className="text-sm text-muted-foreground">{t("flashcards.study.empty")}</p>
+      ) : !loading && queueMatches && items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {t(
+            pick === "unlearned"
+              ? "flashcards.study.emptyUnlearned"
+              : pick === "hard"
+                ? "flashcards.study.emptyHard"
+                : pick === "good"
+                  ? "flashcards.study.emptyGood"
+                  : pick === "failed"
+                    ? "flashcards.study.emptyFailed"
+                    : "flashcards.study.empty",
+          )}
+        </p>
       ) : null}
 
       <div
@@ -984,18 +1191,116 @@ function StudyTab({
 
 // --- Mazos ------------------------------------------------------------------
 
+/** Rejilla de mazos: icono, nombre y cuántas palabras. La elegida lleva el anillo. */
+function DeckGrid({
+  decks,
+  selectedId,
+  onSelect,
+  label,
+  dense = false,
+  leading,
+}: {
+  decks: FlashcardDeck[];
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+  label: string;
+  dense?: boolean;
+  /** Primera ficha, para «todas las tarjetas» en la pestaña Tarjetas. */
+  leading?: { label: string; pressed: boolean; onSelect: () => void };
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={cn(
+        "grid grid-cols-3 gap-2",
+        dense ? "sm:grid-cols-4 lg:grid-cols-6" : "sm:grid-cols-4 lg:grid-cols-5",
+      )}
+    >
+      {leading ? (
+        <button
+          type="button"
+          aria-pressed={leading.pressed}
+          aria-label={leading.label}
+          onClick={leading.onSelect}
+          className={cn(
+            "flex min-w-0 flex-col items-center gap-1 rounded-xl border px-2 text-center",
+            dense ? "py-1.5" : "py-2",
+            leading.pressed
+              ? "border-primary bg-primary/10 ring-2 ring-primary"
+              : "border-border hover:bg-secondary",
+          )}
+        >
+          <Layers
+            className={cn("text-primary", dense ? "size-4" : "size-5")}
+            aria-hidden="true"
+          />
+          <span
+            className={cn(
+              "line-clamp-2 text-[11px] leading-tight",
+              leading.pressed
+                ? "font-semibold text-foreground"
+                : "text-muted-foreground",
+            )}
+          >
+            {leading.label}
+          </span>
+        </button>
+      ) : null}
+      {decks.map((deck) => {
+        const Icon = deckIcon(deck);
+        const pressed = deck.id === selectedId;
+        return (
+          <button
+            key={deck.id}
+            type="button"
+            aria-pressed={pressed}
+            aria-label={deck.name}
+            onClick={() => onSelect(deck.id)}
+            className={cn(
+              "flex min-w-0 flex-col items-center gap-1 rounded-xl border px-2 text-center",
+              dense ? "py-1.5" : "py-2",
+              pressed
+                ? "border-primary bg-primary/10 ring-2 ring-primary"
+                : "border-border hover:bg-secondary",
+            )}
+          >
+            <Icon
+              className={cn("text-primary", dense ? "size-4" : "size-5")}
+              aria-hidden="true"
+            />
+            <span
+              className={cn(
+                "line-clamp-2 text-[11px] leading-tight",
+                pressed ? "font-semibold text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {deck.name}
+            </span>
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              {deck.card_count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DecksTab({
   userId,
   decks,
+  deckId,
   reloadNonce,
   onChanged,
   onStudyDeck,
   onAddCards,
   onDeckCreated,
-  onStudyCollection,
 }: {
   userId: string;
   decks: FlashcardDecks | null;
+  /** Mazo que Estudiar y Tarjetas ya tienen elegido, para abrir el panel en él. */
+  deckId: number | null;
   reloadNonce: number;
   onChanged: () => void;
   onStudyDeck: (id: number) => void;
@@ -1003,8 +1308,6 @@ function DecksTab({
   onAddCards: (id: number) => void;
   /** V3.80.0: el mazo recién creado, para seleccionarlo y saltar a Tarjetas. */
   onDeckCreated: (id: number) => void;
-  /** V3.80.0: estudiar el mazo automático filtrado por un pack listo. */
-  onStudyCollection: (id: number, label: string) => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
@@ -1024,7 +1327,16 @@ function DecksTab({
     () => (decks?.decks ?? []).filter((d) => !d.is_auto),
     [decks],
   );
-  const auto = (decks?.decks ?? []).find((d) => d.is_auto) ?? null;
+  const [picked, setPicked] = useState<number | null>(null);
+  const selected =
+    manual.find((deck) => deck.id === picked) ??
+    manual.find((deck) => deck.id === deckId) ??
+    manual[0] ??
+    null;
+  const [listName, setListName] = useState("");
+  const [listText, setListText] = useState("");
+  const [listBusy, setListBusy] = useState(false);
+  const [listNote, setListNote] = useState<number | null>(null);
 
   async function handleCreate() {
     if (!name.trim() || busy) return;
@@ -1098,333 +1410,205 @@ function DecksTab({
           </p>
         ) : null}
 
-        {auto ? (
-          <div className="flex flex-col gap-1 rounded-lg border border-border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-semibold">
-                <DeckLabel deck={auto} />
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">
-                  {t("flashcards.decks.cards").replace(
-                    "{n}",
-                    String(auto.card_count),
-                  )}
-                </Badge>
-                <Badge variant="secondary">
-                  {t("flashcards.decks.due").replace(
-                    "{n}",
-                    String(auto.due_count + auto.new_count),
-                  )}
-                </Badge>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onStudyDeck(auto.id)}
-                >
-                  {t("flashcards.decks.study")}
-                </Button>
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              {t("flashcards.decks.autoHint")}
-            </p>
-            <p className="text-[11px] text-muted-foreground">
-              {t("flashcards.decks.notEditable")}
-            </p>
-          </div>
-        ) : null}
-
         {manual.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("flashcards.decks.empty")}
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {manual.map((deck) => (
-              <li
-                key={deck.id}
-                className="flex flex-col gap-2 rounded-lg border border-border p-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold">{deck.name}</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">
-                      {t("flashcards.decks.cards").replace(
-                        "{n}",
-                        String(deck.card_count),
-                      )}
-                    </Badge>
-                    {/* V3.86.0: cuántas de esas fichas viven además en otro
-                        mazo. Es la información que hace honesto el borrado. */}
-                    {deck.shared_count > 0 ? (
-                      <Badge variant="outline" className="text-[10px]">
-                        {t("flashcards.decks.shared").replace(
-                          "{n}",
-                          String(deck.shared_count),
-                        )}
-                      </Badge>
-                    ) : null}
-                    <Badge variant="secondary">
-                      {t("flashcards.decks.due").replace(
-                        "{n}",
-                        String(deck.due_count + deck.new_count),
-                      )}
-                    </Badge>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onStudyDeck(deck.id)}
-                    >
-                      {t("flashcards.decks.study")}
-                    </Button>
-                    {/* V3.80.0: el camino que faltaba. Estudiar y Añadir
-                        tarjetas son acciones distintas y las dos se necesitan. */}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onAddCards(deck.id)}
-                    >
-                      <Plus className="size-3.5" aria-hidden="true" />
-                      {t("flashcards.decks.addCards")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      aria-expanded={editing === deck.id}
-                      onClick={() =>
-                        setEditing((current) =>
-                          current === deck.id ? null : deck.id,
-                        )
-                      }
-                    >
-                      {t("flashcards.decks.settings")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      disabled={busy || deletingId != null}
-                      onClick={() => void handleDelete(deck)}
-                    >
-                      {deletingId === deck.id ? (
-                        <BusyIcon />
-                      ) : (
-                        <Trash2 className="size-3.5" aria-hidden="true" />
-                      )}
-                      {t("flashcards.decks.delete")}
-                    </Button>
-                  </div>
-                </div>
-                {editing === deck.id ? (
-                  <DeckEditor
-                    userId={userId}
-                    deck={deck}
-                    key={`${deck.id}-${reloadNonce}-${deck.new_per_day}-${deck.review_per_day}`}
-                    onSaved={() => {
-                      setEditing(null);
-                      onChanged();
-                    }}
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <DeckGrid
+            decks={manual}
+            selectedId={selected?.id ?? null}
+            onSelect={setPicked}
+            label={t("flashcards.decks.pick")}
+          />
         )}
       </Card>
 
-      {/* V3.80.0: los packs que ya existen, ofrecidos como mazos. Va pegado a la
-          lista de mazos porque es otra forma de conseguir uno. */}
-      <ReadyDecks
-        userId={userId}
-        reloadNonce={reloadNonce}
-        onChanged={onChanged}
-        onStudyCollection={onStudyCollection}
-      />
-
-      <Card className="gap-2 p-5">
-        <h3 className="text-sm font-semibold">{t("flashcards.decks.new")}</h3>
-        <form
-          className="flex flex-col gap-2 sm:flex-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleCreate();
-          }}
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("flashcards.decks.namePlaceholder")}
-            maxLength={120}
-            className={cn(INPUT, "flex-1")}
-          />
-          <Button type="submit" size="sm" disabled={busy || !name.trim()}>
-            {busy ? (
-              <BusyIcon />
-            ) : (
+      {selected ? (
+        <Card className="gap-3 p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            {(() => {
+              const Icon = deckIcon(selected);
+              return <Icon className="size-5 text-primary" aria-hidden="true" />;
+            })()}
+            <h3 className="text-sm font-semibold">{selected.name}</h3>
+            {selected.source_collection_id != null ? (
+              <Badge variant="outline" className="text-[10px]">
+                {t("flashcards.decks.theme")}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Tile
+              label={t("flashcards.decks.words")}
+              value={String(selected.card_count)}
+            />
+            <Tile
+              label={t("flashcards.stats.dueToday")}
+              value={String(selected.due_count + selected.new_count)}
+            />
+            <Tile
+              label={t("flashcards.decks.sharedShort")}
+              value={String(selected.shared_count)}
+            />
+          </div>
+          {selected.shared_count > 0 ? (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t("flashcards.decks.shared").replace(
+                "{n}",
+                String(selected.shared_count),
+              )}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onStudyDeck(selected.id)}
+            >
+              {t("flashcards.decks.study")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onAddCards(selected.id)}
+            >
               <Plus className="size-3.5" aria-hidden="true" />
-            )}
-            {busy ? t("common.saving") : t("flashcards.decks.create")}
-          </Button>
-        </form>
-      </Card>
+              {t("flashcards.decks.addCards")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-expanded={editing === selected.id}
+              onClick={() =>
+                setEditing((current) =>
+                  current === selected.id ? null : selected.id,
+                )
+              }
+            >
+              {t("flashcards.decks.settings")}
+            </Button>
+            {selected.source_collection_id == null ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                disabled={deletingId === selected.id}
+                onClick={() => void handleDelete(selected)}
+              >
+                {deletingId === selected.id ? (
+                  <BusyIcon />
+                ) : (
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                )}
+                {t("flashcards.decks.delete")}
+              </Button>
+            ) : null}
+          </div>
+          {editing === selected.id ? (
+            <DeckEditor
+              userId={userId}
+              deck={selected}
+              key={`${selected.id}-${reloadNonce}-${selected.new_per_day}-${selected.review_per_day}`}
+              onSaved={() => {
+                setEditing(null);
+                onChanged();
+              }}
+            />
+          ) : null}
+        </Card>
+      ) : null}
+
+      <InfoDisclosure
+        label={t("flashcards.decks.addLabel")}
+        content="options"
+        id="decks-add"
+      >
+        <Card className="gap-2 p-5">
+          <h3 className="text-sm font-semibold">{t("dictionary.add.listTitle")}</h3>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t("flashcards.decks.pasteHint")}
+          </p>
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!listText.trim() || listBusy) return;
+              setListBusy(true);
+              setError(false);
+              setListNote(null);
+              void addVocabularyBulk(userId, listText, { title: listName.trim() })
+                .then((result) => {
+                  setListText("");
+                  setListName("");
+                  setListNote(result.count);
+                  onChanged();
+                  if (result.deck_id != null) onDeckCreated(result.deck_id);
+                })
+                .catch(() => setError(true))
+                .finally(() => setListBusy(false));
+            }}
+          >
+            <input
+              value={listName}
+              onChange={(e) => setListName(e.target.value)}
+              placeholder={t("dictionary.add.listNamePlaceholder")}
+              maxLength={120}
+              className={INPUT}
+            />
+            <textarea
+              value={listText}
+              onChange={(e) => setListText(e.target.value)}
+              placeholder={t("dictionary.add.listPlaceholder")}
+              rows={4}
+              className={cn(INPUT, "min-h-24")}
+            />
+            <Button type="submit" size="sm" className="w-fit" disabled={listBusy || !listText.trim()}>
+              {listBusy ? t("common.saving") : t("dictionary.add.listCta")}
+            </Button>
+          </form>
+          {listNote != null ? (
+            <p className="text-[11px] text-muted-foreground">
+              {t("dictionary.add.bulkOk").replace("{n}", String(listNote))}
+            </p>
+          ) : null}
+        </Card>
+
+        <Card className="gap-2 p-5">
+          <h3 className="text-sm font-semibold">{t("flashcards.decks.new")}</h3>
+          <form
+            className="flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleCreate();
+            }}
+          >
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t("flashcards.decks.namePlaceholder")}
+              maxLength={120}
+              className={cn(INPUT, "flex-1")}
+            />
+            <Button type="submit" size="sm" disabled={busy || !name.trim()}>
+              {busy ? (
+                <BusyIcon />
+              ) : (
+                <Plus className="size-3.5" aria-hidden="true" />
+              )}
+              {busy ? t("common.saving") : t("flashcards.decks.create")}
+            </Button>
+          </form>
+        </Card>
+      </InfoDisclosure>
     </div>
   );
 }
 
-/**
- * «Mazos listos»: los packs globales que YA existen (`theme_pack`), ofrecidos
- * como mazos (V3.80.0).
- *
- * No crea contenido nuevo ni copia nada: **añadir** un pack materializa sus
- * palabras en el léxico con su carta FSRS (lo que ya hacía `enroll`), y
- * **estudiar** abre la sesión del mazo automático filtrada por ese pack, con el
- * `collection_id` que la cola ya soporta.
- *
- * El mismo pack sigue apareciendo en el bloque «Añadir» de PERSONAL. No es
- * duplicación accidental y por eso se declara aquí: uno es «añadir a mi
- * diccionario» y el otro «empezar a estudiar»; consolidarlo queda aparcado.
- */
-function ReadyDecks({
-  userId,
-  reloadNonce,
-  onChanged,
-  onStudyCollection,
-}: {
-  userId: string;
-  reloadNonce: number;
-  onChanged: () => void;
-  onStudyCollection: (id: number, label: string) => void;
-}) {
-  const { t, lang } = useI18n();
-  const [packs, setPacks] = useState<VocabCollection[]>([]);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [error, setError] = useState(false);
-  const [lastAdded, setLastAdded] = useState<{ id: number; n: number } | null>(
-    null,
-  );
-
-  const load = useCallback(async () => {
-    setError(false);
-    try {
-      const data = await listVocabCollections(userId);
-      setPacks(data.collections.filter((c) => c.kind === "theme_pack"));
-    } catch {
-      setError(true);
-      setPacks([]);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    void load();
-  }, [load, reloadNonce]);
-
-  async function handleEnroll(pack: VocabCollection) {
-    if (busyId != null) return;
-    setBusyId(pack.id);
-    setError(false);
-    try {
-      const result = await enrollVocabCollection(userId, pack.id);
-      setLastAdded({ id: pack.id, n: result.count });
-      await load();
-      // El léxico ha crecido: el mazo automático y las estadísticas cambian.
-      onChanged();
-    } catch {
-      setError(true);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  // Sin packs en el catálogo no se pinta un bloque vacío que prometa mazos.
-  if (packs.length === 0) return null;
-
-  return (
-    <Card className="gap-3 p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold">
-        <Sparkles className="size-4 text-primary" aria-hidden="true" />
-        {t("flashcards.decks.readyTitle")}
-      </h2>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        {t("flashcards.decks.readyHint")}
-      </p>
-      {error ? (
-        <p className="text-sm text-muted-foreground">{t("dictionary.loadError")}</p>
-      ) : null}
-      <ul className="flex flex-col gap-2">
-        {packs.map((pack) => {
-          const label =
-            lang === "es" && pack.title_es ? pack.title_es : pack.title;
-          const justAdded = lastAdded?.id === pack.id;
-          return (
-            <li
-              key={pack.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
-            >
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate text-sm font-semibold">{label}</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {t("flashcards.decks.readyItems")
-                    .replace("{n}", String(pack.item_count))
-                    .replace("{cefr}", pack.cefr_hint || "—")}
-                  {justAdded
-                    ? ` · ${t("flashcards.decks.readyAdded").replace(
-                        "{n}",
-                        String(lastAdded?.n ?? 0),
-                      )}`
-                    : ""}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {pack.enrolled ? (
-                  <>
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "border-transparent bg-success/15 text-success",
-                      )}
-                    >
-                      {t("flashcards.decks.readyEnrolled")}
-                    </Badge>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onStudyCollection(pack.id, label)}
-                    >
-                      {t("flashcards.decks.study")}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={busyId != null}
-                    onClick={() => void handleEnroll(pack)}
-                  >
-                    {busyId === pack.id ? (
-                      <BusyIcon />
-                    ) : (
-                      <Plus className="size-3.5" aria-hidden="true" />
-                    )}
-                    {busyId === pack.id
-                      ? t("common.saving")
-                      : t("flashcards.decks.readyAdd")}
-                  </Button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
 
 function DeckEditor({
   userId,
@@ -1541,7 +1725,9 @@ function CardsTab({
   onPick,
   reloadNonce,
   addCardsNonce,
+  editCard,
   onGoToDecks,
+  onBackToLesson,
 }: {
   userId: string;
   decks: FlashcardDecks | null;
@@ -1551,7 +1737,11 @@ function CardsTab({
   reloadNonce: number;
   /** Sube al crear un mazo o al pulsar «Añadir tarjetas»: enfoca el anverso. */
   addCardsNonce: number;
+  /** Desde Estudiar: abrir el editor de esta ficha, con todas visibles. */
+  editCard: { id: number; nonce: number } | null;
   onGoToDecks: () => void;
+  /** Si la lección sigue abierta, vuelve a la misma palabra. */
+  onBackToLesson?: () => void;
 }) {
   const { t } = useI18n();
   const manual = useMemo(
@@ -1579,6 +1769,28 @@ function CardsTab({
   /** Mazos en los que nace la ficha nueva (casillas; vacío = el primero). */
   const [formDecks, setFormDecks] = useState<number[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const focusedEdit = useRef(0);
+  const editorRef = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    if (!editCard) return;
+    setFilter("all");
+    setStateFilter("all");
+    setEditingId(editCard.id);
+  }, [editCard]);
+
+  useEffect(() => {
+    if (!editCard || focusedEdit.current === editCard.nonce) return;
+    const card = cards.find((entry) => entry.id === editCard.id);
+    if (!card) return;
+    focusedEdit.current = editCard.nonce;
+    setSearch(card.front);
+  }, [editCard, cards]);
+
+  useEffect(() => {
+    if (editingId == null) return;
+    editorRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [editingId, search, cards]);
   const [busy, setBusy] = useState(false);
   // V3.88.0: el borrado de una ficha tiene su propio indicador (antes compartía
   // `busy` con el alta y el spinner habría caído en el botón equivocado).
@@ -1647,21 +1859,28 @@ function CardsTab({
         card.mnemonic.toLowerCase().includes(needle)
       );
     });
+    let ordered: FlashcardCard[];
     if (order === "front") {
-      return [...filtered].sort((a, b) => a.front.localeCompare(b.front));
-    }
-    if (order === "due") {
+      ordered = [...filtered].sort((a, b) => a.front.localeCompare(b.front));
+    } else if (order === "due") {
       // Sin carta programada (`due_at` vacío) va al final: no es «vence ya»,
       // es «aún no está en el scheduler».
-      return [...filtered].sort((a, b) => {
+      ordered = [...filtered].sort((a, b) => {
         if (a.due_at === b.due_at) return a.front.localeCompare(b.front);
         if (!a.due_at) return 1;
         if (!b.due_at) return -1;
         return a.due_at < b.due_at ? -1 : 1;
       });
+    } else {
+      ordered = [...filtered].sort((a, b) => b.id - a.id);
     }
-    return [...filtered].sort((a, b) => b.id - a.id);
-  }, [cards, search, stateFilter, order]);
+    if (editingId == null) return ordered;
+    return [...ordered].sort((a, b) => {
+      if (a.id === editingId) return -1;
+      if (b.id === editingId) return 1;
+      return 0;
+    });
+  }, [cards, search, stateFilter, order, editingId]);
 
   /** Mazos en los que se guardará la ficha nueva: los marcados o, si no hay
    *  ninguno, el primero disponible (así «Guardar» nunca queda muerto). */
@@ -1751,12 +1970,26 @@ function CardsTab({
     );
   }
 
+  const shownDeck =
+    filter === "all" ? null : (manual.find((deck) => deck.id === filter) ?? null);
+  const HeaderIcon = shownDeck ? deckIcon(shownDeck) : BookOpen;
+
   return (
     <div className="flex flex-col gap-4">
+      {onBackToLesson ? (
+        <button
+          type="button"
+          onClick={onBackToLesson}
+          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:border-primary/50"
+        >
+          <ChevronLeft className="size-4" aria-hidden="true" />
+          {t("flashcards.cards.backToLesson")}
+        </button>
+      ) : null}
       <Card className="gap-3 p-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <BookOpen className="size-4 text-primary" aria-hidden="true" />
-          {t("flashcards.cards.title")}
+          <HeaderIcon className="size-4 text-primary" aria-hidden="true" />
+          {shownDeck ? shownDeck.name : t("flashcards.cards.title")}
         </h2>
 
         {addCardsNonce > 0 ? (
@@ -1765,31 +1998,25 @@ function CardsTab({
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <select
-            aria-label={t("flashcards.cards.deckFilter")}
-            value={filter === "all" ? "all" : String(filter)}
-            onChange={(e) =>
-              applyFilter(
-                e.target.value === "all" ? "all" : Number(e.target.value),
-              )
-            }
-            className={cn(INPUT, "sm:w-56")}
-          >
-            <option value="all">{t("flashcards.cards.allDecks")}</option>
-            {manual.map((deck) => (
-              <option key={deck.id} value={deck.id}>
-                {deck.name}
-              </option>
-            ))}
-          </select>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("flashcards.cards.searchPlaceholder")}
-            className={cn(INPUT, "flex-1")}
-          />
-        </div>
+        <DeckGrid
+          dense
+          decks={manual}
+          selectedId={shownDeck?.id ?? null}
+          onSelect={(id) => applyFilter(id)}
+          label={t("flashcards.cards.deckFilter")}
+          leading={{
+            label: t("flashcards.cards.allDecks"),
+            pressed: filter === "all",
+            onSelect: () => applyFilter("all"),
+          }}
+        />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("flashcards.cards.searchPlaceholder")}
+          aria-label={t("flashcards.cards.searchPlaceholder")}
+          className={INPUT}
+        />
 
         <div className="flex flex-wrap items-center gap-1.5">
           {["all", ...CARD_STATES].map((state) => (
@@ -1848,6 +2075,7 @@ function CardsTab({
             {visible.map((card) => (
               <li
                 key={card.id}
+                ref={card.id === editingId ? editorRef : undefined}
                 className="flex flex-col gap-2 rounded-lg border border-border p-3"
               >
                 {editingId === card.id ? (
@@ -2157,31 +2385,31 @@ function CardEditor({
           maxLength={2000}
           className={cn(INPUT, "flex-1")}
         />
-        {/* El recordatorio es editable Y borrable: vaciarlo lo retira de la
-            ficha (y del reverso del estudio). El botón solo existe cuando hay
-            algo que borrar, para no ofrecer una acción vacía. */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <input
-            value={mnemonic}
-            onChange={(e) => setMnemonic(e.target.value)}
-            aria-label={t("flashcards.cards.mnemonic")}
-            placeholder={t("flashcards.cards.mnemonicPlaceholder")}
-            maxLength={400}
-            className={cn(INPUT, "min-w-0 flex-1")}
-          />
-          {mnemonic ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="shrink-0 gap-1.5"
-              onClick={() => setMnemonic("")}
-            >
-              <Eraser className="size-3.5" aria-hidden="true" />
-              {t("flashcards.cards.mnemonicClear")}
-            </Button>
-          ) : null}
-        </div>
+      </div>
+      {/* El recordatorio va en su propia línea: en la fila de anverso/reverso
+          el botón de borrar le quitaba el ancho y no se podía escribir. */}
+      <div className="flex min-w-0 items-center gap-2">
+        <input
+          value={mnemonic}
+          onChange={(e) => setMnemonic(e.target.value)}
+          aria-label={t("flashcards.cards.mnemonic")}
+          placeholder={t("flashcards.cards.mnemonicPlaceholder")}
+          maxLength={400}
+          className={cn(INPUT, "min-w-0 flex-1")}
+        />
+        {mnemonic ? (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="shrink-0"
+            aria-label={t("flashcards.cards.mnemonicClear")}
+            title={t("flashcards.cards.mnemonicClear")}
+            onClick={() => setMnemonic("")}
+          >
+            <Eraser className="size-3.5" aria-hidden="true" />
+          </Button>
+        ) : null}
       </div>
       <fieldset className="flex flex-wrap items-center gap-2">
         <legend className="text-[11px] font-medium text-muted-foreground">
@@ -2226,36 +2454,24 @@ function cardStateLabel(t: (key: string) => string, state: string): string {
 
 // --- Estadísticas -----------------------------------------------------------
 
-function StatsTab({
-  userId,
-  decks,
-  deckId,
-  onPick,
-}: {
-  userId: string;
-  decks: FlashcardDecks | null;
-  deckId: number | null;
-  onPick: (id: number) => void;
-}) {
+function StatsTab({ userId }: { userId: string }) {
   const { t } = useI18n();
   const [stats, setStats] = useState<FlashcardStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  const deck = deckId ?? 0;
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      setStats(await getFlashcardStats(userId, deck));
+      setStats(await getFlashcardStats(userId, 0));
     } catch {
       setError(true);
       setStats(null);
     } finally {
       setLoading(false);
     }
-  }, [userId, deck]);
+  }, [userId]);
 
   useEffect(() => {
     void load();
@@ -2271,8 +2487,6 @@ function StatsTab({
         <BarChart3 className="size-4 text-primary" aria-hidden="true" />
         {t("flashcards.stats.title")}
       </h2>
-
-      <DeckSelect decks={decks} value={deck} onChange={onPick} />
 
       {error ? (
         <p className="text-sm text-muted-foreground">{t("dictionary.loadError")}</p>

@@ -17,6 +17,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { getSettings, saveSettings } from "../../api/settings";
 import { I18nProvider } from "../../hooks/useI18n";
 import { DICTIONARY_VIEW_STORAGE_KEY } from "../../utils/dictionaryView";
+import { mergeStudyPlace } from "../../utils/lastPlace";
 import { setPendingStudyFocus } from "../../utils/studyFocus";
 import { DictionaryScreen } from "./DictionaryScreen";
 
@@ -113,6 +114,21 @@ describe("DictionaryScreen · V3.85.0 dos pestañas y proyección", () => {
     expect(
       screen.getByRole("tab", { name: "Flashcards" }).getAttribute("aria-selected"),
     ).toBe("true");
+  });
+
+  it("recuerda la sub-pestaña de Flashcards (Mazos no vuelve a Estudiar)", () => {
+    window.localStorage.setItem(DICTIONARY_VIEW_STORAGE_KEY, "flashcards");
+    mergeStudyPlace("u1", {
+      tab: "decks",
+      scope: "deck",
+      pick: "pending",
+      level: "A1",
+      deckId: 5,
+    });
+
+    renderScreen("u1");
+
+    expect(screen.getByText("flashcards-view:decks")).toBeTruthy();
   });
 
   it("un `flashcards` heredado abre Flashcards en Estudiar", () => {

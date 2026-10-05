@@ -60,12 +60,20 @@ def _clamp_limit(value: int | None, default: int) -> int:
     return max(0, min(int(value), MAX_PER_DAY))
 
 
+_DECK_COLUMNS = (
+    "id, name, new_per_day, review_per_day, source_collection_id, "
+    "created_at, updated_at"
+)
+
+
 def _deck_row(row) -> dict:
+    source = row["source_collection_id"]
     return {
         "id": int(row["id"]),
         "name": str(row["name"] or ""),
         "new_per_day": int(row["new_per_day"] or 0),
         "review_per_day": int(row["review_per_day"] or 0),
+        "source_collection_id": int(source) if source is not None else None,
         "created_at": str(row["created_at"] or ""),
         "updated_at": str(row["updated_at"] or ""),
     }
@@ -148,7 +156,7 @@ def _card_cols(alias: str = "") -> str:
 def list_decks(user_id: str) -> list[dict]:
     with closing(_conn()) as conn:
         rows = conn.execute(
-            "SELECT id, name, new_per_day, review_per_day, created_at, updated_at "
+            f"SELECT {_DECK_COLUMNS} "
             "FROM flashcard_decks WHERE user_id = ? ORDER BY name COLLATE NOCASE",
             (user_id,),
         ).fetchall()
@@ -158,9 +166,20 @@ def list_decks(user_id: str) -> list[dict]:
 def get_deck(user_id: str, deck_id: int) -> dict | None:
     with closing(_conn()) as conn:
         row = conn.execute(
-            "SELECT id, name, new_per_day, review_per_day, created_at, updated_at "
+            f"SELECT {_DECK_COLUMNS} "
             "FROM flashcard_decks WHERE user_id = ? AND id = ?",
             (user_id, int(deck_id)),
+        ).fetchone()
+    return _deck_row(row) if row is not None else None
+
+
+def deck_for_collection(user_id: str, collection_id: int) -> dict | None:
+    """Mazo que materializó este pack, o `None` si el alumno no lo ha cogido."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_DECK_COLUMNS} FROM flashcard_decks "
+            "WHERE user_id = ? AND source_collection_id = ?",
+            (user_id, int(collection_id)),
         ).fetchone()
     return _deck_row(row) if row is not None else None
 
@@ -171,6 +190,7 @@ def create_deck(
     name: str,
     new_per_day: int | None = None,
     review_per_day: int | None = None,
+    source_collection_id: int | None = None,
 ) -> dict | None:
     """Crea un mazo. `None` si el usuario no existe o el nombre está vacío."""
     if get_user(user_id) is None:
@@ -182,13 +202,15 @@ def create_deck(
     with closing(_conn()) as conn, conn:
         cur = conn.execute(
             "INSERT OR IGNORE INTO flashcard_decks "
-            "(user_id, name, new_per_day, review_per_day, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(user_id, name, new_per_day, review_per_day, source_collection_id, "
+            "created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 clean,
                 _clamp_limit(new_per_day, DEFAULT_NEW_PER_DAY),
                 _clamp_limit(review_per_day, DEFAULT_REVIEW_PER_DAY),
+                None if source_collection_id is None else int(source_collection_id),
                 now,
                 now,
             ),
@@ -242,7 +264,8 @@ def delete_deck(user_id: str, deck_id: int) -> dict | None:
     mazos que le quedan: la FK no admite un mazo que desaparece). Todo en UNA
     transacción: no queda estado a medias.
     """
-    if get_deck(user_id, deck_id) is None:
+    current = get_deck(user_id, deck_id)
+    if current is None:
         return None
     with closing(_conn()) as conn, conn:
         rows = conn.execute(
@@ -284,12 +307,17 @@ def delete_deck(user_id: str, deck_id: int) -> dict | None:
                 deleted_ids,
             )
         conn.execute(
+            "DELETE FROM lexicon_deck_words WHERE user_id = ? AND deck_id = ?",
+            (user_id, int(deck_id)),
+        )
+        conn.execute(
             "DELETE FROM flashcard_decks WHERE user_id = ? AND id = ?",
             (user_id, int(deck_id)),
         )
     return {
         "deleted_card_ids": deleted_ids,
         "shared": max(0, int(total or 0) - len(deleted_ids)),
+        "source_collection_id": current.get("source_collection_id"),
     }
 
 
@@ -1009,6 +1037,31 @@ def review_totals(user_id: str, *, since_iso: str) -> dict:
         "good": int(row["good"] or 0),
         "new_cards": int(row["new_cards"] or 0),
     }
+
+
+def link_lexicon_words(user_id: str, deck_id: int, words: list[str]) -> int:
+    """Enlaza varias palabras del diccionario a un mazo, en una transacción."""
+    if get_user(user_id) is None or int(deck_id) == AUTO_DECK_ID:
+        return 0
+    if get_deck(user_id, deck_id) is None:
+        return 0
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in words:
+        key = " ".join(str(raw or "").strip().lower().split())
+        if key and key not in seen:
+            seen.add(key)
+            cleaned.append(key)
+    if not cleaned:
+        return 0
+    now = _now()
+    with closing(_conn()) as conn, conn:
+        cur = conn.executemany(
+            "INSERT OR IGNORE INTO lexicon_deck_words "
+            "(user_id, deck_id, word, created_at) VALUES (?, ?, ?, ?)",
+            [(user_id, int(deck_id), key, now) for key in cleaned],
+        )
+    return int(cur.rowcount or 0)
 
 
 def link_lexicon_word(user_id: str, deck_id: int, word: str) -> bool:

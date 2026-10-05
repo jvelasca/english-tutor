@@ -1085,12 +1085,15 @@ export interface VocabBulkAddResult {
   added: string[];
   collection_id: number | null;
   count: number;
+  deck_id?: number | null;
 }
 
 export interface VocabEnrollResult {
   collection_id: number;
   added: string[];
   count: number;
+  /** Mazo creado al coger un pack. Ausente si la colección no es un pack. */
+  deck_id?: number | null;
 }
 
 export interface RetentionCard {
@@ -1139,6 +1142,8 @@ export interface FlashcardDeck {
   slug: string;
   /** El mazo automático (id 0) es una vista del léxico: no se edita ni se borra. */
   is_auto: boolean;
+  /** Pack del que salió este mazo. Ausente en el diccionario y en los mazos propios. */
+  source_collection_id?: number | null;
   new_per_day: number;
   review_per_day: number;
   card_count: number;
@@ -1198,7 +1203,13 @@ export type StudyHints = "off" | "definition" | "mnemonic" | "all";
 export type StudyDifficulty = "gentle" | "auto" | "intensive";
 
 export type StudyScope = "all" | "level" | "deck";
-export type StudyQueueMode = "pending" | "failed" | "all";
+export type StudyQueueMode =
+  | "pending"
+  | "unlearned"
+  | "hard"
+  | "good"
+  | "failed"
+  | "all";
 export type LessonFacet = "meaning" | "pronunciation" | "context" | "senses" | "related";
 export type LessonFacetStatus = "done" | "pending" | "na";
 /** Pasos que el alumno puede exigir para contar una palabra como aprendida. */
@@ -1244,7 +1255,10 @@ export interface StudyQueue {
   total: number;
   studied: number;
   learned: number;
+  unlearned: number;
   due: number;
+  hard: number;
+  good: number;
   times_studied: number;
   queued: number;
   study_config?: StudyConfig | null;

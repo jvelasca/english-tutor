@@ -5,50 +5,605 @@
   "title_es": "El cuerpo humano",
   "cefr_hint": "A1",
   "items": [
-    {"word": "body", "lemma": "body", "translation": "cuerpo", "pos": "noun"},
-    {"word": "head", "lemma": "head", "translation": "cabeza", "pos": "noun"},
-    {"word": "face", "lemma": "face", "translation": "cara", "pos": "noun"},
-    {"word": "hair", "lemma": "hair", "translation": "pelo", "pos": "noun"},
-    {"word": "eye", "lemma": "eye", "translation": "ojo", "pos": "noun"},
-    {"word": "ear", "lemma": "ear", "translation": "oreja", "pos": "noun"},
-    {"word": "nose", "lemma": "nose", "translation": "nariz", "pos": "noun"},
-    {"word": "mouth", "lemma": "mouth", "translation": "boca", "pos": "noun"},
-    {"word": "lip", "lemma": "lip", "translation": "labio", "pos": "noun"},
-    {"word": "tooth", "lemma": "tooth", "translation": "diente", "pos": "noun"},
-    {"word": "tongue", "lemma": "tongue", "translation": "lengua", "pos": "noun"},
-    {"word": "eyebrow", "lemma": "eyebrow", "translation": "ceja", "pos": "noun"},
-    {"word": "eyelash", "lemma": "eyelash", "translation": "pestaña", "pos": "noun"},
-    {"word": "beard", "lemma": "beard", "translation": "barba", "pos": "noun"},
-    {"word": "neck", "lemma": "neck", "translation": "cuello", "pos": "noun"},
-    {"word": "shoulder", "lemma": "shoulder", "translation": "hombro", "pos": "noun"},
-    {"word": "arm", "lemma": "arm", "translation": "brazo", "pos": "noun"},
-    {"word": "elbow", "lemma": "elbow", "translation": "codo", "pos": "noun"},
-    {"word": "wrist", "lemma": "wrist", "translation": "muñeca", "pos": "noun"},
-    {"word": "hand", "lemma": "hand", "translation": "mano", "pos": "noun"},
-    {"word": "finger", "lemma": "finger", "translation": "dedo", "pos": "noun"},
-    {"word": "thumb", "lemma": "thumb", "translation": "pulgar", "pos": "noun"},
-    {"word": "nail", "lemma": "nail", "translation": "uña", "pos": "noun"},
-    {"word": "chest", "lemma": "chest", "translation": "pecho", "pos": "noun"},
-    {"word": "back", "lemma": "back", "translation": "espalda", "pos": "noun"},
-    {"word": "stomach", "lemma": "stomach", "translation": "estómago", "pos": "noun"},
-    {"word": "waist", "lemma": "waist", "translation": "cintura", "pos": "noun"},
-    {"word": "hip", "lemma": "hip", "translation": "cadera", "pos": "noun"},
-    {"word": "leg", "lemma": "leg", "translation": "pierna", "pos": "noun"},
-    {"word": "knee", "lemma": "knee", "translation": "rodilla", "pos": "noun"},
-    {"word": "ankle", "lemma": "ankle", "translation": "tobillo", "pos": "noun"},
-    {"word": "foot", "lemma": "foot", "translation": "pie", "pos": "noun"},
-    {"word": "toe", "lemma": "toe", "translation": "dedo del pie", "pos": "noun"},
-    {"word": "skin", "lemma": "skin", "translation": "piel", "pos": "noun"},
-    {"word": "bone", "lemma": "bone", "translation": "hueso", "pos": "noun"},
-    {"word": "muscle", "lemma": "muscle", "translation": "músculo", "pos": "noun"},
-    {"word": "heart", "lemma": "heart", "translation": "corazón", "pos": "noun"},
-    {"word": "brain", "lemma": "brain", "translation": "cerebro", "pos": "noun"},
-    {"word": "lung", "lemma": "lung", "translation": "pulmón", "pos": "noun"},
-    {"word": "liver", "lemma": "liver", "translation": "hígado", "pos": "noun"},
-    {"word": "kidney", "lemma": "kidney", "translation": "riñón", "pos": "noun"},
-    {"word": "throat", "lemma": "throat", "translation": "garganta", "pos": "noun"},
-    {"word": "blood", "lemma": "blood", "translation": "sangre", "pos": "noun"},
-    {"word": "voice", "lemma": "voice", "translation": "voz", "pos": "noun"},
-    {"word": "to breathe", "lemma": "breathe", "translation": "respirar", "pos": "verb"}
+    {
+      "word": "body",
+      "lemma": "body",
+      "translation": "cuerpo",
+      "pos": "noun"
+    },
+    {
+      "word": "head",
+      "lemma": "head",
+      "translation": "cabeza",
+      "pos": "noun"
+    },
+    {
+      "word": "face",
+      "lemma": "face",
+      "translation": "cara",
+      "pos": "noun"
+    },
+    {
+      "word": "hair",
+      "lemma": "hair",
+      "translation": "pelo",
+      "pos": "noun"
+    },
+    {
+      "word": "eye",
+      "lemma": "eye",
+      "translation": "ojo",
+      "pos": "noun"
+    },
+    {
+      "word": "ear",
+      "lemma": "ear",
+      "translation": "oreja",
+      "pos": "noun"
+    },
+    {
+      "word": "nose",
+      "lemma": "nose",
+      "translation": "nariz",
+      "pos": "noun"
+    },
+    {
+      "word": "mouth",
+      "lemma": "mouth",
+      "translation": "boca",
+      "pos": "noun"
+    },
+    {
+      "word": "lip",
+      "lemma": "lip",
+      "translation": "labio",
+      "pos": "noun"
+    },
+    {
+      "word": "tooth",
+      "lemma": "tooth",
+      "translation": "diente",
+      "pos": "noun"
+    },
+    {
+      "word": "tongue",
+      "lemma": "tongue",
+      "translation": "lengua",
+      "pos": "noun"
+    },
+    {
+      "word": "eyebrow",
+      "lemma": "eyebrow",
+      "translation": "ceja",
+      "pos": "noun"
+    },
+    {
+      "word": "eyelash",
+      "lemma": "eyelash",
+      "translation": "pestaña",
+      "pos": "noun"
+    },
+    {
+      "word": "beard",
+      "lemma": "beard",
+      "translation": "barba",
+      "pos": "noun"
+    },
+    {
+      "word": "neck",
+      "lemma": "neck",
+      "translation": "cuello",
+      "pos": "noun"
+    },
+    {
+      "word": "shoulder",
+      "lemma": "shoulder",
+      "translation": "hombro",
+      "pos": "noun"
+    },
+    {
+      "word": "arm",
+      "lemma": "arm",
+      "translation": "brazo",
+      "pos": "noun"
+    },
+    {
+      "word": "elbow",
+      "lemma": "elbow",
+      "translation": "codo",
+      "pos": "noun"
+    },
+    {
+      "word": "wrist",
+      "lemma": "wrist",
+      "translation": "muñeca",
+      "pos": "noun"
+    },
+    {
+      "word": "hand",
+      "lemma": "hand",
+      "translation": "mano",
+      "pos": "noun"
+    },
+    {
+      "word": "finger",
+      "lemma": "finger",
+      "translation": "dedo",
+      "pos": "noun"
+    },
+    {
+      "word": "thumb",
+      "lemma": "thumb",
+      "translation": "pulgar",
+      "pos": "noun"
+    },
+    {
+      "word": "nail",
+      "lemma": "nail",
+      "translation": "uña",
+      "pos": "noun"
+    },
+    {
+      "word": "chest",
+      "lemma": "chest",
+      "translation": "pecho",
+      "pos": "noun"
+    },
+    {
+      "word": "back",
+      "lemma": "back",
+      "translation": "espalda",
+      "pos": "noun"
+    },
+    {
+      "word": "stomach",
+      "lemma": "stomach",
+      "translation": "estómago",
+      "pos": "noun"
+    },
+    {
+      "word": "waist",
+      "lemma": "waist",
+      "translation": "cintura",
+      "pos": "noun"
+    },
+    {
+      "word": "hip",
+      "lemma": "hip",
+      "translation": "cadera",
+      "pos": "noun"
+    },
+    {
+      "word": "leg",
+      "lemma": "leg",
+      "translation": "pierna",
+      "pos": "noun"
+    },
+    {
+      "word": "knee",
+      "lemma": "knee",
+      "translation": "rodilla",
+      "pos": "noun"
+    },
+    {
+      "word": "ankle",
+      "lemma": "ankle",
+      "translation": "tobillo",
+      "pos": "noun"
+    },
+    {
+      "word": "foot",
+      "lemma": "foot",
+      "translation": "pie",
+      "pos": "noun"
+    },
+    {
+      "word": "toe",
+      "lemma": "toe",
+      "translation": "dedo del pie",
+      "pos": "noun"
+    },
+    {
+      "word": "skin",
+      "lemma": "skin",
+      "translation": "piel",
+      "pos": "noun"
+    },
+    {
+      "word": "bone",
+      "lemma": "bone",
+      "translation": "hueso",
+      "pos": "noun"
+    },
+    {
+      "word": "muscle",
+      "lemma": "muscle",
+      "translation": "músculo",
+      "pos": "noun"
+    },
+    {
+      "word": "heart",
+      "lemma": "heart",
+      "translation": "corazón",
+      "pos": "noun"
+    },
+    {
+      "word": "brain",
+      "lemma": "brain",
+      "translation": "cerebro",
+      "pos": "noun"
+    },
+    {
+      "word": "lung",
+      "lemma": "lung",
+      "translation": "pulmón",
+      "pos": "noun"
+    },
+    {
+      "word": "liver",
+      "lemma": "liver",
+      "translation": "hígado",
+      "pos": "noun"
+    },
+    {
+      "word": "kidney",
+      "lemma": "kidney",
+      "translation": "riñón",
+      "pos": "noun"
+    },
+    {
+      "word": "throat",
+      "lemma": "throat",
+      "translation": "garganta",
+      "pos": "noun"
+    },
+    {
+      "word": "blood",
+      "lemma": "blood",
+      "translation": "sangre",
+      "pos": "noun"
+    },
+    {
+      "word": "voice",
+      "lemma": "voice",
+      "translation": "voz",
+      "pos": "noun"
+    },
+    {
+      "word": "to breathe",
+      "lemma": "breathe",
+      "translation": "respirar",
+      "pos": "verb"
+    },
+    {
+      "word": "jaw",
+      "lemma": "jaw",
+      "translation": "mandíbula",
+      "pos": "noun"
+    },
+    {
+      "word": "cheek",
+      "lemma": "cheek",
+      "translation": "mejilla",
+      "pos": "noun"
+    },
+    {
+      "word": "chin",
+      "lemma": "chin",
+      "translation": "barbilla",
+      "pos": "noun"
+    },
+    {
+      "word": "forehead",
+      "lemma": "forehead",
+      "translation": "frente",
+      "pos": "noun"
+    },
+    {
+      "word": "temple",
+      "lemma": "temple",
+      "translation": "sien",
+      "pos": "noun"
+    },
+    {
+      "word": "nape",
+      "lemma": "nape",
+      "translation": "nuca",
+      "pos": "noun"
+    },
+    {
+      "word": "gum",
+      "lemma": "gum",
+      "translation": "encía",
+      "pos": "noun"
+    },
+    {
+      "word": "palate",
+      "lemma": "palate",
+      "translation": "paladar",
+      "pos": "noun"
+    },
+    {
+      "word": "nostril",
+      "lemma": "nostril",
+      "translation": "fosa nasal",
+      "pos": "noun"
+    },
+    {
+      "word": "earlobe",
+      "lemma": "earlobe",
+      "translation": "lóbulo de la oreja",
+      "pos": "noun"
+    },
+    {
+      "word": "pupil",
+      "lemma": "pupil",
+      "translation": "pupila",
+      "pos": "noun"
+    },
+    {
+      "word": "retina",
+      "lemma": "retina",
+      "translation": "retina",
+      "pos": "noun"
+    },
+    {
+      "word": "skull",
+      "lemma": "skull",
+      "translation": "cráneo",
+      "pos": "noun"
+    },
+    {
+      "word": "spine",
+      "lemma": "spine",
+      "translation": "columna vertebral",
+      "pos": "noun"
+    },
+    {
+      "word": "rib",
+      "lemma": "rib",
+      "translation": "costilla",
+      "pos": "noun"
+    },
+    {
+      "word": "collarbone",
+      "lemma": "collarbone",
+      "translation": "clavícula",
+      "pos": "noun"
+    },
+    {
+      "word": "pelvis",
+      "lemma": "pelvis",
+      "translation": "pelvis",
+      "pos": "noun"
+    },
+    {
+      "word": "thigh",
+      "lemma": "thigh",
+      "translation": "muslo",
+      "pos": "noun"
+    },
+    {
+      "word": "calf",
+      "lemma": "calf",
+      "translation": "pantorrilla",
+      "pos": "noun"
+    },
+    {
+      "word": "shin",
+      "lemma": "shin",
+      "translation": "espinilla",
+      "pos": "noun"
+    },
+    {
+      "word": "heel",
+      "lemma": "heel",
+      "translation": "talón",
+      "pos": "noun"
+    },
+    {
+      "word": "sole",
+      "lemma": "sole",
+      "translation": "planta del pie",
+      "pos": "noun"
+    },
+    {
+      "word": "knuckle",
+      "lemma": "knuckle",
+      "translation": "nudillo",
+      "pos": "noun"
+    },
+    {
+      "word": "palm",
+      "lemma": "palm",
+      "translation": "palma",
+      "pos": "noun"
+    },
+    {
+      "word": "fist",
+      "lemma": "fist",
+      "translation": "puño",
+      "pos": "noun"
+    },
+    {
+      "word": "armpit",
+      "lemma": "armpit",
+      "translation": "axila",
+      "pos": "noun"
+    },
+    {
+      "word": "navel",
+      "lemma": "navel",
+      "translation": "ombligo",
+      "pos": "noun"
+    },
+    {
+      "word": "buttock",
+      "lemma": "buttock",
+      "translation": "nalga",
+      "pos": "noun"
+    },
+    {
+      "word": "groin",
+      "lemma": "groin",
+      "translation": "ingle",
+      "pos": "noun"
+    },
+    {
+      "word": "bladder",
+      "lemma": "bladder",
+      "translation": "vejiga",
+      "pos": "noun"
+    },
+    {
+      "word": "intestine",
+      "lemma": "intestine",
+      "translation": "intestino",
+      "pos": "noun"
+    },
+    {
+      "word": "pancreas",
+      "lemma": "pancreas",
+      "translation": "páncreas",
+      "pos": "noun"
+    },
+    {
+      "word": "spleen",
+      "lemma": "spleen",
+      "translation": "bazo",
+      "pos": "noun"
+    },
+    {
+      "word": "artery",
+      "lemma": "artery",
+      "translation": "arteria",
+      "pos": "noun"
+    },
+    {
+      "word": "vein",
+      "lemma": "vein",
+      "translation": "vena",
+      "pos": "noun"
+    },
+    {
+      "word": "nerve",
+      "lemma": "nerve",
+      "translation": "nervio",
+      "pos": "noun"
+    },
+    {
+      "word": "tendon",
+      "lemma": "tendon",
+      "translation": "tendón",
+      "pos": "noun"
+    },
+    {
+      "word": "joint",
+      "lemma": "joint",
+      "translation": "articulación",
+      "pos": "noun"
+    },
+    {
+      "word": "pore",
+      "lemma": "pore",
+      "translation": "poro",
+      "pos": "noun"
+    },
+    {
+      "word": "freckle",
+      "lemma": "freckle",
+      "translation": "peca",
+      "pos": "noun"
+    },
+    {
+      "word": "wrinkle",
+      "lemma": "wrinkle",
+      "translation": "arruga",
+      "pos": "noun"
+    },
+    {
+      "word": "scar",
+      "lemma": "scar",
+      "translation": "cicatriz",
+      "pos": "noun"
+    },
+    {
+      "word": "sweat",
+      "lemma": "sweat",
+      "translation": "sudor",
+      "pos": "noun"
+    },
+    {
+      "word": "tear",
+      "lemma": "tear",
+      "translation": "lágrima",
+      "pos": "noun"
+    },
+    {
+      "word": "saliva",
+      "lemma": "saliva",
+      "translation": "saliva",
+      "pos": "noun"
+    },
+    {
+      "word": "pulse",
+      "lemma": "pulse",
+      "translation": "pulso",
+      "pos": "noun"
+    },
+    {
+      "word": "to blink",
+      "lemma": "blink",
+      "translation": "parpadear",
+      "pos": "verb"
+    },
+    {
+      "word": "to swallow",
+      "lemma": "swallow",
+      "translation": "tragar",
+      "pos": "verb"
+    },
+    {
+      "word": "to chew",
+      "lemma": "chew",
+      "translation": "masticar",
+      "pos": "verb"
+    },
+    {
+      "word": "to sneeze",
+      "lemma": "sneeze",
+      "translation": "estornudar",
+      "pos": "verb"
+    },
+    {
+      "word": "to yawn",
+      "lemma": "yawn",
+      "translation": "bostezar",
+      "pos": "verb"
+    },
+    {
+      "word": "to nod",
+      "lemma": "nod",
+      "translation": "asentir",
+      "pos": "verb"
+    },
+    {
+      "word": "to shrug",
+      "lemma": "shrug",
+      "translation": "encogerse de hombros",
+      "pos": "verb"
+    },
+    {
+      "word": "to cough",
+      "lemma": "cough",
+      "translation": "toser",
+      "pos": "verb"
+    },
+    {
+      "word": "to shiver",
+      "lemma": "shiver",
+      "translation": "tiritar",
+      "pos": "verb"
+    }
   ]
 }

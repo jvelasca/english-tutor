@@ -106,6 +106,54 @@ export function requestStudyExample(
   );
 }
 
+/** Opciones de «¿Cuál es?» desde todo el diccionario. No cierra la lección. */
+export function requestStudyQuiz(
+  word: string,
+  translation: string,
+  exclude: string[],
+  direction: "en-es" | "es-en" = "en-es",
+): Promise<{ choices: string[] }> {
+  return postJson<unknown>("/api/vocabulary/study/quiz", {
+    word,
+    translation,
+    exclude,
+    direction,
+  }).then((raw) => {
+    const data = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const choices = Array.isArray(data.choices)
+      ? data.choices.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+      : [];
+    return { choices };
+  });
+}
+
+/** Pista nueva, guardada en la ficha o en el léxico. No cierra la lección. */
+export function requestStudyHint(body: {
+  word: string;
+  translation: string;
+  cardType: string;
+  cardId: string;
+  direction?: "en-es" | "es-en";
+}): Promise<{ word: string; hint: string }> {
+  return withTimeout(
+    postJson<unknown>("/api/vocabulary/study/hint", {
+      word: body.word,
+      translation: body.translation,
+      card_type: body.cardType,
+      card_id: body.cardId,
+      direction: body.direction ?? "en-es",
+    }).then((raw) => {
+      const data = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      return {
+        word: typeof data.word === "string" ? data.word : body.word,
+        hint: typeof data.hint === "string" ? data.hint : "",
+      };
+    }),
+    120_000,
+    "study hint",
+  );
+}
+
 /** Arranca el precalentado del diccionario del alumno (V3.88.0).
  *
  * El backend responde 202 con el estado inicial del trabajo y lo ejecuta en
@@ -635,7 +683,7 @@ export function getStudyQueue(
   _userId: string,
   options: {
     scope: "all" | "level" | "deck";
-    mode?: "pending" | "failed" | "all";
+    mode?: "pending" | "unlearned" | "hard" | "good" | "failed" | "all";
     level?: string | null;
     deckId?: number | null;
     collectionId?: number | null;

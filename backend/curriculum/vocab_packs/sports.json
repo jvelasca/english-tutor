@@ -5,51 +5,605 @@
   "title_es": "Deporte y ejercicio",
   "cefr_hint": "A2",
   "items": [
-    {"word": "sport", "lemma": "sport", "translation": "deporte", "pos": "noun"},
-    {"word": "football", "lemma": "football", "translation": "fútbol", "pos": "noun"},
-    {"word": "basketball", "lemma": "basketball", "translation": "baloncesto", "pos": "noun"},
-    {"word": "tennis", "lemma": "tennis", "translation": "tenis", "pos": "noun"},
-    {"word": "swimming", "lemma": "swimming", "translation": "natación", "pos": "noun"},
-    {"word": "running", "lemma": "running", "translation": "carrera", "pos": "noun"},
-    {"word": "cycling", "lemma": "cycling", "translation": "ciclismo", "pos": "noun"},
-    {"word": "gymnastics", "lemma": "gymnastics", "translation": "gimnasia", "pos": "noun"},
-    {"word": "athletics", "lemma": "athletics", "translation": "atletismo", "pos": "noun"},
-    {"word": "match", "lemma": "match", "translation": "partido", "pos": "noun"},
-    {"word": "team", "lemma": "team", "translation": "equipo", "pos": "noun"},
-    {"word": "player", "lemma": "player", "translation": "jugador", "pos": "noun"},
-    {"word": "coach", "lemma": "coach", "translation": "entrenador", "pos": "noun"},
-    {"word": "referee", "lemma": "referee", "translation": "árbitro", "pos": "noun"},
-    {"word": "score", "lemma": "score", "translation": "marcador", "pos": "noun"},
-    {"word": "goal", "lemma": "goal", "translation": "gol", "pos": "noun"},
-    {"word": "point", "lemma": "point", "translation": "punto", "pos": "noun"},
-    {"word": "ball", "lemma": "ball", "translation": "balón", "pos": "noun"},
-    {"word": "racket", "lemma": "racket", "translation": "raqueta", "pos": "noun"},
-    {"word": "net", "lemma": "net", "translation": "red", "pos": "noun"},
-    {"word": "bat", "lemma": "bat", "translation": "bate", "pos": "noun"},
-    {"word": "field", "lemma": "field", "translation": "campo", "pos": "noun"},
-    {"word": "pitch", "lemma": "pitch", "translation": "campo de juego", "pos": "noun"},
-    {"word": "court", "lemma": "court", "translation": "pista", "pos": "noun"},
-    {"word": "track", "lemma": "track", "translation": "pista de atletismo", "pos": "noun"},
-    {"word": "pool", "lemma": "pool", "translation": "piscina", "pos": "noun"},
-    {"word": "gym", "lemma": "gym", "translation": "gimnasio", "pos": "noun"},
-    {"word": "training", "lemma": "training", "translation": "entrenamiento", "pos": "noun"},
-    {"word": "warm-up", "lemma": "warm-up", "translation": "calentamiento", "pos": "noun"},
-    {"word": "stretch", "lemma": "stretch", "translation": "estiramiento", "pos": "noun"},
-    {"word": "injury", "lemma": "injury", "translation": "lesión", "pos": "noun"},
-    {"word": "championship", "lemma": "championship", "translation": "campeonato", "pos": "noun"},
-    {"word": "tournament", "lemma": "tournament", "translation": "torneo", "pos": "noun"},
-    {"word": "trophy", "lemma": "trophy", "translation": "trofeo", "pos": "noun"},
-    {"word": "medal", "lemma": "medal", "translation": "medalla", "pos": "noun"},
-    {"word": "victory", "lemma": "victory", "translation": "victoria", "pos": "noun"},
-    {"word": "defeat", "lemma": "defeat", "translation": "derrota", "pos": "noun"},
-    {"word": "draw", "lemma": "draw", "translation": "empate", "pos": "noun"},
-    {"word": "penalty", "lemma": "penalty", "translation": "penalti", "pos": "noun"},
-    {"word": "offside", "lemma": "offside", "translation": "fuera de juego", "pos": "noun"},
-    {"word": "timeout", "lemma": "timeout", "translation": "tiempo muerto", "pos": "noun"},
-    {"word": "to win", "lemma": "win", "translation": "ganar", "pos": "verb"},
-    {"word": "to lose", "lemma": "lose", "translation": "perder", "pos": "verb"},
-    {"word": "to compete", "lemma": "compete", "translation": "competir", "pos": "verb"},
-    {"word": "to train", "lemma": "train", "translation": "entrenar", "pos": "verb"},
-    {"word": "to score", "lemma": "score", "translation": "marcar", "pos": "verb"}
+    {
+      "word": "sport",
+      "lemma": "sport",
+      "translation": "deporte",
+      "pos": "noun"
+    },
+    {
+      "word": "football",
+      "lemma": "football",
+      "translation": "fútbol",
+      "pos": "noun"
+    },
+    {
+      "word": "basketball",
+      "lemma": "basketball",
+      "translation": "baloncesto",
+      "pos": "noun"
+    },
+    {
+      "word": "tennis",
+      "lemma": "tennis",
+      "translation": "tenis",
+      "pos": "noun"
+    },
+    {
+      "word": "swimming",
+      "lemma": "swimming",
+      "translation": "natación",
+      "pos": "noun"
+    },
+    {
+      "word": "running",
+      "lemma": "running",
+      "translation": "carrera",
+      "pos": "noun"
+    },
+    {
+      "word": "cycling",
+      "lemma": "cycling",
+      "translation": "ciclismo",
+      "pos": "noun"
+    },
+    {
+      "word": "gymnastics",
+      "lemma": "gymnastics",
+      "translation": "gimnasia",
+      "pos": "noun"
+    },
+    {
+      "word": "athletics",
+      "lemma": "athletics",
+      "translation": "atletismo",
+      "pos": "noun"
+    },
+    {
+      "word": "match",
+      "lemma": "match",
+      "translation": "partido",
+      "pos": "noun"
+    },
+    {
+      "word": "team",
+      "lemma": "team",
+      "translation": "equipo",
+      "pos": "noun"
+    },
+    {
+      "word": "player",
+      "lemma": "player",
+      "translation": "jugador",
+      "pos": "noun"
+    },
+    {
+      "word": "coach",
+      "lemma": "coach",
+      "translation": "entrenador",
+      "pos": "noun"
+    },
+    {
+      "word": "referee",
+      "lemma": "referee",
+      "translation": "árbitro",
+      "pos": "noun"
+    },
+    {
+      "word": "score",
+      "lemma": "score",
+      "translation": "marcador",
+      "pos": "noun"
+    },
+    {
+      "word": "goal",
+      "lemma": "goal",
+      "translation": "gol",
+      "pos": "noun"
+    },
+    {
+      "word": "point",
+      "lemma": "point",
+      "translation": "punto",
+      "pos": "noun"
+    },
+    {
+      "word": "ball",
+      "lemma": "ball",
+      "translation": "balón",
+      "pos": "noun"
+    },
+    {
+      "word": "racket",
+      "lemma": "racket",
+      "translation": "raqueta",
+      "pos": "noun"
+    },
+    {
+      "word": "net",
+      "lemma": "net",
+      "translation": "red",
+      "pos": "noun"
+    },
+    {
+      "word": "bat",
+      "lemma": "bat",
+      "translation": "bate",
+      "pos": "noun"
+    },
+    {
+      "word": "field",
+      "lemma": "field",
+      "translation": "campo",
+      "pos": "noun"
+    },
+    {
+      "word": "pitch",
+      "lemma": "pitch",
+      "translation": "campo de juego",
+      "pos": "noun"
+    },
+    {
+      "word": "court",
+      "lemma": "court",
+      "translation": "pista",
+      "pos": "noun"
+    },
+    {
+      "word": "track",
+      "lemma": "track",
+      "translation": "pista de atletismo",
+      "pos": "noun"
+    },
+    {
+      "word": "pool",
+      "lemma": "pool",
+      "translation": "piscina",
+      "pos": "noun"
+    },
+    {
+      "word": "gym",
+      "lemma": "gym",
+      "translation": "gimnasio",
+      "pos": "noun"
+    },
+    {
+      "word": "training",
+      "lemma": "training",
+      "translation": "entrenamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "warm-up",
+      "lemma": "warm-up",
+      "translation": "calentamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "stretch",
+      "lemma": "stretch",
+      "translation": "estiramiento",
+      "pos": "noun"
+    },
+    {
+      "word": "injury",
+      "lemma": "injury",
+      "translation": "lesión",
+      "pos": "noun"
+    },
+    {
+      "word": "championship",
+      "lemma": "championship",
+      "translation": "campeonato",
+      "pos": "noun"
+    },
+    {
+      "word": "tournament",
+      "lemma": "tournament",
+      "translation": "torneo",
+      "pos": "noun"
+    },
+    {
+      "word": "trophy",
+      "lemma": "trophy",
+      "translation": "trofeo",
+      "pos": "noun"
+    },
+    {
+      "word": "medal",
+      "lemma": "medal",
+      "translation": "medalla",
+      "pos": "noun"
+    },
+    {
+      "word": "victory",
+      "lemma": "victory",
+      "translation": "victoria",
+      "pos": "noun"
+    },
+    {
+      "word": "defeat",
+      "lemma": "defeat",
+      "translation": "derrota",
+      "pos": "noun"
+    },
+    {
+      "word": "draw",
+      "lemma": "draw",
+      "translation": "empate",
+      "pos": "noun"
+    },
+    {
+      "word": "penalty",
+      "lemma": "penalty",
+      "translation": "penalti",
+      "pos": "noun"
+    },
+    {
+      "word": "offside",
+      "lemma": "offside",
+      "translation": "fuera de juego",
+      "pos": "noun"
+    },
+    {
+      "word": "timeout",
+      "lemma": "timeout",
+      "translation": "tiempo muerto",
+      "pos": "noun"
+    },
+    {
+      "word": "to win",
+      "lemma": "win",
+      "translation": "ganar",
+      "pos": "verb"
+    },
+    {
+      "word": "to lose",
+      "lemma": "lose",
+      "translation": "perder",
+      "pos": "verb"
+    },
+    {
+      "word": "to compete",
+      "lemma": "compete",
+      "translation": "competir",
+      "pos": "verb"
+    },
+    {
+      "word": "to train",
+      "lemma": "train",
+      "translation": "entrenar",
+      "pos": "verb"
+    },
+    {
+      "word": "to score",
+      "lemma": "score",
+      "translation": "marcar",
+      "pos": "verb"
+    },
+    {
+      "word": "kit",
+      "lemma": "kit",
+      "translation": "equipación",
+      "pos": "noun"
+    },
+    {
+      "word": "shin pad",
+      "lemma": "shin pad",
+      "translation": "espinillera",
+      "pos": "noun"
+    },
+    {
+      "word": "whistle",
+      "lemma": "whistle",
+      "translation": "silbato",
+      "pos": "noun"
+    },
+    {
+      "word": "captain",
+      "lemma": "captain",
+      "translation": "capitán",
+      "pos": "noun"
+    },
+    {
+      "word": "substitute",
+      "lemma": "substitute",
+      "translation": "suplente",
+      "pos": "noun"
+    },
+    {
+      "word": "league",
+      "lemma": "league",
+      "translation": "liga",
+      "pos": "noun"
+    },
+    {
+      "word": "season",
+      "lemma": "season",
+      "translation": "temporada",
+      "pos": "noun"
+    },
+    {
+      "word": "kick-off",
+      "lemma": "kick-off",
+      "translation": "saque inicial",
+      "pos": "noun"
+    },
+    {
+      "word": "half-time",
+      "lemma": "half-time",
+      "translation": "descanso",
+      "pos": "noun"
+    },
+    {
+      "word": "full-time",
+      "lemma": "full-time",
+      "translation": "final del partido",
+      "pos": "noun"
+    },
+    {
+      "word": "extra time",
+      "lemma": "extra time",
+      "translation": "prórroga",
+      "pos": "noun"
+    },
+    {
+      "word": "corner",
+      "lemma": "corner",
+      "translation": "córner",
+      "pos": "noun"
+    },
+    {
+      "word": "free kick",
+      "lemma": "free kick",
+      "translation": "falta",
+      "pos": "noun"
+    },
+    {
+      "word": "header",
+      "lemma": "header",
+      "translation": "remate de cabeza",
+      "pos": "noun"
+    },
+    {
+      "word": "serve",
+      "lemma": "serve",
+      "translation": "saque",
+      "pos": "noun"
+    },
+    {
+      "word": "lap",
+      "lemma": "lap",
+      "translation": "vuelta",
+      "pos": "noun"
+    },
+    {
+      "word": "personal best",
+      "lemma": "personal best",
+      "translation": "marca personal",
+      "pos": "noun"
+    },
+    {
+      "word": "marathon",
+      "lemma": "marathon",
+      "translation": "maratón",
+      "pos": "noun"
+    },
+    {
+      "word": "sprint",
+      "lemma": "sprint",
+      "translation": "esprint",
+      "pos": "noun"
+    },
+    {
+      "word": "hurdle",
+      "lemma": "hurdle",
+      "translation": "valla",
+      "pos": "noun"
+    },
+    {
+      "word": "relay",
+      "lemma": "relay",
+      "translation": "relevos",
+      "pos": "noun"
+    },
+    {
+      "word": "changing room",
+      "lemma": "changing room",
+      "translation": "vestuario",
+      "pos": "noun"
+    },
+    {
+      "word": "supporter",
+      "lemma": "supporter",
+      "translation": "aficionado",
+      "pos": "noun"
+    },
+    {
+      "word": "stadium",
+      "lemma": "stadium",
+      "translation": "estadio",
+      "pos": "noun"
+    },
+    {
+      "word": "stand",
+      "lemma": "stand",
+      "translation": "grada",
+      "pos": "noun"
+    },
+    {
+      "word": "foul",
+      "lemma": "foul",
+      "translation": "falta",
+      "pos": "noun"
+    },
+    {
+      "word": "yellow card",
+      "lemma": "yellow card",
+      "translation": "tarjeta amarilla",
+      "pos": "noun"
+    },
+    {
+      "word": "red card",
+      "lemma": "red card",
+      "translation": "tarjeta roja",
+      "pos": "noun"
+    },
+    {
+      "word": "to pass",
+      "lemma": "pass",
+      "translation": "pasar",
+      "pos": "verb"
+    },
+    {
+      "word": "to shoot",
+      "lemma": "shoot",
+      "translation": "chutar",
+      "pos": "verb"
+    },
+    {
+      "word": "to dribble",
+      "lemma": "dribble",
+      "translation": "regatear",
+      "pos": "verb"
+    },
+    {
+      "word": "to save",
+      "lemma": "save",
+      "translation": "parar",
+      "pos": "verb"
+    },
+    {
+      "word": "to warm up",
+      "lemma": "warm up",
+      "translation": "calentar",
+      "pos": "verb"
+    },
+    {
+      "word": "to cheer",
+      "lemma": "cheer",
+      "translation": "animar",
+      "pos": "verb"
+    },
+    {
+      "word": "final",
+      "lemma": "final",
+      "translation": "final",
+      "pos": "noun"
+    },
+    {
+      "word": "semi-final",
+      "lemma": "semi-final",
+      "translation": "semifinal",
+      "pos": "noun"
+    },
+    {
+      "word": "home game",
+      "lemma": "home game",
+      "translation": "partido en casa",
+      "pos": "noun"
+    },
+    {
+      "word": "away game",
+      "lemma": "away game",
+      "translation": "partido fuera",
+      "pos": "noun"
+    },
+    {
+      "word": "line",
+      "lemma": "line",
+      "translation": "línea",
+      "pos": "noun"
+    },
+    {
+      "word": "linesman",
+      "lemma": "linesman",
+      "translation": "árbitro asistente",
+      "pos": "noun"
+    },
+    {
+      "word": "to jump",
+      "lemma": "jump",
+      "translation": "saltar",
+      "pos": "verb"
+    },
+    {
+      "word": "to throw",
+      "lemma": "throw",
+      "translation": "lanzar",
+      "pos": "verb"
+    },
+    {
+      "word": "to catch",
+      "lemma": "catch",
+      "translation": "atrapar",
+      "pos": "verb"
+    },
+    {
+      "word": "to kick",
+      "lemma": "kick",
+      "translation": "dar una patada",
+      "pos": "verb"
+    },
+    {
+      "word": "sweatband",
+      "lemma": "sweatband",
+      "translation": "muñequera",
+      "pos": "noun"
+    },
+    {
+      "word": "water bottle",
+      "lemma": "water bottle",
+      "translation": "botella de agua",
+      "pos": "noun"
+    },
+    {
+      "word": "changing",
+      "lemma": "changing",
+      "translation": "cambio de ropa",
+      "pos": "noun"
+    },
+    {
+      "word": "to stretch",
+      "lemma": "stretch",
+      "translation": "estirar",
+      "pos": "verb"
+    },
+    {
+      "word": "muscle strain",
+      "lemma": "muscle strain",
+      "translation": "tirón muscular",
+      "pos": "noun"
+    },
+    {
+      "word": "to cool down",
+      "lemma": "cool down",
+      "translation": "volver a la calma",
+      "pos": "verb"
+    },
+    {
+      "word": "spectator",
+      "lemma": "spectator",
+      "translation": "espectador",
+      "pos": "noun"
+    },
+    {
+      "word": "to qualify",
+      "lemma": "qualify",
+      "translation": "clasificarse",
+      "pos": "verb"
+    },
+    {
+      "word": "ranking",
+      "lemma": "ranking",
+      "translation": "clasificación",
+      "pos": "noun"
+    },
+    {
+      "word": "stopwatch",
+      "lemma": "stopwatch",
+      "translation": "cronómetro",
+      "pos": "noun"
+    }
   ]
 }

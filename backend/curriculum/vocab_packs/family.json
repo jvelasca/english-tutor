@@ -1,0 +1,609 @@
+{
+  "slug": "family",
+  "kind": "theme_pack",
+  "title": "Family",
+  "title_es": "Familia",
+  "cefr_hint": "A1",
+  "items": [
+    {
+      "word": "family",
+      "lemma": "family",
+      "translation": "familia",
+      "pos": "noun"
+    },
+    {
+      "word": "mother",
+      "lemma": "mother",
+      "translation": "madre",
+      "pos": "noun"
+    },
+    {
+      "word": "father",
+      "lemma": "father",
+      "translation": "padre",
+      "pos": "noun"
+    },
+    {
+      "word": "parent",
+      "lemma": "parent",
+      "translation": "progenitor",
+      "pos": "noun"
+    },
+    {
+      "word": "parents",
+      "lemma": "parents",
+      "translation": "padres",
+      "pos": "noun"
+    },
+    {
+      "word": "son",
+      "lemma": "son",
+      "translation": "hijo",
+      "pos": "noun"
+    },
+    {
+      "word": "daughter",
+      "lemma": "daughter",
+      "translation": "hija",
+      "pos": "noun"
+    },
+    {
+      "word": "child",
+      "lemma": "child",
+      "translation": "niño",
+      "pos": "noun"
+    },
+    {
+      "word": "brother",
+      "lemma": "brother",
+      "translation": "hermano",
+      "pos": "noun"
+    },
+    {
+      "word": "sister",
+      "lemma": "sister",
+      "translation": "hermana",
+      "pos": "noun"
+    },
+    {
+      "word": "baby",
+      "lemma": "baby",
+      "translation": "bebé",
+      "pos": "noun"
+    },
+    {
+      "word": "toddler",
+      "lemma": "toddler",
+      "translation": "niño pequeño",
+      "pos": "noun"
+    },
+    {
+      "word": "teenager",
+      "lemma": "teenager",
+      "translation": "adolescente",
+      "pos": "noun"
+    },
+    {
+      "word": "husband",
+      "lemma": "husband",
+      "translation": "marido",
+      "pos": "noun"
+    },
+    {
+      "word": "wife",
+      "lemma": "wife",
+      "translation": "mujer",
+      "pos": "noun"
+    },
+    {
+      "word": "spouse",
+      "lemma": "spouse",
+      "translation": "cónyuge",
+      "pos": "noun"
+    },
+    {
+      "word": "partner",
+      "lemma": "partner",
+      "translation": "pareja",
+      "pos": "noun"
+    },
+    {
+      "word": "boyfriend",
+      "lemma": "boyfriend",
+      "translation": "novio",
+      "pos": "noun"
+    },
+    {
+      "word": "girlfriend",
+      "lemma": "girlfriend",
+      "translation": "novia",
+      "pos": "noun"
+    },
+    {
+      "word": "wedding",
+      "lemma": "wedding",
+      "translation": "boda",
+      "pos": "noun"
+    },
+    {
+      "word": "marriage",
+      "lemma": "marriage",
+      "translation": "matrimonio",
+      "pos": "noun"
+    },
+    {
+      "word": "divorce",
+      "lemma": "divorce",
+      "translation": "divorcio",
+      "pos": "noun"
+    },
+    {
+      "word": "grandfather",
+      "lemma": "grandfather",
+      "translation": "abuelo",
+      "pos": "noun"
+    },
+    {
+      "word": "grandmother",
+      "lemma": "grandmother",
+      "translation": "abuela",
+      "pos": "noun"
+    },
+    {
+      "word": "grandson",
+      "lemma": "grandson",
+      "translation": "nieto",
+      "pos": "noun"
+    },
+    {
+      "word": "granddaughter",
+      "lemma": "granddaughter",
+      "translation": "nieta",
+      "pos": "noun"
+    },
+    {
+      "word": "uncle",
+      "lemma": "uncle",
+      "translation": "tío",
+      "pos": "noun"
+    },
+    {
+      "word": "aunt",
+      "lemma": "aunt",
+      "translation": "tía",
+      "pos": "noun"
+    },
+    {
+      "word": "cousin",
+      "lemma": "cousin",
+      "translation": "primo",
+      "pos": "noun"
+    },
+    {
+      "word": "nephew",
+      "lemma": "nephew",
+      "translation": "sobrino",
+      "pos": "noun"
+    },
+    {
+      "word": "niece",
+      "lemma": "niece",
+      "translation": "sobrina",
+      "pos": "noun"
+    },
+    {
+      "word": "father-in-law",
+      "lemma": "father-in-law",
+      "translation": "suegro",
+      "pos": "noun"
+    },
+    {
+      "word": "mother-in-law",
+      "lemma": "mother-in-law",
+      "translation": "suegra",
+      "pos": "noun"
+    },
+    {
+      "word": "brother-in-law",
+      "lemma": "brother-in-law",
+      "translation": "cuñado",
+      "pos": "noun"
+    },
+    {
+      "word": "sister-in-law",
+      "lemma": "sister-in-law",
+      "translation": "cuñada",
+      "pos": "noun"
+    },
+    {
+      "word": "son-in-law",
+      "lemma": "son-in-law",
+      "translation": "yerno",
+      "pos": "noun"
+    },
+    {
+      "word": "daughter-in-law",
+      "lemma": "daughter-in-law",
+      "translation": "nuera",
+      "pos": "noun"
+    },
+    {
+      "word": "stepson",
+      "lemma": "stepson",
+      "translation": "hijastro",
+      "pos": "noun"
+    },
+    {
+      "word": "stepdaughter",
+      "lemma": "stepdaughter",
+      "translation": "hijastra",
+      "pos": "noun"
+    },
+    {
+      "word": "stepmother",
+      "lemma": "stepmother",
+      "translation": "madrastra",
+      "pos": "noun"
+    },
+    {
+      "word": "stepfather",
+      "lemma": "stepfather",
+      "translation": "padrastro",
+      "pos": "noun"
+    },
+    {
+      "word": "twin",
+      "lemma": "twin",
+      "translation": "gemelo",
+      "pos": "noun"
+    },
+    {
+      "word": "only child",
+      "lemma": "only child",
+      "translation": "hijo único",
+      "pos": "noun"
+    },
+    {
+      "word": "relative",
+      "lemma": "relative",
+      "translation": "pariente",
+      "pos": "noun"
+    },
+    {
+      "word": "household",
+      "lemma": "household",
+      "translation": "hogar familiar",
+      "pos": "noun"
+    },
+    {
+      "word": "generation",
+      "lemma": "generation",
+      "translation": "generación",
+      "pos": "noun"
+    },
+    {
+      "word": "ancestor",
+      "lemma": "ancestor",
+      "translation": "antepasado",
+      "pos": "noun"
+    },
+    {
+      "word": "surname",
+      "lemma": "surname",
+      "translation": "apellido",
+      "pos": "noun"
+    },
+    {
+      "word": "nickname",
+      "lemma": "nickname",
+      "translation": "apodo",
+      "pos": "noun"
+    },
+    {
+      "word": "birthday",
+      "lemma": "birthday",
+      "translation": "cumpleaños",
+      "pos": "noun"
+    },
+    {
+      "word": "age",
+      "lemma": "age",
+      "translation": "edad",
+      "pos": "noun"
+    },
+    {
+      "word": "childhood",
+      "lemma": "childhood",
+      "translation": "infancia",
+      "pos": "noun"
+    },
+    {
+      "word": "to raise",
+      "lemma": "raise",
+      "translation": "criar",
+      "pos": "verb"
+    },
+    {
+      "word": "to grow up",
+      "lemma": "grow up",
+      "translation": "crecer",
+      "pos": "verb"
+    },
+    {
+      "word": "to get married",
+      "lemma": "get married",
+      "translation": "casarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to be born",
+      "lemma": "be born",
+      "translation": "nacer",
+      "pos": "verb"
+    },
+    {
+      "word": "to adopt",
+      "lemma": "adopt",
+      "translation": "adoptar",
+      "pos": "verb"
+    },
+    {
+      "word": "godfather",
+      "lemma": "godfather",
+      "translation": "padrino",
+      "pos": "noun"
+    },
+    {
+      "word": "godmother",
+      "lemma": "godmother",
+      "translation": "madrina",
+      "pos": "noun"
+    },
+    {
+      "word": "neighbour",
+      "lemma": "neighbour",
+      "translation": "vecino",
+      "pos": "noun"
+    },
+    {
+      "word": "friend",
+      "lemma": "friend",
+      "translation": "amigo",
+      "pos": "noun"
+    },
+    {
+      "word": "stranger",
+      "lemma": "stranger",
+      "translation": "desconocido",
+      "pos": "noun"
+    },
+    {
+      "word": "guest",
+      "lemma": "guest",
+      "translation": "invitado",
+      "pos": "noun"
+    },
+    {
+      "word": "reunion",
+      "lemma": "reunion",
+      "translation": "reunión familiar",
+      "pos": "noun"
+    },
+    {
+      "word": "widow",
+      "lemma": "widow",
+      "translation": "viuda",
+      "pos": "noun"
+    },
+    {
+      "word": "widower",
+      "lemma": "widower",
+      "translation": "viudo",
+      "pos": "noun"
+    },
+    {
+      "word": "single",
+      "lemma": "single",
+      "translation": "soltero",
+      "pos": "adjective"
+    },
+    {
+      "word": "engaged",
+      "lemma": "engaged",
+      "translation": "prometido",
+      "pos": "adjective"
+    },
+    {
+      "word": "married",
+      "lemma": "married",
+      "translation": "casado",
+      "pos": "adjective"
+    },
+    {
+      "word": "to resemble",
+      "lemma": "resemble",
+      "translation": "parecerse",
+      "pos": "verb"
+    },
+    {
+      "word": "to argue",
+      "lemma": "argue",
+      "translation": "discutir",
+      "pos": "verb"
+    },
+    {
+      "word": "to make up",
+      "lemma": "make up",
+      "translation": "hacer las paces",
+      "pos": "verb"
+    },
+    {
+      "word": "to babysit",
+      "lemma": "babysit",
+      "translation": "hacer de canguro",
+      "pos": "verb"
+    },
+    {
+      "word": "newborn",
+      "lemma": "newborn",
+      "translation": "recién nacido",
+      "pos": "noun"
+    },
+    {
+      "word": "pregnancy",
+      "lemma": "pregnancy",
+      "translation": "embarazo",
+      "pos": "noun"
+    },
+    {
+      "word": "pram",
+      "lemma": "pram",
+      "translation": "cochecito",
+      "pos": "noun"
+    },
+    {
+      "word": "dummy",
+      "lemma": "dummy",
+      "translation": "chupete",
+      "pos": "noun"
+    },
+    {
+      "word": "nappy",
+      "lemma": "nappy",
+      "translation": "pañal",
+      "pos": "noun"
+    },
+    {
+      "word": "cot",
+      "lemma": "cot",
+      "translation": "cuna",
+      "pos": "noun"
+    },
+    {
+      "word": "bedtime",
+      "lemma": "bedtime",
+      "translation": "hora de acostarse",
+      "pos": "noun"
+    },
+    {
+      "word": "pocket money",
+      "lemma": "pocket money",
+      "translation": "paga",
+      "pos": "noun"
+    },
+    {
+      "word": "chore",
+      "lemma": "chore",
+      "translation": "tarea de casa",
+      "pos": "noun"
+    },
+    {
+      "word": "to inherit",
+      "lemma": "inherit",
+      "translation": "heredar",
+      "pos": "verb"
+    },
+    {
+      "word": "in-laws",
+      "lemma": "in-laws",
+      "translation": "familia política",
+      "pos": "noun"
+    },
+    {
+      "word": "half-brother",
+      "lemma": "half-brother",
+      "translation": "hermanastro",
+      "pos": "noun"
+    },
+    {
+      "word": "half-sister",
+      "lemma": "half-sister",
+      "translation": "hermanastra",
+      "pos": "noun"
+    },
+    {
+      "word": "great-grandfather",
+      "lemma": "great-grandfather",
+      "translation": "bisabuelo",
+      "pos": "noun"
+    },
+    {
+      "word": "great-grandmother",
+      "lemma": "great-grandmother",
+      "translation": "bisabuela",
+      "pos": "noun"
+    },
+    {
+      "word": "to look after",
+      "lemma": "look after",
+      "translation": "cuidar",
+      "pos": "verb"
+    },
+    {
+      "word": "to get divorced",
+      "lemma": "get divorced",
+      "translation": "divorciarse",
+      "pos": "verb"
+    },
+    {
+      "word": "orphan",
+      "lemma": "orphan",
+      "translation": "huérfano",
+      "pos": "noun"
+    },
+    {
+      "word": "family tree",
+      "lemma": "family tree",
+      "translation": "árbol genealógico",
+      "pos": "noun"
+    },
+    {
+      "word": "maiden name",
+      "lemma": "maiden name",
+      "translation": "apellido de soltera",
+      "pos": "noun"
+    },
+    {
+      "word": "to introduce",
+      "lemma": "introduce",
+      "translation": "presentar",
+      "pos": "verb"
+    },
+    {
+      "word": "to get on",
+      "lemma": "get on",
+      "translation": "llevarse bien",
+      "pos": "verb"
+    },
+    {
+      "word": "to move in",
+      "lemma": "move in",
+      "translation": "irse a vivir con",
+      "pos": "verb"
+    },
+    {
+      "word": "upbringing",
+      "lemma": "upbringing",
+      "translation": "crianza",
+      "pos": "noun"
+    },
+    {
+      "word": "adulthood",
+      "lemma": "adulthood",
+      "translation": "edad adulta",
+      "pos": "noun"
+    },
+    {
+      "word": "to name",
+      "lemma": "name",
+      "translation": "poner nombre",
+      "pos": "verb"
+    },
+    {
+      "word": "godchild",
+      "lemma": "godchild",
+      "translation": "ahijado",
+      "pos": "noun"
+    }
+  ]
+}

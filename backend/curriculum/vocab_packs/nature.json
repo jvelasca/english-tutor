@@ -5,51 +5,605 @@
   "title_es": "Naturaleza y animales",
   "cefr_hint": "A2",
   "items": [
-    {"word": "nature", "lemma": "nature", "translation": "naturaleza", "pos": "noun"},
-    {"word": "tree", "lemma": "tree", "translation": "árbol", "pos": "noun"},
-    {"word": "forest", "lemma": "forest", "translation": "bosque", "pos": "noun"},
-    {"word": "leaf", "lemma": "leaf", "translation": "hoja", "pos": "noun"},
-    {"word": "branch", "lemma": "branch", "translation": "rama", "pos": "noun"},
-    {"word": "root", "lemma": "root", "translation": "raíz", "pos": "noun"},
-    {"word": "flower", "lemma": "flower", "translation": "flor", "pos": "noun"},
-    {"word": "grass", "lemma": "grass", "translation": "hierba", "pos": "noun"},
-    {"word": "field", "lemma": "field", "translation": "campo", "pos": "noun"},
-    {"word": "mountain", "lemma": "mountain", "translation": "montaña", "pos": "noun"},
-    {"word": "hill", "lemma": "hill", "translation": "colina", "pos": "noun"},
-    {"word": "valley", "lemma": "valley", "translation": "valle", "pos": "noun"},
-    {"word": "river", "lemma": "river", "translation": "río", "pos": "noun"},
-    {"word": "lake", "lemma": "lake", "translation": "lago", "pos": "noun"},
-    {"word": "sea", "lemma": "sea", "translation": "mar", "pos": "noun"},
-    {"word": "ocean", "lemma": "ocean", "translation": "océano", "pos": "noun"},
-    {"word": "beach", "lemma": "beach", "translation": "playa", "pos": "noun"},
-    {"word": "island", "lemma": "island", "translation": "isla", "pos": "noun"},
-    {"word": "desert", "lemma": "desert", "translation": "desierto", "pos": "noun"},
-    {"word": "jungle", "lemma": "jungle", "translation": "selva", "pos": "noun"},
-    {"word": "sky", "lemma": "sky", "translation": "cielo", "pos": "noun"},
-    {"word": "cloud", "lemma": "cloud", "translation": "nube", "pos": "noun"},
-    {"word": "sun", "lemma": "sun", "translation": "sol", "pos": "noun"},
-    {"word": "moon", "lemma": "moon", "translation": "luna", "pos": "noun"},
-    {"word": "star", "lemma": "star", "translation": "estrella", "pos": "noun"},
-    {"word": "wind", "lemma": "wind", "translation": "viento", "pos": "noun"},
-    {"word": "rain", "lemma": "rain", "translation": "lluvia", "pos": "noun"},
-    {"word": "snow", "lemma": "snow", "translation": "nieve", "pos": "noun"},
-    {"word": "ice", "lemma": "ice", "translation": "hielo", "pos": "noun"},
-    {"word": "storm", "lemma": "storm", "translation": "tormenta", "pos": "noun"},
-    {"word": "thunder", "lemma": "thunder", "translation": "trueno", "pos": "noun"},
-    {"word": "lightning", "lemma": "lightning", "translation": "relámpago", "pos": "noun"},
-    {"word": "rainbow", "lemma": "rainbow", "translation": "arcoíris", "pos": "noun"},
-    {"word": "animal", "lemma": "animal", "translation": "animal", "pos": "noun"},
-    {"word": "bird", "lemma": "bird", "translation": "pájaro", "pos": "noun"},
-    {"word": "insect", "lemma": "insect", "translation": "insecto", "pos": "noun"},
-    {"word": "butterfly", "lemma": "butterfly", "translation": "mariposa", "pos": "noun"},
-    {"word": "bee", "lemma": "bee", "translation": "abeja", "pos": "noun"},
-    {"word": "ant", "lemma": "ant", "translation": "hormiga", "pos": "noun"},
-    {"word": "dog", "lemma": "dog", "translation": "perro", "pos": "noun"},
-    {"word": "cat", "lemma": "cat", "translation": "gato", "pos": "noun"},
-    {"word": "horse", "lemma": "horse", "translation": "caballo", "pos": "noun"},
-    {"word": "cow", "lemma": "cow", "translation": "vaca", "pos": "noun"},
-    {"word": "sheep", "lemma": "sheep", "translation": "oveja", "pos": "noun"},
-    {"word": "wild", "lemma": "wild", "translation": "salvaje", "pos": "adjective"},
-    {"word": "to grow", "lemma": "grow", "translation": "crecer", "pos": "verb"}
+    {
+      "word": "nature",
+      "lemma": "nature",
+      "translation": "naturaleza",
+      "pos": "noun"
+    },
+    {
+      "word": "tree",
+      "lemma": "tree",
+      "translation": "árbol",
+      "pos": "noun"
+    },
+    {
+      "word": "forest",
+      "lemma": "forest",
+      "translation": "bosque",
+      "pos": "noun"
+    },
+    {
+      "word": "leaf",
+      "lemma": "leaf",
+      "translation": "hoja",
+      "pos": "noun"
+    },
+    {
+      "word": "branch",
+      "lemma": "branch",
+      "translation": "rama",
+      "pos": "noun"
+    },
+    {
+      "word": "root",
+      "lemma": "root",
+      "translation": "raíz",
+      "pos": "noun"
+    },
+    {
+      "word": "flower",
+      "lemma": "flower",
+      "translation": "flor",
+      "pos": "noun"
+    },
+    {
+      "word": "grass",
+      "lemma": "grass",
+      "translation": "hierba",
+      "pos": "noun"
+    },
+    {
+      "word": "field",
+      "lemma": "field",
+      "translation": "campo",
+      "pos": "noun"
+    },
+    {
+      "word": "mountain",
+      "lemma": "mountain",
+      "translation": "montaña",
+      "pos": "noun"
+    },
+    {
+      "word": "hill",
+      "lemma": "hill",
+      "translation": "colina",
+      "pos": "noun"
+    },
+    {
+      "word": "valley",
+      "lemma": "valley",
+      "translation": "valle",
+      "pos": "noun"
+    },
+    {
+      "word": "river",
+      "lemma": "river",
+      "translation": "río",
+      "pos": "noun"
+    },
+    {
+      "word": "lake",
+      "lemma": "lake",
+      "translation": "lago",
+      "pos": "noun"
+    },
+    {
+      "word": "sea",
+      "lemma": "sea",
+      "translation": "mar",
+      "pos": "noun"
+    },
+    {
+      "word": "ocean",
+      "lemma": "ocean",
+      "translation": "océano",
+      "pos": "noun"
+    },
+    {
+      "word": "beach",
+      "lemma": "beach",
+      "translation": "playa",
+      "pos": "noun"
+    },
+    {
+      "word": "island",
+      "lemma": "island",
+      "translation": "isla",
+      "pos": "noun"
+    },
+    {
+      "word": "desert",
+      "lemma": "desert",
+      "translation": "desierto",
+      "pos": "noun"
+    },
+    {
+      "word": "jungle",
+      "lemma": "jungle",
+      "translation": "selva",
+      "pos": "noun"
+    },
+    {
+      "word": "sky",
+      "lemma": "sky",
+      "translation": "cielo",
+      "pos": "noun"
+    },
+    {
+      "word": "cloud",
+      "lemma": "cloud",
+      "translation": "nube",
+      "pos": "noun"
+    },
+    {
+      "word": "sun",
+      "lemma": "sun",
+      "translation": "sol",
+      "pos": "noun"
+    },
+    {
+      "word": "moon",
+      "lemma": "moon",
+      "translation": "luna",
+      "pos": "noun"
+    },
+    {
+      "word": "star",
+      "lemma": "star",
+      "translation": "estrella",
+      "pos": "noun"
+    },
+    {
+      "word": "wind",
+      "lemma": "wind",
+      "translation": "viento",
+      "pos": "noun"
+    },
+    {
+      "word": "rain",
+      "lemma": "rain",
+      "translation": "lluvia",
+      "pos": "noun"
+    },
+    {
+      "word": "snow",
+      "lemma": "snow",
+      "translation": "nieve",
+      "pos": "noun"
+    },
+    {
+      "word": "ice",
+      "lemma": "ice",
+      "translation": "hielo",
+      "pos": "noun"
+    },
+    {
+      "word": "storm",
+      "lemma": "storm",
+      "translation": "tormenta",
+      "pos": "noun"
+    },
+    {
+      "word": "thunder",
+      "lemma": "thunder",
+      "translation": "trueno",
+      "pos": "noun"
+    },
+    {
+      "word": "lightning",
+      "lemma": "lightning",
+      "translation": "relámpago",
+      "pos": "noun"
+    },
+    {
+      "word": "rainbow",
+      "lemma": "rainbow",
+      "translation": "arcoíris",
+      "pos": "noun"
+    },
+    {
+      "word": "animal",
+      "lemma": "animal",
+      "translation": "animal",
+      "pos": "noun"
+    },
+    {
+      "word": "bird",
+      "lemma": "bird",
+      "translation": "pájaro",
+      "pos": "noun"
+    },
+    {
+      "word": "insect",
+      "lemma": "insect",
+      "translation": "insecto",
+      "pos": "noun"
+    },
+    {
+      "word": "butterfly",
+      "lemma": "butterfly",
+      "translation": "mariposa",
+      "pos": "noun"
+    },
+    {
+      "word": "bee",
+      "lemma": "bee",
+      "translation": "abeja",
+      "pos": "noun"
+    },
+    {
+      "word": "ant",
+      "lemma": "ant",
+      "translation": "hormiga",
+      "pos": "noun"
+    },
+    {
+      "word": "dog",
+      "lemma": "dog",
+      "translation": "perro",
+      "pos": "noun"
+    },
+    {
+      "word": "cat",
+      "lemma": "cat",
+      "translation": "gato",
+      "pos": "noun"
+    },
+    {
+      "word": "horse",
+      "lemma": "horse",
+      "translation": "caballo",
+      "pos": "noun"
+    },
+    {
+      "word": "cow",
+      "lemma": "cow",
+      "translation": "vaca",
+      "pos": "noun"
+    },
+    {
+      "word": "sheep",
+      "lemma": "sheep",
+      "translation": "oveja",
+      "pos": "noun"
+    },
+    {
+      "word": "wild",
+      "lemma": "wild",
+      "translation": "salvaje",
+      "pos": "adjective"
+    },
+    {
+      "word": "to grow",
+      "lemma": "grow",
+      "translation": "crecer",
+      "pos": "verb"
+    },
+    {
+      "word": "fog",
+      "lemma": "fog",
+      "translation": "niebla",
+      "pos": "noun"
+    },
+    {
+      "word": "frost",
+      "lemma": "frost",
+      "translation": "helada",
+      "pos": "noun"
+    },
+    {
+      "word": "hail",
+      "lemma": "hail",
+      "translation": "granizo",
+      "pos": "noun"
+    },
+    {
+      "word": "drought",
+      "lemma": "drought",
+      "translation": "sequía",
+      "pos": "noun"
+    },
+    {
+      "word": "flood",
+      "lemma": "flood",
+      "translation": "inundación",
+      "pos": "noun"
+    },
+    {
+      "word": "wave",
+      "lemma": "wave",
+      "translation": "ola",
+      "pos": "noun"
+    },
+    {
+      "word": "tide",
+      "lemma": "tide",
+      "translation": "marea",
+      "pos": "noun"
+    },
+    {
+      "word": "shore",
+      "lemma": "shore",
+      "translation": "orilla",
+      "pos": "noun"
+    },
+    {
+      "word": "cliff",
+      "lemma": "cliff",
+      "translation": "acantilado",
+      "pos": "noun"
+    },
+    {
+      "word": "cave",
+      "lemma": "cave",
+      "translation": "cueva",
+      "pos": "noun"
+    },
+    {
+      "word": "rock",
+      "lemma": "rock",
+      "translation": "roca",
+      "pos": "noun"
+    },
+    {
+      "word": "sand",
+      "lemma": "sand",
+      "translation": "arena",
+      "pos": "noun"
+    },
+    {
+      "word": "soil",
+      "lemma": "soil",
+      "translation": "tierra",
+      "pos": "noun"
+    },
+    {
+      "word": "mud",
+      "lemma": "mud",
+      "translation": "barro",
+      "pos": "noun"
+    },
+    {
+      "word": "seed",
+      "lemma": "seed",
+      "translation": "semilla",
+      "pos": "noun"
+    },
+    {
+      "word": "petal",
+      "lemma": "petal",
+      "translation": "pétalo",
+      "pos": "noun"
+    },
+    {
+      "word": "thorn",
+      "lemma": "thorn",
+      "translation": "espina",
+      "pos": "noun"
+    },
+    {
+      "word": "bark",
+      "lemma": "bark",
+      "translation": "corteza",
+      "pos": "noun"
+    },
+    {
+      "word": "moss",
+      "lemma": "moss",
+      "translation": "musgo",
+      "pos": "noun"
+    },
+    {
+      "word": "mushroom",
+      "lemma": "mushroom",
+      "translation": "seta",
+      "pos": "noun"
+    },
+    {
+      "word": "bush",
+      "lemma": "bush",
+      "translation": "arbusto",
+      "pos": "noun"
+    },
+    {
+      "word": "hedge",
+      "lemma": "hedge",
+      "translation": "seto",
+      "pos": "noun"
+    },
+    {
+      "word": "stream",
+      "lemma": "stream",
+      "translation": "arroyo",
+      "pos": "noun"
+    },
+    {
+      "word": "waterfall",
+      "lemma": "waterfall",
+      "translation": "cascada",
+      "pos": "noun"
+    },
+    {
+      "word": "pond",
+      "lemma": "pond",
+      "translation": "estanque",
+      "pos": "noun"
+    },
+    {
+      "word": "volcano",
+      "lemma": "volcano",
+      "translation": "volcán",
+      "pos": "noun"
+    },
+    {
+      "word": "earthquake",
+      "lemma": "earthquake",
+      "translation": "terremoto",
+      "pos": "noun"
+    },
+    {
+      "word": "wildlife",
+      "lemma": "wildlife",
+      "translation": "fauna",
+      "pos": "noun"
+    },
+    {
+      "word": "mammal",
+      "lemma": "mammal",
+      "translation": "mamífero",
+      "pos": "noun"
+    },
+    {
+      "word": "reptile",
+      "lemma": "reptile",
+      "translation": "reptil",
+      "pos": "noun"
+    },
+    {
+      "word": "whale",
+      "lemma": "whale",
+      "translation": "ballena",
+      "pos": "noun"
+    },
+    {
+      "word": "dolphin",
+      "lemma": "dolphin",
+      "translation": "delfín",
+      "pos": "noun"
+    },
+    {
+      "word": "shark",
+      "lemma": "shark",
+      "translation": "tiburón",
+      "pos": "noun"
+    },
+    {
+      "word": "frog",
+      "lemma": "frog",
+      "translation": "rana",
+      "pos": "noun"
+    },
+    {
+      "word": "snake",
+      "lemma": "snake",
+      "translation": "serpiente",
+      "pos": "noun"
+    },
+    {
+      "word": "spider",
+      "lemma": "spider",
+      "translation": "araña",
+      "pos": "noun"
+    },
+    {
+      "word": "mosquito",
+      "lemma": "mosquito",
+      "translation": "mosquito",
+      "pos": "noun"
+    },
+    {
+      "word": "rabbit",
+      "lemma": "rabbit",
+      "translation": "conejo",
+      "pos": "noun"
+    },
+    {
+      "word": "pig",
+      "lemma": "pig",
+      "translation": "cerdo",
+      "pos": "noun"
+    },
+    {
+      "word": "goat",
+      "lemma": "goat",
+      "translation": "cabra",
+      "pos": "noun"
+    },
+    {
+      "word": "duck",
+      "lemma": "duck",
+      "translation": "pato",
+      "pos": "noun"
+    },
+    {
+      "word": "to bloom",
+      "lemma": "bloom",
+      "translation": "florecer",
+      "pos": "verb"
+    },
+    {
+      "word": "to hunt",
+      "lemma": "hunt",
+      "translation": "cazar",
+      "pos": "verb"
+    },
+    {
+      "word": "nest",
+      "lemma": "nest",
+      "translation": "nido",
+      "pos": "noun"
+    },
+    {
+      "word": "paw",
+      "lemma": "paw",
+      "translation": "pata",
+      "pos": "noun"
+    },
+    {
+      "word": "wing",
+      "lemma": "wing",
+      "translation": "ala",
+      "pos": "noun"
+    },
+    {
+      "word": "feather",
+      "lemma": "feather",
+      "translation": "pluma",
+      "pos": "noun"
+    },
+    {
+      "word": "fur",
+      "lemma": "fur",
+      "translation": "pelo",
+      "pos": "noun"
+    },
+    {
+      "word": "tail",
+      "lemma": "tail",
+      "translation": "cola",
+      "pos": "noun"
+    },
+    {
+      "word": "horn",
+      "lemma": "horn",
+      "translation": "cuerno",
+      "pos": "noun"
+    },
+    {
+      "word": "herd",
+      "lemma": "herd",
+      "translation": "rebaño",
+      "pos": "noun"
+    },
+    {
+      "word": "flock",
+      "lemma": "flock",
+      "translation": "bandada",
+      "pos": "noun"
+    },
+    {
+      "word": "path",
+      "lemma": "path",
+      "translation": "sendero",
+      "pos": "noun"
+    },
+    {
+      "word": "clearing",
+      "lemma": "clearing",
+      "translation": "claro del bosque",
+      "pos": "noun"
+    }
   ]
 }

@@ -5,52 +5,605 @@
   "title_es": "Herramientas y bricolaje",
   "cefr_hint": "A2",
   "items": [
-    {"word": "hammer", "lemma": "hammer", "translation": "martillo", "pos": "noun"},
-    {"word": "nail", "lemma": "nail", "translation": "clavo", "pos": "noun"},
-    {"word": "screw", "lemma": "screw", "translation": "tornillo", "pos": "noun"},
-    {"word": "screwdriver", "lemma": "screwdriver", "translation": "destornillador", "pos": "noun"},
-    {"word": "wrench", "lemma": "wrench", "translation": "llave inglesa", "pos": "noun"},
-    {"word": "spanner", "lemma": "spanner", "translation": "llave fija", "pos": "noun"},
-    {"word": "pliers", "lemma": "pliers", "translation": "alicates", "pos": "noun"},
-    {"word": "saw", "lemma": "saw", "translation": "sierra", "pos": "noun"},
-    {"word": "hacksaw", "lemma": "hacksaw", "translation": "sierra de mano", "pos": "noun"},
-    {"word": "drill", "lemma": "drill", "translation": "taladro", "pos": "noun"},
-    {"word": "chisel", "lemma": "chisel", "translation": "cincel", "pos": "noun"},
-    {"word": "file", "lemma": "file", "translation": "lima", "pos": "noun"},
-    {"word": "sandpaper", "lemma": "sandpaper", "translation": "lija", "pos": "noun"},
-    {"word": "tape measure", "lemma": "tape measure", "translation": "cinta métrica", "pos": "noun"},
-    {"word": "level", "lemma": "level", "translation": "nivel", "pos": "noun"},
-    {"word": "ladder", "lemma": "ladder", "translation": "escalera", "pos": "noun"},
-    {"word": "toolbox", "lemma": "toolbox", "translation": "caja de herramientas", "pos": "noun"},
-    {"word": "bolt", "lemma": "bolt", "translation": "perno", "pos": "noun"},
-    {"word": "nut", "lemma": "nut", "translation": "tuerca", "pos": "noun"},
-    {"word": "washer", "lemma": "washer", "translation": "arandela", "pos": "noun"},
-    {"word": "clamp", "lemma": "clamp", "translation": "abrazadera", "pos": "noun"},
-    {"word": "vice", "lemma": "vice", "translation": "tornillo de banco", "pos": "noun"},
-    {"word": "axe", "lemma": "axe", "translation": "hacha", "pos": "noun"},
-    {"word": "shovel", "lemma": "shovel", "translation": "pala", "pos": "noun"},
-    {"word": "rake", "lemma": "rake", "translation": "rastrillo", "pos": "noun"},
-    {"word": "wheelbarrow", "lemma": "wheelbarrow", "translation": "carretilla", "pos": "noun"},
-    {"word": "rope", "lemma": "rope", "translation": "cuerda", "pos": "noun"},
-    {"word": "wire", "lemma": "wire", "translation": "alambre", "pos": "noun"},
-    {"word": "chain", "lemma": "chain", "translation": "cadena", "pos": "noun"},
-    {"word": "glue", "lemma": "glue", "translation": "pegamento", "pos": "noun"},
-    {"word": "tape", "lemma": "tape", "translation": "cinta adhesiva", "pos": "noun"},
-    {"word": "scissors", "lemma": "scissors", "translation": "tijeras", "pos": "noun"},
-    {"word": "blade", "lemma": "blade", "translation": "hoja / filo", "pos": "noun"},
-    {"word": "handle", "lemma": "handle", "translation": "mango", "pos": "noun"},
-    {"word": "bench", "lemma": "bench", "translation": "banco de trabajo", "pos": "noun"},
-    {"word": "workshop", "lemma": "workshop", "translation": "taller", "pos": "noun"},
-    {"word": "tool", "lemma": "tool", "translation": "herramienta", "pos": "noun"},
-    {"word": "helmet", "lemma": "helmet", "translation": "casco", "pos": "noun"},
-    {"word": "goggles", "lemma": "goggles", "translation": "gafas de protección", "pos": "noun"},
-    {"word": "gloves", "lemma": "gloves", "translation": "guantes", "pos": "noun"},
-    {"word": "apron", "lemma": "apron", "translation": "delantal", "pos": "noun"},
-    {"word": "to tighten", "lemma": "tighten", "translation": "apretar", "pos": "verb"},
-    {"word": "to loosen", "lemma": "loosen", "translation": "aflojar", "pos": "verb"},
-    {"word": "to cut", "lemma": "cut", "translation": "cortar", "pos": "verb"},
-    {"word": "to measure", "lemma": "measure", "translation": "medir", "pos": "verb"},
-    {"word": "to drill", "lemma": "drill", "translation": "taladrar", "pos": "verb"},
-    {"word": "to sand", "lemma": "sand", "translation": "lijar", "pos": "verb"}
+    {
+      "word": "hammer",
+      "lemma": "hammer",
+      "translation": "martillo",
+      "pos": "noun"
+    },
+    {
+      "word": "nail",
+      "lemma": "nail",
+      "translation": "clavo",
+      "pos": "noun"
+    },
+    {
+      "word": "screw",
+      "lemma": "screw",
+      "translation": "tornillo",
+      "pos": "noun"
+    },
+    {
+      "word": "screwdriver",
+      "lemma": "screwdriver",
+      "translation": "destornillador",
+      "pos": "noun"
+    },
+    {
+      "word": "wrench",
+      "lemma": "wrench",
+      "translation": "llave inglesa",
+      "pos": "noun"
+    },
+    {
+      "word": "spanner",
+      "lemma": "spanner",
+      "translation": "llave fija",
+      "pos": "noun"
+    },
+    {
+      "word": "pliers",
+      "lemma": "pliers",
+      "translation": "alicates",
+      "pos": "noun"
+    },
+    {
+      "word": "saw",
+      "lemma": "saw",
+      "translation": "sierra",
+      "pos": "noun"
+    },
+    {
+      "word": "hacksaw",
+      "lemma": "hacksaw",
+      "translation": "sierra de mano",
+      "pos": "noun"
+    },
+    {
+      "word": "drill",
+      "lemma": "drill",
+      "translation": "taladro",
+      "pos": "noun"
+    },
+    {
+      "word": "chisel",
+      "lemma": "chisel",
+      "translation": "cincel",
+      "pos": "noun"
+    },
+    {
+      "word": "file",
+      "lemma": "file",
+      "translation": "lima",
+      "pos": "noun"
+    },
+    {
+      "word": "sandpaper",
+      "lemma": "sandpaper",
+      "translation": "lija",
+      "pos": "noun"
+    },
+    {
+      "word": "tape measure",
+      "lemma": "tape measure",
+      "translation": "cinta métrica",
+      "pos": "noun"
+    },
+    {
+      "word": "level",
+      "lemma": "level",
+      "translation": "nivel",
+      "pos": "noun"
+    },
+    {
+      "word": "ladder",
+      "lemma": "ladder",
+      "translation": "escalera",
+      "pos": "noun"
+    },
+    {
+      "word": "toolbox",
+      "lemma": "toolbox",
+      "translation": "caja de herramientas",
+      "pos": "noun"
+    },
+    {
+      "word": "bolt",
+      "lemma": "bolt",
+      "translation": "perno",
+      "pos": "noun"
+    },
+    {
+      "word": "nut",
+      "lemma": "nut",
+      "translation": "tuerca",
+      "pos": "noun"
+    },
+    {
+      "word": "washer",
+      "lemma": "washer",
+      "translation": "arandela",
+      "pos": "noun"
+    },
+    {
+      "word": "clamp",
+      "lemma": "clamp",
+      "translation": "abrazadera",
+      "pos": "noun"
+    },
+    {
+      "word": "vice",
+      "lemma": "vice",
+      "translation": "tornillo de banco",
+      "pos": "noun"
+    },
+    {
+      "word": "axe",
+      "lemma": "axe",
+      "translation": "hacha",
+      "pos": "noun"
+    },
+    {
+      "word": "shovel",
+      "lemma": "shovel",
+      "translation": "pala",
+      "pos": "noun"
+    },
+    {
+      "word": "rake",
+      "lemma": "rake",
+      "translation": "rastrillo",
+      "pos": "noun"
+    },
+    {
+      "word": "wheelbarrow",
+      "lemma": "wheelbarrow",
+      "translation": "carretilla",
+      "pos": "noun"
+    },
+    {
+      "word": "rope",
+      "lemma": "rope",
+      "translation": "cuerda",
+      "pos": "noun"
+    },
+    {
+      "word": "wire",
+      "lemma": "wire",
+      "translation": "alambre",
+      "pos": "noun"
+    },
+    {
+      "word": "chain",
+      "lemma": "chain",
+      "translation": "cadena",
+      "pos": "noun"
+    },
+    {
+      "word": "glue",
+      "lemma": "glue",
+      "translation": "pegamento",
+      "pos": "noun"
+    },
+    {
+      "word": "tape",
+      "lemma": "tape",
+      "translation": "cinta adhesiva",
+      "pos": "noun"
+    },
+    {
+      "word": "scissors",
+      "lemma": "scissors",
+      "translation": "tijeras",
+      "pos": "noun"
+    },
+    {
+      "word": "blade",
+      "lemma": "blade",
+      "translation": "hoja / filo",
+      "pos": "noun"
+    },
+    {
+      "word": "handle",
+      "lemma": "handle",
+      "translation": "mango",
+      "pos": "noun"
+    },
+    {
+      "word": "bench",
+      "lemma": "bench",
+      "translation": "banco de trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "workshop",
+      "lemma": "workshop",
+      "translation": "taller",
+      "pos": "noun"
+    },
+    {
+      "word": "tool",
+      "lemma": "tool",
+      "translation": "herramienta",
+      "pos": "noun"
+    },
+    {
+      "word": "helmet",
+      "lemma": "helmet",
+      "translation": "casco",
+      "pos": "noun"
+    },
+    {
+      "word": "goggles",
+      "lemma": "goggles",
+      "translation": "gafas de protección",
+      "pos": "noun"
+    },
+    {
+      "word": "gloves",
+      "lemma": "gloves",
+      "translation": "guantes",
+      "pos": "noun"
+    },
+    {
+      "word": "apron",
+      "lemma": "apron",
+      "translation": "delantal",
+      "pos": "noun"
+    },
+    {
+      "word": "to tighten",
+      "lemma": "tighten",
+      "translation": "apretar",
+      "pos": "verb"
+    },
+    {
+      "word": "to loosen",
+      "lemma": "loosen",
+      "translation": "aflojar",
+      "pos": "verb"
+    },
+    {
+      "word": "to cut",
+      "lemma": "cut",
+      "translation": "cortar",
+      "pos": "verb"
+    },
+    {
+      "word": "to measure",
+      "lemma": "measure",
+      "translation": "medir",
+      "pos": "verb"
+    },
+    {
+      "word": "to drill",
+      "lemma": "drill",
+      "translation": "taladrar",
+      "pos": "verb"
+    },
+    {
+      "word": "to sand",
+      "lemma": "sand",
+      "translation": "lijar",
+      "pos": "verb"
+    },
+    {
+      "word": "mallet",
+      "lemma": "mallet",
+      "translation": "mazo de goma",
+      "pos": "noun"
+    },
+    {
+      "word": "crowbar",
+      "lemma": "crowbar",
+      "translation": "palanca",
+      "pos": "noun"
+    },
+    {
+      "word": "utility knife",
+      "lemma": "utility knife",
+      "translation": "cúter",
+      "pos": "noun"
+    },
+    {
+      "word": "plumb line",
+      "lemma": "plumb line",
+      "translation": "plomada",
+      "pos": "noun"
+    },
+    {
+      "word": "paintbrush",
+      "lemma": "paintbrush",
+      "translation": "brocha",
+      "pos": "noun"
+    },
+    {
+      "word": "roller",
+      "lemma": "roller",
+      "translation": "rodillo",
+      "pos": "noun"
+    },
+    {
+      "word": "paint",
+      "lemma": "paint",
+      "translation": "pintura",
+      "pos": "noun"
+    },
+    {
+      "word": "varnish",
+      "lemma": "varnish",
+      "translation": "barniz",
+      "pos": "noun"
+    },
+    {
+      "word": "filler",
+      "lemma": "filler",
+      "translation": "masilla",
+      "pos": "noun"
+    },
+    {
+      "word": "sealant",
+      "lemma": "sealant",
+      "translation": "sellador",
+      "pos": "noun"
+    },
+    {
+      "word": "tile",
+      "lemma": "tile",
+      "translation": "baldosa",
+      "pos": "noun"
+    },
+    {
+      "word": "grout",
+      "lemma": "grout",
+      "translation": "lechada",
+      "pos": "noun"
+    },
+    {
+      "word": "brick",
+      "lemma": "brick",
+      "translation": "ladrillo",
+      "pos": "noun"
+    },
+    {
+      "word": "cement",
+      "lemma": "cement",
+      "translation": "cemento",
+      "pos": "noun"
+    },
+    {
+      "word": "mortar",
+      "lemma": "mortar",
+      "translation": "mortero",
+      "pos": "noun"
+    },
+    {
+      "word": "concrete",
+      "lemma": "concrete",
+      "translation": "hormigón",
+      "pos": "noun"
+    },
+    {
+      "word": "timber",
+      "lemma": "timber",
+      "translation": "madera",
+      "pos": "noun"
+    },
+    {
+      "word": "plank",
+      "lemma": "plank",
+      "translation": "tabla",
+      "pos": "noun"
+    },
+    {
+      "word": "plywood",
+      "lemma": "plywood",
+      "translation": "contrachapado",
+      "pos": "noun"
+    },
+    {
+      "word": "wall plug",
+      "lemma": "wall plug",
+      "translation": "taco",
+      "pos": "noun"
+    },
+    {
+      "word": "padlock",
+      "lemma": "padlock",
+      "translation": "candado",
+      "pos": "noun"
+    },
+    {
+      "word": "extension lead",
+      "lemma": "extension lead",
+      "translation": "alargadera",
+      "pos": "noun"
+    },
+    {
+      "word": "soldering iron",
+      "lemma": "soldering iron",
+      "translation": "soldador",
+      "pos": "noun"
+    },
+    {
+      "word": "torch",
+      "lemma": "torch",
+      "translation": "linterna",
+      "pos": "noun"
+    },
+    {
+      "word": "bucket",
+      "lemma": "bucket",
+      "translation": "cubo",
+      "pos": "noun"
+    },
+    {
+      "word": "to screw",
+      "lemma": "screw",
+      "translation": "atornillar",
+      "pos": "verb"
+    },
+    {
+      "word": "to saw",
+      "lemma": "saw",
+      "translation": "serrar",
+      "pos": "verb"
+    },
+    {
+      "word": "to paint",
+      "lemma": "paint",
+      "translation": "pintar",
+      "pos": "verb"
+    },
+    {
+      "word": "to tile",
+      "lemma": "tile",
+      "translation": "alicatar",
+      "pos": "verb"
+    },
+    {
+      "word": "to weld",
+      "lemma": "weld",
+      "translation": "soldar",
+      "pos": "verb"
+    },
+    {
+      "word": "to glue",
+      "lemma": "glue",
+      "translation": "pegar",
+      "pos": "verb"
+    },
+    {
+      "word": "to hammer",
+      "lemma": "hammer",
+      "translation": "martillar",
+      "pos": "verb"
+    },
+    {
+      "word": "workbench",
+      "lemma": "workbench",
+      "translation": "banco de trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "dust mask",
+      "lemma": "dust mask",
+      "translation": "mascarilla",
+      "pos": "noun"
+    },
+    {
+      "word": "ear defenders",
+      "lemma": "ear defenders",
+      "translation": "protectores auditivos",
+      "pos": "noun"
+    },
+    {
+      "word": "spirit level",
+      "lemma": "spirit level",
+      "translation": "nivel de burbuja",
+      "pos": "noun"
+    },
+    {
+      "word": "set square",
+      "lemma": "set square",
+      "translation": "escuadra",
+      "pos": "noun"
+    },
+    {
+      "word": "pencil mark",
+      "lemma": "pencil mark",
+      "translation": "marca de lápiz",
+      "pos": "noun"
+    },
+    {
+      "word": "to plane",
+      "lemma": "plane",
+      "translation": "cepillar",
+      "pos": "verb"
+    },
+    {
+      "word": "sandpaper sheet",
+      "lemma": "sandpaper sheet",
+      "translation": "hoja de lija",
+      "pos": "noun"
+    },
+    {
+      "word": "hinge",
+      "lemma": "hinge",
+      "translation": "bisagra",
+      "pos": "noun"
+    },
+    {
+      "word": "hook",
+      "lemma": "hook",
+      "translation": "gancho",
+      "pos": "noun"
+    },
+    {
+      "word": "shelf bracket",
+      "lemma": "shelf bracket",
+      "translation": "escuadra de estante",
+      "pos": "noun"
+    },
+    {
+      "word": "instruction manual",
+      "lemma": "instruction manual",
+      "translation": "manual de instrucciones",
+      "pos": "noun"
+    },
+    {
+      "word": "spare part",
+      "lemma": "spare part",
+      "translation": "recambio",
+      "pos": "noun"
+    },
+    {
+      "word": "to repair",
+      "lemma": "repair",
+      "translation": "reparar",
+      "pos": "verb"
+    },
+    {
+      "word": "to assemble",
+      "lemma": "assemble",
+      "translation": "montar",
+      "pos": "verb"
+    },
+    {
+      "word": "to dismantle",
+      "lemma": "dismantle",
+      "translation": "desmontar",
+      "pos": "verb"
+    },
+    {
+      "word": "rust",
+      "lemma": "rust",
+      "translation": "óxido",
+      "pos": "noun"
+    },
+    {
+      "word": "to oil",
+      "lemma": "oil",
+      "translation": "engrasar",
+      "pos": "verb"
+    },
+    {
+      "word": "measuring tape",
+      "lemma": "measuring tape",
+      "translation": "cinta métrica",
+      "pos": "noun"
+    },
+    {
+      "word": "tool belt",
+      "lemma": "tool belt",
+      "translation": "cinturón portaherramientas",
+      "pos": "noun"
+    },
+    {
+      "word": "to fix",
+      "lemma": "fix",
+      "translation": "arreglar",
+      "pos": "verb"
+    }
   ]
 }

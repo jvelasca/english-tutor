@@ -128,6 +128,24 @@ describe("ItemReplayButton · V3.75.5", () => {
     );
   });
 
+  it("en español hay un solo botón y no pide una voz inglesa", async () => {
+    getVoicesMock.mockResolvedValue(
+      catalog(["en_US-lessac-medium", "en_GB-alan-medium"]),
+    );
+    render(
+      <I18nProvider lang="en" setLang={() => {}}>
+        <ItemReplayButton prompt="casa" userId="user-1" language="es" />
+      </I18nProvider>,
+    );
+
+    const spain = await screen.findByRole("button", { name: "Listen in Spanish from Spain" });
+    expect(screen.queryByRole("button", { name: /accent B/i })).toBeNull();
+    fireEvent.click(spain);
+
+    await waitFor(() => expect(speakMock).toHaveBeenCalledWith("casa.", "user-1", "es"));
+    expect(speakMock.mock.calls[0]).toHaveLength(3);
+  });
+
   it("con una sola voz instalada no hay botón B", async () => {
     getVoicesMock.mockResolvedValue(catalog(["en_US-lessac-medium"]));
     renderReplay();

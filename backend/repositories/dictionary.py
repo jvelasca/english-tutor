@@ -520,6 +520,42 @@ def distractor_pool(word: str, *, limit: int = _POOL_LIMIT) -> list[dict]:
     return pool
 
 
+def translations_near(length: int, *, band: int, limit: int = 400) -> list[str]:
+    """Traducciones cuya longitud cae cerca de `length`.
+
+    Sirve para armar distractores de «¿Cuál es?» parecidos en tamaño antes de
+    medir las sílabas. No devuelve la tabla entera.
+    """
+    low = max(1, length - band)
+    high = max(low, length + band)
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT translation FROM dictionary_entries "
+            "WHERE translation <> '' AND length(translation) BETWEEN ? AND ? "
+            "ORDER BY word LIMIT ?",
+            (low, high, limit),
+        ).fetchall()
+    return [str(row["translation"]) for row in rows]
+
+
+def words_near(length: int, *, band: int, limit: int = 400) -> list[str]:
+    """Lemas ingleses cuya longitud cae cerca de `length`.
+
+    Distractores de «¿Cuál es?» cuando se pregunta el español y se responde
+    la palabra inglesa. No devuelve la tabla entera.
+    """
+    low = max(1, length - band)
+    high = max(low, length + band)
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT word FROM dictionary_entries "
+            "WHERE word <> '' AND length(word) BETWEEN ? AND ? "
+            "ORDER BY word LIMIT ?",
+            (low, high, limit),
+        ).fetchall()
+    return [str(row["word"]) for row in rows]
+
+
 # ---------------------------------------------------------------------------
 # V3.39 (diccionario reversible): caché ES→EN. Tabla propia y aislada de
 # `dictionary_entries` para no contaminar el banco de distractores del MCQ
