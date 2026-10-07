@@ -2810,6 +2810,17 @@ body.is-resizing {
   transform: scale(0.94);
 }
 
+.icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+}
+
+.icon-button:disabled:hover {
+  color: var(--color-text-dim);
+  border-color: var(--color-border);
+}
+
 /* Panel de apariencia: control segmentado y muestras de color. */
 .seg {
   display: inline-flex;

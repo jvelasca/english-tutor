@@ -35,6 +35,16 @@ from schemas.chat import ChatMessage
 from services import llm, semantics, translate
 from services import situation as situation_service
 
+# V3.95.0: el guardarraíl de retrotraducción reutiliza el comparador del matcher
+# inverso (`_gloss_segments`, `_segment_score`, `normalize_term`) en vez de
+# escribir una segunda semántica de coincidencia. `dictionary_reverse` no
+# importa este módulo, así que no hay ciclo.
+from services.dictionary_reverse import (
+    _gloss_segments,
+    _segment_score,
+    normalize_term,
+)
+
 logger = logging.getLogger(__name__)
 
 # Versión del prompt + parseador + política POS. Un cambio de criterio (prompt,
@@ -95,7 +105,14 @@ logger = logging.getLogger(__name__)
 # regenera una sola vez al primer lookup (misma invalidación perezosa: no hay
 # migración de datos ni de esquema, y `pos`/`gloss` siguen siendo la identidad
 # frente a los sentidos viejos, así que el scoring NO cambia de forma).
-GENERATOR_VERSION = "1.7.0"
+#
+# V3.95.0: bump 1.7.0 -> 1.8.0. La dirección ES→EN gana el guardarraíl de
+# RETROTRADUCCIÓN (`generate_reverse_content`): un equivalente que no vuelve al
+# término español de origen se descarta en vez de servirse y cachearse. Era el
+# fallo de la caché de «broca» → «rock» (confusión con «roca»). El contenido
+# anterior a 1.8.0 se regenera una sola vez al primer lookup y, al pasar por el
+# guardarraíl, una fila envenenada no puede sobrevivir al bump.
+GENERATOR_VERSION = "1.8.0"
 
 # Límites de contenido generado (validación del parseo tolerante).
 MAX_WORD_CHARS = 80
@@ -297,6 +314,8 @@ _REVERSE_SYSTEM_PROMPT = (
     "can choose. Every \"example\" must contain the English equivalent in some "
     "form and must fit the meaning it belongs to; never repeat the same "
     "example in two senses. "
+    "If you do NOT know the English equivalent, or you are not confident it is "
+    "correct, reply with exactly {\"english\": null} instead of guessing. "
     "Do not add any text outside the JSON object."
 )
 
@@ -743,17 +762,93 @@ async def generate_reverse_content(
     *,
     model: str | None = None,
     fetcher=None,
+    verifier=None,
 ) -> dict:
     """Genera `{english, pos, definition, situation, senses}` para el término ES `word`.
 
     Mismo `fetcher` inyectable y misma degradación que `generate_content`; el
     término debe venir normalizado (minúsculas, acentos conservados).
+
+    V3.95.0 (guardarraíl de retrotraducción): antes de dar por buena la respuesta,
+    el equivalente inglés elegido se RETROTRADUCE con el modelo y se exige que el
+    término español de origen aparezca entre sus traducciones. Es lo que impide
+    servir (y CACHEAR) un equivalente inventado por confusión léxica —el caso
+    reportado «broca» → «rock» (roca)—: como «rock» retrocede a «roca», no a
+    «broca», se descarta con `ContentUnavailableError` y el dominio degrada a
+    `definition_source="none"` en lugar de envenenar la caché global. La
+    verificación es inyectable (`verifier`) para los tests.
     """
     fetch = fetcher or _reverse_fetcher
     raw = await fetch(word, model)
-    return parse_reverse_content(raw, word=word)
+    content = parse_reverse_content(raw, word=word)
+    english = (content.get("english") or "").strip()
+    check = verifier or _default_reverse_verifier
+    if english and not await check(word, english, model):
+        raise ContentUnavailableError(
+            f"El equivalente '{english}' de '{word}' no supera la retrotraducción"
+        )
+    return content
 
 
 async def _reverse_fetcher(word: str, model: str | None) -> str:
     """Llama al modelo local con el prompt ES→EN (misma política y degradación)."""
     return await _fetch_chat(word, model, system_prompt=_REVERSE_SYSTEM_PROMPT)
+
+
+def _spanish_candidates(direct: dict) -> list[str]:
+    """Términos ESPAÑOLES con los que el modelo describe una palabra inglesa.
+
+    De la respuesta EN→ES (`translation` + `meanings`) extrae los segmentos
+    comparables de cada glosa con el MISMO comparador plegado del matcher inverso
+    (`services.dictionary_reverse`), para no inventar una segunda semántica de
+    coincidencia. Puro y tolerante: cualquier campo ausente se ignora.
+    """
+    candidates: list[str] = []
+    candidates.extend(_gloss_segments(direct.get("translation") or ""))
+    for meaning in direct.get("meanings") or []:
+        if isinstance(meaning, dict):
+            term = normalize_term(meaning.get("term") or "")
+            if term:
+                candidates.append(term)
+    return candidates
+
+
+def _matches_source_term(word: str, candidates: list[str]) -> bool:
+    """¿El término español `word` está entre los candidatos de la retrotraducción?
+
+    Usa el scoring de coincidencia del matcher inverso (`_segment_score`):
+    exacta, prefijo u ocurrencia como palabra completa. Plegado de acentos
+    incluido (la eñe se conserva como letra distinta).
+    """
+    target = normalize_term(word)
+    if not target:
+        return False
+    return any(_segment_score(candidate, target) >= 0 for candidate in candidates)
+
+
+async def _default_reverse_verifier(
+    word: str, english: str, model: str | None
+) -> bool:
+    """Retrotraducción de `english` (EN→ES) y comprobación contra `word` (V3.95.0).
+
+    Llama al modelo con el prompt DIRECTO sobre el equivalente inglés y exige que
+    el término español buscado aparezca entre los términos devueltos. Cualquier
+    fallo del modelo o respuesta inválida se trata como NO verificado (se
+    descarta el equivalente): es más honesto degradar a «sin contenido» que
+    servir una traducción que no se ha podido comprobar. Puro respecto al
+    estado del producto (no persiste nada).
+    """
+    try:
+        raw = await _fetch_chat(english, model)
+    except ContentUnavailableError:
+        return False
+    try:
+        direct = parse_content(raw, word=english)
+    except ContentUnavailableError:
+        return False
+    return _matches_source_term(word, _spanish_candidates(direct))
+
+
+# Punto de inyección para tests (sustituible sin tocar el modelo), igual que
+# `_default_fetcher`: el guardarraíl lo consulta en tiempo de llamada.
+_default_reverse_verifier = _default_reverse_verifier

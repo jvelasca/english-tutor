@@ -5,53 +5,605 @@
   "title_es": "Informática e Internet",
   "cefr_hint": "A2",
   "items": [
-    {"word": "keyboard", "lemma": "keyboard", "translation": "teclado", "pos": "noun"},
-    {"word": "mouse", "lemma": "mouse", "translation": "ratón", "pos": "noun"},
-    {"word": "screen", "lemma": "screen", "translation": "pantalla", "pos": "noun"},
-    {"word": "monitor", "lemma": "monitor", "translation": "monitor", "pos": "noun"},
-    {"word": "laptop", "lemma": "laptop", "translation": "portátil", "pos": "noun"},
-    {"word": "desktop", "lemma": "desktop", "translation": "ordenador de sobremesa", "pos": "noun"},
-    {"word": "printer", "lemma": "printer", "translation": "impresora", "pos": "noun"},
-    {"word": "scanner", "lemma": "scanner", "translation": "escáner", "pos": "noun"},
-    {"word": "hard drive", "lemma": "hard drive", "translation": "disco duro", "pos": "noun"},
-    {"word": "memory", "lemma": "memory", "translation": "memoria", "pos": "noun"},
-    {"word": "processor", "lemma": "processor", "translation": "procesador", "pos": "noun"},
-    {"word": "motherboard", "lemma": "motherboard", "translation": "placa base", "pos": "noun"},
-    {"word": "software", "lemma": "software", "translation": "software", "pos": "noun"},
-    {"word": "hardware", "lemma": "hardware", "translation": "hardware", "pos": "noun"},
-    {"word": "program", "lemma": "program", "translation": "programa", "pos": "noun"},
-    {"word": "application", "lemma": "application", "translation": "aplicación", "pos": "noun"},
-    {"word": "file", "lemma": "file", "translation": "archivo", "pos": "noun"},
-    {"word": "folder", "lemma": "folder", "translation": "carpeta", "pos": "noun"},
-    {"word": "password", "lemma": "password", "translation": "contraseña", "pos": "noun"},
-    {"word": "username", "lemma": "username", "translation": "nombre de usuario", "pos": "noun"},
-    {"word": "login", "lemma": "login", "translation": "inicio de sesión", "pos": "noun"},
-    {"word": "backup", "lemma": "backup", "translation": "copia de seguridad", "pos": "noun"},
-    {"word": "network", "lemma": "network", "translation": "red", "pos": "noun"},
-    {"word": "internet", "lemma": "internet", "translation": "internet", "pos": "noun"},
-    {"word": "website", "lemma": "website", "translation": "sitio web", "pos": "noun"},
-    {"word": "browser", "lemma": "browser", "translation": "navegador", "pos": "noun"},
-    {"word": "search engine", "lemma": "search engine", "translation": "buscador", "pos": "noun"},
-    {"word": "email", "lemma": "email", "translation": "correo electrónico", "pos": "noun"},
-    {"word": "attachment", "lemma": "attachment", "translation": "archivo adjunto", "pos": "noun"},
-    {"word": "link", "lemma": "link", "translation": "enlace", "pos": "noun"},
-    {"word": "database", "lemma": "database", "translation": "base de datos", "pos": "noun"},
-    {"word": "server", "lemma": "server", "translation": "servidor", "pos": "noun"},
-    {"word": "cloud", "lemma": "cloud", "translation": "nube", "pos": "noun"},
-    {"word": "bug", "lemma": "bug", "translation": "error de programa", "pos": "noun"},
-    {"word": "firewall", "lemma": "firewall", "translation": "cortafuegos", "pos": "noun"},
-    {"word": "encryption", "lemma": "encryption", "translation": "cifrado", "pos": "noun"},
-    {"word": "shortcut", "lemma": "shortcut", "translation": "atajo", "pos": "noun"},
-    {"word": "cursor", "lemma": "cursor", "translation": "cursor", "pos": "noun"},
-    {"word": "to download", "lemma": "download", "translation": "descargar", "pos": "verb"},
-    {"word": "to upload", "lemma": "upload", "translation": "subir", "pos": "verb"},
-    {"word": "to install", "lemma": "install", "translation": "instalar", "pos": "verb"},
-    {"word": "to uninstall", "lemma": "uninstall", "translation": "desinstalar", "pos": "verb"},
-    {"word": "to update", "lemma": "update", "translation": "actualizar", "pos": "verb"},
-    {"word": "to save", "lemma": "save", "translation": "guardar", "pos": "verb"},
-    {"word": "to delete", "lemma": "delete", "translation": "borrar", "pos": "verb"},
-    {"word": "to click", "lemma": "click", "translation": "hacer clic", "pos": "verb"},
-    {"word": "to type", "lemma": "type", "translation": "escribir (con teclado)", "pos": "verb"},
-    {"word": "to debug", "lemma": "debug", "translation": "depurar", "pos": "verb"}
+    {
+      "word": "keyboard",
+      "lemma": "keyboard",
+      "translation": "teclado",
+      "pos": "noun"
+    },
+    {
+      "word": "mouse",
+      "lemma": "mouse",
+      "translation": "ratón",
+      "pos": "noun"
+    },
+    {
+      "word": "screen",
+      "lemma": "screen",
+      "translation": "pantalla",
+      "pos": "noun"
+    },
+    {
+      "word": "monitor",
+      "lemma": "monitor",
+      "translation": "monitor",
+      "pos": "noun"
+    },
+    {
+      "word": "laptop",
+      "lemma": "laptop",
+      "translation": "portátil",
+      "pos": "noun"
+    },
+    {
+      "word": "desktop",
+      "lemma": "desktop",
+      "translation": "ordenador de sobremesa",
+      "pos": "noun"
+    },
+    {
+      "word": "printer",
+      "lemma": "printer",
+      "translation": "impresora",
+      "pos": "noun"
+    },
+    {
+      "word": "scanner",
+      "lemma": "scanner",
+      "translation": "escáner",
+      "pos": "noun"
+    },
+    {
+      "word": "hard drive",
+      "lemma": "hard drive",
+      "translation": "disco duro",
+      "pos": "noun"
+    },
+    {
+      "word": "memory",
+      "lemma": "memory",
+      "translation": "memoria",
+      "pos": "noun"
+    },
+    {
+      "word": "processor",
+      "lemma": "processor",
+      "translation": "procesador",
+      "pos": "noun"
+    },
+    {
+      "word": "motherboard",
+      "lemma": "motherboard",
+      "translation": "placa base",
+      "pos": "noun"
+    },
+    {
+      "word": "software",
+      "lemma": "software",
+      "translation": "software",
+      "pos": "noun"
+    },
+    {
+      "word": "hardware",
+      "lemma": "hardware",
+      "translation": "hardware",
+      "pos": "noun"
+    },
+    {
+      "word": "program",
+      "lemma": "program",
+      "translation": "programa",
+      "pos": "noun"
+    },
+    {
+      "word": "application",
+      "lemma": "application",
+      "translation": "aplicación",
+      "pos": "noun"
+    },
+    {
+      "word": "file",
+      "lemma": "file",
+      "translation": "archivo",
+      "pos": "noun"
+    },
+    {
+      "word": "folder",
+      "lemma": "folder",
+      "translation": "carpeta",
+      "pos": "noun"
+    },
+    {
+      "word": "password",
+      "lemma": "password",
+      "translation": "contraseña",
+      "pos": "noun"
+    },
+    {
+      "word": "username",
+      "lemma": "username",
+      "translation": "nombre de usuario",
+      "pos": "noun"
+    },
+    {
+      "word": "login",
+      "lemma": "login",
+      "translation": "inicio de sesión",
+      "pos": "noun"
+    },
+    {
+      "word": "backup",
+      "lemma": "backup",
+      "translation": "copia de seguridad",
+      "pos": "noun"
+    },
+    {
+      "word": "network",
+      "lemma": "network",
+      "translation": "red",
+      "pos": "noun"
+    },
+    {
+      "word": "internet",
+      "lemma": "internet",
+      "translation": "internet",
+      "pos": "noun"
+    },
+    {
+      "word": "website",
+      "lemma": "website",
+      "translation": "sitio web",
+      "pos": "noun"
+    },
+    {
+      "word": "browser",
+      "lemma": "browser",
+      "translation": "navegador",
+      "pos": "noun"
+    },
+    {
+      "word": "search engine",
+      "lemma": "search engine",
+      "translation": "buscador",
+      "pos": "noun"
+    },
+    {
+      "word": "email",
+      "lemma": "email",
+      "translation": "correo electrónico",
+      "pos": "noun"
+    },
+    {
+      "word": "attachment",
+      "lemma": "attachment",
+      "translation": "archivo adjunto",
+      "pos": "noun"
+    },
+    {
+      "word": "link",
+      "lemma": "link",
+      "translation": "enlace",
+      "pos": "noun"
+    },
+    {
+      "word": "database",
+      "lemma": "database",
+      "translation": "base de datos",
+      "pos": "noun"
+    },
+    {
+      "word": "server",
+      "lemma": "server",
+      "translation": "servidor",
+      "pos": "noun"
+    },
+    {
+      "word": "cloud",
+      "lemma": "cloud",
+      "translation": "nube",
+      "pos": "noun"
+    },
+    {
+      "word": "bug",
+      "lemma": "bug",
+      "translation": "error de programa",
+      "pos": "noun"
+    },
+    {
+      "word": "firewall",
+      "lemma": "firewall",
+      "translation": "cortafuegos",
+      "pos": "noun"
+    },
+    {
+      "word": "encryption",
+      "lemma": "encryption",
+      "translation": "cifrado",
+      "pos": "noun"
+    },
+    {
+      "word": "shortcut",
+      "lemma": "shortcut",
+      "translation": "atajo",
+      "pos": "noun"
+    },
+    {
+      "word": "cursor",
+      "lemma": "cursor",
+      "translation": "cursor",
+      "pos": "noun"
+    },
+    {
+      "word": "to download",
+      "lemma": "download",
+      "translation": "descargar",
+      "pos": "verb"
+    },
+    {
+      "word": "to upload",
+      "lemma": "upload",
+      "translation": "subir",
+      "pos": "verb"
+    },
+    {
+      "word": "to install",
+      "lemma": "install",
+      "translation": "instalar",
+      "pos": "verb"
+    },
+    {
+      "word": "to uninstall",
+      "lemma": "uninstall",
+      "translation": "desinstalar",
+      "pos": "verb"
+    },
+    {
+      "word": "to update",
+      "lemma": "update",
+      "translation": "actualizar",
+      "pos": "verb"
+    },
+    {
+      "word": "to save",
+      "lemma": "save",
+      "translation": "guardar",
+      "pos": "verb"
+    },
+    {
+      "word": "to delete",
+      "lemma": "delete",
+      "translation": "borrar",
+      "pos": "verb"
+    },
+    {
+      "word": "to click",
+      "lemma": "click",
+      "translation": "hacer clic",
+      "pos": "verb"
+    },
+    {
+      "word": "to type",
+      "lemma": "type",
+      "translation": "escribir (con teclado)",
+      "pos": "verb"
+    },
+    {
+      "word": "to debug",
+      "lemma": "debug",
+      "translation": "depurar",
+      "pos": "verb"
+    },
+    {
+      "word": "wifi",
+      "lemma": "wifi",
+      "translation": "wifi",
+      "pos": "noun"
+    },
+    {
+      "word": "router",
+      "lemma": "router",
+      "translation": "router",
+      "pos": "noun"
+    },
+    {
+      "word": "charger",
+      "lemma": "charger",
+      "translation": "cargador",
+      "pos": "noun"
+    },
+    {
+      "word": "battery",
+      "lemma": "battery",
+      "translation": "batería",
+      "pos": "noun"
+    },
+    {
+      "word": "tablet",
+      "lemma": "tablet",
+      "translation": "tableta",
+      "pos": "noun"
+    },
+    {
+      "word": "smartphone",
+      "lemma": "smartphone",
+      "translation": "móvil",
+      "pos": "noun"
+    },
+    {
+      "word": "headphone",
+      "lemma": "headphone",
+      "translation": "auricular",
+      "pos": "noun"
+    },
+    {
+      "word": "speaker",
+      "lemma": "speaker",
+      "translation": "altavoz",
+      "pos": "noun"
+    },
+    {
+      "word": "webcam",
+      "lemma": "webcam",
+      "translation": "cámara web",
+      "pos": "noun"
+    },
+    {
+      "word": "microphone",
+      "lemma": "microphone",
+      "translation": "micrófono",
+      "pos": "noun"
+    },
+    {
+      "word": "operating system",
+      "lemma": "operating system",
+      "translation": "sistema operativo",
+      "pos": "noun"
+    },
+    {
+      "word": "tab",
+      "lemma": "tab",
+      "translation": "pestaña",
+      "pos": "noun"
+    },
+    {
+      "word": "icon",
+      "lemma": "icon",
+      "translation": "icono",
+      "pos": "noun"
+    },
+    {
+      "word": "settings",
+      "lemma": "settings",
+      "translation": "ajustes",
+      "pos": "noun"
+    },
+    {
+      "word": "notification",
+      "lemma": "notification",
+      "translation": "notificación",
+      "pos": "noun"
+    },
+    {
+      "word": "spam",
+      "lemma": "spam",
+      "translation": "correo basura",
+      "pos": "noun"
+    },
+    {
+      "word": "inbox",
+      "lemma": "inbox",
+      "translation": "bandeja de entrada",
+      "pos": "noun"
+    },
+    {
+      "word": "draft",
+      "lemma": "draft",
+      "translation": "borrador",
+      "pos": "noun"
+    },
+    {
+      "word": "malware",
+      "lemma": "malware",
+      "translation": "programa malicioso",
+      "pos": "noun"
+    },
+    {
+      "word": "licence",
+      "lemma": "licence",
+      "translation": "licencia",
+      "pos": "noun"
+    },
+    {
+      "word": "profile",
+      "lemma": "profile",
+      "translation": "perfil",
+      "pos": "noun"
+    },
+    {
+      "word": "privacy",
+      "lemma": "privacy",
+      "translation": "privacidad",
+      "pos": "noun"
+    },
+    {
+      "word": "cookie",
+      "lemma": "cookie",
+      "translation": "cookie",
+      "pos": "noun"
+    },
+    {
+      "word": "cache",
+      "lemma": "cache",
+      "translation": "caché",
+      "pos": "noun"
+    },
+    {
+      "word": "bandwidth",
+      "lemma": "bandwidth",
+      "translation": "ancho de banda",
+      "pos": "noun"
+    },
+    {
+      "word": "pixel",
+      "lemma": "pixel",
+      "translation": "píxel",
+      "pos": "noun"
+    },
+    {
+      "word": "screenshot",
+      "lemma": "screenshot",
+      "translation": "captura de pantalla",
+      "pos": "noun"
+    },
+    {
+      "word": "clipboard",
+      "lemma": "clipboard",
+      "translation": "portapapeles",
+      "pos": "noun"
+    },
+    {
+      "word": "to restart",
+      "lemma": "restart",
+      "translation": "reiniciar",
+      "pos": "verb"
+    },
+    {
+      "word": "to connect",
+      "lemma": "connect",
+      "translation": "conectarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to disconnect",
+      "lemma": "disconnect",
+      "translation": "desconectarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to browse",
+      "lemma": "browse",
+      "translation": "navegar",
+      "pos": "verb"
+    },
+    {
+      "word": "to search",
+      "lemma": "search",
+      "translation": "buscar",
+      "pos": "verb"
+    },
+    {
+      "word": "to share",
+      "lemma": "share",
+      "translation": "compartir",
+      "pos": "verb"
+    },
+    {
+      "word": "to print",
+      "lemma": "print",
+      "translation": "imprimir",
+      "pos": "verb"
+    },
+    {
+      "word": "to scan",
+      "lemma": "scan",
+      "translation": "escanear",
+      "pos": "verb"
+    },
+    {
+      "word": "to lock",
+      "lemma": "lock",
+      "translation": "bloquear",
+      "pos": "verb"
+    },
+    {
+      "word": "to log in",
+      "lemma": "log in",
+      "translation": "iniciar sesión",
+      "pos": "noun"
+    },
+    {
+      "word": "pop-up",
+      "lemma": "pop-up",
+      "translation": "ventana emergente",
+      "pos": "noun"
+    },
+    {
+      "word": "bookmark",
+      "lemma": "bookmark",
+      "translation": "marcador",
+      "pos": "noun"
+    },
+    {
+      "word": "homepage",
+      "lemma": "homepage",
+      "translation": "página de inicio",
+      "pos": "noun"
+    },
+    {
+      "word": "scroll",
+      "lemma": "scroll",
+      "translation": "desplazamiento",
+      "pos": "noun"
+    },
+    {
+      "word": "to scroll",
+      "lemma": "scroll",
+      "translation": "desplazarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to copy",
+      "lemma": "copy",
+      "translation": "copiar",
+      "pos": "verb"
+    },
+    {
+      "word": "to paste",
+      "lemma": "paste",
+      "translation": "pegar",
+      "pos": "verb"
+    },
+    {
+      "word": "to undo",
+      "lemma": "undo",
+      "translation": "deshacer",
+      "pos": "verb"
+    },
+    {
+      "word": "plug",
+      "lemma": "plug",
+      "translation": "conector",
+      "pos": "noun"
+    },
+    {
+      "word": "cable",
+      "lemma": "cable",
+      "translation": "cable",
+      "pos": "noun"
+    },
+    {
+      "word": "adapter",
+      "lemma": "adapter",
+      "translation": "adaptador",
+      "pos": "noun"
+    },
+    {
+      "word": "touchscreen",
+      "lemma": "touchscreen",
+      "translation": "pantalla táctil",
+      "pos": "noun"
+    },
+    {
+      "word": "to charge",
+      "lemma": "charge",
+      "translation": "cargar",
+      "pos": "verb"
+    },
+    {
+      "word": "keyboard shortcut",
+      "lemma": "keyboard shortcut",
+      "translation": "atajo de teclado",
+      "pos": "noun"
+    }
   ]
 }

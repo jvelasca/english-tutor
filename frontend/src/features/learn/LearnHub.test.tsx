@@ -15,7 +15,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { I18nProvider } from "../../hooks/useI18n";
+import { translate } from "../../utils/i18n";
 import { LearnHub } from "./LearnHub";
+
+/** Etiqueta accesible de una tarjeta de actividad en el idioma del proveedor. */
+function activityAriaLabel(skillKey: string): string {
+  return `${translate("es", "learn.activityAria")}: ${translate("es", skillKey)}`;
+}
 
 function renderHub() {
   return render(
@@ -55,8 +61,17 @@ describe("LearnHub · cierre GUI (V3.73.1)", () => {
   it("mantiene las 4 actividades del hub", () => {
     renderHub();
 
-    for (const name of ["Listening", "Speaking", "Vocabulary", "Grammar"]) {
-      expect(screen.getByRole("button", { name: new RegExp(name) })).toBeTruthy();
+    // Etiquetas resueltas en el idioma del proveedor (es), no literales en
+    // inglés: el hub ya se renderiza traducido y el test debe seguir al Render.
+    for (const key of [
+      "skill.listening",
+      "skill.speaking",
+      "skill.vocabulary",
+      "skill.grammar",
+    ]) {
+      expect(
+        screen.getByRole("button", { name: activityAriaLabel(key) }),
+      ).toBeTruthy();
     }
   });
 
@@ -66,12 +81,11 @@ describe("LearnHub · cierre GUI (V3.73.1)", () => {
     const tutor = screen.getByTestId("learn-hub-tutor");
     expect(tutor.className).toContain("sm:grid-cols-2");
     // Las dos destrezas existen como superficie propia dentro de APRENDER...
-    expect(
-      screen.getByRole("button", { name: /Abrir actividad: Reading/ }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: /Abrir actividad: Writing/ }),
-    ).toBeTruthy();
+    for (const key of ["skill.reading", "skill.writing"]) {
+      expect(
+        screen.getByRole("button", { name: activityAriaLabel(key) }),
+      ).toBeTruthy();
+    }
     // ...y no compiten con las 4 tarjetas del hub.
     expect(screen.getByTestId("learn-hub-grid").contains(tutor)).toBe(false);
   });

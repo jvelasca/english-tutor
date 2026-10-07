@@ -5,52 +5,605 @@
   "title_es": "Escuela y educación",
   "cefr_hint": "A2",
   "items": [
-    {"word": "school", "lemma": "school", "translation": "escuela", "pos": "noun"},
-    {"word": "teacher", "lemma": "teacher", "translation": "profesor", "pos": "noun"},
-    {"word": "student", "lemma": "student", "translation": "estudiante", "pos": "noun"},
-    {"word": "pupil", "lemma": "pupil", "translation": "alumno", "pos": "noun"},
-    {"word": "class", "lemma": "class", "translation": "clase", "pos": "noun"},
-    {"word": "classroom", "lemma": "classroom", "translation": "aula", "pos": "noun"},
-    {"word": "lesson", "lemma": "lesson", "translation": "lección", "pos": "noun"},
-    {"word": "subject", "lemma": "subject", "translation": "asignatura", "pos": "noun"},
-    {"word": "homework", "lemma": "homework", "translation": "deberes", "pos": "noun"},
-    {"word": "exam", "lemma": "exam", "translation": "examen", "pos": "noun"},
-    {"word": "test", "lemma": "test", "translation": "prueba", "pos": "noun"},
-    {"word": "grade", "lemma": "grade", "translation": "nota", "pos": "noun"},
-    {"word": "mark", "lemma": "mark", "translation": "calificación", "pos": "noun"},
-    {"word": "notebook", "lemma": "notebook", "translation": "cuaderno", "pos": "noun"},
-    {"word": "textbook", "lemma": "textbook", "translation": "libro de texto", "pos": "noun"},
-    {"word": "pen", "lemma": "pen", "translation": "bolígrafo", "pos": "noun"},
-    {"word": "pencil", "lemma": "pencil", "translation": "lápiz", "pos": "noun"},
-    {"word": "rubber", "lemma": "rubber", "translation": "goma", "pos": "noun"},
-    {"word": "ruler", "lemma": "ruler", "translation": "regla", "pos": "noun"},
-    {"word": "blackboard", "lemma": "blackboard", "translation": "pizarra", "pos": "noun"},
-    {"word": "whiteboard", "lemma": "whiteboard", "translation": "pizarra blanca", "pos": "noun"},
-    {"word": "desk", "lemma": "desk", "translation": "pupitre", "pos": "noun"},
-    {"word": "library", "lemma": "library", "translation": "biblioteca", "pos": "noun"},
-    {"word": "playground", "lemma": "playground", "translation": "patio de recreo", "pos": "noun"},
-    {"word": "timetable", "lemma": "timetable", "translation": "horario", "pos": "noun"},
-    {"word": "break", "lemma": "break", "translation": "recreo", "pos": "noun"},
-    {"word": "term", "lemma": "term", "translation": "trimestre", "pos": "noun"},
-    {"word": "holiday", "lemma": "holiday", "translation": "vacaciones", "pos": "noun"},
-    {"word": "degree", "lemma": "degree", "translation": "título universitario", "pos": "noun"},
-    {"word": "university", "lemma": "university", "translation": "universidad", "pos": "noun"},
-    {"word": "college", "lemma": "college", "translation": "facultad", "pos": "noun"},
-    {"word": "scholarship", "lemma": "scholarship", "translation": "beca", "pos": "noun"},
-    {"word": "course", "lemma": "course", "translation": "curso", "pos": "noun"},
-    {"word": "lecture", "lemma": "lecture", "translation": "conferencia", "pos": "noun"},
-    {"word": "essay", "lemma": "essay", "translation": "redacción", "pos": "noun"},
-    {"word": "report", "lemma": "report", "translation": "informe", "pos": "noun"},
-    {"word": "project", "lemma": "project", "translation": "proyecto", "pos": "noun"},
-    {"word": "question", "lemma": "question", "translation": "pregunta", "pos": "noun"},
-    {"word": "answer", "lemma": "answer", "translation": "respuesta", "pos": "noun"},
-    {"word": "to study", "lemma": "study", "translation": "estudiar", "pos": "verb"},
-    {"word": "to learn", "lemma": "learn", "translation": "aprender", "pos": "verb"},
-    {"word": "to teach", "lemma": "teach", "translation": "enseñar", "pos": "verb"},
-    {"word": "to revise", "lemma": "revise", "translation": "repasar", "pos": "verb"},
-    {"word": "to pass", "lemma": "pass", "translation": "aprobar", "pos": "verb"},
-    {"word": "to fail", "lemma": "fail", "translation": "suspender", "pos": "verb"},
-    {"word": "to graduate", "lemma": "graduate", "translation": "graduarse", "pos": "verb"},
-    {"word": "to attend", "lemma": "attend", "translation": "asistir a", "pos": "verb"}
+    {
+      "word": "school",
+      "lemma": "school",
+      "translation": "escuela",
+      "pos": "noun"
+    },
+    {
+      "word": "teacher",
+      "lemma": "teacher",
+      "translation": "profesor",
+      "pos": "noun"
+    },
+    {
+      "word": "student",
+      "lemma": "student",
+      "translation": "estudiante",
+      "pos": "noun"
+    },
+    {
+      "word": "pupil",
+      "lemma": "pupil",
+      "translation": "alumno",
+      "pos": "noun"
+    },
+    {
+      "word": "class",
+      "lemma": "class",
+      "translation": "clase",
+      "pos": "noun"
+    },
+    {
+      "word": "classroom",
+      "lemma": "classroom",
+      "translation": "aula",
+      "pos": "noun"
+    },
+    {
+      "word": "lesson",
+      "lemma": "lesson",
+      "translation": "lección",
+      "pos": "noun"
+    },
+    {
+      "word": "subject",
+      "lemma": "subject",
+      "translation": "asignatura",
+      "pos": "noun"
+    },
+    {
+      "word": "homework",
+      "lemma": "homework",
+      "translation": "deberes",
+      "pos": "noun"
+    },
+    {
+      "word": "exam",
+      "lemma": "exam",
+      "translation": "examen",
+      "pos": "noun"
+    },
+    {
+      "word": "test",
+      "lemma": "test",
+      "translation": "prueba",
+      "pos": "noun"
+    },
+    {
+      "word": "grade",
+      "lemma": "grade",
+      "translation": "nota",
+      "pos": "noun"
+    },
+    {
+      "word": "mark",
+      "lemma": "mark",
+      "translation": "calificación",
+      "pos": "noun"
+    },
+    {
+      "word": "notebook",
+      "lemma": "notebook",
+      "translation": "cuaderno",
+      "pos": "noun"
+    },
+    {
+      "word": "textbook",
+      "lemma": "textbook",
+      "translation": "libro de texto",
+      "pos": "noun"
+    },
+    {
+      "word": "pen",
+      "lemma": "pen",
+      "translation": "bolígrafo",
+      "pos": "noun"
+    },
+    {
+      "word": "pencil",
+      "lemma": "pencil",
+      "translation": "lápiz",
+      "pos": "noun"
+    },
+    {
+      "word": "rubber",
+      "lemma": "rubber",
+      "translation": "goma",
+      "pos": "noun"
+    },
+    {
+      "word": "ruler",
+      "lemma": "ruler",
+      "translation": "regla",
+      "pos": "noun"
+    },
+    {
+      "word": "blackboard",
+      "lemma": "blackboard",
+      "translation": "pizarra",
+      "pos": "noun"
+    },
+    {
+      "word": "whiteboard",
+      "lemma": "whiteboard",
+      "translation": "pizarra blanca",
+      "pos": "noun"
+    },
+    {
+      "word": "desk",
+      "lemma": "desk",
+      "translation": "pupitre",
+      "pos": "noun"
+    },
+    {
+      "word": "library",
+      "lemma": "library",
+      "translation": "biblioteca",
+      "pos": "noun"
+    },
+    {
+      "word": "playground",
+      "lemma": "playground",
+      "translation": "patio de recreo",
+      "pos": "noun"
+    },
+    {
+      "word": "timetable",
+      "lemma": "timetable",
+      "translation": "horario",
+      "pos": "noun"
+    },
+    {
+      "word": "break",
+      "lemma": "break",
+      "translation": "recreo",
+      "pos": "noun"
+    },
+    {
+      "word": "term",
+      "lemma": "term",
+      "translation": "trimestre",
+      "pos": "noun"
+    },
+    {
+      "word": "holiday",
+      "lemma": "holiday",
+      "translation": "vacaciones",
+      "pos": "noun"
+    },
+    {
+      "word": "degree",
+      "lemma": "degree",
+      "translation": "título universitario",
+      "pos": "noun"
+    },
+    {
+      "word": "university",
+      "lemma": "university",
+      "translation": "universidad",
+      "pos": "noun"
+    },
+    {
+      "word": "college",
+      "lemma": "college",
+      "translation": "facultad",
+      "pos": "noun"
+    },
+    {
+      "word": "scholarship",
+      "lemma": "scholarship",
+      "translation": "beca",
+      "pos": "noun"
+    },
+    {
+      "word": "course",
+      "lemma": "course",
+      "translation": "curso",
+      "pos": "noun"
+    },
+    {
+      "word": "lecture",
+      "lemma": "lecture",
+      "translation": "conferencia",
+      "pos": "noun"
+    },
+    {
+      "word": "essay",
+      "lemma": "essay",
+      "translation": "redacción",
+      "pos": "noun"
+    },
+    {
+      "word": "report",
+      "lemma": "report",
+      "translation": "informe",
+      "pos": "noun"
+    },
+    {
+      "word": "project",
+      "lemma": "project",
+      "translation": "proyecto",
+      "pos": "noun"
+    },
+    {
+      "word": "question",
+      "lemma": "question",
+      "translation": "pregunta",
+      "pos": "noun"
+    },
+    {
+      "word": "answer",
+      "lemma": "answer",
+      "translation": "respuesta",
+      "pos": "noun"
+    },
+    {
+      "word": "to study",
+      "lemma": "study",
+      "translation": "estudiar",
+      "pos": "verb"
+    },
+    {
+      "word": "to learn",
+      "lemma": "learn",
+      "translation": "aprender",
+      "pos": "verb"
+    },
+    {
+      "word": "to teach",
+      "lemma": "teach",
+      "translation": "enseñar",
+      "pos": "verb"
+    },
+    {
+      "word": "to revise",
+      "lemma": "revise",
+      "translation": "repasar",
+      "pos": "verb"
+    },
+    {
+      "word": "to pass",
+      "lemma": "pass",
+      "translation": "aprobar",
+      "pos": "verb"
+    },
+    {
+      "word": "to fail",
+      "lemma": "fail",
+      "translation": "suspender",
+      "pos": "verb"
+    },
+    {
+      "word": "to graduate",
+      "lemma": "graduate",
+      "translation": "graduarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to attend",
+      "lemma": "attend",
+      "translation": "asistir a",
+      "pos": "verb"
+    },
+    {
+      "word": "head teacher",
+      "lemma": "head teacher",
+      "translation": "director",
+      "pos": "noun"
+    },
+    {
+      "word": "classmate",
+      "lemma": "classmate",
+      "translation": "compañero de clase",
+      "pos": "noun"
+    },
+    {
+      "word": "maths",
+      "lemma": "maths",
+      "translation": "matemáticas",
+      "pos": "noun"
+    },
+    {
+      "word": "science",
+      "lemma": "science",
+      "translation": "ciencias",
+      "pos": "noun"
+    },
+    {
+      "word": "history",
+      "lemma": "history",
+      "translation": "historia",
+      "pos": "noun"
+    },
+    {
+      "word": "geography",
+      "lemma": "geography",
+      "translation": "geografía",
+      "pos": "noun"
+    },
+    {
+      "word": "spelling",
+      "lemma": "spelling",
+      "translation": "ortografía",
+      "pos": "noun"
+    },
+    {
+      "word": "grammar",
+      "lemma": "grammar",
+      "translation": "gramática",
+      "pos": "noun"
+    },
+    {
+      "word": "pronunciation",
+      "lemma": "pronunciation",
+      "translation": "pronunciación",
+      "pos": "noun"
+    },
+    {
+      "word": "dictionary",
+      "lemma": "dictionary",
+      "translation": "diccionario",
+      "pos": "noun"
+    },
+    {
+      "word": "worksheet",
+      "lemma": "worksheet",
+      "translation": "ficha",
+      "pos": "noun"
+    },
+    {
+      "word": "mock exam",
+      "lemma": "mock exam",
+      "translation": "examen de prueba",
+      "pos": "noun"
+    },
+    {
+      "word": "certificate",
+      "lemma": "certificate",
+      "translation": "certificado",
+      "pos": "noun"
+    },
+    {
+      "word": "register",
+      "lemma": "register",
+      "translation": "lista de asistencia",
+      "pos": "noun"
+    },
+    {
+      "word": "absence",
+      "lemma": "absence",
+      "translation": "falta de asistencia",
+      "pos": "noun"
+    },
+    {
+      "word": "detention",
+      "lemma": "detention",
+      "translation": "castigo",
+      "pos": "noun"
+    },
+    {
+      "word": "canteen",
+      "lemma": "canteen",
+      "translation": "comedor",
+      "pos": "noun"
+    },
+    {
+      "word": "locker",
+      "lemma": "locker",
+      "translation": "taquilla",
+      "pos": "noun"
+    },
+    {
+      "word": "laboratory",
+      "lemma": "laboratory",
+      "translation": "laboratorio",
+      "pos": "noun"
+    },
+    {
+      "word": "calculator",
+      "lemma": "calculator",
+      "translation": "calculadora",
+      "pos": "noun"
+    },
+    {
+      "word": "highlighter",
+      "lemma": "highlighter",
+      "translation": "rotulador fluorescente",
+      "pos": "noun"
+    },
+    {
+      "word": "folder",
+      "lemma": "folder",
+      "translation": "carpeta",
+      "pos": "noun"
+    },
+    {
+      "word": "chapter",
+      "lemma": "chapter",
+      "translation": "capítulo",
+      "pos": "noun"
+    },
+    {
+      "word": "paragraph",
+      "lemma": "paragraph",
+      "translation": "párrafo",
+      "pos": "noun"
+    },
+    {
+      "word": "summary",
+      "lemma": "summary",
+      "translation": "resumen",
+      "pos": "noun"
+    },
+    {
+      "word": "to memorise",
+      "lemma": "memorise",
+      "translation": "memorizar",
+      "pos": "verb"
+    },
+    {
+      "word": "to practise",
+      "lemma": "practise",
+      "translation": "practicar",
+      "pos": "verb"
+    },
+    {
+      "word": "to explain",
+      "lemma": "explain",
+      "translation": "explicar",
+      "pos": "verb"
+    },
+    {
+      "word": "to understand",
+      "lemma": "understand",
+      "translation": "entender",
+      "pos": "verb"
+    },
+    {
+      "word": "to hand in",
+      "lemma": "hand in",
+      "translation": "entregar",
+      "pos": "verb"
+    },
+    {
+      "word": "to cheat",
+      "lemma": "cheat",
+      "translation": "copiar en un examen",
+      "pos": "verb"
+    },
+    {
+      "word": "to enrol",
+      "lemma": "enrol",
+      "translation": "matricularse",
+      "pos": "verb"
+    },
+    {
+      "word": "primary school",
+      "lemma": "primary school",
+      "translation": "colegio de primaria",
+      "pos": "noun"
+    },
+    {
+      "word": "secondary school",
+      "lemma": "secondary school",
+      "translation": "instituto",
+      "pos": "noun"
+    },
+    {
+      "word": "sixth form",
+      "lemma": "sixth form",
+      "translation": "bachillerato",
+      "pos": "noun"
+    },
+    {
+      "word": "term time",
+      "lemma": "term time",
+      "translation": "periodo lectivo",
+      "pos": "noun"
+    },
+    {
+      "word": "half-term",
+      "lemma": "half-term",
+      "translation": "vacaciones de mitad de trimestre",
+      "pos": "noun"
+    },
+    {
+      "word": "parents' evening",
+      "lemma": "parents' evening",
+      "translation": "reunión de padres",
+      "pos": "noun"
+    },
+    {
+      "word": "school report",
+      "lemma": "school report",
+      "translation": "boletín de notas",
+      "pos": "noun"
+    },
+    {
+      "word": "to raise your hand",
+      "lemma": "raise your hand",
+      "translation": "levantar la mano",
+      "pos": "verb"
+    },
+    {
+      "word": "to take notes",
+      "lemma": "take notes",
+      "translation": "tomar apuntes",
+      "pos": "verb"
+    },
+    {
+      "word": "exercise book",
+      "lemma": "exercise book",
+      "translation": "cuaderno de ejercicios",
+      "pos": "noun"
+    },
+    {
+      "word": "pencil case",
+      "lemma": "pencil case",
+      "translation": "estuche",
+      "pos": "noun"
+    },
+    {
+      "word": "sharpener",
+      "lemma": "sharpener",
+      "translation": "sacapuntas",
+      "pos": "noun"
+    },
+    {
+      "word": "glue stick",
+      "lemma": "glue stick",
+      "translation": "barra de pegamento",
+      "pos": "noun"
+    },
+    {
+      "word": "pair of compasses",
+      "lemma": "pair of compasses",
+      "translation": "compás",
+      "pos": "noun"
+    },
+    {
+      "word": "map of the school",
+      "lemma": "map of the school",
+      "translation": "plano del centro",
+      "pos": "noun"
+    },
+    {
+      "word": "assembly",
+      "lemma": "assembly",
+      "translation": "asamblea",
+      "pos": "noun"
+    },
+    {
+      "word": "bell",
+      "lemma": "bell",
+      "translation": "timbre",
+      "pos": "noun"
+    },
+    {
+      "word": "corridor",
+      "lemma": "corridor",
+      "translation": "pasillo",
+      "pos": "noun"
+    },
+    {
+      "word": "staff room",
+      "lemma": "staff room",
+      "translation": "sala de profesores",
+      "pos": "noun"
+    },
+    {
+      "word": "to skip class",
+      "lemma": "skip class",
+      "translation": "saltarse una clase",
+      "pos": "verb"
+    },
+    {
+      "word": "to catch up",
+      "lemma": "catch up",
+      "translation": "ponerse al día",
+      "pos": "verb"
+    }
   ]
 }

@@ -310,6 +310,7 @@ distinguirse **de un vistazo por su color**.
     ahora `showHeader` (por defecto `true`, para las superficies que la montan suelta) y
     `DictionaryScreen` lo apaga; el ancho y el relleno de página los pone ya el contenedor de la
     pantalla, así que la vista dejó de aplicarlos por segunda vez.
+- **Consulta ES→EN: el significado en español va primero.** Cada acepción se lee al revés del término inglés: el título es la glosa («herramienta de corte») y debajo va la palabra (`saw`). Añadirla a un mazo escribe la palabra en el diccionario del alumno y la enlaza al mazo; no crea una segunda ficha. El recordatorio vive en esa palabra y, en la sesión, «Pista» lo descubre por trozos. El anillo del mazo es aprendidas / total (carta FSRS en repaso); la sesión de hoy sigue teniendo tope.
 - **Medido, no mirado.** El par de direcciones entra en el **arnés de contraste** (`--strict`, 0
   bloqueantes de 444) midiendo la tinta de cada sentido **sobre su relleno compuesto** en los dos
   temas y sobre los dos fondos, con el porcentaje **leído del CSS** en vez de supuesto: 5.99–8.02:1
@@ -458,9 +459,14 @@ Qué vive en cada tarjeta (todo reutiliza componentes existentes):
 
 Reglas de APRENDER:
 
-- **Aquí no existe gating**: nada se bloquea, todo es explorable. Nada puntúa dominio de curso.
-- La **práctica libre genera evidencia** (envía respuestas/eventos) pero no avanza unidades del
-  curso; solo alimenta el modelo del alumno (repaso, recomendación, diagnóstico).
+- **Aquí no existe gating**: nada se bloquea, todo es explorable. Se puede
+  practicar B2 y volver a A1; al volver se sigue desde los intentos de ese nivel.
+- La **práctica libre genera evidencia** y no avanza unidades del curso ni
+  desbloquea el siguiente nivel formal. La ruta de Listening de un nivel sí se
+  **ve** en la sección Listening de Formación de ese mismo nivel (el mismo
+  `route_gate`): es hito de práctica, no certificado CEFR
+  (`docs/CONSTITUCION-PEDAGOGICA.md` §2.3). El resto alimenta el modelo del
+  alumno (repaso, recomendación, diagnóstico).
 - El CHAT deja de ser una sección raíz: "Conversar" vive aquí. Cuando la conversación es una lección
   del curso (lanzada desde Formación) la cabecera muestra el contexto del curso; cuando se entra
   desde Aprender es práctica libre. Es el **mismo workspace con distinta envoltura**, nunca dos

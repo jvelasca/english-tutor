@@ -1,0 +1,609 @@
+{
+  "slug": "weather",
+  "kind": "theme_pack",
+  "title": "Weather",
+  "title_es": "Tiempo y clima",
+  "cefr_hint": "A2",
+  "items": [
+    {
+      "word": "weather",
+      "lemma": "weather",
+      "translation": "tiempo",
+      "pos": "noun"
+    },
+    {
+      "word": "forecast",
+      "lemma": "forecast",
+      "translation": "previsión",
+      "pos": "noun"
+    },
+    {
+      "word": "climate",
+      "lemma": "climate",
+      "translation": "clima",
+      "pos": "noun"
+    },
+    {
+      "word": "temperature",
+      "lemma": "temperature",
+      "translation": "temperatura",
+      "pos": "noun"
+    },
+    {
+      "word": "degree",
+      "lemma": "degree",
+      "translation": "grado",
+      "pos": "noun"
+    },
+    {
+      "word": "thermometer",
+      "lemma": "thermometer",
+      "translation": "termómetro",
+      "pos": "noun"
+    },
+    {
+      "word": "sunny",
+      "lemma": "sunny",
+      "translation": "soleado",
+      "pos": "adjective"
+    },
+    {
+      "word": "cloudy",
+      "lemma": "cloudy",
+      "translation": "nublado",
+      "pos": "adjective"
+    },
+    {
+      "word": "overcast",
+      "lemma": "overcast",
+      "translation": "cubierto",
+      "pos": "adjective"
+    },
+    {
+      "word": "rainy",
+      "lemma": "rainy",
+      "translation": "lluvioso",
+      "pos": "adjective"
+    },
+    {
+      "word": "windy",
+      "lemma": "windy",
+      "translation": "ventoso",
+      "pos": "adjective"
+    },
+    {
+      "word": "foggy",
+      "lemma": "foggy",
+      "translation": "con niebla",
+      "pos": "adjective"
+    },
+    {
+      "word": "stormy",
+      "lemma": "stormy",
+      "translation": "tormentoso",
+      "pos": "adjective"
+    },
+    {
+      "word": "snowy",
+      "lemma": "snowy",
+      "translation": "nevado",
+      "pos": "adjective"
+    },
+    {
+      "word": "humid",
+      "lemma": "humid",
+      "translation": "húmedo",
+      "pos": "adjective"
+    },
+    {
+      "word": "dry",
+      "lemma": "dry",
+      "translation": "seco",
+      "pos": "adjective"
+    },
+    {
+      "word": "mild",
+      "lemma": "mild",
+      "translation": "suave",
+      "pos": "adjective"
+    },
+    {
+      "word": "chilly",
+      "lemma": "chilly",
+      "translation": "fresco",
+      "pos": "adjective"
+    },
+    {
+      "word": "heatwave",
+      "lemma": "heatwave",
+      "translation": "ola de calor",
+      "pos": "noun"
+    },
+    {
+      "word": "sunshine",
+      "lemma": "sunshine",
+      "translation": "sol",
+      "pos": "noun"
+    },
+    {
+      "word": "sunrise",
+      "lemma": "sunrise",
+      "translation": "amanecer",
+      "pos": "noun"
+    },
+    {
+      "word": "sunset",
+      "lemma": "sunset",
+      "translation": "atardecer",
+      "pos": "noun"
+    },
+    {
+      "word": "shade",
+      "lemma": "shade",
+      "translation": "sombra",
+      "pos": "noun"
+    },
+    {
+      "word": "breeze",
+      "lemma": "breeze",
+      "translation": "brisa",
+      "pos": "noun"
+    },
+    {
+      "word": "gale",
+      "lemma": "gale",
+      "translation": "vendaval",
+      "pos": "noun"
+    },
+    {
+      "word": "hurricane",
+      "lemma": "hurricane",
+      "translation": "huracán",
+      "pos": "noun"
+    },
+    {
+      "word": "thunderstorm",
+      "lemma": "thunderstorm",
+      "translation": "tormenta eléctrica",
+      "pos": "noun"
+    },
+    {
+      "word": "lightning",
+      "lemma": "lightning",
+      "translation": "rayo",
+      "pos": "noun"
+    },
+    {
+      "word": "thunder",
+      "lemma": "thunder",
+      "translation": "trueno",
+      "pos": "noun"
+    },
+    {
+      "word": "downpour",
+      "lemma": "downpour",
+      "translation": "chaparrón",
+      "pos": "noun"
+    },
+    {
+      "word": "drizzle",
+      "lemma": "drizzle",
+      "translation": "llovizna",
+      "pos": "noun"
+    },
+    {
+      "word": "shower",
+      "lemma": "shower",
+      "translation": "chubasco",
+      "pos": "noun"
+    },
+    {
+      "word": "puddle",
+      "lemma": "puddle",
+      "translation": "charco",
+      "pos": "noun"
+    },
+    {
+      "word": "flood",
+      "lemma": "flood",
+      "translation": "inundación",
+      "pos": "noun"
+    },
+    {
+      "word": "drought",
+      "lemma": "drought",
+      "translation": "sequía",
+      "pos": "noun"
+    },
+    {
+      "word": "frost",
+      "lemma": "frost",
+      "translation": "helada",
+      "pos": "noun"
+    },
+    {
+      "word": "hail",
+      "lemma": "hail",
+      "translation": "granizo",
+      "pos": "noun"
+    },
+    {
+      "word": "sleet",
+      "lemma": "sleet",
+      "translation": "aguanieve",
+      "pos": "noun"
+    },
+    {
+      "word": "snowflake",
+      "lemma": "snowflake",
+      "translation": "copo de nieve",
+      "pos": "noun"
+    },
+    {
+      "word": "blizzard",
+      "lemma": "blizzard",
+      "translation": "ventisca",
+      "pos": "noun"
+    },
+    {
+      "word": "fog",
+      "lemma": "fog",
+      "translation": "niebla",
+      "pos": "noun"
+    },
+    {
+      "word": "mist",
+      "lemma": "mist",
+      "translation": "bruma",
+      "pos": "noun"
+    },
+    {
+      "word": "rainbow",
+      "lemma": "rainbow",
+      "translation": "arcoíris",
+      "pos": "noun"
+    },
+    {
+      "word": "cloud",
+      "lemma": "cloud",
+      "translation": "nube",
+      "pos": "noun"
+    },
+    {
+      "word": "sky",
+      "lemma": "sky",
+      "translation": "cielo",
+      "pos": "noun"
+    },
+    {
+      "word": "horizon",
+      "lemma": "horizon",
+      "translation": "horizonte",
+      "pos": "noun"
+    },
+    {
+      "word": "umbrella",
+      "lemma": "umbrella",
+      "translation": "paraguas",
+      "pos": "noun"
+    },
+    {
+      "word": "raincoat",
+      "lemma": "raincoat",
+      "translation": "impermeable",
+      "pos": "noun"
+    },
+    {
+      "word": "wellington",
+      "lemma": "wellington",
+      "translation": "bota de agua",
+      "pos": "noun"
+    },
+    {
+      "word": "to rain",
+      "lemma": "rain",
+      "translation": "llover",
+      "pos": "verb"
+    },
+    {
+      "word": "to snow",
+      "lemma": "snow",
+      "translation": "nevar",
+      "pos": "verb"
+    },
+    {
+      "word": "to hail",
+      "lemma": "hail",
+      "translation": "granizar",
+      "pos": "verb"
+    },
+    {
+      "word": "to freeze",
+      "lemma": "freeze",
+      "translation": "helarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to thaw",
+      "lemma": "thaw",
+      "translation": "deshelarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to melt",
+      "lemma": "melt",
+      "translation": "derretirse",
+      "pos": "verb"
+    },
+    {
+      "word": "to clear",
+      "lemma": "clear",
+      "translation": "despejarse",
+      "pos": "verb"
+    },
+    {
+      "word": "spring",
+      "lemma": "spring",
+      "translation": "primavera",
+      "pos": "noun"
+    },
+    {
+      "word": "summer",
+      "lemma": "summer",
+      "translation": "verano",
+      "pos": "noun"
+    },
+    {
+      "word": "autumn",
+      "lemma": "autumn",
+      "translation": "otoño",
+      "pos": "noun"
+    },
+    {
+      "word": "winter",
+      "lemma": "winter",
+      "translation": "invierno",
+      "pos": "noun"
+    },
+    {
+      "word": "season",
+      "lemma": "season",
+      "translation": "estación",
+      "pos": "noun"
+    },
+    {
+      "word": "humidity",
+      "lemma": "humidity",
+      "translation": "humedad",
+      "pos": "noun"
+    },
+    {
+      "word": "north",
+      "lemma": "north",
+      "translation": "norte",
+      "pos": "noun"
+    },
+    {
+      "word": "south",
+      "lemma": "south",
+      "translation": "sur",
+      "pos": "noun"
+    },
+    {
+      "word": "east",
+      "lemma": "east",
+      "translation": "este",
+      "pos": "noun"
+    },
+    {
+      "word": "west",
+      "lemma": "west",
+      "translation": "oeste",
+      "pos": "noun"
+    },
+    {
+      "word": "warning",
+      "lemma": "warning",
+      "translation": "aviso",
+      "pos": "noun"
+    },
+    {
+      "word": "indoors",
+      "lemma": "indoors",
+      "translation": "en interiores",
+      "pos": "adverb"
+    },
+    {
+      "word": "outdoors",
+      "lemma": "outdoors",
+      "translation": "al aire libre",
+      "pos": "adverb"
+    },
+    {
+      "word": "to get wet",
+      "lemma": "get wet",
+      "translation": "mojarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to shelter",
+      "lemma": "shelter",
+      "translation": "resguardarse",
+      "pos": "verb"
+    },
+    {
+      "word": "heat",
+      "lemma": "heat",
+      "translation": "calor",
+      "pos": "noun"
+    },
+    {
+      "word": "cold",
+      "lemma": "cold",
+      "translation": "frío",
+      "pos": "noun"
+    },
+    {
+      "word": "gust",
+      "lemma": "gust",
+      "translation": "ráfaga",
+      "pos": "noun"
+    },
+    {
+      "word": "changeable",
+      "lemma": "changeable",
+      "translation": "variable",
+      "pos": "adjective"
+    },
+    {
+      "word": "unsettled",
+      "lemma": "unsettled",
+      "translation": "inestable",
+      "pos": "adjective"
+    },
+    {
+      "word": "settled",
+      "lemma": "settled",
+      "translation": "estable",
+      "pos": "adjective"
+    },
+    {
+      "word": "muggy",
+      "lemma": "muggy",
+      "translation": "bochornoso",
+      "pos": "adjective"
+    },
+    {
+      "word": "scorching",
+      "lemma": "scorching",
+      "translation": "abrasador",
+      "pos": "adjective"
+    },
+    {
+      "word": "freezing",
+      "lemma": "freezing",
+      "translation": "helador",
+      "pos": "adjective"
+    },
+    {
+      "word": "below zero",
+      "lemma": "below zero",
+      "translation": "bajo cero",
+      "pos": "adjective"
+    },
+    {
+      "word": "average",
+      "lemma": "average",
+      "translation": "media",
+      "pos": "noun"
+    },
+    {
+      "word": "record",
+      "lemma": "record",
+      "translation": "récord",
+      "pos": "noun"
+    },
+    {
+      "word": "satellite",
+      "lemma": "satellite",
+      "translation": "satélite",
+      "pos": "noun"
+    },
+    {
+      "word": "pressure",
+      "lemma": "pressure",
+      "translation": "presión",
+      "pos": "noun"
+    },
+    {
+      "word": "wind",
+      "lemma": "wind",
+      "translation": "viento",
+      "pos": "noun"
+    },
+    {
+      "word": "rain",
+      "lemma": "rain",
+      "translation": "lluvia",
+      "pos": "noun"
+    },
+    {
+      "word": "snow",
+      "lemma": "snow",
+      "translation": "nieve",
+      "pos": "noun"
+    },
+    {
+      "word": "ice",
+      "lemma": "ice",
+      "translation": "hielo",
+      "pos": "noun"
+    },
+    {
+      "word": "storm",
+      "lemma": "storm",
+      "translation": "tormenta",
+      "pos": "noun"
+    },
+    {
+      "word": "to warm up",
+      "lemma": "warm up",
+      "translation": "entrar en calor",
+      "pos": "verb"
+    },
+    {
+      "word": "to cool down",
+      "lemma": "cool down",
+      "translation": "refrescar",
+      "pos": "verb"
+    },
+    {
+      "word": "waterproof",
+      "lemma": "waterproof",
+      "translation": "impermeable",
+      "pos": "adjective"
+    },
+    {
+      "word": "to forecast",
+      "lemma": "forecast",
+      "translation": "prever el tiempo",
+      "pos": "verb"
+    },
+    {
+      "word": "weather map",
+      "lemma": "weather map",
+      "translation": "mapa del tiempo",
+      "pos": "noun"
+    },
+    {
+      "word": "cold snap",
+      "lemma": "cold snap",
+      "translation": "ola de frío",
+      "pos": "noun"
+    },
+    {
+      "word": "bright",
+      "lemma": "bright",
+      "translation": "luminoso",
+      "pos": "adjective"
+    },
+    {
+      "word": "dull",
+      "lemma": "dull",
+      "translation": "gris",
+      "pos": "adjective"
+    },
+    {
+      "word": "to pour",
+      "lemma": "pour",
+      "translation": "llover a cántaros",
+      "pos": "verb"
+    },
+    {
+      "word": "to drizzle",
+      "lemma": "drizzle",
+      "translation": "lloviznar",
+      "pos": "verb"
+    }
+  ]
+}

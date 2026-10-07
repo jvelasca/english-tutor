@@ -152,7 +152,8 @@ def test_prompts_declare_senses_and_version_is_bumped():
     # V3.91: el contrato de acepción crece (ejemplo, contexto, lema y
     # procedencia) y sube la versión, que es la palanca que regenera la caché
     # anterior de forma perezosa.
-    assert dictionary_content.GENERATOR_VERSION == "1.7.0"
+    # V3.95.0: sube a 1.8.0 con el guardarraíl de retrotraducción (V3.95.0).
+    assert dictionary_content.GENERATOR_VERSION == "1.8.0"
     assert "senses" in dictionary_content._SYSTEM_PROMPT
     assert "senses" in dictionary_content._REVERSE_SYSTEM_PROMPT
     # V3.86.0: el contrato gana `meanings` (significados elegibles) y la regla

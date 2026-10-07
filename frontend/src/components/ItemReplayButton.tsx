@@ -27,6 +27,8 @@ interface ItemReplayButtonProps {
   userId?: string | null;
   /** Idioma de la síntesis; inglés por defecto. */
   language?: VoiceLanguage;
+  /** Avisa al pulsar, también si el audio no llega a sonar. */
+  onPlay?: () => void;
   className?: string;
 }
 
@@ -51,6 +53,7 @@ export function ItemReplayButton({
   correctIndex = null,
   userId,
   language = "en",
+  onPlay,
   className,
 }: ItemReplayButtonProps) {
   const { t } = useI18n();
@@ -64,7 +67,8 @@ export function ItemReplayButton({
   });
   if (!text) return null;
 
-  const accents: VoiceAccent[] = choice.alt ? ["a", "b"] : ["a"];
+  const spanish = language === "es";
+  const accents: VoiceAccent[] = !spanish && choice.alt ? ["a", "b"] : ["a"];
   // Un ítem con opciones es un ítem con pregunta, no una frase suelta: la
   // etiqueta del grupo lo dice, aunque el perfil haya pedido la lectura corta.
   const hasOptions = options.length > 0;
@@ -79,11 +83,16 @@ export function ItemReplayButton({
 
   async function play(accent: VoiceAccent) {
     if (busy) return;
+    onPlay?.();
     setBusy(accent);
     try {
-      const voice = choice.voiceFor(accent);
-      if (voice) await speakWithVoice(text, userId, language, { voice });
-      else await speakWithVoice(text, userId, language);
+      if (spanish) {
+        await speakWithVoice(text, userId, "es");
+      } else {
+        const voice = choice.voiceFor(accent);
+        if (voice) await speakWithVoice(text, userId, language, { voice });
+        else await speakWithVoice(text, userId, language);
+      }
     } catch {
       /* TTS no disponible: se ignora, nunca bloquea el resultado */
     } finally {
@@ -103,8 +112,10 @@ export function ItemReplayButton({
       aria-label={hasOptions ? t("voice.replayItem") : t("voice.replayPhrase")}
     >
       {accents.map((accent) => {
-        const word = accentWord(accent);
-        const title = t(accent === "b" ? "voice.replayItemB" : "voice.replayItemA");
+        const word = spanish ? "" : accentWord(accent);
+        const title = spanish
+          ? t("voice.replaySpain")
+          : t(accent === "b" ? "voice.replayItemB" : "voice.replayItemA");
         return (
           <button
             key={accent}
@@ -124,7 +135,11 @@ export function ItemReplayButton({
             ) : (
               <Volume2 className="size-3.5" aria-hidden="true" />
             )}
-            <span aria-hidden="true">{t(accent === "b" ? "voice.accent.b" : "voice.accent.a")}</span>
+            <span aria-hidden="true">
+              {spanish
+                ? t("voice.accent.es")
+                : t(accent === "b" ? "voice.accent.b" : "voice.accent.a")}
+            </span>
             {word && (
               <span
                 className="hidden font-normal text-muted-foreground sm:inline"

@@ -51,6 +51,7 @@ import type {
   ReviewQueueItem,
   StudyConfig,
   StudyDifficulty,
+  StudyQueue,
   StudyDirection,
   StudyHints,
   StudyMode,
@@ -268,6 +269,10 @@ export function normalizeVocabBulkAdd(raw: unknown): VocabBulkAddResult {
     ...(data as unknown as VocabBulkAddResult),
     added: asStringArray(data.added),
     count: asNumber(data.count),
+    deck_id:
+      data.deck_id == null || data.deck_id === ""
+        ? null
+        : asNumber(data.deck_id),
   };
 }
 
@@ -278,6 +283,10 @@ export function normalizeVocabEnroll(raw: unknown): VocabEnrollResult {
     ...(data as unknown as VocabEnrollResult),
     added: asStringArray(data.added),
     count: asNumber(data.count),
+    deck_id:
+      data.deck_id == null || data.deck_id === ""
+        ? null
+        : asNumber(data.deck_id),
   };
 }
 
@@ -336,9 +345,14 @@ function normalizeFlashcardDeck(raw: Raw): FlashcardDeck {
     name: asString(raw.name),
     slug: asString(raw.slug),
     is_auto: asBoolean(raw.is_auto),
+    source_collection_id:
+      raw.source_collection_id == null || raw.source_collection_id === ""
+        ? null
+        : asNumber(raw.source_collection_id),
     new_per_day: asNumber(raw.new_per_day),
     review_per_day: asNumber(raw.review_per_day),
     card_count: asNumber(raw.card_count),
+    learned_count: asNumber(raw.learned_count),
     shared_count: asNumber(raw.shared_count),
     due_count: asNumber(raw.due_count),
     new_count: asNumber(raw.new_count),
@@ -449,15 +463,82 @@ function asOneOf<T extends string>(
     : fallback;
 }
 
+const REQUIRED_FACETS = ["pronunciation", "context", "senses", "related"] as const;
+
 /** `GET/PUT /api/study/config` y el `study_config` de la cola (V3.87.0). */
 export function normalizeStudyConfig(raw: unknown): StudyConfig {
   const data = isRecord(raw) ? raw : {};
+  const words = asNumber(data.words_per_day);
+  const facets = Array.isArray(data.required_facets) ? data.required_facets : [];
   return {
     direction: asOneOf(data.direction, STUDY_DIRECTIONS, "en-es"),
     mode: asOneOf(data.mode, STUDY_MODES, "recognition"),
     hints: asOneOf(data.hints, STUDY_HINTS, "off"),
     difficulty: asOneOf(data.difficulty, STUDY_DIFFICULTIES, "auto"),
+    words_per_day: words >= 1 && words <= 200 ? words : 20,
+    required_facets: REQUIRED_FACETS.filter((name) =>
+      facets.includes(name),
+    ) as StudyConfig["required_facets"],
     configured: asBoolean(data.configured),
+  };
+}
+
+const LESSON_FACETS = ["meaning", "pronunciation", "context", "senses", "related"] as const;
+const FACET_STATUSES = ["done", "pending", "na"] as const;
+
+function normalizeLessonFacets(raw: unknown): StudyQueue["items"][number]["facets"] {
+  const data = isRecord(raw) ? raw : {};
+  const out: StudyQueue["items"][number]["facets"] = {};
+  for (const name of LESSON_FACETS) {
+    const status = data[name];
+    if (typeof status === "string" && (FACET_STATUSES as readonly string[]).includes(status)) {
+      out[name] = status as "done" | "pending" | "na";
+    }
+  }
+  return out;
+}
+
+/** `GET /api/vocabulary/study/queue`: la lección de hoy y los contadores del ámbito. */
+export function normalizeStudyLessonQueue(raw: unknown): StudyQueue {
+  const data = isRecord(raw) ? raw : {};
+  const scope = asOneOf(data.scope, ["all", "level", "deck"] as const, "all");
+  return {
+    scope,
+    mode: asOneOf(
+      data.mode,
+      ["pending", "unlearned", "hard", "good", "failed", "all"] as const,
+      "pending",
+    ),
+    level: asString(data.level),
+    deck_id: asNumber(data.deck_id),
+    collection_id:
+      data.collection_id == null || data.collection_id === ""
+        ? null
+        : asNumber(data.collection_id),
+    items: asRecordArray(data.items).map((item) => ({
+      item_id: asString(item.item_id),
+      word: asString(item.word),
+      cefr: asString(item.cefr),
+      card_type: item.card_type === "flashcard" ? "flashcard" : "lexicon",
+      card_id: asString(item.card_id),
+      deck_id: asNumber(item.deck_id),
+      is_new: asBoolean(item.is_new),
+      translation: asString(item.translation),
+      definition: asString(item.definition),
+      mnemonic: asString(item.mnemonic),
+      facets: normalizeLessonFacets(item.facets),
+      state: asString(item.state) || "new",
+    })),
+    total: asNumber(data.total),
+    studied: asNumber(data.studied),
+    learned: asNumber(data.learned),
+    unlearned: asNumber(data.unlearned),
+    due: asNumber(data.due),
+    hard: asNumber(data.hard),
+    good: asNumber(data.good),
+    times_studied: asNumber(data.times_studied),
+    queued: asNumber(data.queued),
+    study_config: normalizeStudyConfig(data.study_config),
   };
 }
 

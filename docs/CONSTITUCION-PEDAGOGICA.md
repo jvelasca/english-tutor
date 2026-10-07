@@ -115,6 +115,29 @@ practicando/desarrollando A1".
   (p. ej. "A1 Listening — demonstrated" junto a "B1 Speaking — developing";
   nunca un único nivel global para todo el perfil).
 
+### 2.3 Un dominio, dos puertas
+
+Aprender y Formación no son dos progresos. Son **dos puertas sobre el mismo
+libro de evidencia**.
+
+- **Puerta libre (Aprender).** El alumno elige cualquier nivel y puede llevar
+  varios en paralelo. Nada se bloquea. Al volver a un nivel, la posición sale
+  de los intentos ya guardados: no se empieza de cero. La app guarda y muestra
+  ese avance (cobertura, precisión, puerta de ruta).
+- **Puerta formal (Formación).** El mismo libro, otro plano: orden de unidades,
+  examen y retención. La sección Listening de un nivel **muestra** la ruta de
+  práctica de ese nivel (`route_gate` / `listening_route`). Mostrarla no mueve
+  `academy_objective_mastery`, no desbloquea el siguiente nivel y no imprime
+  un certificado CEFR. Practicar material de un nivel no es haberlo demostrado
+  (sección 2).
+- **Diccionario.** Cuenta como léxico (cobertura y repaso FSRS), no como un
+  nivel CEFR por número de fichas. Aún no se proyecta en la sección de
+  vocabulario del curso.
+
+La línea que no se cruza: elegir B2 en Aprender no abre B2 en Formación ni
+certifica el nivel. Se refleja el trabajo; la certificación formal sigue siendo
+el examen y la retención.
+
 ## 3. Cobertura léxica y unidades léxicas
 
 ### 3.1 Rangos de cobertura léxica (indicadores internos, NO puertas)
@@ -396,6 +419,7 @@ como "tengo B1 en todo".
 | `estimated_bands` (`heuristic_band(score)`) | Estimated CEFR (por destreza) | v3.3.0: sin evidencia la banda es "—" (P0-3); v3.5.0: el perfil nota que las bandas son estimaciones, no certificaciones (P2-9) |
 | `VOCABULARY_BAND_EDGES`/`vocabulary_band`/`evaluate_cefr` | — (interpretación palabras→nivel) | eliminado en v3.3.0 (P0-1) |
 | `route_gate` + `level_status.completed` | Mastery Gate de la competencia Listening (FUNCTIONAL) | v3.3.0: gate de la competencia listening con retención retardada para DEMONSTRATED (P0-4) |
+| `CourseMap.listening_route` | Practice Level de Listening, visible en Formación (§2.3) | proyección de `route_gate` del mismo nivel; no mueve el gating ni certifica |
 | `MasteryRecord` (9 destrezas, `mastery_stage`) | Mastery transversal (DEVELOPING/FUNCTIONAL) | no decide "demostrado" |
 | `mastery_evidence_gate` (Assessment 2.0) | Gate DEMONSTRATED (evidencia por kind) | solo en la escalera, no por competencia libre |
 | `cefr_matrix.json` | Requisitos mínimos por nivel×destreza | v3.4.0: matriz a C1–C2 × las 8 destrezas de la sección 7 (P1-5); `pronunciation` es componente de Speaking y conserva su mínimo plano |

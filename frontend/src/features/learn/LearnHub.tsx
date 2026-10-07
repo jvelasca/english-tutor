@@ -208,7 +208,8 @@ interface LearnHubProps {
  * (Listening · Speaking · Vocabulario · Gramática — DISENO-SPEAKING-UNICO F1;
  * las dos tarjetas orales extra son ahora modos de Speaking) + "Recomendado
  * para ti" servido por el Adaptive Engine. Cada tarjeta abre su sub-ruta de
- * práctica; aquí no existe gating (docs/UI_V3.1.md §4.3).
+ * práctica; aquí no existe gating (docs/UI_V3.1.md §4.3). La ruta de
+ * Listening sí se ve en Formación; no desbloquea el curso.
  */
 export function LearnHub({ userId, onStart, refreshKey = 0 }: LearnHubProps) {
   const { t } = useI18n();

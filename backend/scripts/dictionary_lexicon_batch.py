@@ -67,7 +67,11 @@ from repositories import db as db_repo  # noqa: E402
 from repositories import dictionary as dictionary_repo  # noqa: E402
 from repositories.collections import PACKS_DIR  # noqa: E402
 from services import curriculum as curriculum_service  # noqa: E402
-from services import dictionary_batch, dictionary_content  # noqa: E402
+from services import (  # noqa: E402
+    dictionary_batch,
+    dictionary_content,
+    dictionary_glossary,  # noqa: E402
+)
 
 # Ritmo medido del modelo local con el contrato de acepción VIGENTE (1.7.0):
 # 3 palabras reales preparadas en 26 s de lote sobre una BD temporal con
@@ -78,7 +82,12 @@ from services import dictionary_batch, dictionary_content  # noqa: E402
 # puede corregirlo con `--seconds-per-word` si su equipo es más rápido o más
 # lento. Con este ritmo, las 1.041 palabras del currículum son ≈ 2 h 31 min.
 MEASURED_SECONDS_PER_WORD = 8.7
+# La dirección inversa paga DOS llamadas por término (generación + retrotraducción
+# del guardarraíl V3.95.0), así que el ritmo medido se dobla. Igual de aproximado
+# que el directo y corregible con `--seconds-per-word`.
+MEASURED_SECONDS_PER_WORD_REVERSE = 17.4
 DEFAULT_UNIVERSE_LABEL = "currículum declarado (objective.vocabulary + packs)"
+REVERSE_UNIVERSE_LABEL = "términos españoles curados + traducciones de la caché"
 
 
 def _words_from_packs() -> list[str]:
@@ -112,6 +121,48 @@ def curriculum_words() -> list[str]:
         for objective in level.objectives():
             words.extend(str(word) for word in objective.vocabulary)
     words.extend(_words_from_packs())
+    return words
+
+
+def _split_glosses(raw: object) -> list[str]:
+    """Trocea un campo de traducción ES en términos sueltos («casa, hogar»)."""
+    text = str(raw or "").replace(";", ",").replace("/", ",")
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def reverse_universe() -> list[str]:
+    """Universo de la dirección ES→EN: términos españoles que la app puede buscar.
+
+    Fuentes, todas DETERMINISTAS (nada de datos de terceros, sin licencia):
+
+    - el glosario curado (su cabeza española, `es`);
+    - las traducciones españolas de los packs temáticos;
+    - las traducciones de la caché DIRECTA ya generada (`dictionary_entries`): son
+      los términos españoles que el modelo ya usa para describir el vocabulario del
+      currículum y, por tanto, los que un alumno puede acabar buscando en reversa.
+
+    Se devuelve CRUDO: la limpieza/dedupe/invalidación es de `plan_batch`. Los
+    términos que ya sirven el glosario o los packs NO necesitan generación (la
+    consulta los resuelve sin modelo); se incluyen igual y la frescura/el
+    guardarraíl deciden, porque la lista no es tan grande como para optimizarla.
+    """
+    words: list[str] = []
+    for item in dictionary_glossary.glossary_items():
+        words.append(str(item.get("translation") or ""))
+    if PACKS_DIR.is_dir():
+        for path in sorted(PACKS_DIR.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                print(
+                    f"AVISO: pack ilegible, se omite: {path.name}", file=sys.stderr
+                )
+                continue
+            for item in payload.get("items") or []:
+                if isinstance(item, dict):
+                    words.append(str(item.get("translation") or ""))
+    for entry in dictionary_repo.list_entries():
+        words.extend(_split_glosses(entry.get("translation")))
     return words
 
 
@@ -169,6 +220,48 @@ def _make_persist():
             pos=content.get("pos", ""),
             definition=content.get("definition", ""),
             translation=content.get("translation", ""),
+            situation=content.get("situation", ""),
+            senses=content.get("senses") or [],
+            meanings=content.get("meanings") or [],
+            generator_version=dictionary_content.GENERATOR_VERSION,
+        )
+
+    return persist
+
+
+def _make_generate_reverse(model: str | None, timeout: float):
+    """Generador ES→EN con el GUARDARRAÍL del producto activado (V3.95.0).
+
+    Es `dictionary_content.generate_reverse_content`, que ya incluye la
+    retrotraducción: un equivalente que no vuelve al término español de origen se
+    descarta (lleva al `ContentUnavailableError` que `run_batch` cuenta como
+    `empty`). Así el lote NO puede envenenar la caché inversa; como mucho deja
+    más términos pendientes para la siguiente pasada.
+    """
+
+    async def generate(word: str) -> dict | None:
+        try:
+            return await asyncio.wait_for(
+                dictionary_content.generate_reverse_content(word, model=model),
+                timeout=timeout,
+            )
+        except dictionary_content.ContentUnavailableError:
+            return None
+        except asyncio.TimeoutError:
+            return None
+
+    return generate
+
+
+def _make_persist_reverse():
+    """Persistencia ES→EN inyectable: `save_reverse_entry` del producto."""
+
+    def persist(word: str, content: dict) -> bool:
+        return dictionary_repo.save_reverse_entry(
+            word,
+            english=content.get("english", ""),
+            pos=content.get("pos", ""),
+            definition=content.get("definition", ""),
             situation=content.get("situation", ""),
             senses=content.get("senses") or [],
             meanings=content.get("meanings") or [],
@@ -247,6 +340,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Ruta de la base de datos (por defecto: la del producto).",
     )
     parser.add_argument(
+        "--direction",
+        choices=("en-es", "es-en"),
+        default="en-es",
+        help=(
+            "Dirección del lote (por defecto: en-es). `es-en` prepara la búsqueda "
+            "inversa y pasa por el guardarraíl de retrotraducción (dos llamadas)."
+        ),
+    )
+    parser.add_argument(
         "--words-file",
         type=Path,
         default=None,
@@ -300,6 +402,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.db is not None:
         db_repo.DB_PATH = args.db
 
+    reverse = args.direction == "es-en"
+    normalize = (
+        dictionary_batch.normalize_term_es
+        if reverse
+        else dictionary_batch.normalize_word
+    )
+    seconds_per_word = args.seconds_per_word
+    if seconds_per_word == MEASURED_SECONDS_PER_WORD and reverse:
+        # El ritmo por defecto se ajusta a la dirección elegida (la inversa paga
+        # dos llamadas); un valor explícito del operador manda siempre.
+        seconds_per_word = MEASURED_SECONDS_PER_WORD_REVERSE
+
     # Universo de trabajo. Con lista propia se usa SOLO la lista: mezclarla con
     # el currículum haría que la estimación y el recuento no cuadraran con lo
     # pedido.
@@ -313,6 +427,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: no se pudo leer {args.words_file}: {exc}", file=sys.stderr)
             return 2
         universe_label = str(args.words_file)
+    elif reverse:
+        universe = reverse_universe()
+        universe_label = REVERSE_UNIVERSE_LABEL
     else:
         universe = curriculum_words()
         universe_label = DEFAULT_UNIVERSE_LABEL
@@ -325,19 +442,26 @@ def main(argv: list[str] | None = None) -> int:
 
     version = dictionary_content.GENERATOR_VERSION
     try:
-        fresh = dictionary_repo.fresh_entry_words(universe, version=version)
+        fresh = (
+            dictionary_repo.fresh_reverse_entry_words(universe, version=version)
+            if reverse
+            else dictionary_repo.fresh_entry_words(universe, version=version)
+        )
     except Exception as exc:  # noqa: BLE001 — se reporta como error de configuración
         print(f"ERROR: no se pudo leer la caché: {exc}", file=sys.stderr)
         return 2
 
-    plan = dictionary_batch.plan_batch(universe, fresh=fresh, limit=args.limit)
+    plan = dictionary_batch.plan_batch(
+        universe, fresh=fresh, limit=args.limit, normalize=normalize
+    )
 
     if not args.as_json:
         print("Lote del lexicón offline (V3.91, fase 2)")
         print(f"  Base de datos:       {db_repo.DB_PATH}")
+        print(f"  Dirección:           {args.direction}")
         print(f"  Contrato vigente:    GENERATOR_VERSION={version}")
         print(f"  Fuente del universo: {universe_label}")
-        _print_plan(plan, args.seconds_per_word)
+        _print_plan(plan, seconds_per_word)
 
     if args.dry_run:
         if args.as_json:
@@ -346,6 +470,7 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "database": str(db_repo.DB_PATH),
                         "generator_version": version,
+                        "direction": args.direction,
                         "universe": universe_label,
                         "plan": {
                             "universe": plan.universe,
@@ -357,7 +482,7 @@ def main(argv: list[str] | None = None) -> int:
                             "limited": plan.limited,
                             "estimated_seconds": round(
                                 dictionary_batch.estimate_seconds(
-                                    len(plan.words), args.seconds_per_word
+                                    len(plan.words), seconds_per_word
                                 ),
                                 1,
                             ),
@@ -378,10 +503,16 @@ def main(argv: list[str] | None = None) -> int:
     report = asyncio.run(
         dictionary_batch.run_batch(
             plan.words,
-            generate=_make_generate(
-                args.model, config.DICTIONARY_GENERATION_TIMEOUT_SECONDS
+            generate=(
+                _make_generate_reverse(
+                    args.model, config.DICTIONARY_GENERATION_TIMEOUT_SECONDS
+                )
+                if reverse
+                else _make_generate(
+                    args.model, config.DICTIONARY_GENERATION_TIMEOUT_SECONDS
+                )
             ),
-            persist=_make_persist(),
+            persist=_make_persist_reverse() if reverse else _make_persist(),
             max_seconds=args.max_seconds,
             progress_every=args.progress_every,
             on_progress=on_progress,
@@ -392,6 +523,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = {
             "database": str(db_repo.DB_PATH),
             "generator_version": version,
+            "direction": args.direction,
             "universe": universe_label,
             "plan": {
                 "universe": plan.universe,

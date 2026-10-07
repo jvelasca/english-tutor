@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { noteHistoryPush } from "./historyTrailStore";
 
 /**
  * Ruta canónica de la aplicación: string normalizado que SIEMPRE empieza por
@@ -143,6 +144,7 @@ export function navigateTo(path: Path): void {
   if (typeof window === "undefined") return;
   const nextHash = pathToHash(path);
   if (window.location.hash === nextHash) return;
+  noteHistoryPush(normalizeHash(path));
   window.location.hash = nextHash;
 }
 

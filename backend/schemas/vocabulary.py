@@ -543,6 +543,48 @@ class DictionaryEntryOut(BaseModel):
     usage: DictionaryUsageOut
 
 
+class DictionaryCuratedIn(BaseModel):
+    """Corrección curada de una entrada del diccionario (V3.95.0, webmaster).
+
+    `direction` + `word` identifican la fila. `translation` es el español en
+    `en-es` y el equivalente INGLÉS en `es-en`; `definition`/`situation`/
+    `senses`/`meanings` usan el mismo contrato que la caché. `note` es la nota
+    interna del webmaster (por qué se corrigió), no se muestra al alumno.
+    """
+
+    direction: Literal["en-es", "es-en"]
+    word: str = Field(min_length=1, max_length=120)
+    pos: str = Field(default="", max_length=40)
+    definition: str = Field(default="", max_length=600)
+    translation: str = Field(default="", max_length=500)
+    situation: str = Field(default="", max_length=200)
+    senses: list[DictionarySenseOut] = Field(default_factory=list)
+    meanings: list[DictionaryMeaningOut] = Field(default_factory=list)
+    note: str = Field(default="", max_length=500)
+
+
+class DictionaryCuratedOut(BaseModel):
+    """Corrección curada persistida (V3.95.0)."""
+
+    direction: str
+    word: str
+    pos: str = ""
+    definition: str = ""
+    translation: str = ""
+    situation: str = ""
+    senses: list[DictionarySenseOut] = Field(default_factory=list)
+    meanings: list[DictionaryMeaningOut] = Field(default_factory=list)
+    note: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class DictionaryCuratedListOut(BaseModel):
+    """Listado de correcciones curadas (V3.95.0)."""
+
+    items: list[DictionaryCuratedOut] = Field(default_factory=list)
+
+
 class DictionaryWarmupRequest(BaseModel):
     """Petición de precalentado del diccionario (V3.88.0).
 
@@ -1099,6 +1141,11 @@ class VocabItemAddIn(BaseModel):
     translation: str = Field(default="", max_length=200)
     sense: VocabSenseIn | None = None
     collection_id: int | None = None
+    #: Recordatorio personal. Vacío no borra el que ya hubiera.
+    mnemonic: str = Field(default="", max_length=400)
+    #: Mazos a los que pertenece la palabra. No crea una segunda ficha FSRS.
+    deck_ids: list[int] = Field(default_factory=list, max_length=20)
+    cefr: str = Field(default="", max_length=8)
 
 
 class VocabItemFaceOut(BaseModel):
@@ -1141,6 +1188,7 @@ class VocabBulkAddOut(BaseModel):
     added: list[str]
     collection_id: int | None = None
     count: int = 0
+    deck_id: int | None = None
 
 
 class VocabCollectionOut(BaseModel):
@@ -1167,6 +1215,8 @@ class VocabEnrollOut(BaseModel):
     collection_id: int
     added: list[str]
     count: int = 0
+    #: Mazo creado al coger un pack. `None` si la colección no es un pack.
+    deck_id: int | None = None
 
 
 class RetentionCardOut(BaseModel):
@@ -1217,6 +1267,8 @@ class FlashcardDeckOut(BaseModel):
     name: str
     slug: str = ""
     is_auto: bool = False
+    #: Pack del que salió este mazo. `None` en el diccionario y en los mazos propios.
+    source_collection_id: int | None = None
     new_per_day: int = 0
     review_per_day: int = 0
     card_count: int = 0
@@ -1226,6 +1278,8 @@ class FlashcardDeckOut(BaseModel):
     due_count: int = 0
     new_count: int = 0
     reviewed_today: int = 0
+    #: Palabras del mazo cuya carta FSRS ya está en estado `review`.
+    learned_count: int = 0
     limits: FlashcardLimitsOut | None = None
 
 

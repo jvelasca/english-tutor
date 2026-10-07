@@ -75,6 +75,12 @@ def _stub_reverse_fetcher(monkeypatch, payload: str, calls: list):
         return payload
 
     monkeypatch.setattr(dictionary_content, "_reverse_fetcher", _fake)
+    # V3.95.0: el guardarraíl de retrotraducción se APRUEBA en los tests de
+    # plomería (la verificación tiene sus propios tests más abajo); sin esto la
+    # generación intentaría una segunda llamada al modelo real.
+    monkeypatch.setattr(
+        dictionary_content, "_default_reverse_verifier", _accept_reverse_verifier
+    )
 
 
 def _offline_reverse_fetcher(monkeypatch, calls: list):
@@ -83,6 +89,16 @@ def _offline_reverse_fetcher(monkeypatch, calls: list):
         raise dictionary_content.ContentUnavailableError("test: sin modelo")
 
     monkeypatch.setattr(dictionary_content, "_reverse_fetcher", _offline)
+    monkeypatch.setattr(
+        dictionary_content, "_default_reverse_verifier", _accept_reverse_verifier
+    )
+
+
+async def _accept_reverse_verifier(
+    _word: str, _english: str, _model: str | None
+) -> bool:
+    """Verificador de pruebas: siempre acepta (aísla la plomería del guardarraíl)."""
+    return True
 
 
 def _reverse_lookup(uid: str, word: str) -> dict:
@@ -366,9 +382,145 @@ def test_generate_reverse_content_uses_injected_fetcher():
         return _payload(english="house")
 
     out = asyncio.run(
-        dictionary_content.generate_reverse_content("casa", fetcher=_fake)
+        dictionary_content.generate_reverse_content(
+            "casa", fetcher=_fake, verifier=_accept_reverse_verifier
+        )
     )
     assert out["english"] == "house"
+
+
+# --- V3.95.0: guardarraíl de retrotraducción (calidad del diccionario) ---------
+
+
+def _stub_direct_fetcher(monkeypatch, payload: str, calls: list):
+    """Stub del prompt DIRECTO (EN→ES): lo usa el verificador de retrotraducción."""
+
+    async def _fake(word: str, model: str | None) -> str:
+        calls.append((word, model))
+        return payload
+
+    monkeypatch.setattr(dictionary_content, "_fetch_chat", _fake)
+
+
+def _direct_payload(translation: str, meanings: list[str] | None = None) -> str:
+    return json.dumps(
+        {
+            "pos": "noun",
+            "definition": "A thing.",
+            "translation": translation,
+            "meanings": [{"term": t} for t in (meanings or [])],
+        }
+    )
+
+
+def test_guardrail_rejects_an_equivalent_confused_with_another_word(monkeypatch):
+    """El caso reportado: «broca» → «rock» (confusión con «roca») se rechaza."""
+    import asyncio
+
+    async def _reverse(_word: str, _model: str | None) -> str:
+        return _payload(english="rock", definition="A large stone or boulder")
+
+    calls: list = []
+    _stub_direct_fetcher(
+        monkeypatch, _direct_payload("roca", ["roca", "piedra"]), calls
+    )
+
+    with pytest.raises(dictionary_content.ContentUnavailableError):
+        asyncio.run(
+            dictionary_content.generate_reverse_content("broca", fetcher=_reverse)
+        )
+    # La retrotraducción SÍ se intentó (una llamada al prompt directo de «rock»).
+    assert calls == [("rock", None)]
+
+
+def test_guardrail_accepts_an_equivalent_that_back_translates(monkeypatch):
+    """Un equivalente correcto vuelve al término español y se acepta."""
+    import asyncio
+
+    async def _reverse(_word: str, _model: str | None) -> str:
+        return _payload(english="chisel", definition="A hand tool.")
+
+    calls: list = []
+    _stub_direct_fetcher(monkeypatch, _direct_payload("cincel", ["cincel"]), calls)
+
+    out = asyncio.run(
+        dictionary_content.generate_reverse_content("cincel", fetcher=_reverse)
+    )
+    assert out["english"] == "chisel"
+    assert calls == [("chisel", None)]
+
+
+def test_guardrail_rejects_when_the_back_translation_is_unavailable(monkeypatch):
+    """Si el modelo no puede retrotraducir, no se da el equivalente por bueno."""
+    import asyncio
+
+    async def _reverse(_word: str, _model: str | None) -> str:
+        return _payload(english="house")
+
+    async def _down(_word: str, _model: str | None) -> str:
+        raise dictionary_content.ContentUnavailableError("test: modelo caído")
+
+    monkeypatch.setattr(dictionary_content, "_fetch_chat", _down)
+
+    with pytest.raises(dictionary_content.ContentUnavailableError):
+        asyncio.run(
+            dictionary_content.generate_reverse_content("morada", fetcher=_reverse)
+        )
+
+
+def test_guardrail_accepts_accent_and_morphology_tolerance(monkeypatch):
+    """El plegado de acentos y las variantes no provocan falsos negativos."""
+    import asyncio
+
+    async def _reverse(_word: str, _model: str | None) -> str:
+        return _payload(english="truck")
+
+    _stub_direct_fetcher(monkeypatch, _direct_payload("camión"), [])
+
+    out = asyncio.run(
+        dictionary_content.generate_reverse_content("camion", fetcher=_reverse)
+    )
+    assert out["english"] == "truck"
+
+
+def test_reverse_lookup_serves_the_glossary_and_never_poisons_the_cache(
+    monkeypatch, tmp_path
+):
+    """«broca» la sirve el glosario curado («drill bit») sin consultar al modelo."""
+    a, _b = _setup(monkeypatch, tmp_path)
+    _seed_direct("drill bit", "broca", definition="A cutting tool for drilling.")
+    calls: list = []
+    _offline_reverse_fetcher(monkeypatch, calls)
+
+    data = _reverse_lookup(a, "broca")
+
+    assert data["translation"] == "drill bit"
+    assert data["meanings"][0]["term"] == "drill bit"
+    assert "rock" not in [m["term"] for m in data["meanings"]]
+    assert calls == []
+
+
+def test_reverse_lookup_degrades_when_the_equivalent_is_not_verifiable(
+    monkeypatch, tmp_path
+):
+    """Sin curar y sin poder verificar, se degrada y NO se escribe caché inversa."""
+    a, _b = _setup(monkeypatch, tmp_path)
+
+    async def _reverse(_word: str, _model: str | None) -> str:
+        return _payload(english="rock", definition="A large stone.")
+
+    monkeypatch.setattr(dictionary_content, "_reverse_fetcher", _reverse)
+    # «cantimplora» no está ni en el glosario ni en los packs ni en la caché: cae
+    # al modelo, y el modelo retrotraduce su «rock» a «roca» (no a «cantimplora»),
+    # así que no supera el guardarraíl.
+    _stub_direct_fetcher(monkeypatch, _direct_payload("roca", ["roca"]), [])
+
+    data = _reverse_lookup(a, "cantimplora")
+
+    assert data["direction"] == "es-en"
+    assert data["translation"] is None
+    assert data["definition_source"] == "none"
+    assert _count_rows("dictionary_reverse_entries") == 0
 
 
 # --- V3.86.0: significados elegibles (polisemia) -----------------------------
@@ -387,6 +539,25 @@ def test_match_pack_translation_finds_curated_english():
     lima = dictionary_reverse.match_pack_translation("lima", items)
     assert [m["word"] for m in lima] == ["file"]
     assert dictionary_reverse.match_pack_translation("nada", items) == []
+
+
+def test_match_pack_translation_priority_breaks_ties():
+    """La `priority` curada decide el equivalente por defecto ante un empate."""
+    items = [
+        {"word": "drill", "translation": "broca", "pos": "noun", "priority": 0},
+        {"word": "drill bit", "translation": "broca", "pos": "noun", "priority": 1},
+    ]
+    assert [
+        m["word"] for m in dictionary_reverse.match_pack_translation("broca", items)
+    ] == ["drill bit", "drill"]
+    # Sin prioridad, el desempate sigue siendo alfabético (comportamiento previo).
+    plain = [
+        {"word": "drill", "translation": "broca", "pos": "noun"},
+        {"word": "auger", "translation": "broca", "pos": "noun"},
+    ]
+    assert [
+        m["word"] for m in dictionary_reverse.match_pack_translation("broca", plain)
+    ] == ["auger", "drill"]
 
 
 def test_normalize_meanings_sends_proper_nouns_last_and_dedupes():

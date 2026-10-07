@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from repositories import academy as academy_repo
 from repositories import collections as collections_repo
 from repositories import dictionary as dictionary_repo
+from repositories import flashcards as flashcards_repo
 from repositories import learning as learning_repo
 from repositories import vocabulary as vocabulary_repo
 from services import fsrs
@@ -141,6 +142,34 @@ def _ensure_fsrs_lexicon(user_id: str, words: list[str], *, why: str) -> None:
         academy_repo.upsert_fsrs_cards(user_id, pending)
 
 
+def card_faces(user_id: str, words: list[str]) -> dict[str, dict]:
+    """La misma precedencia que ``card_face``, para varias palabras a la vez."""
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for raw in words:
+        word = str(raw or "").strip().lower()
+        if word and word not in seen:
+            seen.add(word)
+            wanted.append(word)
+    if not wanted:
+        return {}
+    own = vocabulary_repo.translations_for_words(user_id, wanted)
+    packs = collections_repo.translations_for_words(wanted)
+    cached = dictionary_repo.brief_for_words(wanted)
+    out: dict[str, dict] = {}
+    for word in wanted:
+        entry = cached.get(word) or {}
+        translation = (
+            own.get(word) or packs.get(word) or str(entry.get("translation") or "")
+        )
+        out[word] = {
+            "word": word,
+            "translation": translation,
+            "definition": str(entry.get("definition") or ""),
+        }
+    return out
+
+
 def card_face(
     user_id: str, word: str, collection_id: int | None = None
 ) -> dict:
@@ -221,6 +250,9 @@ async def add_item(
     translation: str = "",
     sense: dict | None = None,
     collection_id: int | None = None,
+    mnemonic: str = "",
+    deck_ids: list[int] | None = None,
+    cefr: str = "",
 ) -> dict | None:
     """Añade una palabra suelta al léxico personal + FSRS. Sin evidencia de skill.
 
@@ -244,6 +276,7 @@ async def add_item(
             "translation": (translation or "").strip(),
             "kind": "word",
             "sense": sense,
+            "cefr": (cefr or "").strip(),
         }
     ]
     touched = await run_in_threadpool(
@@ -253,6 +286,18 @@ async def add_item(
     )
     if not touched:
         return None
+    if (mnemonic or "").strip():
+        await run_in_threadpool(
+            vocabulary_repo.set_mnemonic, user_id, normalized, mnemonic
+        )
+    for raw_deck in deck_ids or []:
+        try:
+            deck_id = int(raw_deck)
+        except (TypeError, ValueError):
+            continue
+        await run_in_threadpool(
+            flashcards_repo.link_lexicon_word, user_id, deck_id, normalized
+        )
     if collection_id is not None:
         await run_in_threadpool(
             collections_repo.add_membership, user_id, collection_id, normalized
@@ -320,7 +365,17 @@ async def add_bulk(
         user_id,
         touched,
     )
-    return {"added": touched, "collection_id": coll_id, "count": len(touched)}
+    deck_id = None
+    if collection_id is None:
+        deck_id = await run_in_threadpool(
+            _user_list_deck, user_id, title.strip() or "My list", touched
+        )
+    return {
+        "added": touched,
+        "collection_id": coll_id,
+        "count": len(touched),
+        "deck_id": deck_id,
+    }
 
 
 async def list_collections(user_id: str) -> dict:
@@ -363,6 +418,132 @@ async def create_collection(user_id: str, title: str) -> dict | None:
     }
 
 
+def _user_list_deck(user_id: str, title: str, words: list[str]) -> int | None:
+    """Una lista pegada pasa a ser un mazo del alumno, borrable y renombrable."""
+    base = (title or "My list").strip()[:110] or "My list"
+    created = None
+    for n in range(1, 6):
+        candidate = base if n == 1 else f"{base} ({n})"
+        created = flashcards_repo.create_deck(user_id, name=candidate)
+        if created is not None:
+            break
+    if created is None:
+        return None
+    flashcards_repo.link_lexicon_words(user_id, int(created["id"]), list(words))
+    return int(created["id"])
+
+
+def _pack_deck_name(coll: dict) -> str:
+    """Nombre del mazo: el título en español si el pack lo trae."""
+    title = str(coll.get("title_es") or "").strip() or str(
+        coll.get("title") or ""
+    ).strip()
+    return title or "Pack"
+
+
+def _create_pack_deck(user_id: str, coll: dict) -> dict | None:
+    """Crea el mazo de un pack, o devuelve el que ya existía.
+
+    Si el alumno ya tiene un mazo con ese nombre, se prueba un sufijo. No se
+    reutiliza el mazo ajeno: un pack no se fusiona con uno que él creó.
+    """
+    collection_id = int(coll["id"])
+    existing = flashcards_repo.deck_for_collection(user_id, collection_id)
+    if existing is not None:
+        return existing
+    base = _pack_deck_name(coll)[:110]
+    for n in range(1, 6):
+        candidate = base if n == 1 else f"{base} ({n})"
+        created = flashcards_repo.create_deck(
+            user_id,
+            name=candidate,
+            source_collection_id=collection_id,
+        )
+        if created is not None:
+            return created
+        raced = flashcards_repo.deck_for_collection(user_id, collection_id)
+        if raced is not None:
+            return raced
+    return None
+
+
+async def ensure_theme_pack_decks(user_id: str) -> None:
+    """Cada tema del diccionario es un mazo, también los que el alumno no había cogido.
+
+    Un tema nuevo entra en el diccionario (las mismas palabras, la misma tarjeta).
+    Uno ya cogido solo recibe las palabras que el catálogo haya ganado después:
+    no se reescriben traducciones ni notas. El mazo, si falta, se vuelve a crear.
+    """
+    rows = await run_in_threadpool(collections_repo.list_collections, user_id)
+    for row in rows:
+        if str(row.get("kind") or "") != "theme_pack":
+            continue
+        if not row.get("enrolled"):
+            await enroll_collection(user_id, int(row["id"]))
+            continue
+        await _sync_pack_growth(user_id, row)
+
+
+async def ensure_enrolled_pack_decks(user_id: str) -> None:
+    """Nombre antiguo: ahora todos los temas forman parte del diccionario."""
+    await ensure_theme_pack_decks(user_id)
+
+
+async def _sync_pack_growth(user_id: str, coll: dict) -> None:
+    """Añade al diccionario las palabras nuevas de un tema ya cogido."""
+    collection_id = int(coll["id"])
+    catalog = await run_in_threadpool(
+        collections_repo.list_collection_items, collection_id
+    )
+    member = await run_in_threadpool(
+        collections_repo.words_in_collection, user_id, collection_id
+    )
+    missing = [row for row in catalog if str(row.get("word") or "") not in member]
+    if missing:
+        cefr = str(coll.get("cefr_hint") or "")
+        items = [
+            {
+                "word": row["word"],
+                "lemma": row.get("lemma") or row["word"],
+                "translation": row.get("translation") or "",
+                "cefr": cefr,
+                "kind": "word",
+            }
+            for row in missing
+        ]
+        touched = await run_in_threadpool(
+            partial(vocabulary_repo.seed_study_items, source="imported"),
+            user_id,
+            items,
+        )
+        await run_in_threadpool(
+            collections_repo.add_memberships, user_id, collection_id, touched
+        )
+        await run_in_threadpool(
+            partial(_ensure_fsrs_lexicon, why="retention-import"),
+            user_id,
+            touched,
+        )
+    deck = await run_in_threadpool(
+        flashcards_repo.deck_for_collection, user_id, collection_id
+    )
+    if deck is None or missing:
+        await _materialize_pack_deck(user_id, coll)
+
+
+async def _materialize_pack_deck(user_id: str, coll: dict) -> int | None:
+    deck = await run_in_threadpool(_create_pack_deck, user_id, coll)
+    if deck is None:
+        return None
+    words = await run_in_threadpool(
+        collections_repo.words_in_collection, user_id, int(coll["id"])
+    )
+    await run_in_threadpool(
+        flashcards_repo.link_lexicon_words, user_id, int(deck["id"]), list(words)
+    )
+    return int(deck["id"])
+
+
 async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
     """Activa un pack/lista: materializa ítems en vocabulary + FSRS + membership."""
     coll = await run_in_threadpool(collections_repo.get_collection, collection_id)
@@ -378,7 +559,15 @@ async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
         await run_in_threadpool(
             collections_repo.mark_enrolled, user_id, collection_id
         )
-        return {"collection_id": collection_id, "added": [], "count": 0}
+        deck_id = None
+        if str(coll.get("kind") or "") == "theme_pack":
+            deck_id = await _materialize_pack_deck(user_id, coll)
+        return {
+            "collection_id": collection_id,
+            "added": [],
+            "count": 0,
+            "deck_id": deck_id,
+        }
 
     cefr = str(coll.get("cefr_hint") or "")
     items = [
@@ -409,10 +598,14 @@ async def enroll_collection(user_id: str, collection_id: int) -> dict | None:
         user_id,
         touched,
     )
+    deck_id = None
+    if str(coll.get("kind") or "") == "theme_pack":
+        deck_id = await _materialize_pack_deck(user_id, coll)
     return {
         "collection_id": collection_id,
         "added": touched,
         "count": len(touched),
+        "deck_id": deck_id,
     }
 
 

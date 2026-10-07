@@ -8,33 +8,34 @@
  *
  * 1. Las cinco subpestañas existen (V3.85.0 añade «Mi léxico») y Estudiar es la
  *    de entrada.
- * 2. Estudiar califica por el endpoint del MAZO con `card_type`/`card_id`, y el
- *    resumen final queda alcanzable. Su bloque ofrece DOS acciones rotuladas:
- *    el repaso de competencia («Review now (N)») y la sesión FSRS («Study cards
- *    (N)»).
- * 3. El mazo automático no se puede borrar ni editar (no es una fila).
+ * 2. Estudiar muestra los contadores del ámbito y un solo inicio. La lección
+ *    cierra la palabra con `complete` (léxico + nota), y el resumen final sigue
+ *    siendo alcanzable.
+ * 3. Mazos no incluye el diccionario entero. Un tema no se borra; un mazo
+ *    del alumno sí.
  * 4. El navegador filtra por texto y estado, y el CRUD llama a lo que dice.
  * 5. El salto desde «Mis listas»/packs abre Estudiar con la lista filtrada y
  *    arranca la sesión.
- * 6. «Mi léxico» monta el inventario (buscador, filtros, añadir) sin estudio.
+ * 6. «Mi léxico» es el resumen y abre Estudiar en un donut, sin calificar.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within, act } from "@testing-library/react";
 import { I18nProvider } from "../../hooks/useI18n";
-import type { FlashcardDeck, FlashcardQueue } from "../../types/api";
+import type { FlashcardDeck, StudyQueue } from "../../types/api";
 import { FlashcardsScreen } from "./FlashcardsScreen";
-
-vi.mock("../../api/learning", () => ({
-  getReviewQueue: vi.fn(),
-}));
 
 vi.mock("../../api/vocabulary", () => ({
   listFlashcardDecks: vi.fn(),
   createFlashcardDeck: vi.fn(),
   updateFlashcardDeck: vi.fn(),
   deleteFlashcardDeck: vi.fn(),
-  getFlashcardQueue: vi.fn(),
-  reviewFlashcard: vi.fn(),
+  getStudyQueue: vi.fn(),
+  completeStudyLesson: vi.fn(),
+  lookupDictionaryWord: vi.fn(),
+  requestStudyExample: vi.fn(),
+  requestStudyQuiz: vi.fn(),
+  requestStudyHint: vi.fn(),
+  setVocabularyTranslation: vi.fn(),
   // V3.86.0: la pestaña Fichas es ficha-primero (una ficha vive en N mazos).
   listVocabularyCards: vi.fn(),
   createVocabularyCard: vi.fn(),
@@ -61,6 +62,11 @@ vi.mock("../../api/study", () => ({
   saveStudyConfig: vi.fn(),
 }));
 
+vi.mock("../../api/settings", () => ({
+  getSettings: vi.fn().mockResolvedValue({ settings: {} }),
+  saveSettings: vi.fn().mockResolvedValue({ settings: {} }),
+}));
+
 import {
   createFlashcardDeck,
   addFlashcardsBulk,
@@ -69,17 +75,18 @@ import {
   deleteVocabularyCard,
   enrollVocabCollection,
   getDrillCandidates,
-  getFlashcardQueue,
+  completeStudyLesson,
   getFlashcardStats,
   getLexicon,
+  getStudyQueue,
   listFlashcardDecks,
   listVocabCollections,
   listVocabularyCards,
-  reviewFlashcard,
+  lookupDictionaryWord,
   updateVocabularyCard,
 } from "../../api/vocabulary";
-import { getReviewQueue } from "../../api/learning";
 import { getStudyConfig, saveStudyConfig } from "../../api/study";
+import { mergeStudyPlace, readStudyPlace } from "../../utils/lastPlace";
 import type { StudyConfig } from "../../types/api";
 
 /** Configuración de estudio por defecto de las pruebas (V3.87.0). */
@@ -88,6 +95,8 @@ const DEFAULT_STUDY_CONFIG: StudyConfig = {
   mode: "recognition",
   hints: "off",
   difficulty: "auto",
+  words_per_day: 20,
+  required_facets: [],
   configured: false,
 };
 
@@ -119,35 +128,39 @@ const MANUAL: FlashcardDeck = {
   reviewed_today: 0,
 };
 
-function queue(overrides: Partial<FlashcardQueue> = {}): FlashcardQueue {
+function studyQueue(overrides: Partial<StudyQueue> = {}): StudyQueue {
   return {
-    deck: AUTO,
+    scope: "all",
+    level: "",
+    deck_id: 0,
+    collection_id: null,
     items: [
       {
+        item_id: "item-airport",
+        word: "airport",
+        cefr: "A1",
         card_type: "lexicon",
         card_id: "airport",
-        front: "airport",
-        back: "aeropuerto",
+        deck_id: 0,
+        is_new: true,
+        translation: "aeropuerto",
         definition: "",
         mnemonic: "",
-        prompt: "",
-        answer: "",
-        hint: "",
-        is_new: true,
+        facets: {},
         state: "new",
-        due_at: "",
-        reps: 0,
-        retrievability: 1,
       },
     ],
-    due_count: 2,
-    upcoming_count: 0,
-    queue_count: 2,
-    new_count: 3,
-    reviewed_today: 0,
-    new_today: 0,
-    limits: { new_per_day: 10, review_per_day: 50, new_remaining: 7, review_remaining: 48 },
-    fsrs_version: "test",
+    total: 12,
+    studied: 1,
+    learned: 0,
+    unlearned: 12,
+    due: 2,
+    hard: 0,
+    good: 1,
+    times_studied: 4,
+    queued: 1,
+    mode: "pending",
+    study_config: DEFAULT_STUDY_CONFIG,
     ...overrides,
   };
 }
@@ -164,27 +177,38 @@ function renderScreen(
 
 describe("FlashcardsScreen", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     vi.mocked(listFlashcardDecks).mockResolvedValue({
       auto_deck_id: 0,
       decks: [AUTO, MANUAL],
       fsrs_version: "test",
     });
-    vi.mocked(getFlashcardQueue).mockResolvedValue(queue());
+    vi.mocked(getStudyQueue).mockImplementation(async (_userId, options) =>
+      studyQueue({
+        scope: options.scope,
+        mode: options.mode ?? "pending",
+        level: options.level ?? "",
+        deck_id: options.deckId ?? 0,
+        collection_id: options.collectionId ?? null,
+      }),
+    );
+    vi.mocked(lookupDictionaryWord).mockResolvedValue({
+      word: "airport",
+      translation: "aeropuerto",
+      meanings: [{ term: "aeropuerto", pos: "noun", gloss: "", domain: "", proper_noun: false }],
+      senses: [],
+      example: null,
+    } as never);
+    vi.mocked(completeStudyLesson).mockResolvedValue({
+      word: "airport",
+      learned: false,
+      facets: { meaning: "done" },
+    });
     vi.mocked(getStudyConfig).mockResolvedValue(DEFAULT_STUDY_CONFIG);
     vi.mocked(saveStudyConfig).mockResolvedValue({
       ...DEFAULT_STUDY_CONFIG,
       configured: true,
     });
-    vi.mocked(reviewFlashcard).mockResolvedValue({
-      card_id: "airport",
-      card_type: "lexicon",
-      grade: 3,
-      due_at: "",
-      next_in_days: 2,
-      stability: 1,
-      retrievability: 1,
-      reps: 1,
-    } as never);
     vi.mocked(listVocabularyCards).mockResolvedValue({
       cards: [
         {
@@ -222,13 +246,6 @@ describe("FlashcardsScreen", () => {
     // listos» no se pinta (no se promete lo que no existe). Los tests que lo
     // ejercitan ponen su propio catálogo.
     vi.mocked(listVocabCollections).mockResolvedValue({ collections: [] });
-    // V3.85.0: por defecto no hay nada vencido que repasar, así que el bloque de
-    // estudio ofrece solo la acción de tarjetas.
-    vi.mocked(getReviewQueue).mockResolvedValue({
-      due_count: 0,
-      items: [],
-      fsrs_version: "test",
-    });
     // «Mi léxico» no se abre salvo que la prueba lo pida; se deja un vacío honesto.
     vi.mocked(getLexicon).mockResolvedValue({
       summary: {
@@ -267,9 +284,13 @@ describe("FlashcardsScreen", () => {
     expect(
       screen.getByRole("tab", { name: "Study" }).getAttribute("aria-selected"),
     ).toBe("true");
-    // La cola se pide para el mazo automático, que es donde cae el defecto.
+    // La cola del banco (ámbito «Todas») es la de entrada.
     await waitFor(() =>
-      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
+      expect(getStudyQueue).toHaveBeenCalledWith("u1", {
+        scope: "all",
+        mode: "pending",
+        level: null,
+        deckId: 0,
         collectionId: null,
       }),
     );
@@ -288,13 +309,13 @@ describe("FlashcardsScreen", () => {
     // V3.85.0: «Mi léxico» entra entre Estudiar y Mazos.
     fireEvent.keyDown(study, { key: "ArrowRight" });
 
-    expect(await screen.findByText("Add vocabulary")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Review" })).toBeTruthy();
     const lexicon = screen.getByRole("tab", { name: "My lexicon" });
     expect(lexicon.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(lexicon);
 
     fireEvent.keyDown(lexicon, { key: "ArrowRight" });
-    expect(await screen.findByPlaceholderText("Deck name")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "My decks" })).toBeTruthy();
     const decks = screen.getByRole("tab", { name: "Decks" });
     expect(decks.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(decks);
@@ -308,54 +329,89 @@ describe("FlashcardsScreen", () => {
     // de tarjetas ni la de repaso.
     await waitFor(() => expect(getLexicon).toHaveBeenCalledWith("u1"));
     expect(getDrillCandidates).toHaveBeenCalledWith("u1");
-    expect(screen.getByText("Add vocabulary")).toBeTruthy();
-    expect(screen.queryByText("Study cards (1)")).toBeNull();
+    expect(screen.queryByText("Add vocabulary")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Study the ones not learned" }));
+    await waitFor(() =>
+      expect(getStudyQueue).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ scope: "all", mode: "unlearned" }),
+      ),
+    );
+    expect(screen.queryByRole("button", { name: /Study \(/ })).toBeTruthy();
   });
 
-  it("el bloque de estudio ofrece dos acciones rotuladas con su recuento (V3.85.0)", async () => {
-    vi.mocked(getReviewQueue).mockResolvedValue({
-      due_count: 2,
-      items: [],
-      fsrs_version: "test",
+  it("Estudiar muestra los contadores del banco y un solo inicio", async () => {
+    renderScreen();
+
+    expect(await screen.findByRole("button", { name: "To review, 2" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "To review, 2" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen.getByRole("button", { name: "Not learned, 12" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hard, 0" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Good, 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "All, 12" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Study (1)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "My lexicon" })).toBeTruthy();
+  });
+
+  it("pulsar un donut pide esa cola", async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Hard, 0" }));
+    await waitFor(() =>
+      expect(getStudyQueue).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ mode: "hard" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Hard, 0" }).getAttribute("aria-pressed")).toBe(
+        "true",
+      ),
+    );
+  });
+
+  it("reabre Por mazo y el mazo que se estaba usando", async () => {
+    mergeStudyPlace("u1", {
+      tab: "study",
+      scope: "deck",
+      pick: "pending",
+      level: "A1",
+      deckId: 5,
     });
+
     renderScreen();
 
-    // Repaso de competencia: el recuento viene de la cola del día.
-    expect(
-      await screen.findByRole("button", { name: "Review now (2)" }),
-    ).toBeTruthy();
-    // Sesión FSRS: el recuento es la cola del mazo.
-    expect(screen.getByRole("button", { name: "Study cards (1)" })).toBeTruthy();
-    expect(
-      screen.getByText("2 words are due. One session, one step each."),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "By deck" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    await waitFor(() =>
+      expect((screen.getByRole("combobox", { name: "Deck" }) as HTMLSelectElement).value).toBe(
+        "5",
+      ),
+    );
   });
 
-  it("sin nada vencido no ofrece un botón muerto de repaso", async () => {
+  it("cambiar el ámbito deja el sitio guardado para la próxima apertura", async () => {
     renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "By deck" }));
 
-    expect(
-      await screen.findByText("Nothing to review right now — come back later."),
-    ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Review now/ })).toBeNull();
+    await waitFor(() => expect(readStudyPlace("u1")?.scope).toBe("deck"));
   });
 
-  it("declara la espera de la cola del día en vez de decir «nada que repasar» (V3.88.0)", async () => {
-    let resolveReview: (value: {
-      due_count: number;
-      items: never[];
-      fsrs_version: string;
-    }) => void = () => {};
-    vi.mocked(getReviewQueue).mockReturnValue(
+  it("declara la espera de la cola en vez de decir que el banco está vacío", async () => {
+    let resolveQueue: (value: StudyQueue) => void = () => {};
+    vi.mocked(getStudyQueue).mockReturnValue(
       new Promise((resolve) => {
-        resolveReview = resolve;
+        resolveQueue = resolve;
       }) as never,
     );
 
     renderScreen();
 
-    // Mientras la cola viaja no se afirma que no haya nada: se declara la espera
-    // (región viva con `aria-busy`).
     const statuses = await screen.findAllByRole("status");
     expect(
       statuses.some(
@@ -365,47 +421,117 @@ describe("FlashcardsScreen", () => {
       ),
     ).toBe(true);
     expect(
-      screen.queryByText("Nothing to review right now — come back later."),
+      screen.queryByText(
+        "This view of the bank is empty.",
+      ),
     ).toBeNull();
 
     await act(async () => {
-      resolveReview({ due_count: 0, items: [], fsrs_version: "test" });
+      resolveQueue(studyQueue({ items: [], total: 0, queued: 0 }));
     });
 
     expect(
-      await screen.findByText("Nothing to review right now — come back later."),
+      await screen.findByText(
+        "This view of the bank is empty.",
+      ),
     ).toBeTruthy();
   });
 
-  it("estudiar califica por el endpoint del mazo y el resumen es alcanzable", async () => {
+  it("estudiar cierra la palabra y el resumen es alcanzable", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: /Study cards/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Study (1)" }));
 
     expect(screen.getByText("airport")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Flip card" }));
-    fireEvent.click(screen.getByText("Good"));
+    fireEvent.click(await screen.findByRole("button", { name: "Show the meaning" }));
+    await waitFor(() => {
+      const good = screen.getByRole("button", { name: "Good" }) as HTMLButtonElement;
+      expect(good.disabled).toBe(false);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Good" }));
 
     await waitFor(() =>
-      expect(reviewFlashcard).toHaveBeenCalledWith("u1", 0, {
-        card_type: "lexicon",
-        card_id: "airport",
-        grade: 3,
-      }),
+      expect(completeStudyLesson).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          item_id: "item-airport",
+          grade: 3,
+        }),
+      ),
     );
-    // El resumen final sigue siendo alcanzable (candado de V3.77.2 trasladado).
     expect(await screen.findByText("Session done — 1 cards reviewed.")).toBeTruthy();
   });
 
-  it("el mazo automático se ofrece pero no se puede borrar", async () => {
+  it("el lápiz abre el editor de esa ficha y no el resto del mazo", async () => {
+    vi.mocked(getStudyQueue).mockResolvedValue(
+      studyQueue({
+        items: [
+          {
+            ...studyQueue().items[0]!,
+            item_id: "item-wrench",
+            word: "wrench",
+            card_type: "flashcard",
+            card_id: "12",
+            translation: "llave",
+          },
+        ],
+      }),
+    );
+    vi.mocked(listVocabularyCards).mockResolvedValue({
+      cards: [
+        {
+          id: 20,
+          deck_id: 5,
+          deck_ids: [5],
+          front: "other word",
+          back: "otra",
+          mnemonic: "",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "",
+        },
+        {
+          id: 12,
+          deck_id: 5,
+          deck_ids: [5],
+          front: "wrench",
+          back: "llave",
+          mnemonic: "",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "",
+        },
+      ],
+    } as never);
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Study (1)" }));
+    const edit = await screen.findByRole("button", { name: "Edit this card" });
+    expect(edit.getAttribute("title")).toBe("Edit this card");
+    fireEvent.click(edit);
+
+    const front = (await screen.findByRole("textbox", { name: "Front" })) as HTMLInputElement;
+    expect(front.value).toBe("wrench");
+    await waitFor(() =>
+      expect(
+        (screen.getByPlaceholderText("Search front or back…") as HTMLInputElement).value,
+      ).toBe("wrench"),
+    );
+    expect(screen.queryByDisplayValue("other word")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to the lesson" }));
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Front" })).toBeNull());
+    expect(screen.getByText("wrench")).toBeTruthy();
+  });
+
+  it("Mazos no lista el diccionario entero y el mazo del alumno se puede borrar", async () => {
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
 
-    expect(await screen.findByText("My dictionary")).toBeTruthy();
-    expect(
-      screen.getByText("The auto deck cannot be renamed or deleted."),
-    ).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Idioms" })).toBeTruthy();
+    expect(screen.queryByText("My dictionary")).toBeNull();
 
-    // Solo el mazo manual tiene acciones de borrado.
     const deletes = screen.getAllByRole("button", { name: "Delete" });
     expect(deletes).toHaveLength(1);
 
@@ -421,6 +547,7 @@ describe("FlashcardsScreen", () => {
     vi.mocked(createFlashcardDeck).mockResolvedValue(MANUAL);
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add" }));
 
     fireEvent.change(await screen.findByPlaceholderText("Deck name"), {
       target: { value: "Phrasal verbs" },
@@ -536,6 +663,47 @@ describe("FlashcardsScreen", () => {
     );
   });
 
+  it("un recordatorio ya escrito se puede cambiar sin que el borrado tape el campo", async () => {
+    vi.mocked(listVocabularyCards).mockResolvedValue({
+      cards: [
+        {
+          id: 11,
+          deck_id: 5,
+          deck_ids: [5],
+          front: "flashlight",
+          back: "linterna",
+          mnemonic: "Se utiliza para iluminar en la oscuridad.",
+          state: "new",
+          reps: 0,
+          due_at: "",
+          created_at: "",
+        },
+      ],
+    } as never);
+    vi.mocked(updateVocabularyCard).mockResolvedValue({} as never);
+
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const reminder = screen.getByLabelText("Reminder") as HTMLInputElement;
+    const editor = reminder.closest("form") as HTMLElement;
+    expect(reminder.value).toBe("Se utiliza para iluminar en la oscuridad.");
+    fireEvent.change(reminder, { target: { value: "luz de mano" } });
+    expect(reminder.value).toBe("luz de mano");
+    fireEvent.click(within(editor).getByRole("button", { name: "Clear reminder" }));
+    expect(reminder.value).toBe("");
+    fireEvent.change(reminder, { target: { value: "una pista nueva" } });
+    expect(reminder.value).toBe("una pista nueva");
+    fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(updateVocabularyCard).toHaveBeenCalledWith(
+        "u1",
+        11,
+        expect.objectContaining({ mnemonic: "una pista nueva" }),
+      ),
+    );
+  });
+
   it("el borrado de un mazo avisa de las fichas compartidas (V3.86.0)", async () => {
     const SHARED: FlashcardDeck = {
       ...MANUAL,
@@ -579,11 +747,14 @@ describe("FlashcardsScreen", () => {
   it("el salto desde «Mis listas» abre Estudiar con la lista filtrada y arranca", async () => {
     // Lo que llega de PERSONAL: un encargo de un solo salto (collectionId +
     // nonce), no una preferencia.
-    vi.mocked(getFlashcardQueue).mockResolvedValue(queue());
     renderScreen({ focusCollectionId: 42, focusCollectionLabel: "Travel", focusNonce: 1 });
 
     await waitFor(() =>
-      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
+      expect(getStudyQueue).toHaveBeenCalledWith("u1", {
+        scope: "all",
+        mode: "pending",
+        level: null,
+        deckId: 0,
         collectionId: 42,
       }),
     );
@@ -598,13 +769,14 @@ describe("FlashcardsScreen", () => {
     // El alta del diccionario puede guardar la palabra en un mazo manual: al
     // pulsar «Estudiar en Flashcards» se abre ese mazo, no el automático.
     // V3.86.0: la cola que se sirve es LA DEL MAZO (así arranca su sesión).
-    vi.mocked(getFlashcardQueue).mockResolvedValue(
-      queue({ deck: MANUAL }),
-    );
     renderScreen({ focusDeckId: 5, focusNonce: 1 });
 
     await waitFor(() =>
-      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 5, {
+      expect(getStudyQueue).toHaveBeenCalledWith("u1", {
+        scope: "deck",
+        mode: "pending",
+        level: null,
+        deckId: 5,
         collectionId: null,
       }),
     );
@@ -616,8 +788,14 @@ describe("FlashcardsScreen", () => {
     // seleccionado) seguía en vuelo. Cuando esa cola vieja resuelve, NO debe
     // gastar el encargo: el alumno terminaría en el panel aunque su mazo tenga
     // tarjetas, que es justo el fallo que destapó «una palabra ya rastreada».
-    vi.mocked(getFlashcardQueue).mockImplementation(async (_userId, deckId) =>
-      deckId === 5 ? queue({ deck: MANUAL }) : queue(),
+    vi.mocked(getStudyQueue).mockImplementation(async (_userId, options) =>
+      studyQueue({
+        scope: options.scope,
+        mode: options.mode ?? "pending",
+        level: options.level ?? "",
+        deck_id: options.deckId ?? 0,
+        collection_id: options.collectionId ?? null,
+      }),
     );
     renderScreen({ focusDeckId: 5, focusNonce: 1 });
 
@@ -626,32 +804,17 @@ describe("FlashcardsScreen", () => {
     expect(screen.getAllByText("Idioms").length).toBeGreaterThan(0);
   });
 
-  it("la ruta genérica se acota a un pack o lista con el filtro (V3.84.0)", async () => {
-    vi.mocked(listVocabCollections).mockResolvedValue({
-      collections: [
-        {
-          id: 3,
-          kind: "theme_pack",
-          slug: "food",
-          title: "Food & Drink",
-          title_es: "Comida",
-          cefr_hint: "A1",
-          item_count: 25,
-          enrolled: false,
-          is_global: true,
-        },
-      ],
-    } as never);
+  it("«Por nivel» pide la cola de ese nivel", async () => {
     renderScreen();
-
-    // El filtro solo existe sobre el mazo automático (el de entrada): acota la
-    // ruta genérica a las palabras de un pack o de una lista.
-    const filter = await screen.findByLabelText("Study what");
-    fireEvent.change(filter, { target: { value: "3" } });
+    fireEvent.click(await screen.findByRole("button", { name: "By level" }));
 
     await waitFor(() =>
-      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
-        collectionId: 3,
+      expect(getStudyQueue).toHaveBeenCalledWith("u1", {
+        scope: "level",
+        mode: "pending",
+        level: "A1",
+        deckId: 0,
+        collectionId: null,
       }),
     );
   });
@@ -689,6 +852,7 @@ describe("FlashcardsScreen", () => {
 
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add" }));
     fireEvent.change(await screen.findByPlaceholderText("Deck name"), {
       target: { value: "Phrasal verbs" },
     });
@@ -724,21 +888,27 @@ describe("FlashcardsScreen", () => {
   });
 
   it("estudiar un mazo vacío no abre una sesión de 0: ofrece añadir tarjetas", async () => {
-    vi.mocked(getFlashcardQueue).mockResolvedValue(
-      queue({ deck: { ...MANUAL, card_count: 0 }, items: [] }),
+    vi.mocked(getStudyQueue).mockImplementation(async (_userId, options) =>
+      studyQueue({
+        scope: options.scope,
+        deck_id: options.deckId ?? 0,
+        collection_id: options.collectionId ?? null,
+        items: options.scope === "deck" ? [] : studyQueue().items,
+        total: options.scope === "deck" ? 0 : 12,
+        queued: 0,
+      }),
     );
 
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
-    const row = (await screen.findByText("Idioms")).closest("li")!;
-    fireEvent.click(within(row).getByRole("button", { name: "Study" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Study" }));
 
     expect(
       await screen.findByText(
         "This deck has no cards yet. Add the first one and it can be studied right away.",
       ),
     ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Study cards/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Study \(/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Add cards" }));
     await waitFor(() =>
@@ -747,17 +917,14 @@ describe("FlashcardsScreen", () => {
   });
 
   it("el mazo automático vacío manda al diccionario en vez de ofrecer botones inertes", async () => {
-    vi.mocked(getFlashcardQueue).mockResolvedValue(
-      queue({
-        deck: { ...AUTO, card_count: 0, due_count: 0, new_count: 0 },
-        items: [],
-      }),
+    vi.mocked(getStudyQueue).mockResolvedValue(
+      studyQueue({ items: [], total: 0, queued: 0, studied: 0, learned: 0, due: 0 }),
     );
 
     renderScreen();
     expect(
       await screen.findByText(
-        "Your dictionary has no words yet. Add them in My lexicon and they will show up here.",
+        "This view of the bank is empty.",
       ),
     ).toBeTruthy();
     // No hay tarjetas manuales que añadir aquí: no se ofrece el atajo.
@@ -773,22 +940,23 @@ describe("FlashcardsScreen", () => {
       fsrs_version: "test",
     });
     vi.mocked(listVocabularyCards).mockResolvedValue({ cards: [] } as never);
-    vi.mocked(getFlashcardQueue).mockResolvedValue(
-      queue({ deck: { ...SECOND, card_count: 0 }, items: [] }),
-    );
-
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Cards" }));
-    fireEvent.change(await screen.findByLabelText("Filter by deck"), {
-      target: { value: "6" },
-    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Travel", pressed: false }),
+    );
     await waitFor(() =>
       expect(listVocabularyCards).toHaveBeenCalledWith("u1", { deckId: 6 }),
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Study" }));
+    fireEvent.click(await screen.findByRole("button", { name: "By deck" }));
     await waitFor(() =>
-      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 6, {
+      expect(getStudyQueue).toHaveBeenCalledWith("u1", {
+        scope: "deck",
+        mode: "pending",
+        level: null,
+        deckId: 6,
         collectionId: null,
       }),
     );
@@ -845,7 +1013,7 @@ describe("FlashcardsScreen", () => {
 
   // --- V3.80.0: mazos listos ----------------------------------------------
 
-  it("un mazo listo sin activar se añade y ya activo se estudia filtrado", async () => {
+  it("un tema del diccionario se estudia como mazo y no se borra", async () => {
     const PACK = {
       id: 3,
       kind: "theme_pack",
@@ -867,39 +1035,46 @@ describe("FlashcardsScreen", () => {
       collection_id: 3,
       added: ["airport"],
       count: 12,
+      deck_id: 9,
+    });
+    vi.mocked(listFlashcardDecks).mockResolvedValue({
+      auto_deck_id: 0,
+      decks: [
+        AUTO,
+        MANUAL,
+        {
+          id: 9,
+          slug: "",
+          name: "Travel",
+          is_auto: false,
+          source_collection_id: 3,
+          new_per_day: 10,
+          review_per_day: 50,
+          card_count: 12,
+          shared_count: 0,
+          due_count: 0,
+          new_count: 12,
+          reviewed_today: 0,
+        },
+      ],
+      fsrs_version: "test",
     });
 
     renderScreen();
     fireEvent.click(await screen.findByRole("tab", { name: "Decks" }));
 
-    expect(await screen.findByText("Ready-made decks")).toBeTruthy();
-    const row = screen.getByText("Travel").closest("li") as HTMLElement;
-    // Añadir un pack es «añadir a mi diccionario»: se dice qué son y qué pasará.
-    expect(within(row).getByText("12 words · A2")).toBeTruthy();
-    expect(within(row).queryByText("In your dictionary")).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Travel" }));
+    expect(screen.getByText("Theme")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Study" }));
 
-    enrolled = true;
-    fireEvent.click(within(row).getByRole("button", { name: "Add" }));
-
-    await waitFor(() => expect(enrollVocabCollection).toHaveBeenCalledWith("u1", 3));
-    // El recuento es el que devolvió el servidor.
-    expect(await screen.findByText(/12 added/)).toBeTruthy();
-
-    // Tras activarlo, la acción útil deja de ser «Añadir» (sería idempotente y
-    // añadiría 0): pasa a ser estudiar el mazo automático filtrado por el pack.
-    const enrolledRow = await waitFor(() => {
-      const item = screen.getByText("Travel").closest("li") as HTMLElement;
-      expect(within(item).getByText("In your dictionary")).toBeTruthy();
-      return item;
-    });
-    expect(within(enrolledRow).queryByRole("button", { name: "Add" })).toBeNull();
-    fireEvent.click(within(enrolledRow).getByRole("button", { name: "Study" }));
-
-    // Se estudia en el mazo automático (es el MISMO vocabulario, no una copia),
-    // con el `collection_id` que la cola ya soporta.
     await waitFor(() =>
-      expect(getFlashcardQueue).toHaveBeenCalledWith("u1", 0, {
-        collectionId: 3,
+      expect(getStudyQueue).toHaveBeenCalledWith("u1", {
+        scope: "deck",
+        mode: "pending",
+        level: null,
+        deckId: 9,
+        collectionId: null,
       }),
     );
   });
@@ -916,14 +1091,28 @@ describe("FlashcardsScreen", () => {
     });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByLabelText("Mode")).toBeNull();
+    expect(screen.getByRole("button", { name: "English → Spanish" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
 
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(await screen.findByLabelText("Mode")).toBeTruthy();
+    expect(screen.getByLabelText("Words today")).toBeTruthy();
+    expect(screen.getByText("Meaning always counts.")).toBeTruthy();
 
     // Y se vuelve a plegar.
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByLabelText("Mode")).toBeNull();
+  });
+
+  it("el sentido se cambia desde la cabecera sin abrir la configuración", async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Spanish → English" }));
+    await waitFor(() =>
+      expect(saveStudyConfig).toHaveBeenCalledWith("u1", { direction: "es-en" }),
+    );
     expect(screen.queryByLabelText("Mode")).toBeNull();
   });
 
@@ -940,6 +1129,6 @@ describe("FlashcardsScreen", () => {
     );
     // Guardar reconstruye la cola con la preferencia nueva; la sesión en curso no
     // se reescribe por detrás.
-    await waitFor(() => expect(getFlashcardQueue).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getStudyQueue).toHaveBeenCalledTimes(2));
   });
 });

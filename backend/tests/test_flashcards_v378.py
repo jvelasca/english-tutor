@@ -87,8 +87,12 @@ def test_auto_deck_is_virtual_and_not_a_row(monkeypatch, tmp_path):
         assert auto["card_count"] >= 1
         assert body["auto_deck_id"] == flashcards_repo.AUTO_DECK_ID
 
-    # El mazo automático NO existe como fila: no hay nada que sembrar ni borrar.
-    assert _count("flashcard_decks") == 0
+    # El mazo automático NO existe como fila. Los temas sí: son mazos del
+    # diccionario y aparecen al listar.
+    assert _count(
+        "flashcard_decks", "source_collection_id IS NULL"
+    ) == 0
+    assert _count("flashcard_decks") > 0
 
 
 def test_manual_deck_crud(monkeypatch, tmp_path):

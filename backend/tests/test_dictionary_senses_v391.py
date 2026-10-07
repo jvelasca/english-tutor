@@ -18,8 +18,8 @@ honesto:
 3. **La identidad del scoring no cambia.** La deduplicación por `(pos, gloss)` y
    la regla de `pos` canónico son las de V3.44, y los campos nuevos no alteran ni
    las familias POS ni la resolución del sentido (`sense_fit`).
-4. **La caché anterior se regenera.** `GENERATOR_VERSION` sube a 1.7.0 y una
-   fila de 1.6.0 deja de ser fresca: se regenera una sola vez al primer lookup.
+4. **La caché anterior se regenera.** `GENERATOR_VERSION` sube (hoy 1.8.0 desde
+   V3.95.0) y una fila anterior deja de ser fresca: se regenera al primer lookup.
 """
 
 from __future__ import annotations
@@ -253,7 +253,8 @@ def test_both_prompts_ask_for_the_rich_sense_and_the_same_order():
         assert '"example"' in prompt
         assert '"context"' in prompt
         assert "SAME order" in prompt
-    assert dictionary_content.GENERATOR_VERSION == "1.7.0"
+    # V3.95.0: la versión sube a 1.8.0 con el guardarraíl de retrotraducción.
+    assert dictionary_content.GENERATOR_VERSION == "1.8.0"
 
 
 # --- persistencia ------------------------------------------------------------

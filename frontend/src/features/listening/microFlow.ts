@@ -158,6 +158,36 @@ export function advanceToNext(
   };
 }
 
+/**
+ * Tras la revisión (`post`), el shadowing opcional no es otra pantalla.
+ *
+ * Avanza y, si el paso siguiente es un `shadowing` con `allow_skip`, lo salta.
+ * Así «Siguiente» cierra el ítem: repetir en voz alta queda como oferta en la
+ * misma revisión, no como un segundo botón «Hecho».
+ */
+export function advancePastOptionalShadowing(
+  state: MicroFlowState,
+  flow: ListeningFlowStep[],
+): MicroFlowState {
+  let next = advanceToNext(state, flow);
+  while (!next.finished && next.stage === "shadowing") {
+    const step = currentStep(next, flow);
+    if (!step?.allow_skip) break;
+    next = advanceToNext(next, flow);
+  }
+  return next;
+}
+
+/** El paso que seguiría a `state` es un shadowing que se puede saltar. */
+export function optionalShadowingFollows(
+  state: MicroFlowState,
+  flow: ListeningFlowStep[],
+): boolean {
+  const next = advanceToNext(state, flow);
+  if (next.finished || next.stage !== "shadowing") return false;
+  return Boolean(currentStep(next, flow)?.allow_skip);
+}
+
 /** Revela la transcripción completa (toggle del post / reintento con apoyo).
  * Solo si la política lo permite (`allowManualReveal`) y aún no está revelada. */
 export function revealFull(

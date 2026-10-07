@@ -1,6 +1,6 @@
-# Informe de contraste WCAG — release 3.94.2 (cierre GUI pre-V4.0 · rampa de niveles V3.75.4 · dirección del diccionario V3.75.8)
+# Informe de contraste WCAG — release 3.94.3 (cierre GUI pre-V4.0 · rampa de niveles V3.75.4 · dirección del diccionario V3.75.8)
 
-> Generado por `node frontend/scripts/contrast_audit.mjs` para la release **3.94.2** (`audit: V3.94.2-contraste-wcag`).
+> Generado por `node frontend/scripts/contrast_audit.mjs` para la release **3.94.3** (`audit: V3.94.3-contraste-wcag`).
 
 - Pares que BLOQUEAN (tipografía base + texto de acento + rampa de niveles + dirección + guardas): **0 fallos** de 444.
 - Pares de acento reportados (relleno + tinta y borde): **17 fallos** de 42.

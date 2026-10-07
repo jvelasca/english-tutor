@@ -5,60 +5,605 @@
   "title_es": "Trabajo y oficina",
   "cefr_hint": "B1",
   "items": [
-    {"word": "meeting", "lemma": "meeting", "translation": "reunión", "pos": "noun"},
-    {"word": "deadline", "lemma": "deadline", "translation": "fecha límite", "pos": "noun"},
-    {"word": "colleague", "lemma": "colleague", "translation": "compañero de trabajo", "pos": "noun"},
-    {"word": "boss", "lemma": "boss", "translation": "jefe", "pos": "noun"},
-    {"word": "salary", "lemma": "salary", "translation": "salario", "pos": "noun"},
-    {"word": "interview", "lemma": "interview", "translation": "entrevista", "pos": "noun"},
-    {"word": "resume", "lemma": "resume", "translation": "currículum", "pos": "noun"},
-    {"word": "project", "lemma": "project", "translation": "proyecto", "pos": "noun"},
-    {"word": "email", "lemma": "email", "translation": "correo electrónico", "pos": "noun"},
-    {"word": "schedule", "lemma": "schedule", "translation": "horario / agenda", "pos": "noun"},
-    {"word": "overtime", "lemma": "overtime", "translation": "horas extra", "pos": "noun"},
-    {"word": "remote", "lemma": "remote", "translation": "remoto", "pos": "adjective"},
-    {"word": "office", "lemma": "office", "translation": "oficina", "pos": "noun"},
-    {"word": "client", "lemma": "client", "translation": "cliente", "pos": "noun"},
-    {"word": "presentation", "lemma": "presentation", "translation": "presentación", "pos": "noun"},
-    {"word": "report", "lemma": "report", "translation": "informe", "pos": "noun"},
-    {"word": "task", "lemma": "task", "translation": "tarea", "pos": "noun"},
-    {"word": "goal", "lemma": "goal", "translation": "objetivo", "pos": "noun"},
-    {"word": "team", "lemma": "team", "translation": "equipo", "pos": "noun"},
-    {"word": "promotion", "lemma": "promotion", "translation": "ascenso", "pos": "noun"},
-    {"word": "contract", "lemma": "contract", "translation": "contrato", "pos": "noun"},
-    {"word": "budget", "lemma": "budget", "translation": "presupuesto", "pos": "noun"},
-    {"word": "feedback", "lemma": "feedback", "translation": "comentario / feedback", "pos": "noun"},
-    {"word": "applicant", "lemma": "applicant", "translation": "candidato", "pos": "noun"},
-    {"word": "application", "lemma": "application", "translation": "solicitud", "pos": "noun"},
-    {"word": "cover letter", "lemma": "cover letter", "translation": "carta de presentación", "pos": "noun"},
-    {"word": "position", "lemma": "position", "translation": "puesto", "pos": "noun"},
-    {"word": "department", "lemma": "department", "translation": "departamento", "pos": "noun"},
-    {"word": "manager", "lemma": "manager", "translation": "gerente", "pos": "noun"},
-    {"word": "employee", "lemma": "employee", "translation": "empleado", "pos": "noun"},
-    {"word": "employer", "lemma": "employer", "translation": "empleador", "pos": "noun"},
-    {"word": "staff", "lemma": "staff", "translation": "personal", "pos": "noun"},
-    {"word": "internship", "lemma": "internship", "translation": "prácticas", "pos": "noun"},
-    {"word": "shift", "lemma": "shift", "translation": "turno", "pos": "noun"},
-    {"word": "full-time", "lemma": "full-time", "translation": "jornada completa", "pos": "adjective"},
-    {"word": "part-time", "lemma": "part-time", "translation": "media jornada", "pos": "adjective"},
-    {"word": "freelance", "lemma": "freelance", "translation": "autónomo", "pos": "adjective"},
-    {"word": "workload", "lemma": "workload", "translation": "carga de trabajo", "pos": "noun"},
-    {"word": "milestone", "lemma": "milestone", "translation": "hito", "pos": "noun"},
-    {"word": "agenda", "lemma": "agenda", "translation": "orden del día", "pos": "noun"},
-    {"word": "invoice", "lemma": "invoice", "translation": "factura", "pos": "noun"},
-    {"word": "expense", "lemma": "expense", "translation": "gasto", "pos": "noun"},
-    {"word": "negotiation", "lemma": "negotiation", "translation": "negociación", "pos": "noun"},
-    {"word": "raise", "lemma": "raise", "translation": "aumento de sueldo", "pos": "noun"},
-    {"word": "bonus", "lemma": "bonus", "translation": "bonus", "pos": "noun"},
-    {"word": "benefits", "lemma": "benefits", "translation": "prestaciones", "pos": "noun"},
-    {"word": "notice", "lemma": "notice", "translation": "preaviso", "pos": "noun"},
-    {"word": "to hire", "lemma": "hire", "translation": "contratar", "pos": "verb"},
-    {"word": "to resign", "lemma": "resign", "translation": "dimitir", "pos": "verb"},
-    {"word": "to delegate", "lemma": "delegate", "translation": "delegar", "pos": "verb"},
-    {"word": "to manage", "lemma": "manage", "translation": "gestionar", "pos": "verb"},
-    {"word": "to supervise", "lemma": "supervise", "translation": "supervisar", "pos": "verb"},
-    {"word": "to coordinate", "lemma": "coordinate", "translation": "coordinar", "pos": "verb"},
-    {"word": "to attend", "lemma": "attend", "translation": "asistir a", "pos": "verb"},
-    {"word": "to schedule", "lemma": "schedule", "translation": "programar", "pos": "verb"}
+    {
+      "word": "meeting",
+      "lemma": "meeting",
+      "translation": "reunión",
+      "pos": "noun"
+    },
+    {
+      "word": "deadline",
+      "lemma": "deadline",
+      "translation": "fecha límite",
+      "pos": "noun"
+    },
+    {
+      "word": "colleague",
+      "lemma": "colleague",
+      "translation": "compañero de trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "boss",
+      "lemma": "boss",
+      "translation": "jefe",
+      "pos": "noun"
+    },
+    {
+      "word": "salary",
+      "lemma": "salary",
+      "translation": "salario",
+      "pos": "noun"
+    },
+    {
+      "word": "interview",
+      "lemma": "interview",
+      "translation": "entrevista",
+      "pos": "noun"
+    },
+    {
+      "word": "resume",
+      "lemma": "resume",
+      "translation": "currículum",
+      "pos": "noun"
+    },
+    {
+      "word": "project",
+      "lemma": "project",
+      "translation": "proyecto",
+      "pos": "noun"
+    },
+    {
+      "word": "email",
+      "lemma": "email",
+      "translation": "correo electrónico",
+      "pos": "noun"
+    },
+    {
+      "word": "schedule",
+      "lemma": "schedule",
+      "translation": "horario / agenda",
+      "pos": "noun"
+    },
+    {
+      "word": "overtime",
+      "lemma": "overtime",
+      "translation": "horas extra",
+      "pos": "noun"
+    },
+    {
+      "word": "remote",
+      "lemma": "remote",
+      "translation": "remoto",
+      "pos": "adjective"
+    },
+    {
+      "word": "office",
+      "lemma": "office",
+      "translation": "oficina",
+      "pos": "noun"
+    },
+    {
+      "word": "client",
+      "lemma": "client",
+      "translation": "cliente",
+      "pos": "noun"
+    },
+    {
+      "word": "presentation",
+      "lemma": "presentation",
+      "translation": "presentación",
+      "pos": "noun"
+    },
+    {
+      "word": "report",
+      "lemma": "report",
+      "translation": "informe",
+      "pos": "noun"
+    },
+    {
+      "word": "task",
+      "lemma": "task",
+      "translation": "tarea",
+      "pos": "noun"
+    },
+    {
+      "word": "goal",
+      "lemma": "goal",
+      "translation": "objetivo",
+      "pos": "noun"
+    },
+    {
+      "word": "team",
+      "lemma": "team",
+      "translation": "equipo",
+      "pos": "noun"
+    },
+    {
+      "word": "promotion",
+      "lemma": "promotion",
+      "translation": "ascenso",
+      "pos": "noun"
+    },
+    {
+      "word": "contract",
+      "lemma": "contract",
+      "translation": "contrato",
+      "pos": "noun"
+    },
+    {
+      "word": "budget",
+      "lemma": "budget",
+      "translation": "presupuesto",
+      "pos": "noun"
+    },
+    {
+      "word": "feedback",
+      "lemma": "feedback",
+      "translation": "comentario / feedback",
+      "pos": "noun"
+    },
+    {
+      "word": "applicant",
+      "lemma": "applicant",
+      "translation": "candidato",
+      "pos": "noun"
+    },
+    {
+      "word": "application",
+      "lemma": "application",
+      "translation": "solicitud",
+      "pos": "noun"
+    },
+    {
+      "word": "cover letter",
+      "lemma": "cover letter",
+      "translation": "carta de presentación",
+      "pos": "noun"
+    },
+    {
+      "word": "position",
+      "lemma": "position",
+      "translation": "puesto",
+      "pos": "noun"
+    },
+    {
+      "word": "department",
+      "lemma": "department",
+      "translation": "departamento",
+      "pos": "noun"
+    },
+    {
+      "word": "manager",
+      "lemma": "manager",
+      "translation": "gerente",
+      "pos": "noun"
+    },
+    {
+      "word": "employee",
+      "lemma": "employee",
+      "translation": "empleado",
+      "pos": "noun"
+    },
+    {
+      "word": "employer",
+      "lemma": "employer",
+      "translation": "empleador",
+      "pos": "noun"
+    },
+    {
+      "word": "staff",
+      "lemma": "staff",
+      "translation": "personal",
+      "pos": "noun"
+    },
+    {
+      "word": "internship",
+      "lemma": "internship",
+      "translation": "prácticas",
+      "pos": "noun"
+    },
+    {
+      "word": "shift",
+      "lemma": "shift",
+      "translation": "turno",
+      "pos": "noun"
+    },
+    {
+      "word": "full-time",
+      "lemma": "full-time",
+      "translation": "jornada completa",
+      "pos": "adjective"
+    },
+    {
+      "word": "part-time",
+      "lemma": "part-time",
+      "translation": "media jornada",
+      "pos": "adjective"
+    },
+    {
+      "word": "freelance",
+      "lemma": "freelance",
+      "translation": "autónomo",
+      "pos": "adjective"
+    },
+    {
+      "word": "workload",
+      "lemma": "workload",
+      "translation": "carga de trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "milestone",
+      "lemma": "milestone",
+      "translation": "hito",
+      "pos": "noun"
+    },
+    {
+      "word": "agenda",
+      "lemma": "agenda",
+      "translation": "orden del día",
+      "pos": "noun"
+    },
+    {
+      "word": "invoice",
+      "lemma": "invoice",
+      "translation": "factura",
+      "pos": "noun"
+    },
+    {
+      "word": "expense",
+      "lemma": "expense",
+      "translation": "gasto",
+      "pos": "noun"
+    },
+    {
+      "word": "negotiation",
+      "lemma": "negotiation",
+      "translation": "negociación",
+      "pos": "noun"
+    },
+    {
+      "word": "raise",
+      "lemma": "raise",
+      "translation": "aumento de sueldo",
+      "pos": "noun"
+    },
+    {
+      "word": "bonus",
+      "lemma": "bonus",
+      "translation": "bonus",
+      "pos": "noun"
+    },
+    {
+      "word": "benefits",
+      "lemma": "benefits",
+      "translation": "prestaciones",
+      "pos": "noun"
+    },
+    {
+      "word": "notice",
+      "lemma": "notice",
+      "translation": "preaviso",
+      "pos": "noun"
+    },
+    {
+      "word": "to hire",
+      "lemma": "hire",
+      "translation": "contratar",
+      "pos": "verb"
+    },
+    {
+      "word": "to resign",
+      "lemma": "resign",
+      "translation": "dimitir",
+      "pos": "verb"
+    },
+    {
+      "word": "to delegate",
+      "lemma": "delegate",
+      "translation": "delegar",
+      "pos": "verb"
+    },
+    {
+      "word": "to manage",
+      "lemma": "manage",
+      "translation": "gestionar",
+      "pos": "verb"
+    },
+    {
+      "word": "to supervise",
+      "lemma": "supervise",
+      "translation": "supervisar",
+      "pos": "verb"
+    },
+    {
+      "word": "to coordinate",
+      "lemma": "coordinate",
+      "translation": "coordinar",
+      "pos": "verb"
+    },
+    {
+      "word": "to attend",
+      "lemma": "attend",
+      "translation": "asistir a",
+      "pos": "verb"
+    },
+    {
+      "word": "to schedule",
+      "lemma": "schedule",
+      "translation": "programar",
+      "pos": "verb"
+    },
+    {
+      "word": "open-plan",
+      "lemma": "open-plan",
+      "translation": "diáfano",
+      "pos": "adjective"
+    },
+    {
+      "word": "headquarters",
+      "lemma": "headquarters",
+      "translation": "sede",
+      "pos": "noun"
+    },
+    {
+      "word": "human resources",
+      "lemma": "human resources",
+      "translation": "recursos humanos",
+      "pos": "noun"
+    },
+    {
+      "word": "payroll",
+      "lemma": "payroll",
+      "translation": "nóminas",
+      "pos": "noun"
+    },
+    {
+      "word": "payslip",
+      "lemma": "payslip",
+      "translation": "nómina",
+      "pos": "noun"
+    },
+    {
+      "word": "pension",
+      "lemma": "pension",
+      "translation": "pensión",
+      "pos": "noun"
+    },
+    {
+      "word": "sick leave",
+      "lemma": "sick leave",
+      "translation": "baja por enfermedad",
+      "pos": "noun"
+    },
+    {
+      "word": "annual leave",
+      "lemma": "annual leave",
+      "translation": "vacaciones anuales",
+      "pos": "noun"
+    },
+    {
+      "word": "public holiday",
+      "lemma": "public holiday",
+      "translation": "festivo",
+      "pos": "noun"
+    },
+    {
+      "word": "timesheet",
+      "lemma": "timesheet",
+      "translation": "parte de horas",
+      "pos": "noun"
+    },
+    {
+      "word": "appraisal",
+      "lemma": "appraisal",
+      "translation": "evaluación",
+      "pos": "noun"
+    },
+    {
+      "word": "performance",
+      "lemma": "performance",
+      "translation": "desempeño",
+      "pos": "noun"
+    },
+    {
+      "word": "minutes",
+      "lemma": "minutes",
+      "translation": "acta",
+      "pos": "noun"
+    },
+    {
+      "word": "stakeholder",
+      "lemma": "stakeholder",
+      "translation": "parte interesada",
+      "pos": "noun"
+    },
+    {
+      "word": "purchase order",
+      "lemma": "purchase order",
+      "translation": "pedido de compra",
+      "pos": "noun"
+    },
+    {
+      "word": "complaint",
+      "lemma": "complaint",
+      "translation": "queja",
+      "pos": "noun"
+    },
+    {
+      "word": "to apply",
+      "lemma": "apply",
+      "translation": "solicitar",
+      "pos": "verb"
+    },
+    {
+      "word": "to interview",
+      "lemma": "interview",
+      "translation": "entrevistar",
+      "pos": "verb"
+    },
+    {
+      "word": "to promote",
+      "lemma": "promote",
+      "translation": "ascender",
+      "pos": "verb"
+    },
+    {
+      "word": "to dismiss",
+      "lemma": "dismiss",
+      "translation": "despedir",
+      "pos": "verb"
+    },
+    {
+      "word": "to retire",
+      "lemma": "retire",
+      "translation": "jubilarse",
+      "pos": "verb"
+    },
+    {
+      "word": "to clock in",
+      "lemma": "clock in",
+      "translation": "fichar la entrada",
+      "pos": "verb"
+    },
+    {
+      "word": "to postpone",
+      "lemma": "postpone",
+      "translation": "aplazar",
+      "pos": "verb"
+    },
+    {
+      "word": "to collaborate",
+      "lemma": "collaborate",
+      "translation": "colaborar",
+      "pos": "verb"
+    },
+    {
+      "word": "to prioritise",
+      "lemma": "prioritise",
+      "translation": "priorizar",
+      "pos": "verb"
+    },
+    {
+      "word": "to file",
+      "lemma": "file",
+      "translation": "archivar",
+      "pos": "verb"
+    },
+    {
+      "word": "cubicle",
+      "lemma": "cubicle",
+      "translation": "cubículo",
+      "pos": "noun"
+    },
+    {
+      "word": "notice period",
+      "lemma": "notice period",
+      "translation": "preaviso",
+      "pos": "noun"
+    },
+    {
+      "word": "reference",
+      "lemma": "reference",
+      "translation": "referencia",
+      "pos": "noun"
+    },
+    {
+      "word": "job offer",
+      "lemma": "job offer",
+      "translation": "oferta de trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "probation",
+      "lemma": "probation",
+      "translation": "periodo de prueba",
+      "pos": "noun"
+    },
+    {
+      "word": "redundancy",
+      "lemma": "redundancy",
+      "translation": "despido objetivo",
+      "pos": "noun"
+    },
+    {
+      "word": "to cover",
+      "lemma": "cover",
+      "translation": "sustituir",
+      "pos": "verb"
+    },
+    {
+      "word": "flexitime",
+      "lemma": "flexitime",
+      "translation": "horario flexible",
+      "pos": "noun"
+    },
+    {
+      "word": "in-tray",
+      "lemma": "in-tray",
+      "translation": "bandeja de entrada del trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "out-of-office",
+      "lemma": "out-of-office",
+      "translation": "ausencia de la oficina",
+      "pos": "noun"
+    },
+    {
+      "word": "to forward",
+      "lemma": "forward",
+      "translation": "reenviar",
+      "pos": "verb"
+    },
+    {
+      "word": "to attach",
+      "lemma": "attach",
+      "translation": "adjuntar",
+      "pos": "noun"
+    },
+    {
+      "word": "to photocopy",
+      "lemma": "photocopy",
+      "translation": "fotocopiar",
+      "pos": "verb"
+    },
+    {
+      "word": "to take minutes",
+      "lemma": "take minutes",
+      "translation": "levantar acta",
+      "pos": "verb"
+    },
+    {
+      "word": "action point",
+      "lemma": "action point",
+      "translation": "punto de acción",
+      "pos": "noun"
+    },
+    {
+      "word": "to brainstorm",
+      "lemma": "brainstorm",
+      "translation": "hacer una lluvia de ideas",
+      "pos": "verb"
+    },
+    {
+      "word": "to proofread",
+      "lemma": "proofread",
+      "translation": "revisar un texto",
+      "pos": "verb"
+    },
+    {
+      "word": "shift pattern",
+      "lemma": "shift pattern",
+      "translation": "turno de trabajo",
+      "pos": "noun"
+    },
+    {
+      "word": "to swap shifts",
+      "lemma": "swap shifts",
+      "translation": "cambiar el turno",
+      "pos": "verb"
+    }
   ]
 }

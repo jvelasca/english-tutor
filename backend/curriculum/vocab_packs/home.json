@@ -5,52 +5,605 @@
   "title_es": "Casa y hogar",
   "cefr_hint": "A1",
   "items": [
-    {"word": "house", "lemma": "house", "translation": "casa", "pos": "noun"},
-    {"word": "flat", "lemma": "flat", "translation": "piso", "pos": "noun"},
-    {"word": "room", "lemma": "room", "translation": "habitación", "pos": "noun"},
-    {"word": "kitchen", "lemma": "kitchen", "translation": "cocina", "pos": "noun"},
-    {"word": "bathroom", "lemma": "bathroom", "translation": "baño", "pos": "noun"},
-    {"word": "bedroom", "lemma": "bedroom", "translation": "dormitorio", "pos": "noun"},
-    {"word": "living room", "lemma": "living room", "translation": "salón", "pos": "noun"},
-    {"word": "dining room", "lemma": "dining room", "translation": "comedor", "pos": "noun"},
-    {"word": "hall", "lemma": "hall", "translation": "recibidor", "pos": "noun"},
-    {"word": "door", "lemma": "door", "translation": "puerta", "pos": "noun"},
-    {"word": "window", "lemma": "window", "translation": "ventana", "pos": "noun"},
-    {"word": "wall", "lemma": "wall", "translation": "pared", "pos": "noun"},
-    {"word": "floor", "lemma": "floor", "translation": "suelo", "pos": "noun"},
-    {"word": "ceiling", "lemma": "ceiling", "translation": "techo", "pos": "noun"},
-    {"word": "roof", "lemma": "roof", "translation": "tejado", "pos": "noun"},
-    {"word": "stairs", "lemma": "stairs", "translation": "escaleras", "pos": "noun"},
-    {"word": "garden", "lemma": "garden", "translation": "jardín", "pos": "noun"},
-    {"word": "garage", "lemma": "garage", "translation": "garaje", "pos": "noun"},
-    {"word": "balcony", "lemma": "balcony", "translation": "balcón", "pos": "noun"},
-    {"word": "basement", "lemma": "basement", "translation": "sótano", "pos": "noun"},
-    {"word": "attic", "lemma": "attic", "translation": "ático", "pos": "noun"},
-    {"word": "furniture", "lemma": "furniture", "translation": "muebles", "pos": "noun"},
-    {"word": "sofa", "lemma": "sofa", "translation": "sofá", "pos": "noun"},
-    {"word": "armchair", "lemma": "armchair", "translation": "sillón", "pos": "noun"},
-    {"word": "table", "lemma": "table", "translation": "mesa", "pos": "noun"},
-    {"word": "chair", "lemma": "chair", "translation": "silla", "pos": "noun"},
-    {"word": "bed", "lemma": "bed", "translation": "cama", "pos": "noun"},
-    {"word": "wardrobe", "lemma": "wardrobe", "translation": "armario", "pos": "noun"},
-    {"word": "shelf", "lemma": "shelf", "translation": "estantería", "pos": "noun"},
-    {"word": "drawer", "lemma": "drawer", "translation": "cajón", "pos": "noun"},
-    {"word": "mirror", "lemma": "mirror", "translation": "espejo", "pos": "noun"},
-    {"word": "lamp", "lemma": "lamp", "translation": "lámpara", "pos": "noun"},
-    {"word": "curtain", "lemma": "curtain", "translation": "cortina", "pos": "noun"},
-    {"word": "carpet", "lemma": "carpet", "translation": "alfombra", "pos": "noun"},
-    {"word": "pillow", "lemma": "pillow", "translation": "almohada", "pos": "noun"},
-    {"word": "blanket", "lemma": "blanket", "translation": "manta", "pos": "noun"},
-    {"word": "sheet", "lemma": "sheet", "translation": "sábana", "pos": "noun"},
-    {"word": "towel", "lemma": "towel", "translation": "toalla", "pos": "noun"},
-    {"word": "sink", "lemma": "sink", "translation": "fregadero", "pos": "noun"},
-    {"word": "oven", "lemma": "oven", "translation": "horno", "pos": "noun"},
-    {"word": "fridge", "lemma": "fridge", "translation": "nevera", "pos": "noun"},
-    {"word": "dishwasher", "lemma": "dishwasher", "translation": "lavavajillas", "pos": "noun"},
-    {"word": "washing machine", "lemma": "washing machine", "translation": "lavadora", "pos": "noun"},
-    {"word": "microwave", "lemma": "microwave", "translation": "microondas", "pos": "noun"},
-    {"word": "kettle", "lemma": "kettle", "translation": "hervidor", "pos": "noun"},
-    {"word": "cupboard", "lemma": "cupboard", "translation": "armario de cocina", "pos": "noun"},
-    {"word": "remote control", "lemma": "remote control", "translation": "mando a distancia", "pos": "noun"}
+    {
+      "word": "house",
+      "lemma": "house",
+      "translation": "casa",
+      "pos": "noun"
+    },
+    {
+      "word": "flat",
+      "lemma": "flat",
+      "translation": "piso",
+      "pos": "noun"
+    },
+    {
+      "word": "room",
+      "lemma": "room",
+      "translation": "habitación",
+      "pos": "noun"
+    },
+    {
+      "word": "kitchen",
+      "lemma": "kitchen",
+      "translation": "cocina",
+      "pos": "noun"
+    },
+    {
+      "word": "bathroom",
+      "lemma": "bathroom",
+      "translation": "baño",
+      "pos": "noun"
+    },
+    {
+      "word": "bedroom",
+      "lemma": "bedroom",
+      "translation": "dormitorio",
+      "pos": "noun"
+    },
+    {
+      "word": "living room",
+      "lemma": "living room",
+      "translation": "salón",
+      "pos": "noun"
+    },
+    {
+      "word": "dining room",
+      "lemma": "dining room",
+      "translation": "comedor",
+      "pos": "noun"
+    },
+    {
+      "word": "hall",
+      "lemma": "hall",
+      "translation": "recibidor",
+      "pos": "noun"
+    },
+    {
+      "word": "door",
+      "lemma": "door",
+      "translation": "puerta",
+      "pos": "noun"
+    },
+    {
+      "word": "window",
+      "lemma": "window",
+      "translation": "ventana",
+      "pos": "noun"
+    },
+    {
+      "word": "wall",
+      "lemma": "wall",
+      "translation": "pared",
+      "pos": "noun"
+    },
+    {
+      "word": "floor",
+      "lemma": "floor",
+      "translation": "suelo",
+      "pos": "noun"
+    },
+    {
+      "word": "ceiling",
+      "lemma": "ceiling",
+      "translation": "techo",
+      "pos": "noun"
+    },
+    {
+      "word": "roof",
+      "lemma": "roof",
+      "translation": "tejado",
+      "pos": "noun"
+    },
+    {
+      "word": "stairs",
+      "lemma": "stairs",
+      "translation": "escaleras",
+      "pos": "noun"
+    },
+    {
+      "word": "garden",
+      "lemma": "garden",
+      "translation": "jardín",
+      "pos": "noun"
+    },
+    {
+      "word": "garage",
+      "lemma": "garage",
+      "translation": "garaje",
+      "pos": "noun"
+    },
+    {
+      "word": "balcony",
+      "lemma": "balcony",
+      "translation": "balcón",
+      "pos": "noun"
+    },
+    {
+      "word": "basement",
+      "lemma": "basement",
+      "translation": "sótano",
+      "pos": "noun"
+    },
+    {
+      "word": "attic",
+      "lemma": "attic",
+      "translation": "ático",
+      "pos": "noun"
+    },
+    {
+      "word": "furniture",
+      "lemma": "furniture",
+      "translation": "muebles",
+      "pos": "noun"
+    },
+    {
+      "word": "sofa",
+      "lemma": "sofa",
+      "translation": "sofá",
+      "pos": "noun"
+    },
+    {
+      "word": "armchair",
+      "lemma": "armchair",
+      "translation": "sillón",
+      "pos": "noun"
+    },
+    {
+      "word": "table",
+      "lemma": "table",
+      "translation": "mesa",
+      "pos": "noun"
+    },
+    {
+      "word": "chair",
+      "lemma": "chair",
+      "translation": "silla",
+      "pos": "noun"
+    },
+    {
+      "word": "bed",
+      "lemma": "bed",
+      "translation": "cama",
+      "pos": "noun"
+    },
+    {
+      "word": "wardrobe",
+      "lemma": "wardrobe",
+      "translation": "armario",
+      "pos": "noun"
+    },
+    {
+      "word": "shelf",
+      "lemma": "shelf",
+      "translation": "estantería",
+      "pos": "noun"
+    },
+    {
+      "word": "drawer",
+      "lemma": "drawer",
+      "translation": "cajón",
+      "pos": "noun"
+    },
+    {
+      "word": "mirror",
+      "lemma": "mirror",
+      "translation": "espejo",
+      "pos": "noun"
+    },
+    {
+      "word": "lamp",
+      "lemma": "lamp",
+      "translation": "lámpara",
+      "pos": "noun"
+    },
+    {
+      "word": "curtain",
+      "lemma": "curtain",
+      "translation": "cortina",
+      "pos": "noun"
+    },
+    {
+      "word": "carpet",
+      "lemma": "carpet",
+      "translation": "alfombra",
+      "pos": "noun"
+    },
+    {
+      "word": "pillow",
+      "lemma": "pillow",
+      "translation": "almohada",
+      "pos": "noun"
+    },
+    {
+      "word": "blanket",
+      "lemma": "blanket",
+      "translation": "manta",
+      "pos": "noun"
+    },
+    {
+      "word": "sheet",
+      "lemma": "sheet",
+      "translation": "sábana",
+      "pos": "noun"
+    },
+    {
+      "word": "towel",
+      "lemma": "towel",
+      "translation": "toalla",
+      "pos": "noun"
+    },
+    {
+      "word": "sink",
+      "lemma": "sink",
+      "translation": "fregadero",
+      "pos": "noun"
+    },
+    {
+      "word": "oven",
+      "lemma": "oven",
+      "translation": "horno",
+      "pos": "noun"
+    },
+    {
+      "word": "fridge",
+      "lemma": "fridge",
+      "translation": "nevera",
+      "pos": "noun"
+    },
+    {
+      "word": "dishwasher",
+      "lemma": "dishwasher",
+      "translation": "lavavajillas",
+      "pos": "noun"
+    },
+    {
+      "word": "washing machine",
+      "lemma": "washing machine",
+      "translation": "lavadora",
+      "pos": "noun"
+    },
+    {
+      "word": "microwave",
+      "lemma": "microwave",
+      "translation": "microondas",
+      "pos": "noun"
+    },
+    {
+      "word": "kettle",
+      "lemma": "kettle",
+      "translation": "hervidor",
+      "pos": "noun"
+    },
+    {
+      "word": "cupboard",
+      "lemma": "cupboard",
+      "translation": "armario de cocina",
+      "pos": "noun"
+    },
+    {
+      "word": "remote control",
+      "lemma": "remote control",
+      "translation": "mando a distancia",
+      "pos": "noun"
+    },
+    {
+      "word": "doorbell",
+      "lemma": "doorbell",
+      "translation": "timbre",
+      "pos": "noun"
+    },
+    {
+      "word": "doorknob",
+      "lemma": "doorknob",
+      "translation": "pomo",
+      "pos": "noun"
+    },
+    {
+      "word": "key",
+      "lemma": "key",
+      "translation": "llave",
+      "pos": "noun"
+    },
+    {
+      "word": "lock",
+      "lemma": "lock",
+      "translation": "cerradura",
+      "pos": "noun"
+    },
+    {
+      "word": "letterbox",
+      "lemma": "letterbox",
+      "translation": "buzón",
+      "pos": "noun"
+    },
+    {
+      "word": "doormat",
+      "lemma": "doormat",
+      "translation": "felpudo",
+      "pos": "noun"
+    },
+    {
+      "word": "radiator",
+      "lemma": "radiator",
+      "translation": "radiador",
+      "pos": "noun"
+    },
+    {
+      "word": "boiler",
+      "lemma": "boiler",
+      "translation": "caldera",
+      "pos": "noun"
+    },
+    {
+      "word": "thermostat",
+      "lemma": "thermostat",
+      "translation": "termostato",
+      "pos": "noun"
+    },
+    {
+      "word": "socket",
+      "lemma": "socket",
+      "translation": "enchufe",
+      "pos": "noun"
+    },
+    {
+      "word": "light switch",
+      "lemma": "light switch",
+      "translation": "interruptor",
+      "pos": "noun"
+    },
+    {
+      "word": "light bulb",
+      "lemma": "light bulb",
+      "translation": "bombilla",
+      "pos": "noun"
+    },
+    {
+      "word": "fuse",
+      "lemma": "fuse",
+      "translation": "fusible",
+      "pos": "noun"
+    },
+    {
+      "word": "tap",
+      "lemma": "tap",
+      "translation": "grifo",
+      "pos": "noun"
+    },
+    {
+      "word": "shower",
+      "lemma": "shower",
+      "translation": "ducha",
+      "pos": "noun"
+    },
+    {
+      "word": "bath",
+      "lemma": "bath",
+      "translation": "bañera",
+      "pos": "noun"
+    },
+    {
+      "word": "toilet",
+      "lemma": "toilet",
+      "translation": "inodoro",
+      "pos": "noun"
+    },
+    {
+      "word": "toilet paper",
+      "lemma": "toilet paper",
+      "translation": "papel higiénico",
+      "pos": "noun"
+    },
+    {
+      "word": "bin",
+      "lemma": "bin",
+      "translation": "cubo de la basura",
+      "pos": "noun"
+    },
+    {
+      "word": "broom",
+      "lemma": "broom",
+      "translation": "escoba",
+      "pos": "noun"
+    },
+    {
+      "word": "dustpan",
+      "lemma": "dustpan",
+      "translation": "recogedor",
+      "pos": "noun"
+    },
+    {
+      "word": "mop",
+      "lemma": "mop",
+      "translation": "fregona",
+      "pos": "noun"
+    },
+    {
+      "word": "vacuum cleaner",
+      "lemma": "vacuum cleaner",
+      "translation": "aspiradora",
+      "pos": "noun"
+    },
+    {
+      "word": "iron",
+      "lemma": "iron",
+      "translation": "plancha",
+      "pos": "noun"
+    },
+    {
+      "word": "ironing board",
+      "lemma": "ironing board",
+      "translation": "tabla de planchar",
+      "pos": "noun"
+    },
+    {
+      "word": "clothes horse",
+      "lemma": "clothes horse",
+      "translation": "tendedero",
+      "pos": "noun"
+    },
+    {
+      "word": "peg",
+      "lemma": "peg",
+      "translation": "pinza",
+      "pos": "noun"
+    },
+    {
+      "word": "mattress",
+      "lemma": "mattress",
+      "translation": "colchón",
+      "pos": "noun"
+    },
+    {
+      "word": "duvet",
+      "lemma": "duvet",
+      "translation": "edredón",
+      "pos": "noun"
+    },
+    {
+      "word": "bedside table",
+      "lemma": "bedside table",
+      "translation": "mesilla",
+      "pos": "noun"
+    },
+    {
+      "word": "chest of drawers",
+      "lemma": "chest of drawers",
+      "translation": "cómoda",
+      "pos": "noun"
+    },
+    {
+      "word": "cushion",
+      "lemma": "cushion",
+      "translation": "cojín",
+      "pos": "noun"
+    },
+    {
+      "word": "houseplant",
+      "lemma": "houseplant",
+      "translation": "planta de interior",
+      "pos": "noun"
+    },
+    {
+      "word": "to tidy",
+      "lemma": "tidy",
+      "translation": "ordenar",
+      "pos": "verb"
+    },
+    {
+      "word": "to sweep",
+      "lemma": "sweep",
+      "translation": "barrer",
+      "pos": "verb"
+    },
+    {
+      "word": "to mop",
+      "lemma": "mop",
+      "translation": "fregar",
+      "pos": "verb"
+    },
+    {
+      "word": "to vacuum",
+      "lemma": "vacuum",
+      "translation": "pasar la aspiradora",
+      "pos": "verb"
+    },
+    {
+      "word": "to dust",
+      "lemma": "dust",
+      "translation": "quitar el polvo",
+      "pos": "verb"
+    },
+    {
+      "word": "to lock",
+      "lemma": "lock",
+      "translation": "cerrar con llave",
+      "pos": "verb"
+    },
+    {
+      "word": "to rent",
+      "lemma": "rent",
+      "translation": "alquilar",
+      "pos": "verb"
+    },
+    {
+      "word": "to move house",
+      "lemma": "move house",
+      "translation": "mudarse",
+      "pos": "verb"
+    },
+    {
+      "word": "landlord",
+      "lemma": "landlord",
+      "translation": "casero",
+      "pos": "noun"
+    },
+    {
+      "word": "tenant",
+      "lemma": "tenant",
+      "translation": "inquilino",
+      "pos": "noun"
+    },
+    {
+      "word": "rent",
+      "lemma": "rent",
+      "translation": "alquiler",
+      "pos": "noun"
+    },
+    {
+      "word": "utility bill",
+      "lemma": "utility bill",
+      "translation": "factura de suministros",
+      "pos": "noun"
+    },
+    {
+      "word": "neighbour",
+      "lemma": "neighbour",
+      "translation": "vecino",
+      "pos": "noun"
+    },
+    {
+      "word": "upstairs",
+      "lemma": "upstairs",
+      "translation": "arriba",
+      "pos": "adverb"
+    },
+    {
+      "word": "downstairs",
+      "lemma": "downstairs",
+      "translation": "abajo",
+      "pos": "adverb"
+    },
+    {
+      "word": "to unlock",
+      "lemma": "unlock",
+      "translation": "abrir la cerradura",
+      "pos": "verb"
+    },
+    {
+      "word": "sponge",
+      "lemma": "sponge",
+      "translation": "esponja",
+      "pos": "noun"
+    },
+    {
+      "word": "cloth",
+      "lemma": "cloth",
+      "translation": "trapo",
+      "pos": "noun"
+    },
+    {
+      "word": "washing-up liquid",
+      "lemma": "washing-up liquid",
+      "translation": "lavavajillas",
+      "pos": "noun"
+    },
+    {
+      "word": "to wash up",
+      "lemma": "wash up",
+      "translation": "fregar los platos",
+      "pos": "verb"
+    }
   ]
 }

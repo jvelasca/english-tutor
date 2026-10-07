@@ -9,6 +9,7 @@ import {
   normalizeFlashcardStats,
   normalizeLexicon,
   normalizeRetentionDue,
+  normalizeStudyLessonQueue,
   normalizeStudyQueue,
   normalizeVocabBulkAdd,
   normalizeVocabCollections,
@@ -42,6 +43,7 @@ import type {
   FlashcardReviewResult,
   FlashcardStats,
   Lexicon,
+  StudyQueue,
   RetentionDue,
   RetentionReviewResult,
   VocabBulkAddResult,
@@ -81,6 +83,74 @@ export function lookupDictionaryWord(
     // "cargando" para siempre si Ollama se cuelga.
     120_000,
     "dictionary lookup",
+  );
+}
+
+/** Otra frase de la lección. No cierra la carta ni agenda FSRS. */
+export function requestStudyExample(
+  word: string,
+  avoid: string[],
+): Promise<{ word: string; phrase: string; translation: string }> {
+  return withTimeout(
+    postJson<unknown>("/api/vocabulary/study/example", { word, avoid }).then((raw) => {
+      const data =
+        raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      return {
+        word: typeof data.word === "string" ? data.word : word,
+        phrase: typeof data.phrase === "string" ? data.phrase : "",
+        translation: typeof data.translation === "string" ? data.translation : "",
+      };
+    }),
+    120_000,
+    "study example",
+  );
+}
+
+/** Opciones de «¿Cuál es?» desde todo el diccionario. No cierra la lección. */
+export function requestStudyQuiz(
+  word: string,
+  translation: string,
+  exclude: string[],
+  direction: "en-es" | "es-en" = "en-es",
+): Promise<{ choices: string[] }> {
+  return postJson<unknown>("/api/vocabulary/study/quiz", {
+    word,
+    translation,
+    exclude,
+    direction,
+  }).then((raw) => {
+    const data = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const choices = Array.isArray(data.choices)
+      ? data.choices.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+      : [];
+    return { choices };
+  });
+}
+
+/** Pista nueva, guardada en la ficha o en el léxico. No cierra la lección. */
+export function requestStudyHint(body: {
+  word: string;
+  translation: string;
+  cardType: string;
+  cardId: string;
+  direction?: "en-es" | "es-en";
+}): Promise<{ word: string; hint: string }> {
+  return withTimeout(
+    postJson<unknown>("/api/vocabulary/study/hint", {
+      word: body.word,
+      translation: body.translation,
+      card_type: body.cardType,
+      card_id: body.cardId,
+      direction: body.direction ?? "en-es",
+    }).then((raw) => {
+      const data = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      return {
+        word: typeof data.word === "string" ? data.word : body.word,
+        hint: typeof data.hint === "string" ? data.hint : "",
+      };
+    }),
+    120_000,
+    "study hint",
   );
 }
 
@@ -453,6 +523,9 @@ export function addVocabularyItem(
     translation?: string;
     collectionId?: number;
     sense?: VocabularySenseInput | null;
+    mnemonic?: string;
+    deckIds?: number[];
+    cefr?: string;
   } = {},
 ): Promise<VocabItemAddResult> {
   return postJson<unknown>("/api/vocabulary/items", {
@@ -460,6 +533,9 @@ export function addVocabularyItem(
     translation: options.translation ?? "",
     ...(options.sense ? { sense: options.sense } : {}),
     collection_id: options.collectionId ?? null,
+    mnemonic: options.mnemonic ?? "",
+    deck_ids: options.deckIds ?? [],
+    cefr: options.cefr ?? "",
   }).then(normalizeVocabItemAdd);
 }
 
@@ -587,16 +663,56 @@ export function deleteFlashcardDeck(
 export function getFlashcardQueue(
   _userId: string,
   deckId: number,
-  options: { collectionId?: number | null } = {},
+  options: { collectionId?: number | null; level?: string | null } = {},
 ): Promise<FlashcardQueue> {
   const params = new URLSearchParams();
   if (options.collectionId != null) {
     params.set("collection_id", String(options.collectionId));
   }
+  if (options.level) {
+    params.set("level", options.level);
+  }
   const q = params.toString();
   return getJson<unknown>(
     `/api/vocabulary/decks/${deckId}/queue${q ? `?${q}` : ""}`,
   ).then(normalizeStudyQueue);
+}
+
+/** Cola de la lección de Estudiar (banco, nivel o mazo) con sus contadores. */
+export function getStudyQueue(
+  _userId: string,
+  options: {
+    scope: "all" | "level" | "deck";
+    mode?: "pending" | "unlearned" | "hard" | "good" | "failed" | "all";
+    level?: string | null;
+    deckId?: number | null;
+    collectionId?: number | null;
+  },
+): Promise<StudyQueue> {
+  const params = new URLSearchParams();
+  params.set("scope", options.scope);
+  params.set("mode", options.mode ?? "pending");
+  if (options.level) params.set("level", options.level);
+  if (options.deckId != null) params.set("deck_id", String(options.deckId));
+  if (options.collectionId != null) {
+    params.set("collection_id", String(options.collectionId));
+  }
+  return getJson<unknown>(`/api/vocabulary/study/queue?${params.toString()}`).then(
+    normalizeStudyLessonQueue,
+  );
+}
+
+/** Cierra el ítem servido: una nota FSRS y los pasos que el alumno afirma. */
+export function completeStudyLesson(
+  _userId: string,
+  body: {
+    item_id: string;
+    grade: number;
+    translation?: string;
+    facets: Record<string, string>;
+  },
+): Promise<{ word: string; learned: boolean; facets: Record<string, string> }> {
+  return postJson(`/api/vocabulary/study/complete`, body);
 }
 
 export function reviewFlashcard(

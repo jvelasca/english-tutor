@@ -1,9 +1,17 @@
 import { Layers, Search } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getSettings } from "../../api/settings";
 import { useI18n } from "../../hooks/useI18n";
 import { useDictionaryView } from "../../hooks/useDictionaryView";
 import { useTabList } from "../../hooks/useTabList";
 import { cn } from "../../lib/utils";
+import { dictionaryViewFromSettings } from "../../utils/dictionaryView";
+import {
+  mergeStudyPlace,
+  readStudyPlace,
+  studyPlaceFromSettings,
+} from "../../utils/lastPlace";
+import { rememberStudyPlace } from "../../utils/studyPlaceMemory";
 import { takePendingStudyFocus } from "../../utils/studyFocus";
 import { DictionaryLookup } from "./DictionaryLookup";
 import { DictionaryWarmupAction } from "./DictionaryWarmupAction";
@@ -91,20 +99,53 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
    * inicializa desde el valor persistido para que un `"personal"` guardado
    * abra directamente en «Mi léxico».
    */
-  const [flashcardsTab, setFlashcardsTab] = useState<FlashcardsTab>(() =>
-    view === "personal" ? "lexicon" : "study",
-  );
+  const [flashcardsTab, setFlashcardsTab] = useState<FlashcardsTab>(() => {
+    if (view === "personal") return "lexicon";
+    const place = userId ? readStudyPlace(userId) : null;
+    return place && place.tab !== "lexicon" ? place.tab : "study";
+  });
+  const tabTouched = useRef(false);
+  const openingView = useRef(view);
 
   const activeTab: DictionaryTab = view === "lookup" ? "lookup" : "flashcards";
 
   /** Persiste la sub-pestaña: «Mi léxico» es `"personal"`, el resto `"flashcards"`. */
   const changeFlashcardsTab = useCallback(
     (next: FlashcardsTab) => {
+      tabTouched.current = true;
       setFlashcardsTab(next);
       setView(next === "lexicon" ? "personal" : "flashcards");
+      rememberStudyPlace(userId, { tab: next });
     },
-    [setView],
+    [setView, userId],
   );
+
+  // La sub-pestaña (Mazos, Tarjetas, Estadísticas) no cabe en dictionary_view.
+  // Al montar manda la copia local; si el perfil trae otra y nadie ha pulsado, manda el perfil.
+  useEffect(() => {
+    if (!userId) return;
+    let cancel = false;
+    void getSettings(userId)
+      .then((res) => {
+        if (cancel || tabTouched.current) return;
+        const place = studyPlaceFromSettings(res.settings);
+        if (!place) return;
+        const serverView = dictionaryViewFromSettings(res.settings);
+        const lexicon =
+          serverView === "personal" ||
+          (serverView == null && openingView.current === "personal");
+        if (lexicon) {
+          setFlashcardsTab("lexicon");
+          return;
+        }
+        mergeStudyPlace(userId, place);
+        setFlashcardsTab(place.tab);
+      })
+      .catch(() => {});
+    return () => {
+      cancel = true;
+    };
+  }, [userId]);
 
   /** Pestaña de primer nivel: recuerda la sub-pestaña de Flashcards al volver. */
   const selectTab = useCallback(
@@ -138,10 +179,12 @@ export function DictionaryScreen({ userId }: { userId: string | null }) {
         deckId: deckId ?? null,
         nonce: prev.nonce + 1,
       }));
+      tabTouched.current = true;
       setFlashcardsTab("study");
       setView("flashcards");
+      rememberStudyPlace(userId, { tab: "study" });
     },
-    [setView],
+    [setView, userId],
   );
 
   return (

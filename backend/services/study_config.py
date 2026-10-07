@@ -53,6 +53,20 @@ DEFAULT_MODE = "recognition"
 DEFAULT_HINTS = "off"
 DEFAULT_DIFFICULTY = "auto"
 
+#: Tope de la cola de Estudiar (nuevas + repasos) en el banco y el mazo automático.
+DEFAULT_WORDS_PER_DAY = 20
+WORDS_PER_DAY_MIN = 1
+WORDS_PER_DAY_MAX = 200
+
+#: Pasos que el alumno PUEDE marcar como obligatorios para contar una palabra
+#: como aprendida. El significado siempre cuenta y no viaja en esta lista.
+OPTIONAL_FACETS: tuple[str, ...] = (
+    "pronunciation",
+    "context",
+    "senses",
+    "related",
+)
+
 #: Actividades del Planner 3.0 (`services.lexicon.REVIEW_ACTIVITIES`) por modo.
 #: `recognition` es reconocer/recuperar con apoyo; `production` es construir
 #: (frase, escritura, transferencia). `mixed` no filtra: se traduce a `None`.
@@ -82,17 +96,46 @@ def _one_of(value: object, allowed: tuple[str, ...], default: str) -> str:
     return candidate if candidate in allowed else default
 
 
-def normalize_study_config(raw: object) -> dict[str, str]:
-    """Devuelve SIEMPRE las cuatro claves con valores válidos.
+def _words_per_day(value: object) -> int:
+    """Entero dentro del tope.
+
+    Un valor ilegible cae al defecto; uno fuera, se recorta.
+    """
+    try:
+        number = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return DEFAULT_WORDS_PER_DAY
+    return max(WORDS_PER_DAY_MIN, min(WORDS_PER_DAY_MAX, number))
+
+
+def _required_facets(value: object) -> list[str]:
+    """Subconjunto ordenado de los pasos opcionales. El significado no se lista."""
+    if not isinstance(value, list):
+        return []
+    wanted = {
+        item.strip().lower()
+        for item in value
+        if isinstance(item, str) and item.strip()
+    }
+    return [name for name in OPTIONAL_FACETS if name in wanted]
+
+
+def normalize_study_config(raw: object) -> dict:
+    """Devuelve SIEMPRE el contrato completo con valores válidos.
 
     Acepta lo que venga (un dict de JSON, `None`, basura): la normalización es la
     frontera del motor, así que un valor raro cae al defecto en vez de propagarse.
+    `words_per_day` es un entero y `required_facets` una lista; el resto sigue
+    siendo texto.
     """
     data = raw if isinstance(raw, dict) else {}
-    return {
+    config: dict = {
         key: _one_of(data.get(key), allowed, DEFAULTS[key])
         for key, allowed in _ALLOWED.items()
     }
+    config["words_per_day"] = _words_per_day(data.get("words_per_day"))
+    config["required_facets"] = _required_facets(data.get("required_facets"))
+    return config
 
 
 def allowed_activities(config: dict | None) -> tuple[str, ...] | None:

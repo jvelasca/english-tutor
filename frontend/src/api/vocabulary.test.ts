@@ -200,6 +200,9 @@ describe("vocabulary api", () => {
       word: "ticket",
       translation: "billete",
       collection_id: null,
+      mnemonic: "",
+      deck_ids: [],
+      cefr: "",
     });
     // V3.92: sin acepción elegida, el campo no viaja (ni como null).
     expect("sense" in body).toBe(false);
@@ -229,6 +232,9 @@ describe("vocabulary api", () => {
         source: "dictionary",
       },
       collection_id: null,
+      mnemonic: "",
+      deck_ids: [],
+      cefr: "",
     });
   });
 
