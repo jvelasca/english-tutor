@@ -22,6 +22,7 @@ from repositories import evidence as evidence_repo
 from repositories import vocabulary as vocabulary_repo
 from services import (
     dictionary_content,
+    dictionary_glossary,
     dictionary_mcq,
     dictionary_reverse,
     difficulty,
@@ -2286,6 +2287,38 @@ async def lookup_dictionary(
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    # V3.95.0: la corrección curada por el webmaster es la autoridad MÁS alta: si
+    # existe, se sirve tal cual y no se toca la caché del modelo.
+    curated = await run_in_threadpool(
+        dictionary_repo.get_curated, DIRECTION_EN_ES, normalized
+    )
+    if curated:
+        return await run_in_threadpool(
+            _build_dictionary_entry, normalized, rows, curated
+        )
+    # V3.95.0: léxico externo opcional (cobertura determinista, sin modelo). Va por
+    # debajo del curado y por encima de la generación: si aporta traducción, se
+    # sirve ya, aunque no traiga definición (definition_source="none").
+    lexicon = await run_in_threadpool(
+        dictionary_repo.lookup_lexicon_en_es, normalized
+    )
+    if lexicon:
+        content = {
+            "pos": lexicon[0].get("pos") or "",
+            "definition": "",
+            "translation": ", ".join(
+                dict.fromkeys(item["translation"] for item in lexicon)
+            ),
+            "situation": "",
+            "senses": [],
+            "meanings": [
+                {"term": item["translation"], "pos": item.get("pos") or ""}
+                for item in lexicon
+            ],
+        }
+        return await run_in_threadpool(
+            _build_dictionary_entry, normalized, rows, content
+        )
     cached = await _ensure_cached_content(
         normalized, model=model, user_id=user_id
     )
@@ -2297,17 +2330,26 @@ async def _lookup_dictionary_reverse(
 ) -> dict:
     """Entrada del diccionario ES→EN para el término `word` (V3.39/V3.86.0, D3).
 
-    Tres fuentes, en orden de autoridad para elegir el equivalente POR DEFECTO:
+    Cuatro fuentes, en orden de autoridad para elegir el equivalente POR DEFECTO:
 
-    1. **Pares curados de los packs** — `dictionary_reverse.match_pack_translation`
+    1. **Corrección curada del webmaster** — `dictionary_curated` (V3.95.0): si el
+       webmaster corrigió este término a mano, MANDA sobre todo lo demás y no se
+       consulta nada más.
+    2. **Glosario curado ES→EN** — `services.dictionary_glossary` sobre
+       `curriculum/lexicon/es_en_glossary.json`: pares escritos a mano (herramientas,
+       oficios, casa). Es lo que hace que «broca» dé «drill bit» sin pasar por el
+       modelo (V3.95.0).
+    3. **Pares curados de los packs** — `dictionary_reverse.match_pack_translation`
        sobre el catálogo global (`vocab_collection_items`): autoridad
        determinista y gratis. Es lo que hace que «tornillo» dé «screw» y «lima»
        dé «file» aunque la caché no tenga la entrada.
-    2. **Inversa instantánea** — `match_translation` sobre las traducciones ya
+    4. **Inversa instantánea** — `match_translation` sobre las traducciones ya
        cacheadas en `dictionary_entries`, sin pagar latencia del modelo.
-    3. **Generación** — solo si no hay NINGUNA coincidencia, se genera y cachea
+    5. **Generación** — solo si no hay NINGUNA coincidencia, se genera y cachea
        el contenido ES→EN en `dictionary_reverse_entries` (y su lista
-       `meanings` es entonces la fuente de los significados).
+       `meanings` es entonces la fuente de los significados). Esa generación pasa
+       por el guardarraíl de retrotraducción de `dictionary_content` (V3.95.0), así
+       que un equivalente no verificable se descarta en lugar de servirse.
 
     V3.86.0: los `meanings` que se devuelven son la unión del principal elegido,
     los del contenido generado (si lo hubo) y los candidatos curados e
@@ -2318,17 +2360,54 @@ async def _lookup_dictionary_reverse(
     if not normalized:
         raise ValueError("La palabra buscada queda vacía tras normalizar")
     rows = await run_in_threadpool(vocabulary_repo.get_vocabulary, user_id)
+    # V3.95.0: la corrección curada por el webmaster es la autoridad MÁS alta: si
+    # existe para este término, se sirve tal cual (con su equivalente inglés y su
+    # contenido) y no se consulta glosario, packs, caché ni modelo.
+    override = await run_in_threadpool(
+        dictionary_repo.get_curated, DIRECTION_ES_EN, normalized
+    )
+    if override and (override.get("translation") or "").strip():
+        english = (override.get("translation") or "").strip()
+        meanings = _merge_reverse_meanings(
+            english, list(override.get("meanings") or []), [], []
+        )
+        return await run_in_threadpool(
+            _build_reverse_entry,
+            normalized,
+            english,
+            [],
+            rows,
+            override,
+            meanings,
+        )
     entries = await run_in_threadpool(
         dictionary_repo.find_by_translation, normalized
     )
     pack_items = await run_in_threadpool(collections_repo.list_pack_items)
+    glossary_items = await run_in_threadpool(dictionary_glossary.glossary_items)
     instant = dictionary_reverse.match_translation(normalized, entries)
-    curated = dictionary_reverse.match_pack_translation(normalized, pack_items)
+    # El glosario curado MANDA sobre los packs: se resuelve primero y sus
+    # coincidencias encabezan la lista (ganan el equivalente por defecto). Los
+    # packs solo aportan lo que el glosario no cubre, sin duplicar términos.
+    curated_glossary = dictionary_reverse.match_pack_translation(
+        normalized, list(glossary_items)
+    )
+    glossary_terms = {
+        item["word"].casefold() for item in curated_glossary
+    }
+    curated_packs = [
+        item
+        for item in dictionary_reverse.match_pack_translation(
+            normalized, pack_items
+        )
+        if item["word"].casefold() not in glossary_terms
+    ]
+    curated = curated_glossary + curated_packs
     if curated or instant:
-        # El equivalente por defecto es el CURADO (packs) y, si no, el
-        # instantáneo: determinista y sin modelo. Solo se pide contenido del
-        # equivalente elegido para su definición/uso; los significados se
-        # completan con los candidatos, sin consultar al modelo.
+        # El equivalente por defecto es el CURADO (glosario y, si no, packs) y,
+        # si no, el instantáneo: determinista y sin modelo. Solo se pide
+        # contenido del equivalente elegido para su definición/uso; los
+        # significados se completan con los candidatos, sin consultar al modelo.
         english = curated[0]["word"] if curated else instant[0]
         content = await _ensure_cached_content(
             english, model=model, user_id=user_id
@@ -2337,6 +2416,32 @@ async def _lookup_dictionary_reverse(
             item["word"] for item in curated
         ] + list(instant)
         meanings = _merge_reverse_meanings(english, [], curated, instant)
+        return await run_in_threadpool(
+            _build_reverse_entry,
+            normalized,
+            english,
+            alternatives,
+            rows,
+            content,
+            meanings,
+        )
+    # V3.95.0: léxico externo opcional antes de generar con el modelo. Determinista,
+    # gratis y sin guardarraíl (el dato es de un diccionario publicado, no del
+    # modelo). Sirve el equivalente inglés aunque no traiga definición.
+    lexicon = await run_in_threadpool(
+        dictionary_repo.lookup_lexicon_es_en, normalized
+    )
+    if lexicon:
+        english = lexicon[0]["headword"]
+        alternatives = [item["headword"] for item in lexicon]
+        content = {
+            "pos": lexicon[0].get("pos") or "",
+            "definition": "",
+            "translation": english,
+            "situation": "",
+            "senses": [],
+        }
+        meanings = _merge_reverse_meanings(english, [], [], alternatives)
         return await run_in_threadpool(
             _build_reverse_entry,
             normalized,

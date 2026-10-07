@@ -408,3 +408,52 @@ def test_fresh_entry_words_chunks_a_long_list_without_asking_for_the_whole_table
 
     assert len(fresh) == 450
     assert "unrelated" not in fresh
+
+
+# --- V3.95.0: normalización española y lote ES→EN ------------------------------
+
+
+def test_normalize_term_es_keeps_accents_and_ene():
+    # A diferencia del inglés, la inversa NO pliega acentos ni la eñe: son claves
+    # distintas, no variantes.
+    assert dictionary_batch.normalize_term_es("  Camión.  ") == "camión"
+    assert dictionary_batch.normalize_term_es("Mañana") == "mañana"
+    assert dictionary_batch.normalize_term_es("pingüino") == "pingüino"
+    assert dictionary_batch.normalize_term_es("broca") == "broca"
+    # El inglés, en cambio, rechaza un término acentuado (no es su alfabeto).
+    assert dictionary_batch.normalize_word("camión") == ""
+    assert dictionary_batch.normalize_term_es("") == ""
+    assert dictionary_batch.normalize_term_es("¡¿?") == ""
+
+
+def test_plan_batch_can_use_the_spanish_normalizer():
+    """El lote inverso no puede descartar los acentos por usar el normalizador inglés."""
+    plan = dictionary_batch.plan_batch(
+        ["camión", "mañana", "Bank", "camion"],
+        normalize=dictionary_batch.normalize_term_es,
+    )
+    # «camión» y «mañana» sobreviven; «camion» (sin tilde) es OTRA clave y también
+    # entra; «Bank» se minusculiza.
+    assert set(plan.words) == {"camión", "mañana", "bank", "camion"}
+    assert plan.invalid == 0
+
+
+def test_fresh_reverse_entry_words_matches_the_reverse_cache():
+    version = dictionary_content.GENERATOR_VERSION
+    dictionary_repo.save_reverse_entry(
+        "casa", english="house", definition="x", generator_version=version
+    )
+    # Versión vigente pero sin equivalente inglés: no es servible.
+    dictionary_repo.save_reverse_entry(
+        "perro", english="   ", definition="x", generator_version=version
+    )
+    # Equivalente bueno pero de versión anterior: se regenera.
+    dictionary_repo.save_reverse_entry(
+        "gato", english="cat", definition="x", generator_version="1.6.0"
+    )
+
+    fresh = dictionary_repo.fresh_reverse_entry_words(
+        ["casa", "perro", "gato", "ausente"], version=version
+    )
+
+    assert fresh == {"casa"}

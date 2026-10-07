@@ -109,7 +109,9 @@ def test_generator_version_and_prompt_declare_the_situation_field():
     # V3.88.0: sube a 1.6.0 al EXIGIR un mínimo de significados (MIN_MEANINGS).
     # V3.91: sube a 1.7.0 al ampliar el contrato de ACEPCIÓN (ejemplo, contexto,
     # lema verificado y procedencia) para el diccionario de sentidos.
-    assert dictionary_content.GENERATOR_VERSION == "1.7.0"
+    # V3.95.0: sube a 1.8.0 al añadir el guardarraíl de retrotraducción (un
+    # equivalente ES→EN no verificable se descarta en vez de cachearse).
+    assert dictionary_content.GENERATOR_VERSION == "1.8.0"
     assert "situation" in dictionary_content._SYSTEM_PROMPT
     assert "situation" in dictionary_content._REVERSE_SYSTEM_PROMPT
     # V3.44 (P1-01): el contrato de contenido también declara `senses`.

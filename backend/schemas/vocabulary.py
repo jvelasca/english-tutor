@@ -543,6 +543,48 @@ class DictionaryEntryOut(BaseModel):
     usage: DictionaryUsageOut
 
 
+class DictionaryCuratedIn(BaseModel):
+    """Corrección curada de una entrada del diccionario (V3.95.0, webmaster).
+
+    `direction` + `word` identifican la fila. `translation` es el español en
+    `en-es` y el equivalente INGLÉS en `es-en`; `definition`/`situation`/
+    `senses`/`meanings` usan el mismo contrato que la caché. `note` es la nota
+    interna del webmaster (por qué se corrigió), no se muestra al alumno.
+    """
+
+    direction: Literal["en-es", "es-en"]
+    word: str = Field(min_length=1, max_length=120)
+    pos: str = Field(default="", max_length=40)
+    definition: str = Field(default="", max_length=600)
+    translation: str = Field(default="", max_length=500)
+    situation: str = Field(default="", max_length=200)
+    senses: list[DictionarySenseOut] = Field(default_factory=list)
+    meanings: list[DictionaryMeaningOut] = Field(default_factory=list)
+    note: str = Field(default="", max_length=500)
+
+
+class DictionaryCuratedOut(BaseModel):
+    """Corrección curada persistida (V3.95.0)."""
+
+    direction: str
+    word: str
+    pos: str = ""
+    definition: str = ""
+    translation: str = ""
+    situation: str = ""
+    senses: list[DictionarySenseOut] = Field(default_factory=list)
+    meanings: list[DictionaryMeaningOut] = Field(default_factory=list)
+    note: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class DictionaryCuratedListOut(BaseModel):
+    """Listado de correcciones curadas (V3.95.0)."""
+
+    items: list[DictionaryCuratedOut] = Field(default_factory=list)
+
+
 class DictionaryWarmupRequest(BaseModel):
     """Petición de precalentado del diccionario (V3.88.0).
 

@@ -353,6 +353,8 @@ launcher/
 ├── browser_cookies.py   # diagnóstico de cookies de Chrome/Edge/Brave/Vivaldi/Opera/Firefox
 ├── state_store.py       # persistencia visual: tamaño/posición de ventana y paneles
 ├── config_store.py      # persistencia de preferencias: modo LAN + PIN admin (config.json)
+├── tailscale.py         # sonda de Tailscale (instalado/sesión/IP/DNS) y publicación con Serve
+├── qr_image.py          # código QR (PPM) de la dirección del móvil, para pintarlo en tkinter
 ├── make_icon.ps1        # genera icon.ico (System.Drawing, Windows)
 ├── install_shortcut.ps1 # crea el acceso directo del escritorio (English Tutor.lnk)
 ├── allow-firewall.ps1   # abre TCP 8000 (API + UI) en el firewall (requiere admin)
@@ -364,9 +366,9 @@ launcher/
 └── tests/               # pytest (conftest.py + test_core/test_status/test_browser_cookies/
                          #         test_ui/test_widgets/test_state_store/test_config_store/
                          #         test_process_manager/test_preflight_v373/
-                         #         test_lan_ip_v373/test_lan_mode/
-                         #         test_admin_pin/test_admin_client) — 252
-                         #         funciones de test (269 casos con parametrización), en CI
+                         #         test_lan_ip_v373/test_lan_mode/test_mesh/test_qr_image/
+                         #         test_admin_pin/test_admin_client) — 274
+                         #         funciones de test (291 casos con parametrización), en CI
                          #         (job `launcher`)
 ```
 
@@ -439,6 +441,13 @@ launcher/
   guardar o retirar el PIN o el correo (igual que al cambiar el modo LAN), en vez de limitarse a
   pedirlo por texto. Reexpone la decisión de §5.8 de `docs/audit/PLAN-P0-IDENTIDAD.md`; el detalle
   y su porqué están ahí.
+- **`tailscale.py`** (V3.86.0): sonda (solo lectura) del estado de Tailscale en el equipo
+  —instalado, sesión iniciada, IP de la red mesh y MagicDNS— y la publicación de la web con
+  **Serve**, que pone HTTPS delante del producto. **No** instala Tailscale ni guarda un token de
+  su API, y **no** usa Funnel a propósito: eso sacaría el producto a Internet.
+- **`qr_image.py`**: traduce la dirección del móvil a un código QR en **PPM** para que tkinter lo
+  pinte con `PhotoImage` sin depender de Pillow (`segno` escribe el PPM). Una dirección vacía no
+  dibuja nada: el fallo se degrada a «sin QR», no a una ventana en blanco.
 - **`*.ps1`**: utilidades de Windows para generar el icono, crear el acceso directo y abrir el
   puerto en el firewall.
 

@@ -189,20 +189,26 @@ def match_pack_translation(term: str, items: list[dict]) -> list[dict]:
     """Equivalentes INGLESES curados del término español `term` (V3.86.0).
 
     Autoridad determinista y GRATIS (sin latencia del modelo) sobre el catálogo
-    global de packs: `items` son filas de `vocab_collection_items` con `word`
-    (inglés), `translation` (español) y `pos`. Es lo que hace que «tornillo» dé
-    «screw» y «lima» dé «file» aunque la caché no tenga la entrada o el modelo
-    devuelva un nombre propio.
+    global de packs Y sobre el glosario curado (`services.dictionary_glossary`,
+    que devuelve la MISMA forma): `items` son filas con `word` (inglés),
+    `translation` (español), `pos` y, opcionalmente, `priority`. Es lo que hace
+    que «tornillo» dé «screw» y «lima» dé «file» aunque la caché no tenga la
+    entrada o el modelo devuelva un nombre propio.
 
     Devuelve `[{word, pos}]` ordenados por calidad de coincidencia (exacta antes
-    que parcial) y, a igualdad, alfabéticamente (determinista). Sin duplicados:
-    un mismo equivalente que coincide por varios packs aparece una sola vez con
-    su mejor puntuación. Un término vacío o sin coincidencias devuelve [].
+    que parcial), a igualdad por `priority` DESCENDENTE y, si tampoco, 
+    alfabéticamente (determinista). `priority` solo la declara el glosario curado
+    para desempatar entre varios equivalentes legítimos de un mismo término (p.
+    ej. «broca» → «drill bit» antes que → «drill»); los packs no la traen, así
+    que su orden no cambia (priority 0 para todos). Sin duplicados: un mismo
+    equivalente que coincide por varios ítems aparece una sola vez con su mejor
+    puntuación. Un término vacío o sin coincidencias devuelve [].
     """
     normalized = normalize_term(term)
     if not normalized:
         return []
-    best: dict[str, tuple[dict, int]] = {}
+    # (entrada, score, priority): la prioridad solo ordena, nunca puntúa.
+    best: dict[str, tuple[dict, int, int]] = {}
     for item in items or []:
         english = (item.get("word") or "").strip()
         if not english:
@@ -210,14 +216,20 @@ def match_pack_translation(term: str, items: list[dict]) -> list[dict]:
         score = _pack_term_score(item.get("translation") or "", normalized)
         if score < 0:
             continue
+        try:
+            priority = int(item.get("priority") or 0)
+        except (TypeError, ValueError):
+            priority = 0
         key = english.lower()
         current = best.get(key)
-        if current is None or score > current[1]:
+        if current is None or (score, priority) > (current[1], current[2]):
             best[key] = (
                 {"word": english, "pos": str(item.get("pos") or "").strip().lower()},
                 score,
+                priority,
             )
     ordered = sorted(
-        best.values(), key=lambda item: (-item[1], item[0]["word"].lower())
+        best.values(),
+        key=lambda item: (-item[1], -item[2], item[0]["word"].lower()),
     )
-    return [entry for entry, _ in ordered]
+    return [entry for entry, _score, _priority in ordered]

@@ -7,7 +7,7 @@ selector nacía con una única opción. V3.88.0 cierra ese hueco por el lado del
 contrato de contenido:
 
 - `MIN_MEANINGS` se declara en AMBOS prompts (EN→ES y ES→EN);
-- `GENERATOR_VERSION` subió a 1.6.0 (y hoy es 1.7.0 desde V3.91), lo que invalida
+- `GENERATOR_VERSION` subió a 1.6.0 (hoy es 1.8.0 desde V3.95.0), lo que invalida
   la caché anterior y la regenera una sola vez al primer lookup;
 - la normalización y la frescura de caché conservan lo que ya garantizaban:
   orden del más común al menos, sin duplicados, con los nombres propios al
@@ -43,8 +43,13 @@ def test_both_prompts_forbid_a_single_meaning_for_polysemous_words():
 
 
 def test_generator_version_bump_invalidates_previous_cache():
-    """V3.91: 1.6.0 → 1.7.0 es la palanca que regenera la caché anterior."""
-    assert dictionary_content.GENERATOR_VERSION == "1.7.0"
+    """V3.95.0: 1.7.0 → 1.8.0 es la palanca que regenera la caché anterior.
+
+    El salto acompaña al guardarraíl de retrotraducción: las filas antiguas
+    (p. ej. «broca» → «rock») se tratan como no frescas y se regeneran al
+    consultarlas, ya bajo verificación.
+    """
+    assert dictionary_content.GENERATOR_VERSION == "1.8.0"
 
 
 # --- Frescura de caché ------------------------------------------------------

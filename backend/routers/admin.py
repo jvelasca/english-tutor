@@ -24,8 +24,11 @@ import config
 from dependencies import require_admin_local
 from domain import profile_requests as requests_service
 from domain import users as user_service
+from domain.vocabulary import _normalize_lookup_spanish, _normalize_lookup_word
+from repositories import dictionary as dictionary_repo
 from repositories import profile_requests as requests_repo
 from schemas.profiles import (
+    AdminAccessLink,
     AdminActivationOut,
     AdminApprovalOut,
     AdminCredentials,
@@ -44,10 +47,14 @@ from schemas.profiles import (
     ProfileRequestsOut,
 )
 from schemas.users import User
+from schemas.vocabulary import (
+    DictionaryCuratedIn,
+    DictionaryCuratedListOut,
+    DictionaryCuratedOut,
+)
 from services import credentials, mailer
 
 router = APIRouter()
-
 # `None` = todas las solicitudes. `pending` es el defecto porque es lo que el
 # webmaster tiene que atender; el histórico se pide a propósito.
 _STATUS_FILTERS = (None, *requests_repo.STATUSES)
@@ -422,3 +429,111 @@ async def test_smtp(
         "sent": sent,
         "error": "" if sent else "SMTP_NOT_CONFIGURED_OR_SEND_FAILED",
     }
+
+
+@router.post("/api/admin/access-link")
+async def send_access_link(
+    body: AdminAccessLink, _: None = Depends(require_admin_local)
+) -> dict:
+    """Manda la dirección del móvil. Solo un HTTPS de la red Tailscale."""
+    if not config.is_mesh_access_url(body.url):
+        raise HTTPException(
+            status_code=422,
+            detail="La dirección no es de la red Tailscale.",
+        )
+    sent = mailer.send(
+        kind=mailer.KIND_ACCESS,
+        to=body.to,
+        link=body.url,
+        published=body.published,
+    )
+    return {
+        "sent": sent,
+        "error": "" if sent else "SMTP_NOT_CONFIGURED_OR_SEND_FAILED",
+    }
+
+
+# ---------------------------------------------------------------------------
+# V3.95.0: curación manual del diccionario. El webmaster fija a mano la respuesta
+# correcta de un término (dirección y equivalente incluidos) y esa corrección
+# manda sobre el glosario, los packs, la caché del modelo y el propio guardarraíl.
+# Es contenido GLOBAL (sin `user_id`), como la caché, y el candado es el mismo
+# que el del resto de la consola (`require_admin_local`: PIN + equipo).
+# ---------------------------------------------------------------------------
+
+
+def _normalize_curated_word(direction: str, word: str) -> str:
+    """Clave normalizada de la corrección, con la MISMA normalización del dominio.
+
+    La clave debe coincidir con la que usa la consulta (`_normalize_lookup_word`
+    en EN→ES, `_normalize_lookup_spanish` en ES→EN), o la fila curada no se
+    encontraría nunca. 422 si el término queda vacío.
+    """
+    normalized = (
+        _normalize_lookup_spanish(word)
+        if direction == "es-en"
+        else _normalize_lookup_word(word)
+    )
+    if not normalized:
+        raise HTTPException(status_code=422, detail="El término queda vacío")
+    return normalized
+
+
+@router.get("/api/admin/dictionary/curated", response_model=DictionaryCuratedListOut)
+async def list_dictionary_curated(
+    direction: str | None = Query(default=None),
+    _: None = Depends(require_admin_local),
+) -> dict:
+    """Lista las correcciones curadas (todas o las de una dirección)."""
+    if direction not in (None, "en-es", "es-en"):
+        raise HTTPException(status_code=422, detail="Dirección no válida")
+    return {"items": dictionary_repo.list_curated(direction)}
+
+
+@router.put("/api/admin/dictionary/curated", response_model=DictionaryCuratedOut)
+async def save_dictionary_curated(
+    body: DictionaryCuratedIn,
+    _: None = Depends(require_admin_local),
+) -> dict:
+    """Crea o sobrescribe una corrección curada y la devuelve ya normalizada."""
+    word = _normalize_curated_word(body.direction, body.word)
+    dictionary_repo.save_curated(
+        body.direction,
+        word,
+        pos=body.pos,
+        definition=body.definition,
+        translation=body.translation,
+        situation=body.situation,
+        senses=[s.model_dump() for s in body.senses],
+        meanings=[m.model_dump() for m in body.meanings],
+        note=body.note,
+    )
+    saved = dictionary_repo.get_curated(body.direction, word)
+    if saved is None:  # pragma: no cover — no debería ocurrir tras guardar
+        raise HTTPException(status_code=500, detail="No se pudo guardar la corrección")
+    return saved
+
+
+@router.delete("/api/admin/dictionary/curated/{direction}/{word}")
+async def delete_dictionary_curated(
+    direction: str,
+    word: str,
+    _: None = Depends(require_admin_local),
+) -> dict:
+    """Retira una corrección curada (vuelve a mandar glosario/packs/caché)."""
+    if direction not in ("en-es", "es-en"):
+        raise HTTPException(status_code=422, detail="Dirección no válida")
+    normalized = _normalize_curated_word(direction, word)
+    return {
+        "deleted": dictionary_repo.delete_curated(direction, normalized),
+        "direction": direction,
+        "word": normalized,
+    }
+
+
+@router.get("/api/admin/dictionary/lexicon/sources")
+async def list_dictionary_lexicon_sources(
+    _: None = Depends(require_admin_local),
+) -> dict:
+    """Fuentes de léxico externo cargadas y su licencia (atribución, V3.95.0)."""
+    return {"sources": dictionary_repo.lexicon_sources()}

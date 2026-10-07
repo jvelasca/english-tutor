@@ -442,6 +442,63 @@ def init_db() -> None:
         # O(N) en Python y pasa a ser una consulta acotada; ver
         # `services/dictionary_reverse.py` y `repositories/dictionary.py`.
         _migrate_dictionary_fts(conn)
+        # V3.95.0 (curación manual del diccionario): contenido corregido a mano por
+        # el webmaster. Es la autoridad MÁS alta de la consulta —por delante del
+        # glosario, de los packs y de la caché del modelo— y la única forma de
+        # arreglar una fila concreta sin esperar a un bump de `GENERATOR_VERSION`.
+        # Una fila por (dirección, término): `translation` es el español en `en-es`
+        # y el equivalente inglés en `es-en`; `senses_json`/`meanings_json` usan
+        # el mismo contrato que la caché para que el dominio las sirva sin
+        # adaptadores. No guarda `user_id`: es contenido global curado.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionary_curated (
+                direction TEXT NOT NULL,
+                word TEXT NOT NULL,
+                pos TEXT NOT NULL DEFAULT '',
+                definition TEXT NOT NULL DEFAULT '',
+                translation TEXT NOT NULL DEFAULT '',
+                situation TEXT NOT NULL DEFAULT '',
+                senses_json TEXT NOT NULL DEFAULT '',
+                meanings_json TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (direction, word)
+            )
+            """
+        )
+        # V3.95.0 (léxico externo, OPCIONAL): contenido importado de un diccionario
+        # de terceros (p. ej. FreeDict eng-spa, CC BY-SA 3.0) por decisión del
+        # gerente. La tabla NACE VACÍA y el repo no empaqueta ningún dato: el
+        # operador la rellena con `scripts/import_freedict.py`, que exige
+        # `--accept-license`. Es una autoridad de COBERTURA por DEBAJO del
+        # glosario/packs/curado y por ENCIMA del modelo (determinista y gratis),
+        # y guarda `source`/`license` por fila para poder atribuir. Las columnas
+        # plegadas son las que indexan la búsqueda en cada dirección (misma `fold`
+        # que el matcher inverso).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionary_lexicon (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                headword TEXT NOT NULL,
+                pos TEXT NOT NULL DEFAULT '',
+                translation TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT '',
+                license TEXT NOT NULL DEFAULT '',
+                headword_fold TEXT NOT NULL DEFAULT '',
+                translation_fold TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dictionary_lexicon_headword "
+            "ON dictionary_lexicon(headword_fold)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dictionary_lexicon_translation "
+            "ON dictionary_lexicon(translation_fold)"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS grammar_errors (
@@ -677,6 +734,20 @@ def init_db() -> None:
                 conn.execute(
                     f"ALTER TABLE session_completions ADD COLUMN {_col} {_ddl}"
                 )
+        # Un paso se guarda una sola vez (se reescribe al repetirlo otro día).
+        # Esta tabla conserva los minutos de cada fecha para la semana y el total:
+        # al completar se fotografía el día, y un día anterior no se borra.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS session_day_minutes (
+                user_id TEXT NOT NULL,
+                completed_on TEXT NOT NULL,
+                minutes INTEGER NOT NULL,
+                PRIMARY KEY (user_id, completed_on),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS academy_enrollments (

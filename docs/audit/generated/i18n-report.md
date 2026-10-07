@@ -5,9 +5,9 @@
 ```json
 {
  "audit": "F-2026-09-02",
- "defined": 1897,
- "literal_uses": 1362,
- "referenced_keys": 1580,
+ "defined": 1923,
+ "literal_uses": 1370,
+ "referenced_keys": 1588,
  "dynamic_prefixes": [
   "accent-swatch",
   "appearance.accent.",
@@ -57,6 +57,7 @@
   "mic-button",
   "mic.unavailable.",
   "model-star",
+  "next-why-",
   "objective-node-",
   "pane-backdrop",
   "pd-milestone",
@@ -80,6 +81,7 @@
   "speaking-extra-note-",
   "speaking.",
   "speaking.levelStates.",
+  "subskill.",
   "text-",
   "translator.placeholder.",
   "unitReview.state.",

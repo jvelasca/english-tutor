@@ -174,16 +174,25 @@ export function getJsonOptional<T>(
   });
 }
 
-function sendJson<T>(url: string, method: string, body: unknown): Promise<T> {
+function sendJson<T>(
+  url: string,
+  method: string,
+  body: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
   return request<T>(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(headers ?? {}) },
     body: JSON.stringify(body),
   });
 }
 
-export function postJson<T>(url: string, body: unknown): Promise<T> {
-  return sendJson<T>(url, "POST", body);
+export function postJson<T>(
+  url: string,
+  body: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
+  return sendJson<T>(url, "POST", body, headers);
 }
 
 export function postForm<T>(
@@ -198,8 +207,12 @@ export function postForm<T>(
   });
 }
 
-export function putJson<T>(url: string, body: unknown): Promise<T> {
-  return sendJson<T>(url, "PUT", body);
+export function putJson<T>(
+  url: string,
+  body: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
+  return sendJson<T>(url, "PUT", body, headers);
 }
 
 export function patchJson<T>(url: string, body: unknown): Promise<T> {

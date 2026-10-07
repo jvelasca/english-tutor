@@ -1515,6 +1515,72 @@ describe("DictionaryLookup · V3.83.0 Diccionario → Flashcards", () => {
     expect(screen.getByLabelText("Mi mazo")).toBeTruthy();
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
   });
+
+  it("al añadir, elige cuál de los dos significados se guarda y marca el mazo abierto", async () => {
+    window.localStorage.setItem(
+      "english-tutor.study-place:u1",
+      JSON.stringify({
+        tab: "study",
+        scope: "deck",
+        pick: "all",
+        level: "A1",
+        deckId: 7,
+      }),
+    );
+    const fn = routeFetch([
+      { url: "/api/vocabulary/dictionary", data: LIMA },
+      {
+        url: "/api/vocabulary/items",
+        data: {
+          added: ["lime"],
+          item: { word: "lime", translation: "lima", definition: "" },
+        },
+      },
+      {
+        url: "/api/vocabulary/decks",
+        data: {
+          decks: [AUTO_DECK, MANUAL_DECK],
+          auto_deck_id: 0,
+          fsrs_version: "test",
+        },
+      },
+    ]);
+    renderPanel(<DictionaryLookup userId="u1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Spanish → English" }));
+    fillAndSubmit("lima");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add to Flashcards" }),
+    );
+
+    expect(
+      await screen.findByText("Choose which meaning is added to Flashcards."),
+    ).toBeTruthy();
+    const lime = (await screen.findByRole("radio", {
+      name: "Meaning: Cítrico verde. · lime · noun",
+    })) as HTMLInputElement;
+    fireEvent.click(lime);
+    expect(lime.checked).toBe(true);
+    expect(await screen.findByText("Card: lime → lima")).toBeTruthy();
+    // El mazo que Estudiar tiene abierto queda marcado sin un clic extra.
+    expect((await screen.findByLabelText("Mi mazo") as HTMLInputElement).checked).toBe(
+      true,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add and start learning" }),
+    );
+    expect(await screen.findByText("lime is now learning.")).toBeTruthy();
+    const addCall = fn.mock.calls.find((call) =>
+      String(call[0]).includes("/api/vocabulary/items"),
+    );
+    expect(JSON.parse(String(addCall?.[1]?.body))).toMatchObject({
+      word: "lime",
+      translation: "lima",
+      deck_ids: [7],
+      sense: { term: "lime", gloss: "Cítrico verde." },
+    });
+    window.localStorage.removeItem("english-tutor.study-place:u1");
+  });
 });
 
 describe("DictionaryLookup · V3.91 acepciones pintadas", () => {

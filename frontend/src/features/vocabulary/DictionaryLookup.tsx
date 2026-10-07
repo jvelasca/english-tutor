@@ -34,9 +34,10 @@ import type {
   LexicalStatus,
 } from "../../types/api";
 import { meaningLines } from "./meaningDisplay";
+import { readStudyPlace } from "../../utils/lastPlace";
 import { useI18n } from "../../hooks/useI18n";
 import { LevelBadge } from "../../components/LevelBadge";
-import { ItemReplayButton } from "../../components/ItemReplayButton";
+import { DictionaryCuration } from "./DictionaryCuration";import { ItemReplayButton } from "../../components/ItemReplayButton";
 import { InfoDisclosure } from "../../components/InfoDisclosure";
 import { LoadingNotice } from "../../components/LoadingNotice";
 import { Badge } from "../../components/ui/badge";
@@ -223,22 +224,38 @@ export function DictionaryLookup({
     setSavedDecks([]);
     setPendingDeck(null);
     setDeckCreateError(null);
-    if (!userId || decks !== null) return;
-    await loadDecks();
+    if (!userId) return;
+    const available = decks ?? (await loadDecks());
+    // El mazo que Estudiar tiene abierto es el que el alumno va a mirar. Si no
+    // se marca ninguno, la palabra no entra ahí y «No aprendidas» sigue en 0.
+    if (selectedDecks.length === 0 && available) {
+      const place = readStudyPlace(userId);
+      const deckId = place?.scope === "deck" ? place.deckId : null;
+      if (
+        deckId != null &&
+        deckId > 0 &&
+        available.some((deck) => deck.id === deckId)
+      ) {
+        setSelectedDecks([deckId]);
+      }
+    }
   }
 
   /** Carga (o reintenta cargar) los mazos manuales del panel de alta. */
-  async function loadDecks() {
-    if (!userId) return;
+  async function loadDecks(): Promise<FlashcardDeck[] | null> {
+    if (!userId) return null;
     setDeckError(false);
     setDecksLoading(true);
     try {
       const data = await listFlashcardDecks(userId);
       const all = Array.isArray(data?.decks) ? data.decks : [];
-      setDecks(all.filter((d) => !d.is_auto));
+      const manual = all.filter((d) => !d.is_auto);
+      setDecks(manual);
+      return manual;
     } catch {
       setDeckError(true);
       setDecks(null);
+      return null;
     } finally {
       setDecksLoading(false);
     }
@@ -751,6 +768,13 @@ export function DictionaryLookup({
                   onMnemonic={setAddMnemonic}
                   tracked={tracked}
                   senseLabel={senseLabel}
+                  meanings={meanings}
+                  meaningIndex={activeMeaningIndex}
+                  onPickMeaning={(index) => {
+                    setMeaningIndex(index);
+                    setPracticeWord(null);
+                  }}
+                  isReverse={isReverse}
                   decks={decks}
                   decksLoading={decksLoading}
                   deckError={deckError}
@@ -784,6 +808,16 @@ export function DictionaryLookup({
                 />
               ) : null
             }
+          />
+
+          {/* V3.95.0: el webmaster puede CORREGIR la ficha que está viendo. La
+              corrección manda sobre el glosario, los packs y la caché del
+              modelo; tras guardarla se refresca la entrada. */}
+          <DictionaryCuration
+            direction={entry.direction}
+            word={entry.word}
+            translation={equivalent}
+            onSaved={() => void refreshEntry(entry.word, entry.direction)}
           />
 
           {/* V3.32: escalera de drill oral de la palabra consultada. Practicar
@@ -834,6 +868,10 @@ function AddToFlashcardsPanel({
   onMnemonic,
   tracked,
   senseLabel,
+  meanings = [],
+  meaningIndex = 0,
+  onPickMeaning,
+  isReverse = false,
   decks,
   decksLoading,
   deckError,
@@ -866,6 +904,11 @@ function AddToFlashcardsPanel({
    *  Se declara en el panel de éxito para que el alumno vea QUÉ aprende, no solo
    *  con qué palabra. */
   senseLabel: string;
+  /** Significados de la consulta. Con más de uno, el alta pide cuál se guarda. */
+  meanings?: DictionaryMeaning[];
+  meaningIndex?: number;
+  onPickMeaning?: (index: number) => void;
+  isReverse?: boolean;
   decks: FlashcardDeck[] | null;
   /** V3.88.0: la lista de mazos se está pidiendo (para no decir «sin mazos»). */
   decksLoading: boolean;
@@ -993,6 +1036,33 @@ function AddToFlashcardsPanel({
           ? t("dictionary.lookup.addTrackedNote")
           : t("dictionary.lookup.addHint")}
       </p>
+
+      {meanings.length > 1 && onPickMeaning ? (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="text-[11px] font-medium text-muted-foreground">
+            {t("dictionary.lookup.addMeaningChoice")}
+          </legend>
+          <ul className="flex flex-col gap-1.5">
+            {meanings.map((meaning, index) => (
+              <MeaningOption
+                key={`${meaning.term}-${meaning.pos}-${index}`}
+                meaning={meaning}
+                index={index}
+                selected={index === meaningIndex}
+                isReverse={isReverse}
+                onPick={onPickMeaning}
+              />
+            ))}
+          </ul>
+          {term && back ? (
+            <p className="text-xs text-foreground">
+              {t("dictionary.lookup.addCardPreview")
+                .replace("{front}", term)
+                .replace("{back}", back)}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
       {/* V3.86.0: el reverso escrito a mano solo aparece cuando la consulta no
           trajo equivalente: sin él la tarjeta no tendría nada que recordar. El
@@ -1708,7 +1778,7 @@ function ResultCard({
             nunca son el defecto: «lima» ofrece «file (herramienta)» antes que
             «Lima (capital del Perú)». Elegir uno manda sobre el término de
             práctica, el audio, el bloque del equivalente y el alta. */}
-        {meanings.length > 0 ? (
+        {!addOpen && meanings.length > 0 ? (
           <fieldset className="flex flex-col gap-2">
             <legend className="flex flex-col gap-0.5">
               <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

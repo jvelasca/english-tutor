@@ -61,6 +61,9 @@ from services.dictionary_content import VALID_POS
 # puntuación suelta. Es el mismo criterio con el que la app rechaza una consulta
 # inválida, aplicado aquí para no gastar 4 s de modelo en un token basura.
 _WORD_PART_RE = re.compile(r"^[a-z]+(?:['\u2019-][a-z]+)*$")
+# Alfabeto ESPAÑOL para la dirección inversa (V3.95.0): vocales acentuadas, eñe y
+# diéresis. No se pliegan a propósito (la eñe distingue «año» de «ano»).
+_SPANISH_WORD_PART_RE = re.compile(r"^[a-záéíóúüñ]+(?:['\u2019-][a-záéíóúüñ]+)*$")
 _MAX_WORD_CHARS = 80
 # Ruido de ingesta: entidades HTML/XML sin resolver, viñetas de lista, BOM,
 # marcas de orden y controles. Se retira por DELETE y no con un `strip` porque
@@ -126,7 +129,7 @@ _POS_ALIASES: dict[str, str] = {
 
 
 def normalize_word(raw: object) -> str:
-    """Forma canónica de una palabra de trabajo, o `""` si no es utilizable.
+    """Forma canónica de una palabra INGLESA de trabajo, o `""` si no es utilizable.
 
     Minúsculas, espacios colapsados, sin puntuación de borde, sin ruido de
     ingesta y con la comilla tipográfica reducida a la recta. Se RECHAZA (→ `""`)
@@ -135,6 +138,24 @@ def normalize_word(raw: object) -> str:
     o símbolos, o más largo que un término razonable, es ruido de la lista, no
     vocabulario.
     """
+    return _normalize_with(raw, _WORD_PART_RE)
+
+
+def normalize_term_es(raw: object) -> str:
+    """Forma canónica de un término ESPAÑOL de trabajo (V3.95.0, lote ES→EN).
+
+    Igual que `normalize_word` pero con el alfabeto español: se CONSERVAN las
+    vocales acentuadas, la eñe y la diéresis («camión», «mañana», «pingüino»),
+    que en la inversa NO se pliegan (son claves distintas, no variantes). Debe
+    coincidir con `domain.vocabulary._normalize_lookup_spanish`, que es la
+    normalización con la que la consulta busca; si divergieran, el lote
+    prepararía claves que la consulta nunca encontraría.
+    """
+    return _normalize_with(raw, _SPANISH_WORD_PART_RE)
+
+
+def _normalize_with(raw: object, part_re: re.Pattern[str]) -> str:
+    """Normalización de ingesta compartida por inglés y español (V3.95.0)."""
     text = str(raw or "")
     text = _TERM_NOISE_RE.sub("", text)
     text = text.replace("\u2019", "'").strip().lower()
@@ -142,7 +163,7 @@ def normalize_word(raw: object) -> str:
     text = _TERM_EDGE_RE.sub("", text)
     if not text or len(text) > _MAX_WORD_CHARS:
         return ""
-    if not all(_WORD_PART_RE.match(part) for part in text.split(" ")):
+    if not all(part_re.match(part) for part in text.split(" ")):
         return ""
     return text
 
@@ -231,6 +252,7 @@ def plan_batch(
     *,
     fresh: Iterable[str] = (),
     limit: int | None = None,
+    normalize: Callable[[object], str] = normalize_word,
 ) -> BatchPlan:
     """Ordena el trabajo de una pasada: limpia, deduplica y salta lo fresco.
 
@@ -239,6 +261,10 @@ def plan_batch(
     trabajar por tramos: **no** se aplica un desplazamiento porque no hace falta
     —una palabra preparada deja de estar pendiente, así que la pasada siguiente
     continúa sola donde quedó esta—.
+
+    `normalize` es la normalización de ingesta (V3.95.0): por defecto la inglesa
+    (`normalize_word`); el lote de la dirección inversa pasa `normalize_term_es`
+    para no descartar acentos ni la eñe.
     """
     fresh_set = {str(word).strip().lower() for word in fresh if str(word).strip()}
     words: list[str] = []
@@ -248,7 +274,7 @@ def plan_batch(
     invalid = 0
     for raw in raw_words:
         universe += 1
-        word = normalize_word(raw)
+        word = normalize(raw)
         if not word:
             invalid += 1
             continue

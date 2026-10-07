@@ -334,6 +334,21 @@ def save_entry(
         return cursor.rowcount > 0
 
 
+def delete_entry(word: str) -> bool:
+    """Borra la entrada DIRECTA de `word` de la caché (V3.95.0). Devuelve si había.
+
+    Es la pieza de la CURA de la caché: una fila envenenada (un equivalente
+    inventado por el modelo) puede retirarse sin esperar a un bump de
+    `GENERATOR_VERSION`. El índice FTS5 se sincroniza por disparador de borrado,
+    así que no hay que tocar el índice aquí. `word` es la clave ya normalizada.
+    """
+    with closing(_conn()) as conn, conn:
+        cursor = conn.execute(
+            "DELETE FROM dictionary_entries WHERE word = ?", (word,)
+        )
+        return cursor.rowcount > 0
+
+
 _ENTRY_COLUMNS = (
     "word, pos, definition, translation, situation, senses_json, "
     "meanings_json, generator_version, created_at, updated_at"
@@ -637,6 +652,20 @@ def save_reverse_entry(
         return cursor.rowcount > 0
 
 
+def delete_reverse_entry(word: str) -> bool:
+    """Borra la entrada ES→EN de `word` de la caché (V3.95.0). Devuelve si había.
+
+    Misma pieza de cura que `delete_entry`, para la dirección inversa: la fila
+    envenenada «broca» → «rock» se retira por aquí. `word` es el término español
+    ya normalizado (sin plegar la eñe).
+    """
+    with closing(_conn()) as conn, conn:
+        cursor = conn.execute(
+            "DELETE FROM dictionary_reverse_entries WHERE word = ?", (word,)
+        )
+        return cursor.rowcount > 0
+
+
 def list_reverse_entries() -> list[dict]:
     """Todas las entradas ES→EN (orden estable por término español)."""
     with closing(_conn()) as conn:
@@ -645,6 +674,34 @@ def list_reverse_entries() -> list[dict]:
             "ORDER BY word"
         ).fetchall()
     return [_entry_dict(row) for row in rows]
+
+
+def fresh_reverse_entry_words(
+    words: Iterable[str], *, version: str
+) -> set[str]:
+    """Subconjunto de `words` que la caché ES→EN ya sirve FRESCA (V3.95.0).
+
+    Mismo criterio que `fresh_entry_words` pero sobre `dictionary_reverse_entries`
+    (`english` no vacío = contenido servible). Es lo que hace REANUDABLE el lote
+    de la dirección inversa: un término ya preparado deja de estar pendiente.
+    """
+    wanted = [str(word).strip().lower() for word in words if str(word).strip()]
+    if not wanted:
+        return set()
+    fresh: set[str] = set()
+    with closing(_conn()) as conn:
+        for start in range(0, len(wanted), _IN_CHUNK):
+            chunk = list(dict.fromkeys(wanted[start : start + _IN_CHUNK]))
+            marks = ",".join("?" * len(chunk))
+            rows = conn.execute(
+                "SELECT word FROM dictionary_reverse_entries "
+                "WHERE generator_version = ? "
+                "AND TRIM(COALESCE(english, '')) <> '' "
+                f"AND word IN ({marks})",
+                (version, *chunk),
+            ).fetchall()
+            fresh.update(str(row[0]) for row in rows)
+    return fresh
 
 
 def cefr_words() -> dict[str, str]:
@@ -663,3 +720,213 @@ def cefr_words() -> dict[str, str]:
         for row in rows
         if str(row["word"] or "").strip()
     }
+
+
+# ---------------------------------------------------------------------------
+# V3.95.0: contenido CURADO a mano (corrección del webmaster). Autoridad MÁS alta
+# de la consulta (`dictionary_curated`), por delante del glosario, de los packs
+# y de la caché del modelo. Se sirve con la MISMA forma que `get_entry` /
+# `get_reverse_entry` (`_entry_dict`) para que el dominio no tenga dos caminos.
+# ---------------------------------------------------------------------------
+
+_CURATED_COLUMNS = (
+    "direction, word, pos, definition, translation, situation, "
+    "senses_json, meanings_json, note, created_at, updated_at"
+)
+
+
+def get_curated(direction: str, word: str) -> dict | None:
+    """Corrección curada de `(direction, word)` (None si no existe) (V3.95.0)."""
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            f"SELECT {_CURATED_COLUMNS} FROM dictionary_curated "
+            "WHERE direction = ? AND word = ?",
+            (direction, word),
+        ).fetchone()
+    return _entry_dict(row) if row else None
+
+
+def list_curated(direction: str | None = None) -> list[dict]:
+    """Todas las correcciones curadas (o las de una dirección), estable por término."""
+    with closing(_conn()) as conn:
+        if direction is None:
+            rows = conn.execute(
+                f"SELECT {_CURATED_COLUMNS} FROM dictionary_curated "
+                "ORDER BY direction, word"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT {_CURATED_COLUMNS} FROM dictionary_curated "
+                "WHERE direction = ? ORDER BY word",
+                (direction,),
+            ).fetchall()
+    return [_entry_dict(row) for row in rows]
+
+
+def save_curated(
+    direction: str,
+    word: str,
+    *,
+    pos: str = "",
+    definition: str = "",
+    translation: str = "",
+    situation: str = "",
+    senses: object = None,
+    meanings: object = None,
+    note: str = "",
+) -> bool:
+    """Inserta o sobrescribe la corrección curada de `(direction, word)` (V3.95.0).
+
+    Mismo `INSERT ... ON CONFLICT DO UPDATE` que la caché. `translation` es el
+    español en `en-es` y el equivalente inglés en `es-en`; `senses`/`meanings` se
+    serializan con el MISMO codificador que la caché para compartir contrato.
+    """
+    with closing(_conn()) as conn, conn:
+        now = _now()
+        cursor = conn.execute(
+            "INSERT INTO dictionary_curated "
+            "(direction, word, pos, definition, translation, situation, "
+            "senses_json, meanings_json, note, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(direction, word) DO UPDATE SET "
+            "pos = excluded.pos, "
+            "definition = excluded.definition, "
+            "translation = excluded.translation, "
+            "situation = excluded.situation, "
+            "senses_json = excluded.senses_json, "
+            "meanings_json = excluded.meanings_json, "
+            "note = excluded.note, "
+            "updated_at = excluded.updated_at",
+            (
+                direction,
+                word,
+                pos,
+                definition,
+                translation,
+                situation,
+                _encode_senses(senses),
+                _encode_meanings(meanings),
+                note,
+                now,
+                now,
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def delete_curated(direction: str, word: str) -> bool:
+    """Retira la corrección curada de `(direction, word)` (V3.95.0). Devuelve si había."""
+    with closing(_conn()) as conn, conn:
+        cursor = conn.execute(
+            "DELETE FROM dictionary_curated WHERE direction = ? AND word = ?",
+            (direction, word),
+        )
+        return cursor.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# V3.95.0: léxico EXTERNO opcional (`dictionary_lexicon`). Nace VACÍO; lo rellena
+# `scripts/import_freedict.py` con una decisión explícita de licencia. Autoridad
+# de COBERTURA por debajo del curado/glosario/packs y por encima del modelo.
+# ---------------------------------------------------------------------------
+
+
+def clear_lexicon_source(source: str) -> int:
+    """Borra las filas de una fuente externa concreta (reimportación limpia)."""
+    with closing(_conn()) as conn, conn:
+        cursor = conn.execute(
+            "DELETE FROM dictionary_lexicon WHERE source = ?", (source,)
+        )
+        return int(cursor.rowcount or 0)
+
+
+def add_lexicon_entries(
+    rows: Iterable[dict],
+    *,
+    source: str,
+    license: str,
+    replace_source: bool = False,
+) -> int:
+    """Inserta en lote filas de léxico externo (V3.95.0). Devuelve las insertadas.
+
+    Cada fila es `{headword, translation, pos?}`. Se plegán las dos columnas de
+    búsqueda con la MISMA `fold` del matcher para que el índice y la comparación
+    no diverjan. Filas sin cabeza o sin traducción se descartan (no son
+    contenido). `replace_source=True` vacía antes esa fuente para reimportar sin
+    duplicar.
+    """
+    cleaned: list[tuple[str, str, str, str, str, str, str]] = []
+    for raw in rows:
+        headword = str((raw or {}).get("headword") or "").strip()
+        translation = str((raw or {}).get("translation") or "").strip()
+        if not headword or not translation:
+            continue
+        pos = str((raw or {}).get("pos") or "").strip().lower()
+        cleaned.append(
+            (
+                headword,
+                pos,
+                translation,
+                source,
+                license,
+                fold(headword),
+                fold(translation),
+            )
+        )
+    if not cleaned:
+        return 0
+    with closing(_conn()) as conn, conn:
+        if replace_source:
+            conn.execute("DELETE FROM dictionary_lexicon WHERE source = ?", (source,))
+        conn.executemany(
+            "INSERT INTO dictionary_lexicon "
+            "(headword, pos, translation, source, license, "
+            "headword_fold, translation_fold) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            cleaned,
+        )
+    return len(cleaned)
+
+
+def lexicon_sources() -> list[dict]:
+    """Fuentes externas cargadas, con su licencia y su recuento (atribución)."""
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT source, license, COUNT(*) AS entries FROM dictionary_lexicon "
+            "GROUP BY source, license ORDER BY source"
+        ).fetchall()
+    return [
+        {
+            "source": str(row["source"]),
+            "license": str(row["license"]),
+            "entries": int(row["entries"]),
+        }
+        for row in rows
+    ]
+
+
+def lookup_lexicon_en_es(word: str, *, limit: int = 8) -> list[dict]:
+    """Traducciones ESPAÑOLAS externas de la palabra INGLESA `word` (V3.95.0)."""
+    key = fold(word)
+    if not key:
+        return []
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT translation, pos, source FROM dictionary_lexicon "
+            "WHERE headword_fold = ? ORDER BY pos, translation LIMIT ?",
+            (key, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def lookup_lexicon_es_en(term: str, *, limit: int = 8) -> list[dict]:
+    """Palabras INGLESAS externas cuya traducción española es `term` (V3.95.0)."""
+    key = fold(term)
+    if not key:
+        return []
+    with closing(_conn()) as conn:
+        rows = conn.execute(
+            "SELECT headword, pos, source FROM dictionary_lexicon "
+            "WHERE translation_fold = ? ORDER BY pos, headword LIMIT ?",
+            (key, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
