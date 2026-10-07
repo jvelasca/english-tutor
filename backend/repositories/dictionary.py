@@ -815,7 +815,10 @@ def save_curated(
 
 
 def delete_curated(direction: str, word: str) -> bool:
-    """Retira la corrección curada de `(direction, word)` (V3.95.0). Devuelve si había."""
+    """Retira la corrección curada de `(direction, word)` (V3.95.0).
+
+    Devuelve si había.
+    """
     with closing(_conn()) as conn, conn:
         cursor = conn.execute(
             "DELETE FROM dictionary_curated WHERE direction = ? AND word = ?",

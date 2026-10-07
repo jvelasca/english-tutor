@@ -94,7 +94,9 @@ def _offline_reverse_fetcher(monkeypatch, calls: list):
     )
 
 
-async def _accept_reverse_verifier(_word: str, _english: str, _model: str | None) -> bool:
+async def _accept_reverse_verifier(
+    _word: str, _english: str, _model: str | None
+) -> bool:
     """Verificador de pruebas: siempre acepta (aísla la plomería del guardarraíl)."""
     return True
 
@@ -419,7 +421,9 @@ def test_guardrail_rejects_an_equivalent_confused_with_another_word(monkeypatch)
         return _payload(english="rock", definition="A large stone or boulder")
 
     calls: list = []
-    _stub_direct_fetcher(monkeypatch, _direct_payload("roca", ["roca", "piedra"]), calls)
+    _stub_direct_fetcher(
+        monkeypatch, _direct_payload("roca", ["roca", "piedra"]), calls
+    )
 
     with pytest.raises(dictionary_content.ContentUnavailableError):
         asyncio.run(

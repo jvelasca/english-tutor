@@ -427,7 +427,8 @@ def test_normalize_term_es_keeps_accents_and_ene():
 
 
 def test_plan_batch_can_use_the_spanish_normalizer():
-    """El lote inverso no puede descartar los acentos por usar el normalizador inglés."""
+    """El lote inverso no puede descartar los acentos por usar el normalizador
+    inglés."""
     plan = dictionary_batch.plan_batch(
         ["camión", "mañana", "Bank", "camion"],
         normalize=dictionary_batch.normalize_term_es,

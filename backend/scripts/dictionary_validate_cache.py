@@ -22,8 +22,8 @@ Uso (desde `backend/`):
 
     python -m scripts.dictionary_validate_cache              # informe
     python -m scripts.dictionary_validate_cache --json       # para CI
-    python -m scripts.dictionary_validate_cache --apply      # BORRA las inversas (fiables)
-    python -m scripts.dictionary_validate_cache --apply --include-direct   # + asesoras EN→ES
+    python -m scripts.dictionary_validate_cache --apply      # BORRA las inversas
+    python -m scripts.dictionary_validate_cache --apply --include-direct  # + EN→ES
 
 Códigos de salida: 0 = informe emitido (haya o no sospechosas); 2 = error de BD.
 
@@ -52,8 +52,8 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from repositories import db as db_repo  # noqa: E402
 from repositories import collections as collections_repo  # noqa: E402
+from repositories import db as db_repo  # noqa: E402
 from repositories import dictionary as dictionary_repo  # noqa: E402
 from services import dictionary_glossary, dictionary_reverse  # noqa: E402
 
@@ -113,7 +113,10 @@ def _close(left: str, right: str) -> bool:
         return False
     if left == right:
         return True
-    return len(left) >= 4 and left.startswith(right) or len(right) >= 4 and right.startswith(left)
+    return (
+        len(left) >= 4 and left.startswith(right)
+        or len(right) >= 4 and right.startswith(left)
+    )
 
 
 def direct_is_consistent(row: dict, items: list[dict]) -> bool | None:
@@ -132,7 +135,10 @@ def direct_is_consistent(row: dict, items: list[dict]) -> bool | None:
 
 
 def reverse_is_consistent(row: dict, items: list[dict]) -> bool | None:
-    """¿Es plausible el equivalente inglés cacheado de una fila ES→EN? (None = sin juicio)."""
+    """¿Es plausible el equivalente inglés cacheado de una fila ES→EN?
+
+    `None` = sin juicio.
+    """
     curated = dictionary_reverse.match_pack_translation(row.get("word") or "", items)
     if not curated:
         return None
@@ -284,7 +290,8 @@ def main(argv: list[str] | None = None) -> int:
         _print_report(report)
         if args.apply:
             print(
-                f"\nBorradas: directas={deleted['direct']} inversas={deleted['reverse']}"
+                f"\nBorradas: directas={deleted['direct']} "
+                f"inversas={deleted['reverse']}"
             )
             if not args.include_direct and report["direct"]["suspect"]:
                 print(

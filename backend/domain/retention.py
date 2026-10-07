@@ -435,7 +435,9 @@ def _user_list_deck(user_id: str, title: str, words: list[str]) -> int | None:
 
 def _pack_deck_name(coll: dict) -> str:
     """Nombre del mazo: el título en español si el pack lo trae."""
-    title = str(coll.get("title_es") or "").strip() or str(coll.get("title") or "").strip()
+    title = str(coll.get("title_es") or "").strip() or str(
+        coll.get("title") or ""
+    ).strip()
     return title or "Pack"
 
 

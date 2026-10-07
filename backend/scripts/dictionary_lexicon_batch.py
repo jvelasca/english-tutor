@@ -67,8 +67,11 @@ from repositories import db as db_repo  # noqa: E402
 from repositories import dictionary as dictionary_repo  # noqa: E402
 from repositories.collections import PACKS_DIR  # noqa: E402
 from services import curriculum as curriculum_service  # noqa: E402
-from services import dictionary_batch, dictionary_content  # noqa: E402
-from services import dictionary_glossary  # noqa: E402
+from services import (  # noqa: E402
+    dictionary_batch,
+    dictionary_content,
+    dictionary_glossary,  # noqa: E402
+)
 
 # Ritmo medido del modelo local con el contrato de acepción VIGENTE (1.7.0):
 # 3 palabras reales preparadas en 26 s de lote sobre una BD temporal con
@@ -401,7 +404,9 @@ def main(argv: list[str] | None = None) -> int:
 
     reverse = args.direction == "es-en"
     normalize = (
-        dictionary_batch.normalize_term_es if reverse else dictionary_batch.normalize_word
+        dictionary_batch.normalize_term_es
+        if reverse
+        else dictionary_batch.normalize_word
     )
     seconds_per_word = args.seconds_per_word
     if seconds_per_word == MEASURED_SECONDS_PER_WORD and reverse:

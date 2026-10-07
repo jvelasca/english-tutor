@@ -196,7 +196,7 @@ def match_pack_translation(term: str, items: list[dict]) -> list[dict]:
     entrada o el modelo devuelva un nombre propio.
 
     Devuelve `[{word, pos}]` ordenados por calidad de coincidencia (exacta antes
-    que parcial), a igualdad por `priority` DESCENDENTE y, si tampoco, 
+    que parcial), a igualdad por `priority` DESCENDENTE y, si tampoco,
     alfabéticamente (determinista). `priority` solo la declara el glosario curado
     para desempatar entre varios equivalentes legítimos de un mismo término (p.
     ej. «broca» → «drill bit» antes que → «drill»); los packs no la traen, así

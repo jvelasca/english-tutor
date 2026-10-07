@@ -42,7 +42,8 @@ def test_quiz_endpoint_uses_the_dictionary_and_not_the_lesson(monkeypatch, tmp_p
     user_id = _setup(monkeypatch, tmp_path)
     with closing(db._conn()) as conn, conn:
         conn.executemany(
-            "INSERT INTO dictionary_entries (word, translation, created_at) VALUES (?, ?, ?)",
+            "INSERT INTO dictionary_entries "
+            "(word, translation, created_at) VALUES (?, ?, ?)",
             [
                 ("hammer", "martillo", "2020-01-01"),
                 ("truck", "camión", "2020-01-01"),
@@ -77,7 +78,8 @@ def test_reverse_quiz_uses_english_lemmas_and_skips_the_lesson(monkeypatch, tmp_
     user_id = _setup(monkeypatch, tmp_path)
     with closing(db._conn()) as conn, conn:
         conn.executemany(
-            "INSERT INTO dictionary_entries (word, translation, created_at) VALUES (?, ?, ?)",
+            "INSERT INTO dictionary_entries "
+            "(word, translation, created_at) VALUES (?, ?, ?)",
             [
                 ("hammer", "martillo", "2020-01-01"),
                 ("truck", "camión", "2020-01-01"),

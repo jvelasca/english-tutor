@@ -10,9 +10,9 @@ También fija el candado: sin PIN de administración no se cura nada.
 
 from __future__ import annotations
 
-import config
 from fastapi.testclient import TestClient
 
+import config
 from main import app
 from repositories import db
 from repositories import dictionary as dictionary_repo

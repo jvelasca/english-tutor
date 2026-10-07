@@ -1100,7 +1100,9 @@ async def study_hint(body: StudyHintIn, user: dict = Depends(current_user)) -> d
             body.word, body.translation, direction=body.direction
         )
     except study_hint_service.HintUnavailable as exc:
-        raise HTTPException(status_code=503, detail="No se pudo crear la pista") from exc
+        raise HTTPException(
+            status_code=503, detail="No se pudo crear la pista"
+        ) from exc
     if hint is None:
         raise HTTPException(status_code=400, detail="Palabra no válida")
     await _store_study_hint(user["id"], body, hint)

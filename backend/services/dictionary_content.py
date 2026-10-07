@@ -34,6 +34,7 @@ import re
 from schemas.chat import ChatMessage
 from services import llm, semantics, translate
 from services import situation as situation_service
+
 # V3.95.0: el guardarraíl de retrotraducción reutiliza el comparador del matcher
 # inverso (`_gloss_segments`, `_segment_score`, `normalize_term`) en vez de
 # escribir una segunda semántica de coincidencia. `dictionary_reverse` no

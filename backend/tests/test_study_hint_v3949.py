@@ -51,7 +51,8 @@ def test_hint_endpoint_saves_the_lexicon_reminder(monkeypatch, tmp_path):
     user_id = _setup(monkeypatch, tmp_path)
     with closing(db._conn()) as conn, conn:
         conn.execute(
-            "INSERT INTO vocabulary (user_id, word, production_count, first_seen, last_seen) "
+            "INSERT INTO vocabulary "
+            "(user_id, word, production_count, first_seen, last_seen) "
             "VALUES (?, 'hammer', 0, '2020-01-01', '2020-01-01')",
             (user_id,),
         )
@@ -65,7 +66,12 @@ def test_hint_endpoint_saves_the_lexicon_reminder(monkeypatch, tmp_path):
     response = client.post(
         "/api/vocabulary/study/hint",
         params={"user_id": user_id},
-        json={"word": "hammer", "translation": "martillo", "card_type": "lexicon", "card_id": "hammer"},
+        json={
+            "word": "hammer",
+            "translation": "martillo",
+            "card_type": "lexicon",
+            "card_id": "hammer",
+        },
     )
     assert response.status_code == 200, response.text
     assert response.json()["hint"] == "sirve para clavar sin decir el nombre"
