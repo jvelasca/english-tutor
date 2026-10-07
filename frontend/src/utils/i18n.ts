@@ -22,34 +22,18 @@ const STRINGS: Record<string, Entry> = {
   // V3.39 (Fase 2): el Traductor es otro destino AUXILIAR del mismo bloque.
   "nav.translator": { en: "Translator", es: "Traductor" },
 
-  // Destrezas y subdestrezas de la ruta del día, en el idioma de la interfaz.
-  // El contenido de la práctica (frases, can-do) no se traduce aquí.
-  "skill.listening": { en: "Listening", es: "Comprensión oral" },
-  "skill.speaking": { en: "Speaking", es: "Expresión oral" },
-  "skill.reading": { en: "Reading", es: "Lectura" },
-  "skill.writing": { en: "Writing", es: "Escritura" },
-  "skill.grammar": { en: "Grammar", es: "Gramática" },
-  "skill.pronunciation": { en: "Pronunciation", es: "Pronunciación" },
-  "skill.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
-  "skill.conversation": { en: "Conversation", es: "Conversación" },
-  "subskill.gist": { en: "Main idea", es: "Idea principal" },
-  "subskill.detail": { en: "Detail", es: "Detalle" },
-  "subskill.inference": { en: "Inference", es: "Inferencia" },
-  "subskill.attitude": { en: "Attitude", es: "Actitud" },
-  "subskill.word_recognition": { en: "Word recognition", es: "Reconocer palabras" },
-  "subskill.sound_recognition": { en: "Sound recognition", es: "Reconocer sonidos" },
-  "subskill.phrase_recognition": { en: "Phrase recognition", es: "Reconocer frases" },
-  "subskill.vocabulary": { en: "Vocabulary", es: "Vocabulario" },
-  "subskill.numbers": { en: "Numbers", es: "Números" },
-  "subskill.speaker_intention": { en: "Intention", es: "Intención" },
-  "subskill.fast_speech": { en: "Fast speech", es: "Habla rápida" },
-  "subskill.connected_speech": { en: "Connected speech", es: "Habla encadenada" },
-  "subskill.dictation": { en: "Dictation", es: "Dictado" },
-  "subskill.shadowing": { en: "Shadowing", es: "Sombra" },
-  "subskill.multiple_speakers": { en: "Multiple speakers", es: "Varias voces" },
-  "subskill.note_taking": { en: "Note taking", es: "Tomar notas" },
-  "subskill.prediction": { en: "Prediction", es: "Predicción" },
-  "subskill.sequencing": { en: "Sequencing", es: "Ordenar" },
+  // Destrezas. Nombres de destreza/actividad en inglés también para la UI en
+  // español (decisión V3.6.1): "Grammar/Pronunciation/Vocabulary/…" mantienen
+  // su nombre en inglés como es habitual en apps de idiomas; el resto de la
+  // interfaz sí se traduce al español.
+  "skill.listening": { en: "Listening", es: "Listening" },
+  "skill.speaking": { en: "Speaking", es: "Speaking" },
+  "skill.reading": { en: "Reading", es: "Reading" },
+  "skill.writing": { en: "Writing", es: "Writing" },
+  "skill.grammar": { en: "Grammar", es: "Grammar" },
+  "skill.pronunciation": { en: "Pronunciation", es: "Pronunciation" },
+  "skill.vocabulary": { en: "Vocabulary", es: "Vocabulary" },
+  "skill.conversation": { en: "Conversation", es: "Conversation" },
 
   // Aprender (hub de práctica libre, V3.1)
   "learn.title": { en: "Learn", es: "Aprender" },
@@ -157,11 +141,6 @@ const STRINGS: Record<string, Entry> = {
   "home.nextFocus": { en: "Next focus", es: "Siguiente foco" },
   "home.practiceNow": { en: "Practice now", es: "Practicar ahora" },
   "home.streak": { en: "day streak", es: "días de racha" },
-  "home.streakOne": { en: "day streak", es: "día de racha" },
-  "home.today": { en: "Today", es: "Hoy" },
-  "home.week": { en: "Week", es: "Semanal" },
-  "home.total": { en: "Total", es: "Total" },
-  "home.review": { en: "Review", es: "Repaso" },
   "home.min": { en: "min", es: "min" },
   "home.allDone": {
     en: "All done for today. Great work!",
@@ -173,7 +152,16 @@ const STRINGS: Record<string, Entry> = {
   },
   "home.retry": { en: "Try again", es: "Reintentar" },
   // V3.72 (F3): ancla textual «estás aquí» + posición en la ruta (nivel meta).
+  "home.youAreHere": { en: "You are here", es: "Estás aquí" },
   "home.yourTarget": { en: "Goal: {level}", es: "Meta: {level}" },
+  "home.todayGoal": {
+    en: "Your goal today",
+    es: "Tu objetivo de hoy",
+  },
+  "home.recommended": {
+    en: "Recommended for you",
+    es: "Recomendado para ti",
+  },
   "home.seeProgress": {
     en: "See my progress",
     es: "Ver mi progreso",
@@ -1388,14 +1376,6 @@ const STRINGS: Record<string, Entry> = {
     en: "Pick the meaning you want to study.",
     es: "Elige el significado que quieres estudiar.",
   },
-  "dictionary.lookup.addMeaningChoice": {
-    en: "Choose which meaning is added to Flashcards.",
-    es: "Elige qué significado se añade a Flashcards.",
-  },
-  "dictionary.lookup.addCardPreview": {
-    en: "Card: {front} → {back}",
-    es: "Tarjeta: {front} → {back}",
-  },
   // V3.88.0: las acepciones que no caben en los principales se pliegan tras el
   // «...». Se dice cuántas quedan para que el plegado no parezca una pérdida.
   "dictionary.lookup.moreMeanings": {
@@ -1668,6 +1648,52 @@ const STRINGS: Record<string, Entry> = {
     en: "Dictionary views",
     es: "Vistas del diccionario",
   },
+  "dictionary.lookup.addMeaningChoice": {
+    en: "Choose which meaning is added to Flashcards.",
+    es: "Elige qué significado se añade a Flashcards.",
+  },
+  "dictionary.lookup.addCardPreview": {
+    en: "Card: {front} → {back}",
+    es: "Tarjeta: {front} → {back}",
+  },
+  // V3.95.0: curación manual del diccionario por el webmaster.
+  "dictionary.admin.curateAria": {
+    en: "Open the webmaster correction panel",
+    es: "Abrir el panel de corrección del webmaster",
+  },
+  "dictionary.admin.curateCta": { en: "Fix entry", es: "Corregir ficha" },
+  "dictionary.admin.curateTitle": {
+    en: "Webmaster correction",
+    es: "Corrección del webmaster",
+  },
+  "dictionary.admin.curateHint": {
+    en: "Saves the right answer for this term. It overrides the glossary, the packs and the model cache for every user.",
+    es: "Guarda la respuesta correcta de este término. Manda sobre el glosario, los packs y la caché del modelo para todos los usuarios.",
+  },
+  "dictionary.admin.curateTranslation": {
+    en: "Equivalent",
+    es: "Equivalente",
+  },
+  "dictionary.admin.curateDefinition": {
+    en: "Definition (optional)",
+    es: "Definición (opcional)",
+  },
+  "dictionary.admin.curateNote": {
+    en: "Note (internal, optional)",
+    es: "Nota (interna, opcional)",
+  },
+  "dictionary.admin.curatePin": { en: "Admin PIN", es: "PIN de admin" },
+  "dictionary.admin.curateSave": { en: "Save correction", es: "Guardar corrección" },
+  "dictionary.admin.curateDelete": { en: "Remove correction", es: "Quitar corrección" },
+  "dictionary.admin.curateSaved": { en: "Correction saved", es: "Corrección guardada" },
+  "dictionary.admin.curateRemoved": {
+    en: "Correction removed",
+    es: "Corrección retirada",
+  },
+  "dictionary.admin.curateError": {
+    en: "The correction could not be saved.",
+    es: "No se pudo guardar la corrección.",
+  },
   "dictionary.lookup.title": {
     en: "Dictionary lookup",
     es: "Consulta de diccionario",
@@ -1709,45 +1735,6 @@ const STRINGS: Record<string, Entry> = {
   "dictionary.lookup.alternativesLabel": {
     en: "Other translations",
     es: "Otras traducciones",
-  },
-  // V3.95.0: curación manual del diccionario por el webmaster. La corrección manda
-  // sobre el glosario, los packs y la caché del modelo.
-  "dictionary.admin.curateCta": { en: "Fix entry", es: "Corregir ficha" },
-  "dictionary.admin.curateTitle": {
-    en: "Webmaster correction",
-    es: "Corrección del webmaster",
-  },
-  "dictionary.admin.curateHint": {
-    en: "Saves the right answer for this term. It overrides the glossary, the packs and the model cache for every user.",
-    es: "Guarda la respuesta correcta de este término. Manda sobre el glosario, los packs y la caché del modelo para todos los usuarios.",
-  },
-  "dictionary.admin.curateTranslation": {
-    en: "Equivalent",
-    es: "Equivalente",
-  },
-  "dictionary.admin.curateDefinition": {
-    en: "Definition (optional)",
-    es: "Definición (opcional)",
-  },
-  "dictionary.admin.curateNote": {
-    en: "Note (internal, optional)",
-    es: "Nota (interna, opcional)",
-  },
-  "dictionary.admin.curateSave": { en: "Save correction", es: "Guardar corrección" },
-  "dictionary.admin.curateDelete": { en: "Remove correction", es: "Quitar corrección" },
-  "dictionary.admin.curateSaved": { en: "Correction saved", es: "Corrección guardada" },
-  "dictionary.admin.curateRemoved": {
-    en: "Correction removed",
-    es: "Corrección retirada",
-  },
-  "dictionary.admin.curateError": {
-    en: "The correction could not be saved.",
-    es: "No se pudo guardar la corrección.",
-  },
-  "dictionary.admin.curatePin": { en: "Admin PIN", es: "PIN de admin" },
-  "dictionary.admin.curateAria": {
-    en: "Open the webmaster correction panel",
-    es: "Abrir el panel de corrección del webmaster",
   },
   "dictionary.lookup.button": { en: "Look up", es: "Buscar" },
   "dictionary.lookup.searchAria": {
@@ -2513,8 +2500,6 @@ const STRINGS: Record<string, Entry> = {
     es: "Con tu email y tu contraseña. Nadie puede entrar como tú.",
   },
   "password.label": { en: "Password", es: "Contraseña" },
-  "password.show": { en: "Show", es: "Ver" },
-  "password.hide": { en: "Hide", es: "Ocultar" },
   "password.submit": { en: "Sign in", es: "Entrar" },
   "password.invalid": {
     en: "That email or password is not right.",
@@ -2978,12 +2963,43 @@ const STRINGS: Record<string, Entry> = {
   "today.minPerDay": { en: "Min/day", es: "Min/día" },
   "today.daysPerWeek": { en: "Days/week", es: "Días/semana" },
   "today.saved": { en: "Saved", es: "Guardado" },
+  "today.nextMilestone": { en: "next milestone", es: "próximo hito" },
+  "today.readyFor": { en: "Readiness for", es: "Preparación para" },
+  "today.blocking": { en: "Blocking skill:", es: "Destreza bloqueante:" },
   // F-C3 (V3.26): motivo de bloqueo de readiness por destreza (`blocked_by`).
+  "today.blockReason.score": {
+    en: "score below the band",
+    es: "puntuación por debajo de la banda",
+  },
+  "today.blockReason.confidence": {
+    en: "low confidence",
+    es: "confianza baja",
+  },
+  "today.blockReason.evidence": {
+    en: "not enough evidence",
+    es: "evidencia insuficiente",
+  },
+  "today.blockReason.transfer": {
+    en: "needs transfer tasks",
+    es: "faltan tareas de transferencia",
+  },
+  "today.blockReason.novel": {
+    en: "needs novel production",
+    es: "falta producción novel",
+  },
+  "today.blockReason.other": { en: "gate not met", es: "gate sin cumplir" },
+  "today.review": { en: "review", es: "repasa" },
+  "today.practice": { en: "practice", es: "practica" },
+  "today.readyToReassess": {
+    en: "Ready to reassess",
+    es: "Listo para reevaluar",
+  },
   "today.startSession": { en: "Start today's session", es: "Empezar la sesión de hoy" },
   "today.noModel": {
     en: "No learning model yet. Practice and your daily plan will appear here.",
     es: "Aún no hay modelo de aprendizaje. Practica y aquí verás tu plan de hoy.",
   },
+  "today.subskill": { en: "Sub-skill:", es: "Sub-destreza:" },
   "today.goalType.general": { en: "General conversation", es: "Conversación general" },
   "today.goalType.travel": { en: "Travel", es: "Viajar" },
   "today.goalType.work": { en: "Work", es: "Trabajo" },
@@ -2998,14 +3014,28 @@ const STRINGS: Record<string, Entry> = {
   "today.planMode.units": { en: "By units", es: "Por unidades" },
   "today.planMode.mixed": { en: "Time and units", es: "Tiempo y unidades" },
   "today.targetUnits": { en: "Units", es: "Unidades" },
+  "today.unitsShort": { en: "units", es: "unidades" },
   "today.maxNew": { en: "New items max", es: "Máximo de nuevas" },
   "today.includeListening": { en: "Include Listening", es: "Incluir Listening" },
   "today.includeSpeaking": { en: "Include Speaking", es: "Incluir Speaking" },
   "today.goalProgress": { en: "Today's goal", es: "Objetivo de hoy" },
-  "today.weekProgress": { en: "This week's goal", es: "Objetivo de la semana" },
-  "today.totalProgress": {
-    en: "Progress toward the goal",
-    es: "Progreso hasta la meta",
+  "today.progressUnits": { en: "Units done", es: "Unidades hechas" },
+  "today.progressMinutes": { en: "Minutes done", es: "Minutos hechos" },
+  "today.estimated": { en: "engine estimate", es: "estimación del motor" },
+  "today.pendingReviews": { en: "Pending reviews", es: "Repasos pendientes" },
+  "today.pendingBreakdown": {
+    en: "{fsrs} FSRS, {listening} Listening",
+    es: "{fsrs} FSRS, {listening} Listening",
+  },
+  "today.todayAccuracy": { en: "Today's accuracy", es: "Acierto de hoy" },
+  "today.noData": { en: "No data yet", es: "Sin datos aún" },
+  "today.difficultyEvidence": {
+    en: "Words that got harder: {words}",
+    es: "Palabras que se han complicado: {words}",
+  },
+  "today.difficultyEvidenceNote": {
+    en: "({count} listening misses; it's evidence, not a review)",
+    es: "({count} fallos de escucha; es evidencia, no un repaso)",
   },
   "today.goalMet": {
     en: "Today's goal is met",
@@ -4329,6 +4359,10 @@ const STRINGS: Record<string, Entry> = {
   "today.kind.easy_wins": { en: "Boost", es: "Refuerzo" },
   "today.kindPhrase.review": { en: "Review", es: "Repasar" },
   "today.kindPhrase.easy_wins": { en: "Boost", es: "Refuerzo" },
+  "today.stability": {
+    en: "stability {pct}%",
+    es: "estabilidad {pct}%",
+  },
 
   // Writing: foco y botón del panel, marcador del recorrido.
   "writing.nextFocus": { en: "NEXT FOCUS", es: "PRÓXIMO FOCO" },

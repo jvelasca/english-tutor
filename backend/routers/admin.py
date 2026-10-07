@@ -28,7 +28,6 @@ from domain.vocabulary import _normalize_lookup_spanish, _normalize_lookup_word
 from repositories import dictionary as dictionary_repo
 from repositories import profile_requests as requests_repo
 from schemas.profiles import (
-    AdminAccessLink,
     AdminActivationOut,
     AdminApprovalOut,
     AdminCredentials,
@@ -425,28 +424,6 @@ async def test_smtp(
     alguien espera una verificación que nunca llega.
     """
     sent = mailer.send(kind=mailer.KIND_TEST, to=body.to)
-    return {
-        "sent": sent,
-        "error": "" if sent else "SMTP_NOT_CONFIGURED_OR_SEND_FAILED",
-    }
-
-
-@router.post("/api/admin/access-link")
-async def send_access_link(
-    body: AdminAccessLink, _: None = Depends(require_admin_local)
-) -> dict:
-    """Manda la dirección del móvil. Solo un HTTPS de la red Tailscale."""
-    if not config.is_mesh_access_url(body.url):
-        raise HTTPException(
-            status_code=422,
-            detail="La dirección no es de la red Tailscale.",
-        )
-    sent = mailer.send(
-        kind=mailer.KIND_ACCESS,
-        to=body.to,
-        link=body.url,
-        published=body.published,
-    )
     return {
         "sent": sent,
         "error": "" if sent else "SMTP_NOT_CONFIGURED_OR_SEND_FAILED",
